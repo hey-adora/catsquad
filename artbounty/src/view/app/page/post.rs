@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use crate::api::shared::post_comment::UserPostComment;
-use crate::api::{Api, ApiWeb, Server404Err, ServerErr};
+use crate::api::{Api, ApiWeb, ApiWebTmp, Server404Err, ServerErr};
 use crate::path::{PATH_LOGIN, link_home, link_img, link_user};
 use crate::valid::MAX_POST_DESCRIPTION_LENGTH;
 use crate::valid::MAX_POST_TAGS_LENGTH;
@@ -346,23 +346,18 @@ pub fn Page() -> impl IntoView {
         // imgs.push((String::new(), 0.0);
 
         let mut views = imgs
-                .into_iter()
-                .enumerate()
-                .map(|(i, (url, ratio))| {
-                    let id = format!("#id{i}");
-                    let id2 = id.clone();
-
-                    view! { <a
-                        href=id2
-                        class=move ||  {
-                            let hash = location.hash.get();
-                            trace!("hash: {hash}");
-                            format!("h-[5rem] w-[5rem] bg-base05 bg-cover bg-center {}", if id == hash || (hash.is_empty() && i == 0) {"border-2 border-base08"} else {""})
-                        }
-                        style:background-image=move || format!("url(\"{url}\")") ></a> }
-                }.into_any()
-                )
-                .collect_view();
+            .into_iter()
+            .enumerate()
+            .map(|(i, (url, ratio))| {
+                view! {
+                    <PreviewImg
+                        index=move|| i
+                        link=move|| url.clone()
+                    />
+                }
+                .into_any()
+            })
+            .collect_view();
 
         let preview_add = {
             // let i = views.len();
@@ -710,6 +705,92 @@ pub fn Page() -> impl IntoView {
 
             // TODO probably change 1fr to fixed size or auto or minmax bs
         </main>
+    }
+}
+
+pub async fn delete_post_img(index: usize) -> Option<()> {
+    // self.err_tags.update(|v| v.clear());
+
+    // let api = ApiWebTmp::new()
+
+    // let result =
+    //     api
+    //     .delete_post_like(post_key, tags)
+    //     .send_native()
+    //     .await;
+
+    // match result {
+    //     Ok(crate::api::ServerRes::Post(v)) => {
+    //         self.live_tags_length.set(v.tags.len());
+    //         self.tags.set(v.tags);
+    //         self.update_tags_mode.set(false);
+    //         return Some(());
+    //     }
+    //     Ok(res) => {
+    //         let err = format!("wrong res, expected Post, got {:?}", res);
+    //         error!(err);
+    //         self.err_tags.set(err);
+    //     }
+    //     Err(ServerErr::NotFoundErr(Server404Err::NotFound)) => {
+    //         self.post_state.set(PostState::NotFound);
+    //         self.err_general.set("post not found".to_string());
+    //     }
+    //     Err(err) => {
+    //         let err = format!("unexpected err {:#?}", { err });
+    //         error!(err);
+    //         self.err_tags.set(err);
+    //     }
+    // }
+
+    None
+}
+
+#[component]
+pub fn PreviewImg(
+    #[prop(optional, into)] index: Option<Callback<(), usize>>,
+    #[prop(optional, into)] link: Option<Callback<(), String>>,
+    // #[prop(optional, into)] hash: Option<Callback<(), String>>,
+) -> impl IntoView {
+    let location = use_location();
+
+    let index_fn = move || index.map(|v| v.run(())).unwrap_or_default();
+    let link_fn = move || link.map(|v| v.run(())).unwrap_or_default();
+    let id_fn = move || format!("#id{}", index_fn());
+    let is_selected = move || {
+        let hash = location.hash.get();
+        let index = index_fn();
+        let id = id_fn();
+        id == hash || (hash.is_empty() && index == 0)
+    };
+
+    view! {
+        <a
+            href=id_fn
+            class=move || format!("h-[5rem] w-[5rem] bg-base02 bg-cover bg-center rounded-xl {}", if is_selected() {"border-3 border-base05"} else {""})
+            style:background-image=move || format!("url(\"{}\")", link_fn())
+        >
+        </a>
+    }
+}
+
+#[component]
+pub fn PreviewAdd(
+    #[prop(optional, into)] class: Option<Callback<(), String>>,
+    #[prop(optional, into)] hash: Option<Callback<(), String>>,
+    #[prop(optional, into)] on_click: Option<Callback<MouseEvent>>,
+) -> impl IntoView {
+    let location = use_location();
+
+    view! { <button
+            id="previw_add"
+            // href=id2
+            class=move ||  {
+                let hash = location.hash.get();
+                trace!("hash: {hash}");
+                format!("text-[2rem] grid place-items-center h-[5rem] w-[5rem] rounded-xl bg-base05/10 bg-cover bg-center border-2 border-base05")
+            }
+            // style:background-image=move || format!("url(\"{url}\")")
+            >"+"</button>
     }
 }
 

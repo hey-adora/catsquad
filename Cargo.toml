@@ -1,11 +1,38 @@
+
 [workspace]
 resolver = "2"
-members = ["artbounty", "artbounty-seed"]
+members = ["artbounty", "artbounty-seed", "catsquad-api", "catsquad-client", "catsquad-db", "catsquad-log", "catsquad-web"]
+default-members = ["catsquad-api"]
 
 [workspace.dependencies]
-# chromiumoxide = "0.9.1"
-leptos = { version = "0.8.17", features = ["nightly"] }
+# api
+axum = { version = "0.8.8", features = ["http1", "multipart", "form"] }
+tokio = { version = "1.46.1", features = ["macros", "rt-multi-thread"] }
+tower = { version = "0.5.2" } # TODO make util testing only
+#log
+tracing = "0.1.41"
+tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
+wasm-bindgen = { version = "0.2.122" }
+#db
+surrealdb = { git = "https://github.com/hey-adora/surrealdb", features = [
+    "kv-surrealkv",
+    "kv-mem",
+] }
+# web
+leptos = { version = "0.8.17", features = ["csr"] }
 leptos_router = { version = "0.8.12" }
+console_error_panic_hook = "0.1.7" # dyn
+
+catsquad-log = { path = "catsquad-log" }
+catsquad-db = { path = "catsquad-db" }
+
+serde_json = { version = "1.0.149" }
+tokio-util = "0.7.18"
+thiserror = { version = "2.0.12" }
+serde = { version = "1.0.219", features = ["serde_derive"] }
+rand = "0.9.1"
+
+# chromiumoxide = "0.9.1"
 leptos_axum = { version = "0.8.8" }
 leptos_meta = { version = "0.8.6" }
 hydration_context = { version = "0.3.0" }
@@ -20,31 +47,16 @@ cfg-if = "1"
 gxhash = { version = "3.5.0", features = ["deterministic"] }
 argon2 = "0.5.3"
 reqwest = { version = "0.13.2", features = ["zstd", "multipart", "stream", "blocking"] }
-rand = "0.9.1"
-serde = { version = "1.0.219", features = ["serde_derive"] }
-serde_json = { version = "1.0.149" }
 axum-server = { version = "0.8.0", features = ["tls-rustls"] }
-axum = { version = "0.8.8", features = ["http2"] }
-axum-test = { version = "19.0.0", features = ["reqwest"] }
-tokio = { version = "1.46.1", features = ["full"] }
-tokio-util = "0.7.18"
-tower = { version = "0.5.2", features = ["timeout"] }
+axum-test = { version = "19.0.0", features = ["reqwest", "typed-routing"] }
 http = "1.3.1"
 tower-http = { version = "0.6.4", features = [
     "compression-full",
     "timeout",
     "cors",
 ] }
-surrealdb = { git = "https://github.com/hey-adora/surrealdb", features = [
-    "kv-surrealkv",
-    "kv-mem",
-] }
-console_error_panic_hook = "0.1.7" # dyn
 rkyv = { version = "0.8.10", features = ["unaligned"] }
 server_fn = { version = "0.8.2", features = [] }
-tracing = "0.1.41"
-tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
-wasm-bindgen = { version = "0.2.122" }
 wasm-bindgen-futures = { version = "0.4.50" }
 wasm-bindgen-test = "0.3.50"
 send_wrapper = { version = "0.6.0" }
@@ -52,7 +64,6 @@ futures = { version = "0.3.31" }
 futures-util = "0.3.32"
 async-stream = "0.3.6"
 bytes = "1.11.1"
-thiserror = { version = "2.0.12" }
 anyhow = { version = "1.0.98" }
 log = "0.4.27"
 # js-sys = "0.3.99"

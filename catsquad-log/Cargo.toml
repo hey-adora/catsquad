@@ -1,0 +1,12 @@
+[package]
+name = "catsquad-log"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+crate-type = ["rlib"]
+
+[dependencies]
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+wasm-bindgen = { workspace = true }

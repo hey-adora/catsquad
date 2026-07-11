@@ -13,6 +13,7 @@ use thiserror::Error;
 use tracing::{error, trace};
 
 use crate::db::post::create_post_id;
+use crate::path::to_thumbnail_file_name;
 use crate::valid::{MAX_STORAGE, MAX_STORAGE_PER_FILE};
 
 pub type DbEngine = Db<local::Db>;
@@ -259,7 +260,7 @@ pub fn to_post_file_path(hash: &str, extension: &str, directory_path: &str) -> s
 }
 
 pub fn to_post_thumbnail_path(hash: &str, directory_path: &str) -> std::path::PathBuf {
-    let thumnail_name = crate::api::backend::to_thumbnail_file_name(hash);
+    let thumnail_name = to_thumbnail_file_name(hash);
     let org_path = std::path::Path::new(directory_path);
     org_path.join(&thumnail_name)
 }

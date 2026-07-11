@@ -51,7 +51,7 @@ rustflags = [
 # [unstable]
 # codegen-backend = true
 
-[profile.wasm-debug]
+[profile.wasm_debug]
 inherits = "dev"
 incremental = true
 opt-level = 0
@@ -62,7 +62,7 @@ panic = "abort"
 debug = "none"
 strip = "none"
 
-[profile.wasm-debug.package."*"]
+[profile.wasm_debug.package."*"]
 opt-level = 0
 # codegen-backend = "llvm"
 

@@ -3,6 +3,7 @@
 // but client is on old version
 // wrong input
 
+use crate::path::to_thumbnail_file_name;
 use crate::valid::MAX_POST_COMMENT_LENGTH;
 use crate::valid::MAX_POST_DESCRIPTION_LENGTH;
 use crate::valid::MAX_POST_TAGS_LENGTH;
@@ -13,6 +14,8 @@ use leptos::prelude::*;
 use reqwest::RequestBuilder;
 use rkyv::result::ArchivedResult;
 use std::fmt::Display;
+use std::path::Path;
+use std::path::PathBuf;
 use std::str::FromStr;
 use thiserror::Error;
 use tracing::{debug, error, trace};
@@ -660,6 +663,9 @@ pub enum ServerErr {
     #[error("add post file err {0}")]
     AddPostFileErr(#[from] ServerAddPostFileErr),
 
+    #[error("Remove post file err {0}")]
+    RemovePostFileErr(#[from] ServerRemovePostFileErr),
+
     #[error("update post err {0}")]
     UpdatePostTagsErr(#[from] ServerUpdatePostTagsErr),
 
@@ -932,15 +938,32 @@ pub enum ServerTokenErr {
     rkyv::Serialize,
     rkyv::Deserialize,
 )]
+pub enum ServerRemovePostFileErr {
+    #[error("file hash param not found")]
+    FileHashParamNotFound,
+
+    #[error("post id param not found")]
+    PostIdParamNotFound,
+
+    #[error("post not found")]
+    PostNotFound,
+
+    #[error("file hash")]
+    FileHashNotFound,
+}
+
+#[derive(
+    Error,
+    Debug,
+    Clone,
+    PartialEq,
+    serde::Serialize,
+    serde::Deserialize,
+    rkyv::Archive,
+    rkyv::Serialize,
+    rkyv::Deserialize,
+)]
 pub enum ServerAddPostFileErr {
-    // #[error("max file size {max_bytes} bytes, upload stopped at {got_bytes} bytes")]
-    // FileTooBig { max_bytes: usize, got_bytes: usize },
-    //
-    // #[error("io err {0}")]
-    // IoErr(#[from] std::io::Error),
-    //
-    // #[error(transparent)]
-    // StreamErr(#[from] anyhow::Error),
     #[error("file already exists")]
     Duplicate,
 
@@ -966,10 +989,6 @@ pub enum ServerAddPostFileErr {
         got: usize,
     },
 
-    // #[error("max user storage reached {max} bytes, used: {used} bytes")]
-    // OutOfStorage { max: usize, used: usize },
-    // #[error(transparent)]
-    // StreamErr(#[from] anyhow::Error),
     #[error("post not found")]
     NotFound,
 
@@ -978,8 +997,6 @@ pub enum ServerAddPostFileErr {
 
     #[error("file extension {0} is not supported")]
     UnsupportedExtension(String),
-    // #[error("post not found {0:#?}")]
-    // UnAuthorized(Vec<ServerErrImgMeta>),
 }
 
 #[derive(
@@ -1499,6 +1516,22 @@ pub struct UserPostFile {
     pub height: u32,
 }
 
+impl UserPostFile {
+    pub fn file_path(&self, root_path: impl AsRef<str>) -> PathBuf {
+        let file_path = Path::new(root_path.as_ref())
+            .join(&self.hash)
+            .with_extension(&self.extension);
+        file_path
+    }
+
+    pub fn thumbnail_path(&self, root_path: impl AsRef<str>) -> PathBuf {
+        let thumnail_name = to_thumbnail_file_name(&self.hash);
+        let file_path = Path::new(root_path.as_ref()).join(&thumnail_name);
+        // .with_extension(&self.extension);
+        file_path
+    }
+}
+
 #[cfg(feature = "ssr")]
 impl From<crate::db::DBUserPostFile> for UserPostFile {
     fn from(value: crate::db::DBUserPostFile) -> Self {
@@ -1748,7 +1781,7 @@ pub fn hash_password<S: Into<String>>(password: S) -> Result<String, argon2::pas
 }
 
 pub trait Api {
-    fn provide_builder(&self, path: impl AsRef<str>) -> RequestBuilder;
+    fn provide_builder(&self, path: impl AsRef<str>) -> ReqBuilder;
     fn provide_signal_result(&self) -> Option<RwSignal<Option<Result<ServerRes, ServerErr>>>> {
         None
     }
@@ -2146,6 +2179,12 @@ pub trait Api {
         )
     }
 
+    fn remove_post_file(&self, post_key: impl AsRef<str>, file_hash: impl AsRef<str>) -> ApiReq {
+        let url = crate::path::link_api_post_remove_file(post_key, file_hash);
+        trace!("api sending req to {url}");
+        self.into_req(&url, ServerReq::None)
+    }
+
     fn add_post(
         &self,
         title: impl Into<String>,
@@ -2277,8 +2316,13 @@ pub trait Api {
     }
 }
 
+pub enum ReqBuilder {
+    Reqwest(RequestBuilder),
+    Axum(http::request::Builder),
+}
+
 pub struct ApiReq {
-    pub builder: RequestBuilder,
+    pub builder: ReqBuilder,
     pub server_req: ServerReq,
     pub result: Option<RwSignal<Option<Result<ServerRes, ServerErr>>>>,
     pub busy: Option<RwSignal<bool>>,
@@ -2317,7 +2361,16 @@ impl ApiReq {
             signal_busy.set(true);
         }
         spawn_local(async move {
-            let (_, result) = send(builder, req, None::<&str>).await;
+            let result = match builder {
+                ReqBuilder::Reqwest(builder) => {
+                    let (_, result) = send_reqwest(builder, req, None::<&str>).await;
+                    result
+                }
+                ReqBuilder::Axum(_) => {
+                    //
+                    unreachable!();
+                }
+            };
             fut(result.clone()).await;
             if let Some(signal_result) = signal_result {
                 signal_result.set(Some(result));
@@ -2331,7 +2384,16 @@ impl ApiReq {
     pub async fn send_native(self) -> Result<ServerRes, ServerErr> {
         let req = self.server_req;
         let builder = self.builder;
-        let (_, result) = send(builder, req, None::<&str>).await;
+        let result = match builder {
+            ReqBuilder::Reqwest(builder) => {
+                let (_, result) = send_reqwest(builder, req, None::<&str>).await;
+                result
+            }
+            ReqBuilder::Axum(_) => {
+                //
+                unreachable!();
+            }
+        };
         result
     }
 
@@ -2341,7 +2403,16 @@ impl ApiReq {
     ) -> Result<ServerRes, ServerErr> {
         let req = self.server_req;
         let builder = self.builder;
-        let (_, result) = send(builder, req, Some(auth_token)).await;
+        let result = match builder {
+            ReqBuilder::Reqwest(builder) => {
+                let (_, result) = send_reqwest(builder, req, Some(auth_token)).await;
+                result
+            }
+            ReqBuilder::Axum(_) => {
+                //
+                unreachable!();
+            }
+        };
         result
     }
 
@@ -2355,7 +2426,17 @@ impl ApiReq {
         let secret = secret.into();
         let req = self.server_req;
         let builder = self.builder;
-        let (mut headers, result) = send(builder, req, None::<&str>).await;
+        let (mut headers, result) = match builder {
+            ReqBuilder::Reqwest(builder) => {
+                let (mut headers, result) = send_reqwest(builder, req, None::<&str>).await;
+                (headers, result)
+            }
+            ReqBuilder::Axum(_) => {
+                //
+                unreachable!()
+            }
+        };
+
         let token = auth_token_get(&mut headers, SET_COOKIE);
         let decoded_token = token.clone();
         (token, decoded_token, result)
@@ -2364,7 +2445,8 @@ impl ApiReq {
 
 #[cfg(test)]
 pub struct ApiTest {
-    pub server: axum_test::TestServer,
+    // pub server: axum_test::TestServer,
+    pub router: axum::Router,
 
     // this was added as optional to not break existing tests
     pub auth_token_overwrite: String,
@@ -2372,9 +2454,9 @@ pub struct ApiTest {
 
 #[cfg(test)]
 impl ApiTest {
-    pub fn new(server: axum_test::TestServer) -> Self {
+    pub fn new(router: axum::Router) -> Self {
         Self {
-            server,
+            router,
             auth_token_overwrite: String::new(),
         }
     }
@@ -2386,30 +2468,39 @@ impl ApiTest {
 
 #[cfg(test)]
 impl Api for ApiTest {
-    fn provide_builder(&self, path: impl AsRef<str>) -> RequestBuilder {
-        let path = path.as_ref();
-        let url = format!("{}{path}", crate::path::PATH_API);
+    fn provide_builder(&self, path: impl AsRef<str>) -> ReqBuilder {
+        // let url = link_api_post_remove_file(post_key, file_hash)
+        // let r= self.router.oneshot();
         // self.server.reqwest_post(&url)
-        let mut req = self.server.reqwest_post(&url);
-        if !self.auth_token_overwrite.is_empty() {
-            req = req.header(http::header::COOKIE, self.auth_token_overwrite.clone());
-        }
+        use tower::{Service, ServiceExt};
 
-        req
+        let builder = axum::http::Request::post(path.as_ref());
+        // let path = path.as_ref();
+        // let url = format!("{}{path}", crate::path::PATH_API);
+
+        // let mut req = self.server.reqwest_post(&url);
+        // if !self.auth_token_overwrite.is_empty() {
+        //     req = req.header(http::header::COOKIE, self.auth_token_overwrite.clone());
+        // }
+
+        ReqBuilder::Axum(builder)
     }
 }
 
 #[cfg(test)]
 impl Api for &ApiTest {
-    fn provide_builder(&self, path: impl AsRef<str>) -> RequestBuilder {
-        let path = path.as_ref();
-        let url = format!("{}{path}", crate::path::PATH_API);
-        let mut req = self.server.reqwest_post(&url);
-        if !self.auth_token_overwrite.is_empty() {
-            req = req.header(http::header::COOKIE, self.auth_token_overwrite.clone());
-        }
+    fn provide_builder(&self, path: impl AsRef<str>) -> ReqBuilder {
+        use tower::{Service, ServiceExt};
 
-        req
+        let builder = axum::http::Request::post(path.as_ref());
+        // let path = path.as_ref();
+        // let url = format!("{}{path}", crate::path::PATH_API);
+        // let mut req = self.server.reqwest_post(&url);
+        // if !self.auth_token_overwrite.is_empty() {
+        //     req = req.header(http::header::COOKIE, self.auth_token_overwrite.clone());
+        // }
+
+        ReqBuilder::Axum(builder)
     }
 }
 
@@ -2417,11 +2508,11 @@ impl Api for &ApiTest {
 pub struct ApiWebTmp {}
 
 impl Api for ApiWebTmp {
-    fn provide_builder(&self, path: impl AsRef<str>) -> RequestBuilder {
+    fn provide_builder(&self, path: impl AsRef<str>) -> ReqBuilder {
         let origin = location().origin().unwrap();
         let path = path.as_ref();
         let url = format!("{origin}{}{path}", crate::path::PATH_API);
-        reqwest::Client::new().post(url)
+        ReqBuilder::Reqwest(reqwest::Client::new().post(url))
     }
 }
 
@@ -2437,11 +2528,11 @@ pub struct ApiNative {
 }
 
 impl Api for ApiNative {
-    fn provide_builder(&self, path: impl AsRef<str>) -> RequestBuilder {
+    fn provide_builder(&self, path: impl AsRef<str>) -> ReqBuilder {
         let origin = &self.origin;
         let path = path.as_ref();
         let url = format!("{origin}{}{path}", crate::path::PATH_API);
-        reqwest::Client::new().post(url)
+        ReqBuilder::Reqwest(reqwest::Client::new().post(url))
     }
 }
 
@@ -2475,11 +2566,11 @@ impl ApiWeb {
 }
 
 impl Api for ApiWeb {
-    fn provide_builder(&self, path: impl AsRef<str>) -> RequestBuilder {
+    fn provide_builder(&self, path: impl AsRef<str>) -> ReqBuilder {
         let origin = location().origin().unwrap();
         let path = path.as_ref();
         let url = format!("{origin}{}{path}", crate::path::PATH_API);
-        reqwest::Client::new().post(url)
+        ReqBuilder::Reqwest(reqwest::Client::new().post(url))
     }
 
     fn provide_signal_result(&self) -> Option<RwSignal<Option<Result<ServerRes, ServerErr>>>> {
@@ -2583,7 +2674,7 @@ impl axum::response::IntoResponse for ServerRes {
     }
 }
 
-pub async fn send(
+pub async fn send_reqwest(
     mut req_builder: RequestBuilder,
     req: ServerReq,
     token: Option<impl AsRef<str>>,
@@ -2664,8 +2755,8 @@ pub mod tests {
     use crate::api::{
         Api, ApiTest, EmailChangeErr, EmailChangeNewErr, EmailChangeStage, EmailChangeTokenErr,
         Order, PostLikeErr, Server404Err, ServerAddPostFileErr, ServerAuthErr, ServerErr,
-        ServerLoginErr, ServerRegistrationErr, ServerReqImg, ServerRes, ServerSendInviteErr,
-        ServerUpdatePostTitleErr, TimeRange, UserPost,
+        ServerLoginErr, ServerRegistrationErr, ServerRemovePostFileErr, ServerReqImg, ServerRes,
+        ServerSendInviteErr, ServerUpdatePostTitleErr, TimeRange, UserPost,
     };
     use crate::db::DB404Err;
     use crate::db::email_change::create_email_change_id;
@@ -2815,6 +2906,30 @@ pub mod tests {
             match result {
                 Ok(crate::api::ServerRes::Ok) => Some(()),
                 _ => None,
+            }
+        }
+
+        pub async fn remove_post_file(
+            &self,
+            time: u128,
+            auth_token: impl Into<String>,
+            post_key: impl AsRef<str>,
+            file_hash: impl AsRef<str>,
+        ) -> Result<UserPost, ServerRemovePostFileErr> {
+            self.set_time(time).await;
+            let auth_token = auth_token.into();
+
+            let result = self
+                .api
+                .remove_post_file(post_key, file_hash)
+                .send_native_with_token(auth_token.clone())
+                .await;
+            trace!("{result:#?}");
+
+            match result {
+                Ok(crate::api::ServerRes::Post(v)) => Ok(v),
+                Err(ServerErr::RemovePostFileErr(err)) => Err(err),
+                _ => unreachable!(),
             }
         }
 

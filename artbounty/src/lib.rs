@@ -300,6 +300,9 @@ pub mod valid {
 
 pub mod path {
 
+    use std::{ffi::OsStr, path::PathBuf};
+
+    use anyhow::anyhow;
     use leptos::prelude::*;
     use leptos_router::{OptionalParamSegment, ParamSegment, StaticSegment, WildcardSegment, path};
 
@@ -355,7 +358,11 @@ pub mod path {
     pub const PATH_API_POST_UPDATE_TITLE: &'static str = "/post/update_title";
     pub const PATH_API_POST_UPDATE_DESCRIPTION: &'static str = "/post/update_description";
     pub const PATH_API_POST_ADD: &'static str = "/post/add";
+    // TODO maybe it should be post_key
     pub const PATH_API_POST_FILE_ADD: &'static str = "/post/{post_id}/add_file";
+    // pub const PATH_API_POST_FILE_REMOVE: &'static str = "/post/post_id/file/file_hash/remove";
+    // pub const PATH_API_POST_FILE_REMOVE: &'static str = "/post/{psot_id}/file/{file_hash}/remove";
+    pub const PATH_API_POST_FILE_REMOVE: &'static str = "/post/{post_id}/file/{file_hash}/remove";
     pub const PATH_API_POST_GET: &'static str = "/post/get";
     pub const PATH_API_POSTS_GET: &'static str = "/post/search";
     pub const PATH_API_POST_GET_OLDER: &'static str = "/post/get_older";
@@ -374,6 +381,22 @@ pub mod path {
     pub const PATH_REGISTER: &'static str = "/register";
     pub const PATH_UPLOAD: &'static str = "/upload";
     pub const PATH_SETTINGS: &'static str = "/settings";
+
+    pub fn to_thumbnail_file_name(file_name: impl AsRef<str>) -> String {
+        format!("{}_thumbnail_default.webp", file_name.as_ref())
+    }
+
+    pub fn to_thumbnail_path(file_path: impl AsRef<OsStr>) -> Result<PathBuf, anyhow::Error> {
+        let output = std::path::Path::new(file_path.as_ref());
+        let output = output.with_extension("");
+        let file_name = output
+            .file_name()
+            .ok_or_else(|| anyhow!("invalid filename"))?
+            .to_str()
+            .ok_or_else(|| anyhow!("invalid filename"))?;
+        let file_name_new = to_thumbnail_file_name(file_name);
+        Ok(output.with_file_name(file_name_new).with_extension("webp"))
+    }
 
     pub fn link_post_with_history(
         user: impl AsRef<str>,
@@ -396,6 +419,17 @@ pub mod path {
         // http://localhost:3000/api/post/5idoghr47bvsajsi5izx/add_file
         format!("/api/post/{}/add_file", post_key.as_ref())
     }
+    pub fn link_api_post_remove_file(
+        post_key: impl AsRef<str>,
+        file_hash: impl AsRef<str>,
+    ) -> String {
+        format!(
+            "/api/post/{}/file/{}/remove",
+            post_key.as_ref(),
+            file_hash.as_ref()
+        )
+    }
+    // pub const PATH_API_POST_FILE_REMOVE: &'static str = "/post/{psot_id}/file/{file_hash}/remove";
     // pub fn link_absolute_api_post_add_file(host: impl AsRef<str>, post_key: impl AsRef<str>) -> String {
     //     // http://localhost:3000/api/post/5idoghr47bvsajsi5izx/add_file
     //     format!("{}/api/post/{}/add_file", host.as_ref(), post_key.as_ref())

@@ -1,0 +1,14 @@
+[package]
+name = "catsquad-db"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+crate-type = ["dylib"]
+
+[dependencies]
+catsquad-log = { workspace = true }
+surrealdb = { workspace = true }
+tokio = { workspace = true }
+thiserror = { workspace = true }
+serde = { workspace = true }

@@ -11,11 +11,11 @@ use crate::api::{
     AuthToken, ChangeUsernameErr, EmailChangeErr, EmailChangeNewErr, EmailChangeStage,
     EmailChangeTokenErr, Server404Err, ServerAddPostErr, ServerAddPostFileErr, ServerAuthErr,
     ServerDecodeInviteErr, ServerDesErr, ServerErr, ServerErrImg, ServerErrImgMeta, ServerLoginErr,
-    ServerRegistrationErr, ServerReq, ServerRes, ServerTokenErr, ServerUpdatePostDescriptionErr,
-    ServerUpdatePostTagsErr, ServerUpdatePostTitleErr, User, UserPost, UserPostFile,
-    auth_token_get, hash_password, verify_password,
+    ServerRegistrationErr, ServerRemovePostFileErr, ServerReq, ServerRes, ServerTokenErr,
+    ServerUpdatePostDescriptionErr, ServerUpdatePostTagsErr, ServerUpdatePostTitleErr, User,
+    UserPost, UserPostFile, auth_token_get, hash_password, verify_password,
 };
-use crate::db::{AddUserErr, DBPostAddFileErr, DBPostCommentErr, DBUser};
+use crate::db::{AddUserErr, DBPostAddFileErr, DBPostCommentErr, DBPostRemoveFileErr, DBUser};
 use crate::db::{DB404Err, DBUserPostFile};
 use crate::valid::SUPPORTED_FILE_EXTENSIONS;
 use crate::valid::auth::{
@@ -591,6 +591,50 @@ pub async fn get_img_resolution(img_path: impl AsRef<str>) -> anyhow::Result<(u3
 
     resolution_from_str(result)
 }
+// let post_key = params
+//     .into_iter()
+//     .find(|(name, _)| *name == "file_index")
+//     .map(|(_, value)| value)
+//     .and_then(|v| usize::from_str(v).ok())
+//     .ok_or(ServerErr::from(Err::FileIndexParamNotFound))?;
+
+pub async fn remove_post_file(
+    State(app): State<AppState>,
+    params: axum::extract::RawPathParams,
+    db_user: Extension<DBUser>,
+) -> Result<ServerRes, ServerErr> {
+    // ) -> impl IntoResponse {
+    // "kill me you fucks"
+    type Err = ServerRemovePostFileErr;
+
+    trace!("running remove_post_file");
+
+    let file_hash = params
+        .into_iter()
+        .find(|(name, _)| *name == "file_hash")
+        .map(|(_, value)| value)
+        .ok_or(ServerErr::from(Err::FileHashParamNotFound))?;
+
+    let post_key = params
+        .iter()
+        .find(|(name, _)| *name == "post_id")
+        .ok_or(ServerErr::from(Err::PostIdParamNotFound))
+        .map(|(_, value)| value)?;
+
+    let time = app.clock.now().await;
+
+    let post = app
+        .db
+        .remove_post_file(time, db_user.id.clone(), post_key, file_hash)
+        .await
+        .map_err(|err| match err {
+            DBPostRemoveFileErr::PostNotFound => ServerErr::from(Err::PostNotFound),
+            DBPostRemoveFileErr::HashNotFound => ServerErr::from(Err::FileHashParamNotFound),
+            DBPostRemoveFileErr::DB(_) => ServerErr::DbErr,
+        })?;
+
+    Ok(ServerRes::Post(post.into()))
+}
 
 pub async fn add_post_file(
     State(app): State<AppState>,
@@ -1096,6 +1140,7 @@ mod tests {
 
     use crate::api::app_state::AppState;
     use crate::api::backend::post::{SaveFileErr, handle_file_saving, resolution_from_str};
+    use crate::api::backend::proccess_post_files;
     use crate::api::shared::post_comment::UserPostComment;
     use crate::api::tests::ApiTestApp;
     use crate::api::{
@@ -1108,6 +1153,7 @@ mod tests {
     use crate::db::post_comment::DBPostComment;
     use crate::db::{DB404Err, to_post_file_path, to_post_thumbnail_path};
     use crate::db::{DBEmailIsTakenErr, DBUser, email_change::DBEmailChange};
+    use crate::path::link_api_post_remove_file;
     use crate::server::create_api_router;
     use crate::valid::MAX_POST_TITLE_LENGTH;
 
@@ -1415,6 +1461,62 @@ mod tests {
         // let mut hasher = GxHasher::with_seed(0);
         hasher.write(&file);
         hasher.finish().to_string()
+    }
+
+    #[tokio::test]
+    async fn test_remove_post_file() {
+        use axum::{
+            body::Body,
+            extract::connect_info::MockConnectInfo,
+            http::{self, Request, StatusCode},
+        };
+
+        const FILE1_PATH: &str = "../assets/favicon.ico";
+        const FILES_PATH: &str = "/tmp/test_remove_post_file";
+
+        let app = ApiTestApp::new_with_exp_and_files(1, FILES_PATH).await;
+        // let time = Arc::new(Mutex::new(0));
+        // let state = AppState::new_testng(time, 10).await;
+        // let router = create_api_router(state);
+
+        // use tower::{Service, ServiceExt};
+        // let url = link_api_post_remove_file(post_key, file_hash)
+        // router.oneshot(Request::post(""));
+
+        let auth_token = app
+            .register(0, "hey", "hey@heyadora.com", "pas$word123456789")
+            .await
+            .unwrap();
+
+        let post = app
+            .add_post(0, &auth_token, "title1", "cat", "one")
+            .await
+            .unwrap();
+
+        let post = app
+            .add_post_file(0, &auth_token, post.key.clone(), FILE1_PATH)
+            .await
+            .unwrap();
+
+        let file_path = post.file[0].file_path(FILES_PATH);
+        let thumbnail_path = post.file[0].thumbnail_path(FILES_PATH);
+
+        proccess_post_files(app.state.db.clone(), FILES_PATH, 1280)
+            .await
+            .unwrap();
+
+        assert_eq!(post.file.len(), 1);
+        assert!(file_path.exists());
+        assert!(thumbnail_path.exists());
+
+        let post = app
+            .remove_post_file(0, &auth_token, post.key.clone(), &post.file[0].hash)
+            .await
+            .unwrap();
+
+        assert_eq!(post.file.len(), 0);
+        assert!(file_path.exists());
+        assert!(thumbnail_path.exists());
     }
 
     #[tokio::test]

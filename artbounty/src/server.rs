@@ -24,7 +24,7 @@ pub async fn server() {
         http::Method,
         middleware::{self, Next},
         response::IntoResponse,
-        routing::post,
+        routing::{get, post},
     };
     use leptos_axum::{LeptosRoutes, generate_route_list};
     use std::sync::Arc;
@@ -230,7 +230,7 @@ pub fn create_api_router(
         extract::{Query, Request, State},
         http::Method,
         middleware::{self, Next},
-        routing::post,
+        routing::{get, post},
     };
 
     use crate::{
@@ -396,6 +396,16 @@ pub fn create_api_router(
         .route(
             path::PATH_API_POST_DELETE,
             post(api::backend::post::delete_post),
+        )
+        // path::PATH_API_POST_FILE_REMOVE,
+        // .route("/FUCK_ME", get(api::backend::post::remove_post_file))
+        .route(
+            path::PATH_API_POST_FILE_REMOVE,
+            get(api::backend::post::remove_post_file),
+        )
+        .route(
+            path::PATH_API_POST_FILE_REMOVE,
+            post(api::backend::post::remove_post_file),
         )
         .route_layer(middleware::from_fn_with_state(
             app_state.clone(),

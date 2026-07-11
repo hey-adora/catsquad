@@ -12,7 +12,10 @@ use crate::db::{AddUserErr, email_change::DBChangeEmailErr};
 use crate::db::{DB404Err, DBChangeUsernameErr, DBUserPost, DbEngine, create_user_id};
 use crate::db::{DBEmailIsTakenErr, DBUser};
 use crate::db::{DBUserPostFile, email_change::DBEmailChange};
-use crate::path::{link_settings_form_email_current_confirm, link_settings_form_email_new_confirm};
+use crate::path::{
+    link_settings_form_email_current_confirm, link_settings_form_email_new_confirm,
+    to_thumbnail_path,
+};
 use crate::valid::auth::{
     proccess_password, proccess_post_description, proccess_post_title, proccess_username,
 };
@@ -89,22 +92,6 @@ fn test_scale_resolution() {
     assert_eq!(result, (720, 1280));
     let result = scale_resolution(1280, 720, 1280);
     assert_eq!(result, (1280, 720));
-}
-
-pub fn to_thumbnail_file_name(file_name: impl AsRef<str>) -> String {
-    format!("{}_thumbnail_default.webp", file_name.as_ref())
-}
-
-pub fn to_thumbnail_path(file_path: impl AsRef<OsStr>) -> Result<PathBuf, anyhow::Error> {
-    let output = Path::new(file_path.as_ref());
-    let output = output.with_extension("");
-    let file_name = output
-        .file_name()
-        .ok_or_else(|| anyhow!("invalid filename"))?
-        .to_str()
-        .ok_or_else(|| anyhow!("invalid filename"))?;
-    let file_name_new = to_thumbnail_file_name(file_name);
-    Ok(output.with_file_name(file_name_new).with_extension("webp"))
 }
 
 #[test]

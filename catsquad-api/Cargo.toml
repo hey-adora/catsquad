@@ -1,0 +1,22 @@
+[package]
+name = "catsquad-api"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+anyhow = { workspace = true }
+axum = { workspace = true }
+catsquad-db = { workspace = true }
+catsquad-log = { workspace = true }
+rand = { workspace = true }
+serde_json = { workspace = true }
+serde = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+# tower= { workspace = true, features = ["timeout", "util"] }
+
+[dev-dependencies]
+tower= { workspace = true, features = ["util"] }
+# tower = { workspace = true, optional = true }
+# 
+# features = ["timeout", "util"]
