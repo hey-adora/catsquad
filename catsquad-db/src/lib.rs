@@ -1,5 +1,5 @@
 use catsquad_log::prelude::*;
-use surrealdb::engine::local::{Db as DbEngine, Mem};
+use surrealdb::engine::local::{Db as DbEngine, Mem, SurrealKv};
 use surrealdb::types::{RecordId, SurrealValue, ToSql};
 use surrealdb::{IndexedResults, Surreal};
 
@@ -8,27 +8,54 @@ use crate::migration::migrate;
 mod migration;
 mod query;
 
-pub use query::email_sent_add::DbEmailSent;
-pub use query::email_sent_add::DbEmailSentAddErr;
-pub use query::email_sent_add::DbEmailSentReason;
-pub use query::email_sent_add::create_email_sent_id;
-pub use query::invite_add::DbInvite;
-pub use query::invite_add::DbInviteAddErr;
-pub use query::invite_add::create_invite_id;
-pub use query::invite_get_all::DbInviteGetAllErr;
-pub use query::invite_get_by_key::DbInviteGetByKeyErr;
-pub use query::migration_add::DbMigration;
-pub use query::migration_add::DbMigrationAddErr;
-pub use query::migration_get_latest::DbMigrationGetLatestErr;
-pub use query::user_add::DbUser;
-pub use query::user_add::DbUserAddErr;
-pub use query::user_add::create_user_id;
-pub use query::user_get_all::DbUserGetAllErr;
-pub use query::user_get_by_email::DbUserGetByEmailErr;
-pub use query::user_get_by_username::DbUserGetByUsernameErr;
-pub use query::user_get_password::DbUserGetPasswordErr;
-pub use query::user_update_password_by_email::DbUserUpdatePasswordByEmailErr;
-pub use query::user_update_password_by_id::DbUserUpdatePasswordByIdErr;
+pub use query::comment_add::*;
+pub use query::comment_get_all::*;
+pub use query::comment_remove::*;
+pub use query::comment_search::*;
+pub use query::comment_update_text::*;
+pub use query::email_change_add::*;
+pub use query::email_change_get_by_key::*;
+pub use query::email_change_update_cancel::*;
+pub use query::email_change_update_current_confirm::*;
+pub use query::email_change_update_finish::*;
+pub use query::email_change_update_new_add::*;
+pub use query::email_change_update_new_confirm::*;
+pub use query::email_sent_add::*;
+pub use query::email_sent_get_all;
+pub use query::invite_add::*;
+pub use query::invite_get_all::*;
+pub use query::invite_get_by_key::*;
+pub use query::migration_add::*;
+pub use query::migration_get_latest::*;
+pub use query::password_change_add::*;
+pub use query::password_change_get_all::*;
+pub use query::password_change_update_confirm::*;
+pub use query::post_add::*;
+pub use query::post_get_all::*;
+pub use query::post_get_unproccesed::*;
+pub use query::post_like_add::*;
+pub use query::post_like_get_all::*;
+pub use query::post_like_get_by_post::*;
+pub use query::post_like_remove::*;
+pub use query::post_remove::*;
+pub use query::post_search::*;
+pub use query::post_update_description::*;
+pub use query::post_update_file_add::*;
+pub use query::post_update_file_remove::*;
+pub use query::post_update_order::*;
+pub use query::post_update_proccesed::*;
+pub use query::post_update_title::*;
+pub use query::session_add::*;
+pub use query::session_get_by_key::*;
+pub use query::session_remove::*;
+pub use query::user_add::*;
+pub use query::user_get_all::*;
+pub use query::user_get_by_email::*;
+pub use query::user_get_by_username::*;
+pub use query::user_get_password::*;
+pub use query::user_update_password_by_email::*;
+pub use query::user_update_password_by_id::*;
+pub use query::user_update_username::*;
 
 pub fn id_to_string(v: RecordId) -> String {
     v.key.to_sql_pretty()
@@ -40,11 +67,20 @@ pub struct Db {
 }
 
 impl Db {
-    pub async fn mem() -> Self {
+    pub async fn mem(time: u128) -> Self {
         let db = Surreal::new::<Mem>(()).await.unwrap();
         db.use_ns("catsquad").use_db("api").await.unwrap();
         let db = Self { db };
-        migrate(&db).await;
+        migrate(time, &db).await;
+        db
+    }
+    pub async fn local(time: u128, database_path: impl AsRef<str>) -> Self {
+        let db = Surreal::new::<SurrealKv>(database_path.as_ref())
+            .await
+            .unwrap();
+        db.use_ns("catsquad").use_db("api").await.unwrap();
+        let db = Self { db };
+        migrate(time, &db).await;
         db
     }
 }

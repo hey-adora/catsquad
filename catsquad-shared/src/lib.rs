@@ -1,19 +1,42 @@
 mod api;
+mod page;
 
-pub const LINK_API_USER_ADD: &str = "/api/register";
-pub const LINK_API_INVITE_ADD: &str = "/api/invite";
-pub const LINK_API_INVITE_GET_BY_KEY: &str = "/api/invite/{invite_key}";
-pub const LINK_API_SESSION_ADD: &str = "/api/login";
-pub const LINK_API_SESSION_GET_BY_SESSION_KEY: &str = "/api/profile";
-pub const LINK_WEB_INDEX: &str = "/";
-pub const LINK_WEB_LOGIN: &str = "/login";
-pub const LINK_WEB_REGISTER: &str = "/login";
-pub const LINK_WEB_CSS: &str = "/catsquad.css";
-pub const LINK_WEB_WASM: &str = "/catsquad_bg.wasm";
-pub const LINK_WEB_JS: &str = "/catsquad.js";
-pub const LINK_WEB_FAVICON: &str = "/favicon.ico";
+pub const MAX_STORAGE_PER_FILE: u64 = 1024 * 1000 * 30; // 30MB
+pub const MAX_STORAGE: u64 = 1024 * 1000 * 1000 * 2; // 2GB
+pub const SUPPORTED_FILE_EXTENSIONS: &[&str] = &["ico", "svg", "jpg", "jpeg", "png", "webp"];
+pub const MAX_POST_DESCRIPTION_LENGTH: usize = 2000;
+pub const MAX_POST_COMMENT_LENGTH: usize = 2000;
+pub const MAX_POST_TAGS_LENGTH: usize = 2000;
+pub const MAX_POST_TITLE_LENGTH: usize = 120;
+pub const MAX_USERNAME_LENGTH: usize = 32;
+pub const MIN_USERNAME_LENGTH: usize = 3;
+pub const MIN_PASSWORD_LENGTH: usize = 12;
+pub const MAX_PASSWORD_LENGTH: usize = 100;
 
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
-pub struct InviteAddRes {
-    pub expires: u128,
-}
+pub use api::Order;
+pub use api::TimeRange;
+pub use api::ToForm;
+pub use api::email_change_update_cancel::*;
+pub use api::email_change_update_current_add::*;
+pub use api::email_change_update_current_confirm::*;
+pub use api::email_change_update_finish::*;
+pub use api::email_change_update_new_add::*;
+pub use api::email_change_update_new_confirm::*;
+pub use api::invite_add::*;
+pub use api::invite_get_by_key::*;
+pub use api::password_change_add::*;
+pub use api::password_change_update_confirm::*;
+pub use api::post_add::*;
+pub use api::post_search::*;
+pub use api::post_update_file_add::*;
+pub use api::session_add::*;
+pub use api::session_delete::*;
+pub use api::user_add::*;
+pub use api::user_get_by_session_key::*;
+pub use api::user_update_username::*;
+
+pub use page::assets::*;
+pub use page::index::*;
+pub use page::login::*;
+pub use page::register::*;
+pub use page::settings::*;

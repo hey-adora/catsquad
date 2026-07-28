@@ -1,29 +1,143 @@
 use axum::{
     Router,
+    extract::{Path, State},
+    http::{HeaderMap, StatusCode},
+    middleware,
+    response::IntoResponse,
     routing::{get, post},
 };
+use catsquad_db::DbUser;
 use catsquad_log::prelude::*;
+use tokio::fs;
 
-use crate::{api, state::AppState};
-
+use crate::{
+    api::{self, assets::index_404},
+    auth::{auth_middleware, auth_optional_middleware},
+    state::AppState,
+};
 pub async fn server() {
-    let state = AppState::mem().await;
+    let state = AppState::local().await;
     let addr = state.get_bind().await;
     info!("starting server {addr}");
 
     let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
 
-    let app = app(state);
+    let app = app(state).await;
 
     axum::serve(listener, app).await.unwrap();
 }
 
-pub fn app(state: AppState) -> Router {
-    let router_public = Router::new()
-        .route(api::USER_ADD_ENDPOINT, post(api::user_add))
-        .route(api::INVITE_ADD_ENDPOINT, post(api::invite_add))
-        .route(api::INVITE_GET_BY_KEY_ENDPOINT, get(api::invite_get_by_key))
-        .with_state(state);
+pub async fn app(state: AppState) -> Router {
+    let router_web = Router::new()
+        .route(catsquad_shared::LINK_WEB_INDEX, get(api::assets::index))
+        .route(catsquad_shared::LINK_WEB_REGISTER, get(api::assets::index))
+        .route(catsquad_shared::LINK_WEB_LOGIN, get(api::assets::index));
 
-    router_public
+    let router_assets = Router::new()
+        .route(catsquad_shared::LINK_WEB_CSS, get(api::assets::css))
+        .route(catsquad_shared::LINK_WEB_WASM, get(api::assets::wasm))
+        .route(catsquad_shared::LINK_WEB_JS, get(api::assets::js))
+        .route(catsquad_shared::LINK_WEB_FAVICON, get(api::assets::favicon))
+        .route(catsquad_shared::LINK_WEB_FONT_HI, get(api::assets::font_hi))
+        .route(
+            catsquad_shared::LINK_WEB_FONT_LUCKY,
+            get(api::assets::font_lucky),
+        );
+
+    let router_public = Router::new()
+        .route(
+            catsquad_shared::LINK_API_SESSION_ADD,
+            post(api::session_add),
+        )
+        .route(catsquad_shared::LINK_API_USER_ADD, post(api::user_add))
+        .route(catsquad_shared::LINK_API_INVITE_ADD, post(api::invite_add))
+        .route(
+            catsquad_shared::LINK_API_INVITE_GET_BY_KEY,
+            get(api::invite_get_by_key),
+        );
+
+    let router_optionanl_auth = Router::new()
+        .route(
+            catsquad_shared::LINK_API_PASSWORD_CHANGE_ADD,
+            post(api::password_change_add),
+        )
+        .route(
+            catsquad_shared::LINK_API_PASSWORD_CHANGE_UPDATE_CONFIRM,
+            post(api::user_password_change_confirm),
+        )
+        .route_layer(middleware::from_fn_with_state(
+            state.clone(),
+            auth_optional_middleware,
+        ));
+
+    let router_auth = Router::new()
+        .route(catsquad_shared::LINK_API_POST_ADD, post(api::post_add))
+        .route(
+            catsquad_shared::LINK_API_POST_UPDATE_FILE_ADD,
+            post(api::post_update_file_add),
+        )
+        .route(
+            catsquad_shared::LINK_API_EMAIL_CHANGE_UPDATE_CURRENT_ADD,
+            post(api::email_change_add),
+        )
+        .route(
+            catsquad_shared::LINK_API_EMAIL_CHANGE_UPDATE_CURRENT_CONFIRM,
+            post(api::email_change_update_current_confirm),
+        )
+        .route(
+            catsquad_shared::LINK_API_EMAIL_CHANGE_UPDATE_NEW_ADD,
+            post(api::email_change_update_new_add),
+        )
+        .route(
+            catsquad_shared::LINK_API_EMAIL_CHANGE_UPDATE_NEW_CONFIRM,
+            post(api::email_change_update_new_confirm),
+        )
+        .route(
+            catsquad_shared::LINK_API_EMAIL_CHANGE_UPDATE_FINISH,
+            post(api::email_change_update_finish),
+        )
+        .route(
+            catsquad_shared::LINK_API_EMAIL_CHANGE_UPDATE_CANCEL,
+            post(api::email_change_update_finish),
+        )
+        .route(
+            catsquad_shared::LINK_API_USER_UPDATE_USERNAME,
+            post(api::user_update_username),
+        )
+        .route(
+            catsquad_shared::LINK_API_SESSION_DELETE,
+            post(api::session_delete),
+        )
+        .route(
+            catsquad_shared::LINK_API_SESSION_GET_BY_SESSION_KEY,
+            get(api::user_get_by_session_token),
+        )
+        .route_layer(middleware::from_fn_with_state(
+            state.clone(),
+            auth_middleware,
+        ));
+
+    let app = Router::new()
+        .merge(router_assets)
+        .merge(router_web)
+        .merge(router_public)
+        .merge(router_auth)
+        .merge(router_optionanl_auth)
+        .fallback(index_404)
+        .with_state(state.clone());
+
+    app
 }
+
+// async fn dir_to_mem(path: impl AsRef<str>) -> (Vec<String>, Vec<u8>) {
+//     let output_paths = Vec::new();
+//     let output_data = Vec::new();
+//     let mut paths = fs::read_dir(path.as_ref()).await.unwrap();
+//     loop {
+//         let Some(path) = paths.next_entry().await.unwrap() else {
+//             break;
+//         };
+//     }
+
+//     (output_paths, output_data)
+// }

@@ -1,12 +1,22 @@
 @import "tailwindcss" source(none);
 
-@source "../artbounty/**/*.rs";
+@source "../assets/index.html";
+@source "../catsquad-web/**/*.rs";
 /* @import "tailwindcss"; */
 
 @font-face {
   font-family: "Atkinson Hyperlegible Next VF";
-  src: url("/atkinson_hyperlegible_next/atkinson_hyperlegible_next_vf-variable.woff2") format("woff2");
+  src: url("/font_hi.woff2") format("woff2");
 }
+
+@font-face {
+  font-family: "Luckiest Guy";
+  src: url("/font_lucky.ttf") format("truetype");
+}
+/* @font-face { */
+  /* font-family: "Luckiest Guy"; */
+  /* src: url("/font_lucky.ttf") format("ttf"); */
+/* } */
 
 @keyframes glow {
   /* from { */
@@ -48,5 +58,6 @@
     --color-base0F: #F2CDCD;
 
     --font-hi: "Atkinson Hyperlegible Next VF", sans-serif;
+    --font-lucky: "Luckiest Guy", cursive;
 }
 

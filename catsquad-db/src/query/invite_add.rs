@@ -54,7 +54,6 @@ impl Db {
                      THROW "email already used"
                  };
                  CREATE invite SET
-                       kind = $kind,
                        email = $email,
                        expires = $expires,
                        used = false,
@@ -86,7 +85,7 @@ impl Db {
 async fn test_invite_add() {
     init_log();
 
-    let db = Db::mem().await;
+    let db = Db::mem(0).await;
 
     let invite1 = db.invite_add(0, "hey@hey.com", 1).await.unwrap();
     assert_eq!(invite1.email, "hey@hey.com");

@@ -1,14 +1,22 @@
 
 [workspace]
 resolver = "2"
-members = ["artbounty", "artbounty-seed", "catsquad-api", "catsquad-client", "catsquad-db", "catsquad-log", "catsquad-web"]
+members = ["catsquad-api", "catsquad-client", "catsquad-db", "catsquad-log", "catsquad-web", "catsquad-shared"]
 default-members = ["catsquad-api"]
 
 [workspace.dependencies]
 # api
 axum = { version = "0.8.8", features = ["http1", "multipart", "form"] }
-tokio = { version = "1.46.1", features = ["macros", "rt-multi-thread"] }
+tokio = { version = "1.46.1" }
+# tokio = { version = "1.46.1", features = ["macros", "rt-multi-thread", "process", "fs"] }
+http = "1.3.1"
 tower = { version = "0.5.2" } # TODO make util testing only
+tower-http = { version = "0.6.4", features = [
+    "fs",
+    # "compression-full",
+    # "timeout",
+    # "cors",
+] }
 #log
 tracing = "0.1.41"
 tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
@@ -19,26 +27,33 @@ surrealdb = { git = "https://github.com/hey-adora/surrealdb", features = [
     "kv-mem",
 ] }
 # web
+strum = { version = "0.27.1", features = ["strum_macros", "derive"] }
 leptos = { version = "0.8.17", features = ["csr"] }
 leptos_router = { version = "0.8.12" }
-console_error_panic_hook = "0.1.7" # dyn
+console_error_panic_hook = "0.1.7"
+hydration_context = { version = "0.3.0" }
+# client
+reqwest = { version = "0.13.2", features = ["zstd", "multipart", "stream", "json"] }
+url = { version = "2.5.8" }
 
 catsquad-log = { path = "catsquad-log" }
 catsquad-db = { path = "catsquad-db" }
+catsquad-api = { path = "catsquad-api" }
+catsquad-shared = { path = "catsquad-shared" }
+catsquad-client = { path = "catsquad-client" }
+catsquad-web-utils = { path = "catsquad-web-utils" }
 
+serde = { version = "1.0.219", features = ["serde_derive"] }
+serde_urlencoded = "0.7.1"
 serde_json = { version = "1.0.149" }
 tokio-util = "0.7.18"
 thiserror = { version = "2.0.12" }
-serde = { version = "1.0.219", features = ["serde_derive"] }
 rand = "0.9.1"
 
 # chromiumoxide = "0.9.1"
 leptos_axum = { version = "0.8.8" }
 leptos_meta = { version = "0.8.6" }
-hydration_context = { version = "0.3.0" }
 # any_spawner = { version = "0.3.0" }
-strum = { version = "0.27.1", features = ["strum_macros", "derive"] }
-artbounty = { path = "artbounty" }
 # little_exif = "0.6.14"
 image = "0.25.6"
 # webp = "0.3.0"
@@ -46,15 +61,8 @@ config = "0.15.14"
 cfg-if = "1"
 gxhash = { version = "3.5.0", features = ["deterministic"] }
 argon2 = "0.5.3"
-reqwest = { version = "0.13.2", features = ["zstd", "multipart", "stream", "blocking"] }
 axum-server = { version = "0.8.0", features = ["tls-rustls"] }
 axum-test = { version = "19.0.0", features = ["reqwest", "typed-routing"] }
-http = "1.3.1"
-tower-http = { version = "0.6.4", features = [
-    "compression-full",
-    "timeout",
-    "cors",
-] }
 rkyv = { version = "0.8.10", features = ["unaligned"] }
 server_fn = { version = "0.8.2", features = [] }
 wasm-bindgen-futures = { version = "0.4.50" }
@@ -99,6 +107,7 @@ web-sys = { version = "0.3.91", features = [
     "FileList",
     "XmlHttpRequest",
     "XmlHttpRequestUpload",
+    "XmlHttpRequestResponseType",
     # "Multipart",
     "Crypto",
     "CssStyleDeclaration",
@@ -106,25 +115,3 @@ web-sys = { version = "0.3.91", features = [
     "ScrollBehavior",
     "ScrollLogicalPosition",
 ] }
-
-[[workspace.metadata.leptos]]
-name = "artbounty"
-bin-package = "artbounty-backend"
-lib-package = "artbounty-frontend"
-output-name = "artbounty_1"
-site-root = "target/site"
-site-pkg-dir = "pkg"
-tailwind-input-file = "style/tailwind.css"
-assets-dir = "assets"
-site-addr = "0.0.0.0:3000"
-reload-port = 3001
-end2end-cmd = "yarn playwright test"
-end2end-dir = "e2e"
-browserquery = "defaults"
-watch = true
-env = "DEV"
-lib-profile-release = "wasm-release"
-bin-features = []
-lib-features = ["hydrate"]
-bin-default-features = false
-lib-default-features = false

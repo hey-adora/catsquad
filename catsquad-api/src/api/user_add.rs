@@ -1,97 +1,62 @@
-use std::ascii::AsciiExt;
-
-use anyhow::anyhow;
 use axum::{
     Form, Json,
-    extract::{Multipart, State},
-    http::StatusCode,
+    extract::State,
+    http::{HeaderMap, StatusCode},
     response::IntoResponse,
 };
-use catsquad_db::{DbUser, DbUserAddErr, id_to_string};
+use catsquad_db::{DbSessionAddErr, DbUser, DbUserAddErr, id_to_string};
 use catsquad_log::prelude::*;
-
-use crate::{
-    MAX_STORAGE, MAX_STORAGE_PER_FILE,
-    state::AppState,
-    validation::{validate_password, validate_username},
+use catsquad_shared::{
+    MAX_STORAGE, MAX_STORAGE_PER_FILE, RedactedUserRes, SensitiveUserRes, UserAddErr, UserAddReq,
+    validate_password, validate_username,
 };
 
-pub const USER_ADD_ENDPOINT: &'static str = "/api/register";
+use crate::{
+    auth::{create_auth_cookie, hash_password},
+    state::AppState,
+};
 
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
-pub struct UserAddRes {
-    pub key: String,
-    pub username: String,
-    pub email: String,
-    pub created_at: u128,
-}
-
-impl From<DbUser> for UserAddRes {
-    fn from(value: DbUser) -> Self {
-        Self {
-            key: id_to_string(value.id),
-            username: value.username,
-            email: value.email,
-            created_at: value.created_at,
-        }
+pub fn from_db_user_redacted(value: DbUser) -> RedactedUserRes {
+    RedactedUserRes {
+        key: id_to_string(value.id),
+        username: value.username,
+        created_at: value.created_at,
     }
 }
 
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
-pub struct UserAddReq {
-    pub username: String,
-    pub password: String,
-    pub invite_token: String,
-}
-
-pub const USER_ADD_REQ_FIELD_USERNAME: &'static str = "username";
-pub const USER_ADD_REQ_FIELD_PASSWORD: &'static str = "password";
-pub const USER_ADD_REQ_FIELD_INVITE_TOKEN: &'static str = "invite_token";
-
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq, thiserror::Error)]
-pub enum UserAddErr {
-    #[error("invalid input")]
-    InvalidInput {
-        username: Option<String>,
-        password: Option<String>,
-    },
-
-    #[error("email is taken")]
-    EmailIsTaken,
-
-    #[error("username is taken")]
-    UsernameIsTaken,
-
-    #[error("invite not found")]
-    InviteNotFound,
-
-    #[error("invite already used")]
-    InviteAlreadyUsed,
-
-    #[error("invite expired")]
-    InviteExpired,
-
-    #[error("bad request {0}")]
-    BadRequest(String),
-
-    #[error("internal server err")]
-    InternalServerErr,
-}
-
-impl From<DbUserAddErr> for UserAddErr {
-    fn from(value: DbUserAddErr) -> Self {
-        match value {
-            DbUserAddErr::EmailIsTaken => UserAddErr::EmailIsTaken,
-            DbUserAddErr::UsernameIsTaken => UserAddErr::UsernameIsTaken,
-            DbUserAddErr::InviteNotFound => UserAddErr::InviteNotFound,
-            DbUserAddErr::InviteAlreadyUsed => UserAddErr::InviteAlreadyUsed,
-            DbUserAddErr::InviteExpired => UserAddErr::InviteExpired,
-            DbUserAddErr::Db(_) => UserAddErr::InternalServerErr,
-        }
+pub fn from_db_user_sensitive(value: DbUser) -> SensitiveUserRes {
+    SensitiveUserRes {
+        key: id_to_string(value.id),
+        username: value.username,
+        email: value.email,
+        created_at: value.created_at,
     }
 }
 
-pub fn status_code(result: &Result<UserAddRes, UserAddErr>) -> StatusCode {
+fn from_db_user_add_err(value: DbUserAddErr) -> UserAddErr {
+    match value {
+        DbUserAddErr::EmailIsTaken => UserAddErr::EmailIsTaken,
+        DbUserAddErr::UsernameIsTaken => UserAddErr::UsernameIsTaken,
+        DbUserAddErr::InviteNotFound => UserAddErr::InviteNotFound,
+        DbUserAddErr::InviteAlreadyUsed => UserAddErr::InviteAlreadyUsed,
+        DbUserAddErr::InviteExpired => UserAddErr::InviteExpired,
+        DbUserAddErr::Db(_) => UserAddErr::InternalServer,
+    }
+}
+
+fn from_db_session_add_err(value: DbSessionAddErr) -> UserAddErr {
+    match value {
+        _ => UserAddErr::InternalServer,
+    }
+}
+
+fn from_argon_err(value: argon2::password_hash::Error) -> UserAddErr {
+    match value {
+        _ => UserAddErr::InternalServer,
+    }
+}
+
+fn status_code(result: &Result<SensitiveUserRes, UserAddErr>) -> StatusCode {
     match result {
         Ok(_) => StatusCode::OK,
         Err(UserAddErr::InvalidInput { .. }) => StatusCode::BAD_REQUEST,
@@ -101,7 +66,7 @@ pub fn status_code(result: &Result<UserAddRes, UserAddErr>) -> StatusCode {
         Err(UserAddErr::InviteAlreadyUsed) => StatusCode::BAD_REQUEST,
         Err(UserAddErr::InviteExpired) => StatusCode::BAD_REQUEST,
         Err(UserAddErr::BadRequest(_)) => StatusCode::BAD_REQUEST,
-        Err(UserAddErr::InternalServerErr) => StatusCode::INTERNAL_SERVER_ERROR,
+        Err(UserAddErr::InternalServer) => StatusCode::INTERNAL_SERVER_ERROR,
     }
 }
 
@@ -110,7 +75,7 @@ pub async fn user_add(
     Form(req): Form<UserAddReq>,
 ) -> impl IntoResponse {
     let time = app.get_time().await;
-    let inner = async || -> Result<UserAddRes, UserAddErr> {
+    let inner = async || -> Result<SensitiveUserRes, UserAddErr> {
         let username = req.username.trim().to_lowercase();
         let password = req.password;
         let username_err = validate_username(&username);
@@ -123,134 +88,175 @@ pub async fn user_add(
             });
         }
 
+        let password = hash_password(password)
+            .inspect_err(|err| error!("{err}"))
+            .map_err(from_argon_err)?;
+
         let user = app
             .db
             .user_add(
                 time,
                 username,
                 password,
-                req.invite_token,
+                req.invite_key,
                 MAX_STORAGE,
                 MAX_STORAGE_PER_FILE,
             )
-            .await?;
+            .await
+            .map_err(from_db_user_add_err)?;
 
-        let user = UserAddRes::from(user);
+        let user = from_db_user_sensitive(user);
         Ok(user)
     };
-    let result = inner().await;
-    let status_code = status_code(&result);
-    (status_code, Json(result))
-}
-
-#[cfg(test)]
-mod invite_add_test_utils {
-    use crate::{
-        TestServer,
-        api::{
-            USER_ADD_ENDPOINT,
-            user_add::{
-                USER_ADD_REQ_FIELD_INVITE_TOKEN, USER_ADD_REQ_FIELD_PASSWORD,
-                USER_ADD_REQ_FIELD_USERNAME, UserAddErr, UserAddRes,
-            },
-        },
-    };
-
-    impl TestServer {
-        pub async fn user_add(
-            &self,
-            username: impl AsRef<str>,
-            password: impl AsRef<str>,
-            invite_token: impl AsRef<str>,
-        ) -> Result<UserAddRes, UserAddErr> {
-            let data = format!(
-                "{}={}&{}={}&{}={}",
-                USER_ADD_REQ_FIELD_USERNAME,
-                username.as_ref(),
-                USER_ADD_REQ_FIELD_PASSWORD,
-                password.as_ref(),
-                USER_ADD_REQ_FIELD_INVITE_TOKEN,
-                invite_token.as_ref()
-            );
-            self.post::<Result<UserAddRes, UserAddErr>>(USER_ADD_ENDPOINT, data)
+    let user_add_result = inner().await;
+    match user_add_result {
+        Ok(result) => {
+            let session_add_result = app
+                .db
+                .session_add(time, &result.email)
                 .await
+                .map_err(from_db_session_add_err);
+
+            let headers = match session_add_result {
+                Ok(session) => create_auth_cookie(id_to_string(session.id)),
+                Err(_) => {
+                    let headers = HeaderMap::new();
+                    let status_code = StatusCode::INTERNAL_SERVER_ERROR;
+                    let result = Err(UserAddErr::InternalServer);
+                    return (status_code, headers, Json(result));
+                }
+            };
+
+            let result = Ok(result);
+            let status_code = status_code(&result);
+            (status_code, headers, Json(result))
+        }
+
+        Err(err) => {
+            let result = Err(err);
+            let status_code = status_code(&result);
+            let headers = HeaderMap::new();
+            (status_code, headers, Json(result))
         }
     }
 }
 
-#[tokio::test]
-async fn test_user_add() {
-    init_log();
-    let server = crate::TestServer::new().await;
+#[cfg(test)]
+mod test_utils {
+    use axum::http::{
+        HeaderName,
+        header::{self, SET_COOKIE},
+    };
+    use catsquad_db::{DbUser, id_to_string};
+    use catsquad_shared::{LINK_API_USER_ADD, ToForm, UserAddReq};
 
-    let result = server.user_add("hey", "hello", "").await;
-    assert!(
-        matches!(result, Err(UserAddErr::InvalidInput { username, password }) if username.is_none() && password.is_some())
-    );
+    use crate::{
+        TestServer,
+        api::user_add::{SensitiveUserRes, UserAddErr},
+        auth::auth_token_get,
+    };
 
-    let result = server.user_add("he", "hello@P", "").await;
-    assert!(
-        matches!(result, Err(UserAddErr::InvalidInput { username, password }) if username.is_some() && password.is_some())
-    );
+    impl TestServer {
+        // pub async fn user_add(
+        //     &self,
+        //     username: impl Into<String>,
+        //     password: impl Into<String>,
+        //     invite_token: impl Into<String>,
+        // ) -> (Result<UserRes, UserAddErr>, Option<String>) {
+        //     let data = UserAddReq {
+        //         username: username.into(),
+        //         password: password.into(),
+        //         invite_key: invite_token.into(),
+        //     }
+        //     .to_form()
+        //     .unwrap();
+        //     self.post_and_get_auth_token::<Result<UserRes, UserAddErr>>(LINK_API_USER_ADD, data)
+        //         .await
+        // }
 
-    let result = server.user_add("hey", "hello1111111@1P", "invalid").await;
-    assert!(matches!(result, Err(UserAddErr::InviteNotFound)));
+        pub async fn user_add(
+            &self,
+            user: impl Into<String>,
+            email: impl Into<String>,
+            password: impl Into<String>,
+        ) -> (DbUser, String) {
+            let username = user.into();
+            let email = email.into();
+            let password = password.into();
+            let _invite = self
+                .client
+                .invite_add(email.clone())
+                .await
+                .send()
+                .await
+                .into_res()
+                .await
+                .unwrap();
+            // let invite = self.invite_add(email.clone()).await.unwrap();
+            let invite = id_to_string(
+                self.state
+                    .db
+                    .invite_get_all()
+                    .await
+                    .unwrap()
+                    .into_iter()
+                    .find(|v| !v.used && v.email == email)
+                    .unwrap()
+                    .id
+                    .clone(),
+            );
+            let res = self
+                .client
+                .user_add(username, invite, password)
+                .await
+                .send()
+                .await;
+            let headers = res.get_headers().unwrap();
+            let session_key = auth_token_get(&headers, header::SET_COOKIE).unwrap();
+            let _res = res.into_res().await.unwrap();
 
-    let invite = server.invite_add("prime@heyadora.com").await.unwrap();
-    // server.state.db.invi;
-
-    // let result = server
-    //     .post::<Result<UserAddRes, UserAddErr>>(
-    //         USER_ADD_ENDPOINT,
-    //         "username=hey&password=wtf&invite_token=invalid",
-    //     )
-    //     .await;
+            // let session_key = res.get_auth_token().unwrap();
+            // let res = res.into_res().await;
+            let user = self.state.db.user_get_by_email(email).await.unwrap();
+            (user, session_key)
+        }
+    }
 }
 
-// pub async fn parse_multipart(mut multipart: Multipart) -> anyhow::Result<UserAddReq> {
-//     let field_count = 3_usize;
-//     let mut field_username = None::<String>;
-//     let mut field_password = None::<String>;
-//     let mut field_invite_token = None::<String>;
-//     let mut index = 0;
+// #[tokio::test]
+// async fn test_user_add() {
+//     init_log();
+//     let server = crate::TestServer::new().await;
 
-//     while let Ok(Some(field)) = multipart.next_field().await {
-//         if index >= field_count {
-//             break;
-//         }
-//         let Some(name) = field.name() else {
-//             break;
-//         };
-//         let name = match name {
-//             "username" => {
-//                 let bytes = field.bytes().await?;
-//                 field_username = Some(String::from_utf8(bytes.to_vec())?);
-//             }
-//             "password" => {
-//                 let bytes = field.bytes().await?;
-//                 field_password = Some(String::from_utf8(bytes.to_vec())?);
-//             }
-//             "invite_token" => {
-//                 let bytes = field.bytes().await?;
-//                 field_invite_token = Some(String::from_utf8(bytes.to_vec())?);
-//             }
-//             _ => {
-//                 break;
-//             }
-//         };
-//         index += 1;
-//     }
+//     let (result, _) = server.user_add("hey", "hello", "").await;
+//     assert!(
+//         matches!(result, Err(UserAddErr::InvalidInput { username, password }) if username.is_none() && password.is_some())
+//     );
 
-//     let username = field_username.ok_or_else(|| anyhow!("missing username"))?;
-//     let password = field_password.ok_or_else(|| anyhow!("missing password"))?;
-//     let invite_token = field_invite_token.ok_or_else(|| anyhow!("missing invite_token"))?;
+//     let (result, _) = server.user_add("he", "hello@P", "").await;
+//     assert!(
+//         matches!(result, Err(UserAddErr::InvalidInput { username, password }) if username.is_some() && password.is_some())
+//     );
 
-//     Ok(UserAddReq {
-//         username,
-//         password,
-//         invite_token,
-//     })
+//     let (result, _) = server.user_add("hey", "hello1111111@1P", "invalid").await;
+//     assert!(matches!(result, Err(UserAddErr::InviteNotFound)));
+
+//     let _invite = server.invite_add("prime@heyadora.com").await.unwrap();
+//     let invite = id_to_string(
+//         server.state.db.invite_get_all().await.unwrap()[0]
+//             .id
+//             .clone(),
+//     );
+//     let (result, token) = server.user_add("hey", "hello1111111@1P", invite).await;
+//     assert!(matches!(result, Ok(_)));
+//     let _result = server
+//         .state
+//         .db
+//         .session_get_by_key(token.unwrap())
+//         .await
+//         .unwrap();
+
+//     // check if its encrypted
+//     let user = server.state.db.user_get_by_username("hey").await.unwrap();
+//     assert_ne!(user.password, "hello1111111@1P");
 // }
-// let req = parse_multipart(multipart)
-//     .await
-//     .map_err(|err| UserAddErr::BadRequest(err.to_string()))?;

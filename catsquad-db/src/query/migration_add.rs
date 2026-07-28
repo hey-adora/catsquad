@@ -65,7 +65,7 @@ impl Db {
 #[tokio::test]
 async fn test_migration_add() {
     init_log();
-    let db = Db::mem().await;
+    let db = Db::mem(0).await;
 
     db.migration_add(0, 9999).await.unwrap();
     let result = db.migration_add(0, 9999).await;

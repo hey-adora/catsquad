@@ -1,18 +1,15 @@
-use std::{cell::RefCell, sync::RwLock};
-
 use catsquad_log::prelude::*;
 use leptos;
-use leptos::prelude::*;
-use std::sync::{Arc, LazyLock};
-use wasm_bindgen::prelude::*;
+use page::App;
 
-// use app::App;
-#[component]
-fn App() -> impl IntoView {
-    view! {
-        "yo wtf 3"
-    }
-}
+mod component;
+mod hook;
+mod page;
+mod page_state;
+
+pub use component::errors::Errs;
+pub use component::nav::Nav;
+pub use page_state::PageState;
 
 #[wasm_bindgen::prelude::wasm_bindgen]
 pub fn csr() {
@@ -20,4 +17,12 @@ pub fn csr() {
     init_log();
     info!("starting web app...");
     leptos::mount::mount_to_body(App);
+}
+
+#[cfg(test)]
+pub fn init_owner() -> leptos::prelude::Owner {
+    use hydration_context::SsrSharedContext;
+    use leptos::prelude::Owner;
+    use std::sync::Arc;
+    Owner::new_root(Some(Arc::new(SsrSharedContext::new())))
 }

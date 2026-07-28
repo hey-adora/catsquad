@@ -13,27 +13,61 @@ pub struct ApiConfig {
     pub bind: String,
     pub secret: String,
     pub invite_expiration_ns: u128,
+    pub password_change_expiration_ns: u128,
+    pub email_change_expiration_ns: u128,
     pub database_path: String,
     pub storage_path: String,
+    pub assets_path: String,
+    pub tmp_path: String,
 }
 
 pub const FIELD_ADDRESS: &'static str = "address";
 pub const FIELD_BIND: &'static str = "bind";
 pub const FIELD_SECRET: &'static str = "secret";
 pub const FIELD_INVITE_EXPIRATION: &'static str = "invite_expiration_ns";
+pub const FIELD_PASSWORD_CHANGE_EXPIRATION: &'static str = "password_change_expiration_ns";
+pub const FIELD_EMAIL_CHANGE_EXPIRATION: &'static str = "email_change_expiration_ns";
 pub const FIELD_DATABASE_PATH: &'static str = "database_path";
 pub const FIELD_STORAGE_PATH: &'static str = "storage_path";
+pub const FIELD_ASSETS_PATH: &'static str = "assets_path";
+pub const FIELD_TMP_PATH: &'static str = "tmp_path";
 
 impl ApiConfig {
-    pub async fn new(
+    pub async fn new(conf_path: impl AsRef<Path>) -> Self {
+        read_or_create(conf_path, || ApiConfig::default()).await
+    }
+
+    pub async fn new_with_path_override(
         conf_path: impl AsRef<Path>,
         database_path: impl Into<String>,
         storage_path: impl Into<String>,
+        assets_path: impl Into<String>,
+        tmp_path: impl Into<String>,
     ) -> Self {
-        read_or_create(conf_path, || ApiConfig {
-            database_path: database_path.into(),
-            storage_path: storage_path.into(),
-            ..Default::default()
+        read_or_create(conf_path, || {
+            let mut conf = ApiConfig::default();
+            let database_path = database_path.into();
+            let storage_path = storage_path.into();
+            let assets_path = assets_path.into();
+            let tmp_path = tmp_path.into();
+
+            if !database_path.is_empty() {
+                conf.database_path = database_path;
+            }
+
+            if !storage_path.is_empty() {
+                conf.storage_path = storage_path;
+            }
+
+            if !assets_path.is_empty() {
+                conf.assets_path = assets_path;
+            }
+
+            if !tmp_path.is_empty() {
+                conf.tmp_path = tmp_path;
+            }
+
+            conf
         })
         .await
     }
@@ -77,6 +111,16 @@ async fn read_or_create(path: impl AsRef<Path>, or_else: impl FnOnce() -> ApiCon
         fs::create_dir_all(storage_path).await.unwrap()
     }
 
+    let tmp_path = Path::new(&config_file.tmp_path);
+    if !tmp_path.exists() {
+        fs::create_dir_all(tmp_path).await.unwrap()
+    }
+
+    let assets_path = Path::new(&config_file.assets_path);
+    if !assets_path.exists() {
+        panic!("assets path not found: {:?}", assets_path);
+    }
+
     config_file
 }
 
@@ -84,11 +128,17 @@ async fn read_or_create(path: impl AsRef<Path>, or_else: impl FnOnce() -> ApiCon
 async fn test_api_config_new() {
     init_log();
 
-    let test_config = async |conf_path: &str, db_path: &str, storage_path: &str| {
+    let test_config = async |conf_path: &str,
+                             db_path: &str,
+                             storage_path: &str,
+                             assets_path: &str,
+                             tmp_path: &str| {
         let confa = read_or_create(conf_path, || {
             let mut conf = ApiConfig::default();
             conf.database_path = db_path.to_string();
             conf.storage_path = storage_path.to_string();
+            conf.assets_path = assets_path.to_string();
+            conf.tmp_path = tmp_path.to_string();
 
             conf
         })
@@ -105,12 +155,16 @@ async fn test_api_config_new() {
         "/tmp/test_catconf/catsquad.conf",
         "/tmp/test_catconf/db",
         "/tmp/test_catconf/storage",
+        "/tmp",
+        "/tmp/test_catconf/tmp",
     )
     .await;
     test_config(
         "../target/tmp/catconf/catsquad.conf",
         "../target/tmp/catconf/db",
         "../target/tmp/catconf/storage",
+        "/tmp",
+        "../target/tmp/catconf/tmp",
     )
     .await;
 }
@@ -122,8 +176,12 @@ impl Default for ApiConfig {
             bind: "localhost:3000".to_string(),
             secret: "test".to_string(),
             invite_expiration_ns: 1800000000000,
-            database_path: "db".to_string(),
-            storage_path: "storage".to_string(),
+            password_change_expiration_ns: 1800000000000,
+            email_change_expiration_ns: 1800000000000,
+            database_path: "target/db".to_string(),
+            storage_path: "target/storage".to_string(),
+            assets_path: "target/dist".to_string(),
+            tmp_path: "target/tmp".to_string(),
         }
     }
 }
@@ -150,8 +208,26 @@ impl<T: AsRef<str>> From<T> for ApiConfig {
                         continue;
                     }
                 }
+                FIELD_PASSWORD_CHANGE_EXPIRATION => {
+                    conf.password_change_expiration_ns =
+                        if let Ok(v) = u128::from_str_radix(value, 10) {
+                            v
+                        } else {
+                            continue;
+                        }
+                }
+                FIELD_EMAIL_CHANGE_EXPIRATION => {
+                    conf.password_change_expiration_ns =
+                        if let Ok(v) = u128::from_str_radix(value, 10) {
+                            v
+                        } else {
+                            continue;
+                        }
+                }
                 FIELD_DATABASE_PATH => conf.database_path = value.to_string(),
                 FIELD_STORAGE_PATH => conf.storage_path = value.to_string(),
+                FIELD_ASSETS_PATH => conf.assets_path = value.to_string(),
+                FIELD_TMP_PATH => conf.tmp_path = value.to_string(),
                 _ => (),
             }
         }
@@ -182,9 +258,25 @@ impl From<&ApiConfig> for String {
             &value.invite_expiration_ns.to_string(),
         );
         output.push('\n');
+        push(
+            &mut output,
+            FIELD_PASSWORD_CHANGE_EXPIRATION,
+            &value.password_change_expiration_ns.to_string(),
+        );
+        output.push('\n');
+        push(
+            &mut output,
+            FIELD_EMAIL_CHANGE_EXPIRATION,
+            &value.password_change_expiration_ns.to_string(),
+        );
+        output.push('\n');
         push(&mut output, FIELD_DATABASE_PATH, &value.database_path);
         output.push('\n');
         push(&mut output, FIELD_STORAGE_PATH, &value.storage_path);
+        output.push('\n');
+        push(&mut output, FIELD_ASSETS_PATH, &value.assets_path);
+        output.push('\n');
+        push(&mut output, FIELD_TMP_PATH, &value.tmp_path);
 
         output
     }
@@ -205,13 +297,17 @@ impl ToString for ApiConfig {
 #[test]
 fn test_api_config_from_str() {
     let input = format!(
-        "{}=hello\n{}=111\n{}=hello2\n{}=123\n{}=hello3\n{}=tmp",
+        "{}=hello\n{}=111\n{}=hello2\n{}=123\n{}=124\n{}=124\n{}=hello3\n{}=tmp\n{}=tmp2\n{}=tmp3",
         FIELD_ADDRESS,
         FIELD_BIND,
         FIELD_SECRET,
         FIELD_INVITE_EXPIRATION,
+        FIELD_PASSWORD_CHANGE_EXPIRATION,
+        FIELD_EMAIL_CHANGE_EXPIRATION,
         FIELD_DATABASE_PATH,
-        FIELD_STORAGE_PATH
+        FIELD_STORAGE_PATH,
+        FIELD_ASSETS_PATH,
+        FIELD_TMP_PATH,
     );
     let settings = ApiConfig::from(&input);
     let settings_str = settings.to_string();

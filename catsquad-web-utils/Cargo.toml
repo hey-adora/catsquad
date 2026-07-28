@@ -1,0 +1,16 @@
+[package]
+name = "catsquad-web-utils"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+leptos = { workspace = true }
+leptos_router = { workspace = true }
+wasm-bindgen = { workspace = true }
+wasm-bindgen-futures = { workspace = true }
+web-sys = { workspace = true }
+tracing = { workspace = true }
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+cfg-if = { workspace = true }
+send_wrapper = { workspace = true }

@@ -32,7 +32,7 @@ impl Db {
 async fn test_invite_get_all() {
     init_log();
 
-    let db = Db::mem().await;
+    let db = Db::mem(0).await;
     let invite = db.invite_add(0, "hey@hey.com", 10).await.unwrap();
     let invites = db.invite_get_all().await.unwrap();
     assert_eq!(invites.len(), 1);

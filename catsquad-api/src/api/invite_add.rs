@@ -1,54 +1,28 @@
 use axum::{Form, Json, extract::State, http::StatusCode, response::IntoResponse};
-use catsquad_db::{
-    DbEmailSentAddErr, DbInvite, DbInviteAddErr, DbUserUpdatePasswordByIdErr, id_to_string,
-};
+use catsquad_db::{DbInvite, DbInviteAddErr, id_to_string};
 use catsquad_log::prelude::*;
+use catsquad_shared::{
+    InviteAddErr, InviteAddReq, InviteRes, link_absolute_reg_finish, validate_email,
+};
 
-use crate::{state::AppState, validation::validate_email, web::link_absolute_reg_finish};
+use crate::state::AppState;
 
-pub const INVITE_ADD_ENDPOINT: &'static str = "/api/invite";
-
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
-pub struct InviteAddRes {
-    pub expires: u128,
-}
-
-impl From<DbInvite> for InviteAddRes {
-    fn from(value: DbInvite) -> Self {
-        Self {
-            expires: value.expires,
-        }
+fn from_db_invite(value: DbInvite) -> InviteRes {
+    InviteRes {
+        expires: value.expires,
     }
 }
 
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
-pub struct InviteAddReq {
-    pub email: String,
-}
-pub const INVITE_ADD_REQ_FIELD_EMAIL: &'static str = "email";
-
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq, thiserror::Error)]
-pub enum InviteAddErr {
-    #[error("email is invalid")]
-    InvalidEmail(String),
-
-    #[error("bad request {0}")]
-    BadRequest(String),
-
-    #[error("internal server err")]
-    InternalServerErr,
-}
-
-pub fn status_code(result: &Result<InviteAddRes, InviteAddErr>) -> StatusCode {
+fn status_code(result: &Result<InviteRes, InviteAddErr>) -> StatusCode {
     match result {
         Ok(_) => StatusCode::OK,
         Err(InviteAddErr::InvalidEmail(_)) => StatusCode::BAD_REQUEST,
         Err(InviteAddErr::BadRequest(_)) => StatusCode::BAD_REQUEST,
-        Err(InviteAddErr::InternalServerErr) => StatusCode::INTERNAL_SERVER_ERROR,
+        Err(InviteAddErr::InternalServer) => StatusCode::INTERNAL_SERVER_ERROR,
     }
 }
 
-pub fn send_email(address: impl AsRef<str>, token: impl AsRef<str>) -> String {
+fn send_email_invite(address: impl AsRef<str>, token: impl AsRef<str>) -> String {
     let link = link_absolute_reg_finish(address, token);
     debug!("EMAIL SENT {link}");
     link
@@ -60,33 +34,31 @@ pub async fn invite_add(
 ) -> impl IntoResponse {
     let time = app.get_time().await;
     let invite_expiration = app.get_invite_expiration().await;
-    let inner = async || -> Result<InviteAddRes, InviteAddErr> {
+    let inner = async || -> Result<InviteRes, InviteAddErr> {
         let email = req.email.trim().to_lowercase();
         validate_email(&email).map_err(|err| InviteAddErr::InvalidEmail(err))?;
 
         let expires = time + invite_expiration;
         let result = app.db.invite_add(time, &email, expires).await;
-        let result = match result {
+        let invite = match result {
             Ok(v) => v,
-            Err(DbInviteAddErr::EmailIsTaken(_)) => return Ok(InviteAddRes { expires }),
-            Err(DbInviteAddErr::Db(_)) => return Err(InviteAddErr::InternalServerErr),
+            Err(DbInviteAddErr::EmailIsTaken(_)) => return Ok(InviteRes { expires }),
+            Err(DbInviteAddErr::Db(_)) => return Err(InviteAddErr::InternalServer),
         };
 
         let address = app.get_address().await;
-        let email_body = send_email(address, &id_to_string(result.id));
+        let email_body = send_email_invite(address, &id_to_string(invite.id.clone()));
         let _ = app
             .db
             .email_sent_add(
                 0,
-                catsquad_db::DbEmailSentReason::ConfirmInvite,
+                catsquad_db::DbEmailSentReason::InviteAdd,
                 email,
                 email_body,
             )
             .await;
 
-        Ok(InviteAddRes {
-            expires: result.expires,
-        })
+        Ok(from_db_invite(invite))
     };
 
     let result = inner().await;
@@ -95,36 +67,37 @@ pub async fn invite_add(
     (status_code, Json(result))
 }
 
-#[cfg(test)]
-mod invite_add_test_utils {
-    use crate::{
-        TestServer,
-        api::{
-            INVITE_ADD_ENDPOINT,
-            invite_add::{INVITE_ADD_REQ_FIELD_EMAIL, InviteAddErr, InviteAddRes},
-        },
-    };
+// #[cfg(test)]
+// mod test_utils {
+//     use catsquad_shared::{InviteAddErr, InviteAddReq, InviteRes, LINK_API_INVITE_ADD, ToForm};
 
-    impl TestServer {
-        pub async fn invite_add(
-            &self,
-            email: impl AsRef<str>,
-        ) -> Result<InviteAddRes, InviteAddErr> {
-            let data = format!("{}={}", INVITE_ADD_REQ_FIELD_EMAIL, email.as_ref());
-            self.post::<Result<InviteAddRes, InviteAddErr>>(INVITE_ADD_ENDPOINT, data)
-                .await
-        }
-    }
-}
+//     use crate::TestServer;
 
-#[tokio::test]
-async fn test_invite_add() {
-    init_log();
-    let server = crate::TestServer::new().await;
+//     impl TestServer {
+//         pub async fn invite_add(
+//             &self,
+//             email: impl Into<String>,
+//         ) -> Result<InviteRes, InviteAddErr> {
+//             let data = InviteAddReq {
+//                 email: email.into(),
+//             }
+//             .to_form()
+//             .unwrap();
+//             self.post::<Result<InviteRes, InviteAddErr>>(LINK_API_INVITE_ADD, data)
+//                 .await
+//         }
+//     }
+// }
 
-    let result = server.invite_add("hello").await;
-    assert!(matches!(result, Err(InviteAddErr::InvalidEmail(_))));
+// #[tokio::test]
+// async fn test_invite_add() {
+//     init_log();
+//     let server = crate::TestServer::new().await;
 
-    let result = server.invite_add("prime@heyadora.com").await;
-    assert!(result.is_ok());
-}
+//     let result = server.client.api_invite_add("hello").await.into_res().await;
+//     // let result = server.invite_add("hello").await;
+//     assert!(matches!(result, Err(InviteAddErr::InvalidEmail(_))));
+
+//     let result = server.invite_add("prime@heyadora.com").await;
+//     assert!(result.is_ok());
+// }

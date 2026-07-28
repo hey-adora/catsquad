@@ -11,6 +11,7 @@ pub mod prelude {
     pub use tracing::error;
     pub use tracing::info;
     pub use tracing::trace;
+    pub use tracing::warn;
 }
 
 pub use tracing::Level;

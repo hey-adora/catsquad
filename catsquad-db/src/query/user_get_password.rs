@@ -39,7 +39,7 @@ impl Db {
 async fn test_user_get_password() {
     init_log();
 
-    let db = Db::mem().await;
+    let db = Db::mem(0).await;
 
     let invite = db.invite_add(0, "hey@hey.com", 10).await.unwrap();
     db.user_add(0, "hey", "hey", invite.id.key.clone(), 10, 10)

@@ -1,0 +1,2063 @@
+pub mod prelude {
+    pub use super::dropzone::{self, AddDropZone};
+    pub use super::event_listener::{
+        self, AddEventListener, create_event_closure, create_event_listener,
+    };
+    pub use super::file::{self, GetFileStream, GetFiles, GetStreamChunk, PushChunkToVec};
+    pub use super::intersection_observer::{self, AddIntersectionObserver, IntersectionOptions};
+    pub use super::interval::{self};
+    pub use super::leptos_helpers::{
+        FnRun, FnRunT0, FnRunT1, Hidden, QueryField, QueryFn, QueryGetter, RwQuery, ToFnT0, ToFnT1,
+        ToQueryField,
+    };
+
+    pub use super::mutation_observer::{self, AddMutationObserver, MutationObserverOptions};
+    pub use super::random::{random_u8, random_u32, random_u32_ranged, random_u64};
+    pub use super::resize_observer::{self, AddResizeObserver, GetContentBoxSize};
+    pub use super::rw_signal_tree::RwSignalTree;
+    pub use super::time::{ns_to_str, time_now_ms, time_now_ns};
+    pub use super::timeout::{SetTimeoutError, set_timeout};
+
+    // #[cfg(feature = "testing")]
+    pub use super::debugger::{StoreSignal, debug_data_push};
+}
+
+// TODO fx bs api, create struct abstraction over web api and let user freely use it anywhere
+// TODO edit: good luck wit that mate
+
+// #[cfg(feature = "testing")]
+pub mod debugger {
+    use leptos::prelude::*;
+    use std::{
+        fmt::Debug,
+        sync::{LazyLock, RwLock},
+    };
+    use web_sys::js_sys::{Array, Object, Reflect};
+
+    use wasm_bindgen::prelude::*;
+
+    use crate::time::time_now_ns;
+
+    // use crate::view::toolbox::time::time_now_ns;
+
+    #[derive(Clone, Debug, Default)]
+    pub struct DebugState {
+        pub signal_data: Vec<SignalDataWrap>,
+        pub manual_data: Vec<ManualDataWrap>,
+        // pub delayed_scroll: Vec<Vec<f64>>,
+        // pub delayed_scroll: Vec<Vec<f64>>,
+        // pub delayed_scroll: Vec<StoredValue<f64, LocalStorage>>,
+    }
+
+    #[derive(Clone, Debug, Default)]
+    pub struct SignalDataWrap {
+        pub label: String,
+        pub active: bool,
+        pub data: Vec<String>,
+    }
+
+    #[derive(Clone, Debug, Default)]
+    pub struct ManualDataWrap {
+        pub created_at: u128,
+        pub label: String,
+        pub data: String,
+    }
+
+    pub static DEBUG_STATE: LazyLock<RwLock<DebugState>> =
+        LazyLock::new(|| RwLock::new(DebugState::default()));
+
+    fn signal_data_push(label: impl Into<String>) -> usize {
+        let mut state = DEBUG_STATE.write().unwrap();
+        let index = state.signal_data.len();
+        state.signal_data.push(SignalDataWrap {
+            label: label.into(),
+            active: true,
+            data: Vec::new(),
+        });
+        index
+    }
+
+    #[wasm_bindgen]
+    pub fn get_debug_state() -> Object {
+        let state = DEBUG_STATE.read().unwrap();
+
+        let output = Object::new();
+
+        let signal_output = Array::new();
+        for wrap in &state.signal_data {
+            let value_output = Array::new();
+            for value in &wrap.data {
+                value_output.push(&JsValue::from_str(value));
+            }
+            let label = JsValue::from_str(&wrap.label);
+            let active = JsValue::from_bool(wrap.active);
+            let label_and_values = Object::new();
+            Reflect::set(&label_and_values, &JsValue::from_str("label"), &label).unwrap();
+            Reflect::set(&label_and_values, &JsValue::from_str("active"), &active).unwrap();
+            Reflect::set(
+                &label_and_values,
+                &JsValue::from_str("data"),
+                &JsValue::from(value_output),
+            )
+            .unwrap();
+            signal_output.push(&label_and_values);
+            // label_and_values.p
+            // output.push(value);
+        }
+
+        let manual_output = Array::new();
+        for wrap in &state.manual_data {
+            let wrap_js = Object::new();
+            let created_at = JsValue::from_str(&wrap.created_at.to_string());
+            let label = JsValue::from_str(&wrap.label);
+            let data = JsValue::from_str(&wrap.data);
+
+            Reflect::set(&wrap_js, &JsValue::from_str("created_at"), &created_at).unwrap();
+            Reflect::set(&wrap_js, &JsValue::from_str("label"), &label).unwrap();
+            Reflect::set(&wrap_js, &JsValue::from_str("data"), &data).unwrap();
+
+            manual_output.push(&wrap_js);
+        }
+
+        Reflect::set(
+            &output,
+            &JsValue::from_str("signal_data"),
+            &JsValue::from(signal_output),
+        )
+        .unwrap();
+        Reflect::set(
+            &output,
+            &JsValue::from_str("manual_data"),
+            &JsValue::from(manual_output),
+        )
+        .unwrap();
+
+        // kill_pos_koks();
+
+        // DEBUG_STATE
+        // let wtf = KILLME2.with_borrow(|v| {
+        //     // let v = v.get_mut();
+        //     *v
+        // });
+
+        // trace!("wowza2 {}", wtf);
+        output
+    }
+
+    pub fn debug_data_push(label: impl Into<String>, data: impl Into<String>) {
+        let created_at = time_now_ns();
+        let label = label.into();
+        let data = data.into();
+
+        let data_wrap = ManualDataWrap {
+            created_at,
+            label,
+            data,
+        };
+
+        let mut debug_data = DEBUG_STATE.write().unwrap();
+        debug_data.manual_data.push(data_wrap);
+    }
+
+    #[derive(Debug)]
+    pub enum StoreType<T: Clone + 'static> {
+        Reactive(RwSignal<T, LocalStorage>),
+        Static(StoredValue<T, LocalStorage>),
+    }
+    impl<T: Clone + 'static> Copy for StoreType<T> {}
+    impl<T: Clone + 'static> Clone for StoreType<T> {
+        fn clone(&self) -> Self {
+            match self {
+                Self::Reactive(v) => Self::Reactive(v.clone()),
+                Self::Static(v) => Self::Static(v.clone()),
+            }
+        }
+    }
+
+    impl<T: Clone + 'static> StoreType<T> {
+        pub fn new_reactive(t: T) -> Self {
+            Self::Reactive(RwSignal::new_local(t))
+        }
+
+        pub fn new_static(t: T) -> Self {
+            Self::Static(StoredValue::new_local(t))
+        }
+
+        pub fn get(&self) -> T {
+            match self {
+                Self::Reactive(signal) => signal.get(),
+                Self::Static(signal) => signal.get_value(),
+            }
+        }
+
+        pub fn get_untracked(&self) -> T {
+            match self {
+                Self::Reactive(signal) => signal.get_untracked(),
+                Self::Static(signal) => signal.get_value(),
+            }
+        }
+
+        pub fn set(&self, t: T) {
+            match self {
+                Self::Reactive(signal) => signal.set(t),
+                Self::Static(signal) => signal.set_value(t),
+            }
+        }
+
+        pub fn set_untracked(&self, t: T) {
+            match self {
+                Self::Reactive(signal) => signal.update_untracked(|v| *v = t),
+                Self::Static(signal) => signal.set_value(t),
+            }
+        }
+
+        pub fn update(&self, f: impl FnOnce(&mut T)) {
+            match self {
+                Self::Reactive(signal) => signal.update(f),
+                Self::Static(signal) => signal.update_value(f),
+            }
+        }
+
+        pub fn update_untracked(&self, f: impl FnOnce(&mut T)) {
+            match self {
+                Self::Reactive(signal) => signal.update_untracked(f),
+                Self::Static(signal) => signal.update_value(f),
+            }
+        }
+
+        pub fn with<O>(&self, f: impl FnOnce(&T) -> O) -> O {
+            match self {
+                Self::Reactive(signal) => signal.with(f),
+                Self::Static(signal) => signal.with_value(f),
+            }
+        }
+
+        pub fn with_untracked<O>(&self, f: impl FnOnce(&T) -> O) -> O {
+            match self {
+                Self::Reactive(signal) => signal.with_untracked(f),
+                Self::Static(signal) => signal.with_value(f),
+            }
+        }
+    }
+
+    #[derive(Clone, Debug)]
+    pub struct StoreSignal<T: 'static + Clone> {
+        // pub label: String,
+        pub label: StoredValue<String, LocalStorage>,
+        slot: usize,
+        stored_value: StoreType<T>,
+        formatter: StoredValue<Box<dyn Fn(&T) -> String + 'static>, LocalStorage>,
+        // formatter: StoredValue<Box<fn(&T) -> String >, LocalStorage>,
+    }
+
+    impl<T: Clone + 'static> Copy for StoreSignal<T> {}
+
+    impl<T: 'static + Debug + Clone> StoreSignal<T> {
+        pub fn new(reactive: bool, label: impl Into<String>, t: T) -> Self {
+            let label = label.into();
+            let slot = signal_data_push(&label);
+            // let stored_value = StoredValue::new_local(t);
+            let formatter = move |v: &T| format!("{v:?}");
+
+            on_cleanup(move || {
+                let mut state = DEBUG_STATE.write().unwrap();
+                let wrap = &mut state.signal_data[slot];
+                wrap.active = false;
+            });
+
+            let stored_value = if reactive {
+                StoreType::new_reactive(t)
+            } else {
+                StoreType::new_static(t)
+            };
+
+            Self {
+                label: StoredValue::new_local(label),
+                slot,
+                stored_value,
+                formatter: StoredValue::new_local(Box::new(formatter)),
+            }
+        }
+        //<F: Fn(&T) -> String + 'static>
+        pub fn new_with_formmater(
+            reactive: bool,
+            label: impl Into<String>,
+            t: T,
+            formatter_fn: impl Fn(&T) -> String + 'static,
+        ) -> Self {
+            let label = label.into();
+            let slot = signal_data_push(&label);
+            // let stored_value = StoredValue::new_local(t);
+
+            on_cleanup(move || {
+                let mut state = DEBUG_STATE.write().unwrap();
+                let wrap = &mut state.signal_data[slot];
+                wrap.active = false;
+            });
+
+            let stored_value = if reactive {
+                StoreType::new_reactive(t)
+            } else {
+                StoreType::new_static(t)
+            };
+
+            Self {
+                label: StoredValue::new_local(label),
+                slot,
+                stored_value,
+                formatter: StoredValue::new_local(Box::new(formatter_fn)),
+            }
+        }
+
+        fn debug_state_push(&self, t: &T) {
+            let mut state = DEBUG_STATE.write().unwrap();
+            let wrap = &mut state.signal_data[self.slot];
+            let data = self.formatter.with_value(|v| v(&t));
+            wrap.data.push(data);
+        }
+
+        pub fn set_untracked(&self, t: T) {
+            self.debug_state_push(&t);
+            self.stored_value.set_untracked(t);
+        }
+
+        pub fn set(&self, t: T) {
+            self.debug_state_push(&t);
+            self.stored_value.set(t);
+        }
+
+        pub fn get_untracked(&self) -> T {
+            self.stored_value.get_untracked()
+        }
+
+        pub fn get(&self) -> T {
+            self.stored_value.get()
+        }
+
+        pub fn with_untracked<O>(&self, f: impl FnOnce(&T) -> O) -> O {
+            self.stored_value.with_untracked(f)
+        }
+
+        pub fn with<O>(&self, f: impl FnOnce(&T) -> O) -> O {
+            self.stored_value.with(f)
+        }
+
+        pub fn update_untracked(&self, f: impl FnOnce(&mut T)) {
+            self.stored_value.update_untracked(f);
+
+            let t = self.stored_value.get_untracked();
+            self.debug_state_push(&t);
+            // let mut state = DEBUG_STATE.write().unwrap();
+            // let wrap = &mut state.signal_data[self.slot];
+            // let data = self.formatter.with_value(|v| v(&t));
+            // wrap.data.push(data);
+        }
+
+        pub fn update(&self, f: impl FnOnce(&mut T)) {
+            self.stored_value.update(f);
+
+            let t = self.stored_value.get_untracked();
+            self.debug_state_push(&t);
+            // let mut state = DEBUG_STATE.write().unwrap();
+            // let wrap = &mut state.signal_data[self.slot];
+            // let data = self.formatter.with_value(|v| v(&t));
+            // wrap.data.push(data);
+        }
+    }
+
+    #[cfg(test)]
+    pub mod tests {
+        use std::sync::Arc;
+
+        use hydration_context::HydrateSharedContext;
+        use leptos::prelude::*;
+
+        use crate::{init_test_log, view::toolbox::prelude::StoreSignal};
+
+        #[tokio::test]
+        pub async fn toolbox_signal_debugger() {
+            init_test_log();
+            let owner = Owner::new_root(Some(Arc::new(HydrateSharedContext::new())));
+
+            let run = |signal: StoreSignal<i32>| {
+                let result = signal.get();
+                assert_eq!(result, 10);
+                let result = signal.get_untracked();
+                assert_eq!(result, 10);
+                let result = signal.with(|v| v.clone());
+                assert_eq!(result, 10);
+                let result = signal.with_untracked(|v| v.clone());
+                assert_eq!(result, 10);
+
+                signal.set(11);
+                let result = signal.get();
+                assert_eq!(result, 11);
+
+                signal.update(|v| *v = 12);
+                let result = signal.get();
+                assert_eq!(result, 12);
+
+                signal.set_untracked(13);
+                let result = signal.get_untracked();
+                assert_eq!(result, 13);
+            };
+
+            let signal = StoreSignal::new(false, "wtf", 10);
+            run(signal);
+            let signal = StoreSignal::new(true, "wtf2", 10);
+            run(signal);
+            //
+        }
+    }
+
+    // pub trait SetValueWithDebug {
+    //
+    //     fn set_value_with_debug(&self);
+    //
+    // }
+    //
+    // impl <T, S> SetValueWithDebug for StoredValue<T, S> {
+    //     //
+    //
+    //     fn set_value_with_debug(&self, t: T) {
+    //         let state = DEBUG_STATE.write().unwrap();
+    //         state.data
+    //
+    //     }
+    //
+    // }
+
+    // #[cfg(feature = "testing")]
+
+    // #[cfg(feature = "testing")]
+}
+
+pub mod time {
+
+    use tracing::trace;
+    use web_sys::js_sys;
+
+    pub fn time_now_ms() -> f64 {
+        js_sys::Date::now()
+    }
+
+    pub fn time_now_ns() -> u128 {
+        cfg_if::cfg_if! {
+            if #[cfg(feature = "ssr")] {
+                use std::time::{SystemTime, UNIX_EPOCH};
+                let time = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
+                time.as_nanos()
+            } else {
+                use wasm_bindgen::JsValue;
+                use web_sys::js_sys::Date;
+                let time = Date::new_0();
+                let time = time.get_time() as u64;
+                let time = time as u128 * 1000000;
+                time
+            }
+        }
+    }
+
+    pub fn ns_to_str(ns: u128) -> String {
+        let mut output = String::new();
+
+        let table = [
+            (1000_u128, ("ns", "ns")),
+            (1000, ("μs", "μs")),
+            (1000, ("ms", "ms")),
+            (60, ("second", "seconds")),
+            (60, ("minute", "minutes")),
+            (24, ("hour", "hours")),
+            (7, ("day", "days")),
+            (4, ("week", "weeks")),
+            (12, ("month", "months")),
+            (10, ("year", "years")),
+            (10, ("decade", "decades")),
+            (10, ("century", "centuries")),
+            (1000, ("millennium", "millenniums")),
+            (1000, ("aeon", "aeons")),
+        ];
+
+        let mut total_size = 1;
+        for (size, label) in table {
+            let prev_size = total_size;
+            total_size *= size;
+            trace!(
+                "ns({ns}) size({size}) label({label:?}) prev_size({prev_size}) total_size({total_size})"
+            );
+            if ns < total_size {
+                let new_size = ns / prev_size;
+                output.push_str(&new_size.to_string());
+                output.push(' ');
+                output.push_str(if new_size > 1 { label.1 } else { label.0 });
+                return output;
+            }
+        }
+
+        output.push('∞');
+
+        output
+    }
+
+    #[cfg(test)]
+    mod time_tests {
+
+        use std::time::Duration;
+
+        use crate::{init_test_log, view::toolbox::time::ns_to_str};
+
+        #[test]
+        fn time_to_str_test() {
+            init_test_log();
+
+            let result = ns_to_str(Duration::from_nanos(1).as_nanos());
+            assert_eq!(result, "1 ns");
+
+            let result = ns_to_str(Duration::from_micros(1).as_nanos());
+            assert_eq!(result, "1 μs");
+
+            let result = ns_to_str(Duration::from_millis(1).as_nanos());
+            assert_eq!(result, "1 ms");
+
+            let result = ns_to_str(Duration::from_secs(1).as_nanos());
+            assert_eq!(result, "1 second");
+
+            let result = ns_to_str(Duration::from_secs(59).as_nanos());
+            assert_eq!(result, "59 seconds");
+
+            let result = ns_to_str(Duration::from_secs(60).as_nanos());
+            assert_eq!(result, "1 minute");
+
+            let result = ns_to_str(Duration::from_mins(1).as_nanos());
+            assert_eq!(result, "1 minute");
+
+            let result = ns_to_str(Duration::from_hours(1).as_nanos());
+            assert_eq!(result, "1 hour");
+
+            let result = ns_to_str(Duration::from_hours(24).as_nanos());
+            assert_eq!(result, "1 day");
+
+            let result = ns_to_str(Duration::from_hours(24 * 7).as_nanos());
+            assert_eq!(result, "1 week");
+        }
+    }
+}
+pub mod rw_signal_tree {
+    use std::{collections::HashMap, fmt::Debug, hash::Hash};
+    use tracing::trace;
+
+    use leptos::prelude::{LocalStorage, RwSignal, UpdateUntracked, on_cleanup};
+
+    // pub enum RwSignalKind<K, T> {
+    //     Root(T),
+    //     Two
+    // }
+
+    pub struct RwSignalTree<K, T> {
+        // pub rw_signal: RwSignal<HashMap<K, T>, LocalStorage>
+        pub root: RwSignal<HashMap<K, RwSignal<T, LocalStorage>>, LocalStorage>, // pub rw_signal: RwSignal<HashMap<K, RwSignal<T, LocalStorage>>, LocalStorage>
+    }
+
+    impl<K: 'static + Eq + Hash + Clone + Debug + Sync + Send, T: 'static> RwSignalTree<K, T> {
+        //
+        pub fn new_root() -> RwSignalTree<K, T> {
+            Self {
+                root: RwSignal::new_local(HashMap::new()),
+            }
+        }
+
+        pub fn leaf(&self, key: K, value_default: T) -> RwSignal<T, LocalStorage> {
+            let root = self.root.clone();
+            root.try_update_untracked(|v| {
+                v.entry(key.clone())
+                    .or_insert_with(|| {
+                        let signal = RwSignal::new_local(value_default);
+
+                        on_cleanup(move || {
+                            trace!("rw_signal_tree: ATTEMPTING to remove {key:?}");
+                            root.try_update_untracked(|v| {
+                                let result = v.remove(&key);
+                                if result.is_some() {
+                                    trace!("rw_signal_tree: removed {key:?}");
+                                }
+                            });
+                        });
+
+                        signal
+                    })
+                    .clone()
+            })
+            .unwrap()
+            // TODO i hope this doesnt explode
+        }
+    }
+}
+
+pub mod leptos_helpers {
+
+    use leptos::prelude::*;
+    use leptos_router::NavigateOptions;
+    use leptos_router::hooks::{query_signal, query_signal_with_options};
+    use leptos_router::params::{Params, ParamsError};
+    use std::str::FromStr;
+
+    #[derive(Clone)]
+    pub struct RwQuery<T: FromStr + ToString + Clone + Sync + Send + Default + PartialEq + 'static> {
+        pub fn_get: Memo<Option<T>>,
+        pub fn_set: SignalSetter<Option<T>>,
+    }
+
+    impl<T: FromStr + ToString + Clone + Sync + Send + Default + PartialEq + 'static> Copy
+        for RwQuery<T>
+    {
+    }
+
+    impl<T: FromStr + ToString + Clone + Sync + Send + Default + PartialEq + 'static> RwQuery<T> {
+        pub fn new(key: impl Into<Oco<'static, str>>) -> RwQuery<T> {
+            let (get, set) = query_signal_with_options::<T>(
+                key,
+                NavigateOptions {
+                    scroll: false,
+                    ..Default::default()
+                },
+            );
+
+            Self {
+                fn_get: get,
+                fn_set: set,
+            }
+        }
+
+        pub fn get(&self) -> Option<T> {
+            self.fn_get.get()
+        }
+
+        pub fn get_untracked(&self) -> Option<T> {
+            self.fn_get.get_untracked()
+        }
+
+        pub fn get_or_default(&self) -> T {
+            self.fn_get.get().unwrap_or_default()
+        }
+
+        pub fn get_or_else(&self, value: impl Into<T>) -> T {
+            self.fn_get.get().unwrap_or_else(|| value.into())
+        }
+
+        pub fn get_or_default_untracked(&self) -> T {
+            self.fn_get.get_untracked().unwrap_or_default()
+        }
+
+        pub fn set(&self, value: T) {
+            self.fn_set.set(Some(value));
+        }
+
+        pub fn clear(&self) {
+            self.fn_set.set(None);
+        }
+
+        pub fn is_some(&self) -> bool {
+            self.fn_get.with(|v| v.is_some())
+        }
+
+        pub fn is_some_untracked(&self) -> bool {
+            self.fn_get.with_untracked(|v| v.is_some())
+        }
+    }
+
+    pub trait Hidden {
+        fn hide_if_true(&self) -> &'static str;
+        fn hide_if_false(&self) -> &'static str;
+    }
+
+    impl<T: FnRunT0<bool>> Hidden for T {
+        fn hide_if_true(&self) -> &'static str {
+            if self.run() { "hidden" } else { "visible" }
+        }
+        fn hide_if_false(&self) -> &'static str {
+            if self.run() { "visible" } else { "hidden" }
+        }
+    }
+
+    pub trait ToQueryField<QueryInput: Params + Sync + Send + Clone + 'static> {
+        fn to_query_field<MapFnOutput, MapFn>(self, f: MapFn) -> QueryField<MapFnOutput>
+        where
+            MapFnOutput: Sync + Send + Default + Clone + 'static,
+            MapFn: Fn(&QueryInput) -> Option<&MapFnOutput> + Send + Sync + 'static + Clone;
+    }
+
+    impl<QueryInput: Params + Sync + Send + Clone + 'static> ToQueryField<QueryInput>
+        for Memo<Result<QueryInput, ParamsError>>
+    {
+        fn to_query_field<MapFnOutput, MapFn>(self, f: MapFn) -> QueryField<MapFnOutput>
+        where
+            MapFnOutput: Sync + Send + Default + Clone + 'static,
+            MapFn: Fn(&QueryInput) -> Option<&MapFnOutput> + Send + Sync + 'static + Clone,
+        {
+            QueryField::<MapFnOutput>::new(self, f)
+        }
+    }
+
+    #[derive(Clone)]
+    pub struct QueryField<T: Clone + Sync + Send> {
+        pub get: StoredValue<Box<dyn Fn() -> T + Sync + Send>>,
+        pub get_untracked: StoredValue<Box<dyn Fn() -> T + Sync + Send + 'static>>,
+        pub check: StoredValue<Box<dyn Fn() -> bool + Sync + Send + 'static>>,
+    }
+
+    impl<T: Clone + Sync + Send + 'static> Copy for QueryField<T> {}
+
+    impl<T: Clone + Sync + Send + Default + 'static> QueryField<T> {
+        pub fn new<QueryInput, MapFn>(
+            query: Memo<Result<QueryInput, ParamsError>>,
+            f: MapFn,
+        ) -> Self
+        where
+            QueryInput: Params + Sync + Send + Clone + 'static,
+            MapFn: Fn(&QueryInput) -> Option<&T> + Clone + Sync + Send + 'static,
+        {
+            let fn_get = query.to_getter_fn({
+                let f = f.clone();
+                move |v| f(v).cloned()
+            });
+            let fn_get_untracked = query.to_getter_fn_untracked({
+                let f = f.clone();
+                move |v| f(v).cloned()
+            });
+            let fn_check = query.to_checker_fn(f.clone());
+
+            Self {
+                get: StoredValue::new(Box::new(fn_get)),
+                get_untracked: StoredValue::new(Box::new(fn_get_untracked)),
+                check: StoredValue::new(Box::new(fn_check)),
+            }
+        }
+
+        pub fn get(&self) -> T {
+            self.get.run()
+        }
+
+        pub fn get_untracked(&self) -> T {
+            self.get_untracked.run()
+        }
+
+        pub fn check(&self) -> bool {
+            self.check.run()
+        }
+    }
+
+    pub trait QueryFn<'a, M, T: 'static> {
+        fn to_query_fn<F: Fn(M) -> T + Send + Sync + Copy + 'static>(
+            &self,
+            f: F,
+        ) -> impl Fn() -> T + Send + Sync + Clone + Copy + 'static + use<'a, Self, M, T, F>
+        where
+            Self: Sized;
+    }
+
+    impl<'a, M: 'static + Send + Sync + Clone, T: 'static> QueryFn<'a, M, T> for Memo<M> {
+        fn to_query_fn<F: Fn(M) -> T + Send + Sync + Copy + 'static>(
+            &self,
+            f: F,
+        ) -> impl Fn() -> T + Send + Sync + Clone + Copy + 'static + use<'a, T, F, M>
+        where
+            Self: Sized,
+        {
+            let s = self.clone();
+            move || f(s.get())
+        }
+    }
+
+    pub trait QueryGetter<QueryInput: Params + Sync + Send + Clone + 'static> {
+        fn to_getter_fn<MapFnOutput, MapFn>(self, f: MapFn) -> impl Fn() -> MapFnOutput
+        where
+            MapFnOutput: Sync + Send + Default,
+            MapFn: Fn(&QueryInput) -> Option<MapFnOutput> + Clone;
+
+        fn to_getter_fn_untracked<MapFnOutput, MapFn>(self, f: MapFn) -> impl Fn() -> MapFnOutput
+        where
+            MapFnOutput: Sync + Send + Default,
+            MapFn: Fn(&QueryInput) -> Option<MapFnOutput> + Clone;
+
+        fn to_checker_fn<MapFnOutput, MapFn>(self, f: MapFn) -> impl Fn() -> bool
+        where
+            MapFnOutput: Sync + Send,
+            MapFn: Fn(&QueryInput) -> Option<&MapFnOutput> + Clone;
+    }
+
+    impl<QueryInput: Params + Sync + Send + Clone + 'static> QueryGetter<QueryInput>
+        for Memo<Result<QueryInput, ParamsError>>
+    {
+        fn to_getter_fn<MapFnOutput, MapFn>(self, f: MapFn) -> impl Fn() -> MapFnOutput
+        where
+            MapFnOutput: Sync + Send + Default,
+            MapFn: Fn(&QueryInput) -> Option<MapFnOutput> + Clone,
+        {
+            let query = self.clone();
+            move || {
+                let f = f.clone();
+                query.with(|v| v.as_ref().ok().and_then(f).unwrap_or_default())
+            }
+        }
+
+        fn to_getter_fn_untracked<MapFnOutput, MapFn>(self, f: MapFn) -> impl Fn() -> MapFnOutput
+        where
+            MapFnOutput: Sync + Send + Default,
+            MapFn: Fn(&QueryInput) -> Option<MapFnOutput> + Clone,
+        {
+            let query = self.clone();
+            move || {
+                let f = f.clone();
+                query.with_untracked(|v| v.as_ref().ok().and_then(f).unwrap_or_default())
+            }
+        }
+
+        fn to_checker_fn<MapFnOutput, MapFn>(self, f: MapFn) -> impl Fn() -> bool
+        where
+            MapFnOutput: Sync + Send,
+            MapFn: Fn(&QueryInput) -> Option<&MapFnOutput> + Clone,
+        {
+            let query = self;
+            move || {
+                let f = f.clone();
+                query.with(|v| v.as_ref().ok().map(|v| f(v).is_some()).unwrap_or_default())
+            }
+        }
+    }
+
+    pub trait FnRun<O, T> {
+        fn run(&self, t: T) -> O;
+    }
+
+    impl<O, F: Fn() -> O> FnRun<O, ()> for F {
+        fn run(&self, _: ()) -> O {
+            (self)()
+        }
+    }
+
+    impl<O, T1, F: Fn(T1) -> O> FnRun<O, (T1,)> for F {
+        fn run(&self, (t1,): (T1,)) -> O {
+            (self)(t1)
+        }
+    }
+
+    pub trait FnRunT0<O: 'static> {
+        fn run(&self) -> O;
+    }
+
+    pub trait FnRunT1<O: 'static, T1: 'static> {
+        fn run(&self, t1: T1) -> O;
+    }
+
+    pub trait FnRunT2<O: 'static, T1, T2> {
+        fn run(&self, t1: T1, t2: T2) -> O;
+    }
+
+    impl<O: 'static> FnRunT0<O> for StoredValue<Box<dyn Fn() -> O + Sync + Send + 'static>> {
+        fn run(&self) -> O {
+            self.to_fn()()
+        }
+    }
+
+    impl<O: 'static> FnRunT0<O> for StoredValue<Box<dyn Fn() -> O + 'static>, LocalStorage> {
+        fn run(&self) -> O {
+            self.to_fn()()
+        }
+    }
+
+    impl<O: 'static, T1: 'static> FnRunT1<O, T1>
+        for StoredValue<Box<dyn Fn(T1) -> O + Sync + Send + 'static>>
+    {
+        fn run(&self, t1: T1) -> O {
+            self.to_fn()(t1)
+        }
+    }
+
+    impl<O: 'static, T1: 'static> FnRunT1<O, T1>
+        for StoredValue<Box<dyn Fn(T1) -> O + 'static>, LocalStorage>
+    {
+        fn run(&self, t1: T1) -> O {
+            self.to_fn()(t1)
+        }
+    }
+
+    pub trait ToFnT0<'a, T: 'static> {
+        fn to_fn(&self) -> impl Fn() -> T + 'static + use<'a, Self, T>;
+    }
+
+    impl<'a, T: 'static> ToFnT0<'a, T> for StoredValue<Box<dyn Fn() -> T + Sync + Send + 'static>> {
+        fn to_fn(&self) -> impl Fn() -> T + 'static + use<'a, T> {
+            let f = self.clone();
+            move || (f.read_value())()
+        }
+    }
+
+    impl<'a, T: 'static> ToFnT0<'a, T> for StoredValue<Box<dyn Fn() -> T + 'static>, LocalStorage> {
+        fn to_fn(&self) -> impl Fn() -> T + 'static + use<'a, T> {
+            let f = self.clone();
+            move || (f.read_value())()
+        }
+    }
+
+    impl<'a, O: 'static> ToFnT0<'a, O> for StoredValue<Box<dyn FnRun<O, ()> + Sync + Send + 'static>> {
+        fn to_fn(&self) -> impl Fn() -> O + 'static + use<'a, O> {
+            let f = self.clone();
+            move || f.read_value().run(())
+        }
+    }
+
+    impl<'a, O: 'static> ToFnT0<'a, O> for StoredValue<Box<dyn FnRun<O, ()> + 'static>, LocalStorage> {
+        fn to_fn(&self) -> impl Fn() -> O + 'static + use<'a, O> {
+            let f = self.clone();
+            move || f.read_value().run(())
+        }
+    }
+
+    pub trait ToFnT1<'a, T: 'static, P1> {
+        fn to_fn(&self) -> impl Fn(P1) -> T + 'static + use<'a, Self, T, P1>;
+        // ) -> impl Fn(P1) -> T + Send + Sync + Clone + Copy + 'static + use<'a, Self, T, P1>;
+    }
+
+    impl<'a, T: 'static, P1: 'static> ToFnT1<'a, T, P1>
+        for StoredValue<Box<dyn Fn(P1) -> T + Sync + Send + 'static>>
+    {
+        fn to_fn(&self) -> impl Fn(P1) -> T + 'static + use<'a, T, P1> {
+            let f = self.clone();
+            move |v: P1| (f.read_value())(v)
+        }
+    }
+
+    impl<'a, O: 'static, T1: 'static> ToFnT1<'a, O, T1>
+        for StoredValue<Box<dyn FnRun<O, (T1,)> + 'static>, LocalStorage>
+    {
+        fn to_fn(&self) -> impl Fn(T1) -> O + 'static + use<'a, O, T1> {
+            let f = self.clone();
+            move |t1: T1| f.read_value().run((t1,))
+        }
+    }
+
+    impl<'a, T: 'static, P1: 'static> ToFnT1<'a, T, P1>
+        for StoredValue<Box<dyn Fn(P1) -> T + 'static>, LocalStorage>
+    {
+        fn to_fn(&self) -> impl Fn(P1) -> T + 'static + use<'a, T, P1> {
+            let f = self.clone();
+            move |v: P1| (f.read_value())(v)
+        }
+    }
+
+    pub trait ToFnTwo<'a, T: 'static, P1, P2> {
+        fn to_fn(
+            &self,
+        ) -> impl Fn(P1, P2) -> T + Send + Sync + Clone + Copy + 'static + use<'a, Self, T, P1, P2>;
+    }
+
+    fn foo() {
+        let v: StoredValue<Box<dyn Fn() -> String + Sync + Send + 'static>> =
+            StoredValue::new(Box::new(Box::new(move || String::new())));
+        let a = v.to_fn();
+
+        let v: StoredValue<Box<dyn Fn(u64) -> String + Sync + Send + 'static>> =
+            StoredValue::new(Box::new(Box::new(move |v: u64| String::new())));
+        let a = v.to_fn();
+
+        let v: StoredValue<Box<dyn Fn(u64) + Sync + Send + 'static>> =
+            StoredValue::new(Box::new(Box::new(move |v: u64| {
+                //
+            })));
+        let a = v.to_fn();
+    }
+}
+
+pub mod random {
+
+    use web_sys::js_sys::Math::random;
+
+    pub fn random_u8() -> u8 {
+        (random().to_bits() % 255) as u8
+    }
+
+    pub fn random_u64() -> u64 {
+        random().to_bits()
+    }
+
+    pub fn random_u32() -> u32 {
+        random_u64() as u32
+    }
+
+    pub fn random_u32_ranged(min: u32, max: u32) -> u32 {
+        (random_u32() + min) % max
+    }
+}
+
+pub mod timeout {
+    use std::time::Duration;
+
+    use wasm_bindgen::{JsCast, prelude::Closure};
+    use web_sys::window;
+
+    #[derive(thiserror::Error, Clone, Debug)]
+    pub enum SetTimeoutError {
+        #[error("failed to get Window object")]
+        GettingWindow,
+
+        #[error("failed to set timeout {0}")]
+        SettingTimeout(String),
+    }
+
+    pub fn set_timeout<F>(callback: F, duration: Duration) -> Result<i32, SetTimeoutError>
+    where
+        F: Fn() + Clone + 'static,
+    {
+        let closure = Closure::<dyn Fn()>::new(callback.clone()).into_js_value();
+        let ms = duration.as_millis() as i32;
+        let handle = window()
+            .ok_or(SetTimeoutError::GettingWindow)?
+            .set_timeout_with_callback_and_timeout_and_arguments_0(
+                closure.as_ref().unchecked_ref(),
+                ms,
+            )
+            .map_err(|err| {
+                SetTimeoutError::SettingTimeout(
+                    err.as_string()
+                        .unwrap_or_else(|| String::from("uwknown error")),
+                )
+            })?;
+
+        Ok(handle)
+    }
+}
+
+pub mod interval {
+
+    use std::time::Duration;
+
+    use leptos::prelude::{Effect, GetValue, SetValue, StoredValue, on_cleanup};
+    use thiserror::Error;
+    use tracing::{error, trace};
+    use wasm_bindgen::{JsCast, prelude::Closure};
+    use web_sys::window;
+
+    #[derive(Debug, Clone, Copy)]
+    pub struct IntervalHandle(StoredValue<Option<i32>>);
+
+    #[derive(Debug, Error, Clone)]
+    pub enum ErrorIntervalClear {
+        #[error("failed to get Window object")]
+        GettingWindow,
+    }
+
+    #[derive(Debug, Error, Clone)]
+    pub enum ErrorSetInterval {
+        #[error("failed to get Window object")]
+        GettingWindow,
+
+        #[error("failed to set interval \"{0}\"")]
+        SettingInterval(String),
+    }
+
+    impl Default for IntervalHandle {
+        fn default() -> Self {
+            Self::new()
+        }
+    }
+
+    // TODO remove this bs
+    impl IntervalHandle {
+        pub fn new() -> Self {
+            Self(StoredValue::new(None))
+        }
+
+        pub fn clear(self) -> Result<bool, ErrorIntervalClear> {
+            let Some(handle) = self.0.get_value() else {
+                return Ok(false);
+            };
+            window()
+                .ok_or(ErrorIntervalClear::GettingWindow)?
+                .clear_interval_with_handle(handle);
+            Ok(true)
+        }
+
+        pub fn set(&self, handle: i32) {
+            self.0.set_value(Some(handle));
+        }
+
+        pub fn unset(&self) {
+            self.0.set_value(None);
+        }
+    }
+
+    #[track_caller]
+    pub fn new<F>(callback: F, duration: Duration) -> Result<IntervalHandle, ErrorSetInterval>
+    where
+        F: Fn() + Clone + 'static,
+    {
+        let handle = IntervalHandle::new();
+        let caller_location = std::panic::Location::caller();
+
+        Effect::new(move || {
+            let window = window().ok_or(ErrorSetInterval::GettingWindow);
+            let window = match window {
+                Ok(v) => v,
+                Err(err) => {
+                    error!("failed to set interval at {} : {}", caller_location, err);
+                    return;
+                }
+            };
+            let closure = Closure::<dyn Fn()>::new(callback.clone()).into_js_value();
+            let ms = duration.as_millis() as i32;
+            let handle_id = window
+                .set_interval_with_callback_and_timeout_and_arguments_0(
+                    closure.as_ref().unchecked_ref(),
+                    ms,
+                )
+                .map_err(|e| {
+                    ErrorSetInterval::SettingInterval(
+                        e.as_string()
+                            .unwrap_or_else(|| String::from("uwknown error")),
+                    )
+                });
+            let handle_id = match handle_id {
+                Ok(v) => v,
+                Err(err) => {
+                    error!("failed to set interval at {} : {}", caller_location, err);
+                    return;
+                }
+            };
+
+            handle.set(handle_id);
+        });
+
+        on_cleanup(move || {
+            let result = handle.clear();
+            let result = match result {
+                Ok(v) => v,
+                Err(err) => {
+                    error!("failed to clear interval at {} : {}", caller_location, err);
+                    return;
+                }
+            };
+            if result {
+                trace!("interval cleared");
+            } else {
+                trace!("no interval set");
+            }
+        });
+
+        Ok(handle)
+    }
+}
+
+pub mod intersection_observer {
+
+    use leptos::html::ElementType;
+    use leptos::prelude::*;
+    use tracing::{error, trace, trace_span, warn};
+    use wasm_bindgen::prelude::Closure;
+    use wasm_bindgen::{JsCast, JsValue};
+    use web_sys::{
+        HtmlElement, IntersectionObserver, IntersectionObserverEntry, IntersectionObserverInit,
+        js_sys::Array,
+    };
+
+    pub trait AddIntersectionObserver {
+        fn add_intersection_observer_with_options<F, R>(
+            &self,
+            callback: F,
+            options: IntersectionOptions<R>,
+        ) where
+            R: ElementType,
+            R::Output: JsCast + Clone + 'static + Into<HtmlElement>,
+            F: FnMut(Vec<IntersectionObserverEntry>, IntersectionObserver)
+                + Send
+                + Sync
+                + Clone
+                + 'static;
+    }
+
+    impl<E> AddIntersectionObserver for NodeRef<E>
+    where
+        E: ElementType,
+        E::Output: JsCast + Clone + 'static + Into<HtmlElement>,
+    {
+        fn add_intersection_observer_with_options<F, R>(
+            &self,
+            callback: F,
+            options: IntersectionOptions<R>,
+        ) where
+            R: ElementType,
+            R::Output: JsCast + Clone + 'static + Into<HtmlElement>,
+            F: FnMut(Vec<IntersectionObserverEntry>, IntersectionObserver)
+                + Send
+                + Sync
+                + Clone
+                + 'static,
+        {
+            new(*self, callback, options);
+        }
+    }
+
+    pub struct IntersectionOptions<E = leptos::html::Div>
+    where
+        E: ElementType,
+        E::Output: JsCast + Clone + 'static + Into<HtmlElement>,
+    {
+        root: Option<NodeRef<E>>,
+        root_margin: Option<String>,
+        threshold: Option<u64>,
+    }
+
+    impl<E> Clone for IntersectionOptions<E>
+    where
+        E: ElementType,
+        E::Output: JsCast + Clone + 'static + Into<HtmlElement>,
+    {
+        fn clone(&self) -> Self {
+            Self {
+                root: self.root.clone(),
+                root_margin: self.root_margin.clone(),
+                threshold: self.threshold.clone(),
+            }
+        }
+    }
+
+    impl<E> Default for IntersectionOptions<E>
+    where
+        E: ElementType,
+        E::Output: JsCast + Clone + 'static + Into<HtmlElement>,
+    {
+        fn default() -> Self {
+            Self {
+                root: None,
+                root_margin: None,
+                threshold: None,
+            }
+        }
+    }
+
+    impl<E> TryFrom<IntersectionOptions<E>> for IntersectionObserverInit
+    where
+        E: ElementType,
+        E::Output: JsCast + Clone + 'static + Into<HtmlElement>,
+    {
+        type Error = &'static str;
+
+        fn try_from(value: IntersectionOptions<E>) -> Result<Self, Self::Error> {
+            let observer_settings = IntersectionObserverInit::new();
+            if let Some(root) = value.root {
+                let Some(root) = root.get().map(|v| v.into()) as Option<HtmlElement> else {
+                    return Err("root elm not ready");
+                };
+                trace!("root option set"); // 
+                observer_settings.set_root(Some(&root));
+            }
+
+            if let Some(margin) = value.root_margin {
+                trace!("margin option set");
+                observer_settings.set_root_margin(&margin);
+            }
+
+            if let Some(threshold) = value.threshold {
+                trace!("threshold option set");
+                observer_settings.set_threshold(&JsValue::from_f64(f64::from_bits(threshold)));
+            }
+
+            Ok(observer_settings)
+        }
+    }
+
+    impl<E> IntersectionOptions<E>
+    where
+        E: ElementType,
+        E::Output: JsCast + Clone + 'static + Into<HtmlElement>,
+    {
+        pub fn set_root(mut self, root: NodeRef<E>) -> Self {
+            self.root = Some(root);
+            self
+        }
+
+        pub fn set_root_margin(mut self, root_margin: String) -> Self {
+            self.root_margin = Some(root_margin);
+            self
+        }
+
+        pub fn set_threshold(mut self, threshold: f64) -> Self {
+            self.threshold = Some(threshold.to_bits());
+            self
+        }
+    }
+
+    pub fn new<E, R, F>(target: NodeRef<E>, callback: F, options: IntersectionOptions<R>)
+    where
+        E: ElementType,
+        E::Output: JsCast + Clone + 'static + Into<HtmlElement>,
+        R: ElementType,
+        R::Output: JsCast + Clone + 'static + Into<HtmlElement>,
+        F: FnMut(Vec<IntersectionObserverEntry>, IntersectionObserver)
+            + Clone
+            + Send
+            + Sync
+            + 'static,
+    {
+        let observer = StoredValue::new_local(None);
+
+        Effect::new(move || {
+            let span = trace_span!("intersection observer").entered();
+
+            let (Some(target), Ok(options)) = (
+                target.get().map(|v| v.into()) as Option<HtmlElement>,
+                options.clone().try_into() as Result<IntersectionObserverInit, &'static str>,
+            ) else {
+                return;
+            };
+
+            let inner_observer = observer.get_value().unwrap_or_else(|| {
+                let inner_observer = new_with_options_raw(callback.clone(), &options);
+                observer.set_value(Some(inner_observer.clone()));
+                inner_observer
+            });
+
+            inner_observer.observe(&target);
+
+            span.exit();
+        });
+
+        on_cleanup(move || {
+            let span = trace_span!("intersection observer").entered();
+
+            let Some(observer) = observer.get_value() else {
+                return;
+            };
+            observer.disconnect();
+
+            span.exit();
+        });
+    }
+
+    pub fn new_closure(
+        mut callback: impl FnMut(Vec<IntersectionObserverEntry>, IntersectionObserver) + 'static,
+    ) -> JsValue {
+        Closure::<dyn FnMut(Array, IntersectionObserver)>::new(
+            move |entries: Array, observer: IntersectionObserver| {
+                let entries: Vec<IntersectionObserverEntry> = entries
+                    .to_vec()
+                    .into_iter()
+                    .map(|v| v.unchecked_into::<IntersectionObserverEntry>())
+                    .collect();
+                callback(entries, observer);
+            },
+        )
+        .into_js_value()
+    }
+
+    pub fn new_raw<F>(callback: F) -> IntersectionObserver
+    where
+        F: FnMut(Vec<IntersectionObserverEntry>, IntersectionObserver) + Clone + 'static,
+    {
+        IntersectionObserver::new(new_closure(callback).as_ref().unchecked_ref()).unwrap()
+    }
+
+    pub fn new_with_options_raw<F>(
+        callback: F,
+        options: &IntersectionObserverInit,
+    ) -> IntersectionObserver
+    where
+        F: FnMut(Vec<IntersectionObserverEntry>, IntersectionObserver) + Clone + 'static,
+    {
+        IntersectionObserver::new_with_options(
+            new_closure(callback).as_ref().unchecked_ref(),
+            options,
+        )
+        .unwrap()
+    }
+}
+
+pub mod mutation_observer {
+
+    use leptos::{html::ElementType, prelude::*};
+    use tracing::{error, trace_span};
+    use wasm_bindgen::prelude::*;
+    use web_sys::{
+        self, HtmlElement, MutationRecord,
+        js_sys::{self, Array},
+    };
+
+    #[derive(Clone, Debug, Copy, Default)]
+    pub struct MutationObserverOptions {
+        pub child_list: bool,
+        pub attributes: bool,
+        pub subtree: bool,
+        pub attribute_old_value: bool,
+        pub character_data: bool,
+        pub character_data_old_value: bool,
+    }
+
+    impl MutationObserverOptions {
+        pub fn new() -> Self {
+            Self::default()
+        }
+
+        pub fn set_child_list(mut self) -> Self {
+            self.child_list = true;
+            self
+        }
+
+        pub fn set_attributes(mut self) -> Self {
+            self.attributes = true;
+            self
+        }
+
+        pub fn subtree(mut self) -> Self {
+            self.subtree = true;
+            self
+        }
+
+        pub fn character_data(mut self) -> Self {
+            self.character_data = true;
+            self
+        }
+
+        pub fn attribute_old_value(mut self) -> Self {
+            self.attribute_old_value = true;
+            self
+        }
+
+        pub fn character_data_old_value(mut self) -> Self {
+            self.character_data_old_value = true;
+            self
+        }
+    }
+
+    impl From<MutationObserverOptions> for web_sys::MutationObserverInit {
+        fn from(value: MutationObserverOptions) -> Self {
+            let options = web_sys::MutationObserverInit::new();
+
+            if value.subtree {
+                options.set_subtree(value.subtree);
+            }
+
+            if value.attributes {
+                options.set_attributes(value.attributes);
+            }
+
+            if value.child_list {
+                options.set_child_list(value.child_list);
+            }
+
+            if value.character_data {
+                options.set_character_data(value.character_data);
+            }
+
+            if value.attribute_old_value {
+                options.set_attribute_old_value(value.attribute_old_value);
+            }
+
+            if value.character_data_old_value {
+                options.set_character_data_old_value(value.character_data_old_value);
+            }
+
+            options
+        }
+    }
+
+    pub trait AddMutationObserver {
+        fn add_mutation_observer<O, F>(&self, callback: F, options: O)
+        where
+            O: Into<web_sys::MutationObserverInit> + Clone + 'static,
+            F: FnMut(Vec<MutationRecord>, web_sys::MutationObserver)
+                + Send
+                + Sync
+                + Clone
+                + 'static;
+    }
+
+    impl<E> AddMutationObserver for NodeRef<E>
+    where
+        E: ElementType,
+        E::Output: JsCast + Clone + 'static + Into<HtmlElement>,
+    {
+        fn add_mutation_observer<O, F>(&self, callback: F, options: O)
+        where
+            O: Into<web_sys::MutationObserverInit> + Clone + 'static,
+            F: FnMut(Vec<MutationRecord>, web_sys::MutationObserver)
+                + Send
+                + Sync
+                + Clone
+                + 'static,
+        {
+            new(*self, callback, options);
+        }
+    }
+
+    pub fn new<E, F, O>(target: NodeRef<E>, callback: F, options: O)
+    where
+        E: ElementType,
+        E::Output: JsCast + Clone + 'static + Into<HtmlElement>,
+        F: FnMut(Vec<MutationRecord>, web_sys::MutationObserver) + Clone + Send + Sync + 'static,
+        O: Into<web_sys::MutationObserverInit> + Clone + 'static,
+    {
+        let observer = StoredValue::new_local(None::<web_sys::MutationObserver>);
+
+        Effect::new(move || {
+            let span = trace_span!("mutation observer").entered();
+
+            let Some(target): Option<HtmlElement> = target.get().map(|v| v.into()) else {
+                return;
+            };
+
+            let raw_observer = observer.get_value().unwrap_or_else(|| {
+                let inner_observer = new_raw(callback.clone());
+                observer.set_value(Some(inner_observer.clone()));
+                inner_observer
+            });
+
+            let options = options.clone().into();
+            let result = raw_observer.observe_with_options(&target, &options);
+            if result.is_err() {
+                error!("mutatino observation failed");
+            }
+
+            span.exit();
+        });
+
+        on_cleanup(move || {
+            let Some(raw_observer) = observer.get_value() else {
+                return;
+            };
+
+            raw_observer.disconnect();
+        });
+    }
+
+    pub fn new_raw<F>(mut callback: F) -> web_sys::MutationObserver
+    where
+        F: FnMut(Vec<MutationRecord>, web_sys::MutationObserver) + Clone + 'static,
+    {
+        let observer_closure = Closure::<dyn FnMut(Array, web_sys::MutationObserver)>::new(
+            move |entries: Array, observer: web_sys::MutationObserver| {
+                let entries: Vec<MutationRecord> = entries
+                    .to_vec()
+                    .into_iter()
+                    .map(|v| v.unchecked_into::<MutationRecord>())
+                    .collect();
+                callback(entries, observer);
+            },
+        )
+        .into_js_value();
+        web_sys::MutationObserver::new(observer_closure.as_ref().unchecked_ref()).unwrap()
+    }
+}
+
+pub mod resize_observer {
+
+    use std::collections::HashMap;
+
+    use leptos::{
+        html::ElementType,
+        prelude::{
+            Effect, Get, GetUntracked, GetValue, NodeRef, SetValue, StoredValue, UpdateValue,
+            expect_context, on_cleanup, provide_context, use_context,
+        },
+    };
+    use send_wrapper::SendWrapper;
+    use tracing::{trace, trace_span};
+    // use uuid::Uuid;
+    use wasm_bindgen::prelude::*;
+    use web_sys::{
+        self, HtmlElement, ResizeObserver, ResizeObserverEntry, ResizeObserverSize, js_sys::Array,
+    };
+
+    pub trait AddResizeObserver {
+        fn add_resize_observer<F>(&self, callback: F)
+        where
+            F: FnMut(Vec<ResizeObserverEntry>, ResizeObserver) + Send + Sync + Clone + 'static;
+    }
+
+    pub trait GetContentBoxSize {
+        fn get_content_box_size(&self) -> Vec<ResizeObserverSize>;
+    }
+
+    impl GetContentBoxSize for ResizeObserverEntry {
+        fn get_content_box_size(&self) -> Vec<ResizeObserverSize> {
+            self.content_box_size()
+                .to_vec()
+                .into_iter()
+                .map(|v| v.unchecked_into::<ResizeObserverSize>())
+                .collect()
+        }
+    }
+
+    impl<E> AddResizeObserver for NodeRef<E>
+    where
+        E: ElementType,
+        E::Output: JsCast + Clone + 'static + Into<HtmlElement>,
+    {
+        fn add_resize_observer<F>(&self, callback: F)
+        where
+            F: FnMut(Vec<ResizeObserverEntry>, ResizeObserver) + Send + Sync + Clone + 'static,
+        {
+            new(*self, callback);
+        }
+    }
+
+    #[derive(Default, Clone)]
+    struct GlobalState {
+        pub observer: StoredValue<Option<SendWrapper<ResizeObserver>>>,
+        pub callbacks: StoredValue<
+            HashMap<
+                String,
+                Box<dyn FnMut(ResizeObserverEntry, ResizeObserver) + Send + Sync + 'static>,
+            >,
+        >,
+    }
+
+    pub fn new<E, F>(target: NodeRef<E>, callback: F)
+    where
+        E: ElementType,
+        E::Output: JsCast + Clone + 'static + Into<HtmlElement>,
+        F: FnMut(Vec<ResizeObserverEntry>, web_sys::ResizeObserver) + Clone + Send + Sync + 'static,
+    {
+        let observer = StoredValue::new_local(None);
+
+        Effect::new(move || {
+            let span = trace_span!("resize observer").entered();
+
+            let Some(target): Option<HtmlElement> = target.get().map(|v| v.into()) else {
+                return;
+            };
+
+            let inner_observer = observer.get_value().unwrap_or_else(|| {
+                let inner_observer = new_raw(callback.clone());
+                observer.set_value(Some(inner_observer.clone()));
+                inner_observer
+            });
+
+            inner_observer.observe(&target);
+
+            span.exit();
+        });
+
+        on_cleanup(move || {
+            let Some(observer) = observer.get_value() else {
+                return;
+            };
+
+            observer.disconnect();
+        });
+    }
+
+    pub fn new_raw<F>(mut callback: F) -> ResizeObserver
+    where
+        F: FnMut(Vec<web_sys::ResizeObserverEntry>, web_sys::ResizeObserver) + Clone + 'static,
+    {
+        let resize_observer_closure = Closure::<dyn FnMut(Array, ResizeObserver)>::new(
+            move |entries: Array, observer: ResizeObserver| {
+                let entries: Vec<ResizeObserverEntry> = entries
+                    .to_vec()
+                    .into_iter()
+                    .map(|v| v.unchecked_into::<ResizeObserverEntry>())
+                    .collect();
+                callback(entries, observer);
+            },
+        )
+        .into_js_value();
+        ResizeObserver::new(resize_observer_closure.as_ref().unchecked_ref()).unwrap()
+    }
+}
+
+pub mod event_listener {
+
+    use std::fmt::Debug;
+
+    use leptos::{ev::EventDescriptor, html::ElementType, prelude::*};
+    use tracing::{trace, trace_span};
+    use wasm_bindgen::prelude::*;
+    use web_sys::{Element, HtmlElement, js_sys::Function};
+
+    pub trait AddEventListener {
+        fn add_event_listener<T, F>(&self, event: T, callback: F)
+        where
+            T: EventDescriptor + Debug + 'static,
+            F: FnMut(<T as EventDescriptor>::EventType) + Clone + 'static;
+    }
+
+    impl<E> AddEventListener for NodeRef<E>
+    where
+        E: ElementType,
+        E::Output: JsCast + Clone + 'static + Into<HtmlElement>,
+    {
+        fn add_event_listener<T, F>(&self, event: T, callback: F)
+        where
+            T: EventDescriptor + Debug + 'static,
+            F: FnMut(<T as EventDescriptor>::EventType) + Clone + 'static,
+        {
+            new(*self, event, callback);
+        }
+    }
+
+    pub fn create_event_closure<
+        T: EventDescriptor + 'static,
+        // F: FnMut(<T as EventDescriptor>::EventType) + Clone + 'static,
+    >(
+        // event: T,
+        f: impl FnMut(<T as EventDescriptor>::EventType) + 'static,
+    ) -> Function {
+        Closure::<dyn FnMut(_)>::new(f)
+            .into_js_value()
+            .unchecked_into()
+    }
+
+    pub fn create_event_listener<
+        T: EventDescriptor + 'static,
+        F: FnMut(<T as EventDescriptor>::EventType) + Clone + 'static,
+    >(
+        elm: impl AsRef<Element>,
+        event: T,
+        f: F,
+    ) -> Function {
+        let elm = elm.as_ref();
+        let closure = create_event_closure::<T>(f);
+        elm.add_event_listener_with_callback(&event.name(), &closure)
+            .unwrap();
+        closure
+    }
+
+    pub fn new<E, T, F>(target: NodeRef<E>, event: T, f: F)
+    where
+        E: ElementType,
+        E::Output: JsCast + Clone + 'static + Into<HtmlElement>,
+        T: EventDescriptor + Debug + 'static,
+        F: FnMut(<T as EventDescriptor>::EventType) + Clone + 'static,
+    {
+        Effect::new(move || {
+            let span = trace_span!("event_listener").entered();
+            let Some(node) = target.get() else {
+                trace!("target not found");
+                return;
+            };
+
+            let node: HtmlElement = node.into();
+
+            let closure = Closure::<dyn FnMut(_)>::new(f.clone()).into_js_value();
+
+            node.add_event_listener_with_callback(&event.name(), closure.as_ref().unchecked_ref())
+                .unwrap();
+
+            span.exit();
+        });
+    }
+}
+
+pub mod file {
+
+    use send_wrapper::SendWrapper;
+    use thiserror::Error;
+    use wasm_bindgen::JsCast;
+    use wasm_bindgen_futures::JsFuture;
+    use web_sys::{
+        DragEvent,
+        File,
+        FileList,
+        ReadableStreamDefaultReader,
+        // DragEvent, File, FileList, ReadableStreamDefaultReader,
+        js_sys::{Object, Reflect, Uint8Array},
+    };
+
+    #[derive(Error, Debug, Clone)]
+    pub enum ErrorGetFileStream {
+        #[error("failed to cast as \"ReadableStreamDefaultReader\" \"{0}\"")]
+        Cast(String),
+    }
+
+    #[derive(Error, Debug, Clone)]
+    pub enum ErrorGetStreamChunk {
+        #[error("failed to get chunk \"{0}\"")]
+        GetChunk(String),
+
+        #[error("failed to cast chunk to object \"{0}\"")]
+        CastToObject(String),
+
+        #[error("failed to cast chunk to Uint8Array \"{0}\"")]
+        CastToArray(String),
+
+        #[error("failed to read 'done' field from chunk object \"{0}\"")]
+        ReadingFieldDone(String),
+
+        #[error("failed to read 'value' field from chunk object \"{0}\"")]
+        ReadingFieldValue(String),
+    }
+
+    pub trait PushChunkToVec {
+        fn push_to_vec(&self, buffer: &mut Vec<u8>);
+    }
+
+    pub trait GetFiles {
+        fn get_files(&self) -> Vec<File>;
+    }
+
+    pub trait GetFileStream {
+        fn get_file_stream(&self) -> Result<ReadableStreamDefaultReader, ErrorGetFileStream>;
+    }
+
+    pub trait GetStreamChunk {
+        fn get_stream_chunk(
+            &self,
+        ) -> impl Future<Output = Result<Option<Uint8Array>, ErrorGetStreamChunk>>;
+    }
+
+    impl PushChunkToVec for Uint8Array {
+        fn push_to_vec(&self, buffer: &mut Vec<u8>) {
+            let chunk = self;
+            let data_len = buffer.len();
+            buffer.resize(data_len + chunk.length() as usize, 0);
+            chunk.copy_to(&mut buffer[data_len..]);
+        }
+    }
+
+    impl GetStreamChunk for ReadableStreamDefaultReader {
+        async fn get_stream_chunk(&self) -> Result<Option<Uint8Array>, ErrorGetStreamChunk> {
+            get_stream_chunk(self).await
+        }
+    }
+
+    impl GetFileStream for File {
+        fn get_file_stream(&self) -> Result<ReadableStreamDefaultReader, ErrorGetFileStream> {
+            get_file_stream(self)
+        }
+    }
+
+    impl GetFiles for DragEvent {
+        fn get_files(&self) -> Vec<File> {
+            let Some(files) = self.data_transfer().and_then(|v| v.files()) else {
+                return Vec::new();
+            };
+            get_files(&files)
+        }
+    }
+
+    impl GetFiles for FileList {
+        fn get_files(&self) -> Vec<File> {
+            get_files(self)
+        }
+    }
+
+    pub fn get_files(files: &FileList) -> Vec<File> {
+        (0..files.length())
+            .filter_map(|i| files.get(i))
+            .collect::<Vec<File>>()
+    }
+
+    pub fn get_file_stream(file: &File) -> Result<ReadableStreamDefaultReader, ErrorGetFileStream> {
+        let stream = file.stream();
+        let reader = stream
+            .get_reader()
+            .dyn_into::<ReadableStreamDefaultReader>()
+            .map_err(|e| {
+                ErrorGetFileStream::Cast(
+                    e.as_string()
+                        .unwrap_or_else(|| String::from("uwknown error")),
+                )
+            })?;
+        Ok(reader)
+    }
+
+    pub async fn get_stream_chunk(
+        reader: &ReadableStreamDefaultReader,
+    ) -> Result<Option<Uint8Array>, ErrorGetStreamChunk> {
+        let promise = reader.read();
+        let fut = JsFuture::from(promise);
+        let fut = SendWrapper::new(fut);
+        let chunk = fut
+            .await
+            .map_err(|e| {
+                ErrorGetStreamChunk::GetChunk(
+                    e.as_string()
+                        .unwrap_or_else(|| String::from("uwknown error")),
+                )
+            })?
+            .dyn_into::<Object>()
+            .map_err(|e| {
+                ErrorGetStreamChunk::CastToObject(
+                    e.as_string()
+                        .unwrap_or_else(|| String::from("uwknown error")),
+                )
+            })?;
+        let done = Reflect::get(&chunk, &"done".into()).map_err(|e| {
+            ErrorGetStreamChunk::ReadingFieldDone(
+                e.as_string()
+                    .unwrap_or_else(|| String::from("uwknown error")),
+            )
+        })?;
+        if done.is_truthy() {
+            return Ok(None);
+        }
+        let chunk = Reflect::get(&chunk, &"value".into())
+            .map_err(|e| {
+                ErrorGetStreamChunk::ReadingFieldValue(
+                    e.as_string()
+                        .unwrap_or_else(|| String::from("uwknown error")),
+                )
+            })?
+            .dyn_into::<Uint8Array>()
+            .map_err(|e| {
+                ErrorGetStreamChunk::CastToArray(
+                    e.as_string()
+                        .unwrap_or_else(|| String::from("uwknown error")),
+                )
+            })?;
+
+        Ok(Some(chunk))
+    }
+}
+
+pub mod dropzone {
+
+    use std::{cell::RefCell, fmt::Display, future::Future, rc::Rc};
+
+    use leptos::{ev, html::ElementType, prelude::*, task::spawn_local};
+    use tracing::error;
+    use wasm_bindgen::prelude::*;
+
+    use web_sys::{DragEvent, HtmlElement};
+
+    use super::event_listener;
+
+    pub enum Event {
+        Start,
+        Enter,
+        Over,
+        Drop,
+        Leave,
+    }
+
+    impl Display for Event {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            let name = match self {
+                Event::Start => "start",
+                Event::Enter => "enter",
+                Event::Over => "over",
+                Event::Drop => "drop",
+                Event::Leave => "leave",
+            };
+            write!(f, "{}", name)
+        }
+    }
+
+    pub trait AddDropZone {
+        fn use_file_drop<F, R>(&self, callback: F)
+        where
+            R: Future<Output = anyhow::Result<()>> + 'static,
+            F: FnMut(Event, DragEvent) -> R + 'static;
+    }
+
+    impl<E> AddDropZone for NodeRef<E>
+    where
+        E: ElementType,
+        E::Output: JsCast + Clone + 'static + Into<HtmlElement>,
+    {
+        #[track_caller]
+        fn use_file_drop<F, R>(&self, callback: F)
+        where
+            R: Future<Output = anyhow::Result<()>> + 'static,
+            F: FnMut(Event, DragEvent) -> R + 'static,
+        {
+            new(*self, callback);
+        }
+    }
+
+    #[track_caller]
+    pub fn new<E, F, R>(target: NodeRef<E>, callback: F)
+    where
+        E: ElementType,
+        E::Output: JsCast + Clone + 'static + Into<HtmlElement>,
+        R: Future<Output = anyhow::Result<()>> + 'static,
+        F: FnMut(Event, DragEvent) -> R + 'static,
+    {
+        let callback_location = *std::panic::Location::caller();
+        let callback = Rc::new(RefCell::new(callback));
+
+        event_listener::new(target, ev::dragstart, {
+            let callback = callback.clone();
+            move |e| {
+                let callback = callback.clone();
+                let fut = async move {
+                    let mut callback = callback.borrow_mut();
+                    let result = callback(Event::Start, e).await;
+
+                    if let Err(err) = result {
+                        error!("dropzone error at: {}: {}", callback_location, err);
+                    }
+                };
+                spawn_local(fut);
+            }
+        });
+
+        event_listener::new(target, ev::dragleave, {
+            let callback = callback.clone();
+
+            move |e| {
+                let callback = callback.clone();
+                let fut = async move {
+                    let mut callback = callback.borrow_mut();
+                    let result = callback(Event::Leave, e).await;
+                    if let Err(err) = result {
+                        error!("dropzone error at: {}: {}", callback_location, err);
+                    }
+                };
+                spawn_local(fut);
+            }
+        });
+
+        event_listener::new(target, ev::dragenter, {
+            let callback = callback.clone();
+
+            move |e| {
+                let callback = callback.clone();
+                let fut = async move {
+                    let mut callback = callback.borrow_mut();
+                    let result = callback(Event::Enter, e).await;
+                    if let Err(err) = result {
+                        error!("dropzone error at: {}: {}", callback_location, err);
+                    }
+                };
+                spawn_local(fut);
+            }
+        });
+
+        event_listener::new(target, ev::dragover, {
+            let callback = callback.clone();
+
+            move |e| {
+                e.prevent_default();
+
+                let callback = callback.clone();
+                let fut = async move {
+                    let mut callback = callback.borrow_mut();
+                    let result = callback(Event::Over, e).await;
+                    if let Err(err) = result {
+                        error!("dropzone error at: {}: {}", callback_location, err);
+                    }
+                };
+                spawn_local(fut);
+            }
+        });
+
+        event_listener::new(target, ev::drop, {
+            let callback = callback.clone();
+
+            move |e| {
+                e.prevent_default();
+                e.stop_propagation();
+
+                let callback = callback.clone();
+                let fut = async move {
+                    let mut callback = callback.borrow_mut();
+                    let result = callback(Event::Drop, e).await;
+                    if let Err(err) = result {
+                        error!("dropzone error at: {}: {}", callback_location, err);
+                    }
+                };
+                spawn_local(fut);
+            }
+        });
+    }
+}

@@ -8,6 +8,7 @@ crate-type = ["dylib"]
 
 [dependencies]
 catsquad-log = { workspace = true }
+catsquad-shared = { workspace = true }
 surrealdb = { workspace = true }
 tokio = { workspace = true }
 thiserror = { workspace = true }

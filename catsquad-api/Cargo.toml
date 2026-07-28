@@ -3,20 +3,38 @@ name = "catsquad-api"
 version = "0.1.0"
 edition = "2024"
 
+[features]
+test_server = [
+    "dep:tower",
+    "dep:axum-test",
+    "dep:catsquad-client",
+]
+
 [dependencies]
 anyhow = { workspace = true }
 axum = { workspace = true }
 catsquad-db = { workspace = true }
 catsquad-log = { workspace = true }
+catsquad-shared = { workspace = true }
 rand = { workspace = true }
 serde_json = { workspace = true }
 serde = { workspace = true }
 thiserror = { workspace = true }
-tokio = { workspace = true }
+tokio = { workspace = true, features = ["macros", "rt-multi-thread", "process"] }
+argon2 = { workspace = true }
+bytes = { workspace = true }
+futures = { workspace = true }
+futures-util = { workspace = true }
+tower= { workspace = true, features = ["util"], optional = true }
+axum-test = { workspace = true , optional = true } 
+catsquad-client = { workspace = true, features = ["axum_test"], optional = true }
+# tower-http = { workspace = true }
 # tower= { workspace = true, features = ["timeout", "util"] }
 
 [dev-dependencies]
 tower= { workspace = true, features = ["util"] }
+axum-test = { workspace = true } 
+catsquad-client = { workspace = true, features = ["axum_test"] }
 # tower = { workspace = true, optional = true }
 # 
 # features = ["timeout", "util"]

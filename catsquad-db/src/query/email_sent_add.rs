@@ -17,19 +17,35 @@ pub struct DbEmailSent {
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize, SurrealValue)]
 pub enum DbEmailSentReason {
-    ConfirmInvite,
-    ConfirmPasswordChange,
-    ConfirmEmailChange,
-    ConfirmEmailChangeNewEmail,
+    InviteAdd,
+    SessionAdd,
+    UserEmailChangeAddCurrent,
+    UserEmailChangeAddNew,
+    UserEmailChangeFinish,
+    // UserEmailChangeConfirmCurrent,
+    // UserEmailChangeConfirmNew,
+    UserUsernameChange,
+    UserPasswordChangeAdd,
+    UserPasswordChangeConfirm,
+    UserPasswordResetAdd,
+    UserPasswordResetConfirm,
 }
 
 impl Display for DbEmailSentReason {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let text = match self {
-            DbEmailSentReason::ConfirmInvite => "confirm_invite",
-            DbEmailSentReason::ConfirmPasswordChange => "confirm_password_change",
-            DbEmailSentReason::ConfirmEmailChange => "confirm_email_change",
-            DbEmailSentReason::ConfirmEmailChangeNewEmail => "confirm_email_change_new_email",
+            DbEmailSentReason::InviteAdd => "invite_add",
+            DbEmailSentReason::SessionAdd => "session_add",
+            DbEmailSentReason::UserUsernameChange => "user_username_change",
+            DbEmailSentReason::UserEmailChangeAddCurrent => "user_email_change_add_current",
+            DbEmailSentReason::UserEmailChangeAddNew => "user_email_change_add_new",
+            DbEmailSentReason::UserEmailChangeFinish => "user_email_change_finish",
+            // DbEmailSentReason::UserEmailChangeConfirmCurrent => "user_email_change_confirm_current",
+            // DbEmailSentReason::UserEmailChangeConfirmNew => "user_email_change_confirm_new",
+            DbEmailSentReason::UserPasswordChangeAdd => "user_password_change_add",
+            DbEmailSentReason::UserPasswordChangeConfirm => "user_password_change_confirm",
+            DbEmailSentReason::UserPasswordResetAdd => "user_password_reset_add",
+            DbEmailSentReason::UserPasswordResetConfirm => "user_password_reset_confirm",
         };
 
         write!(f, "{}", text)
@@ -98,19 +114,14 @@ impl Db {
 async fn test_email_sent_add() {
     init_log();
 
-    let db = Db::mem().await;
+    let db = Db::mem(0).await;
 
     let email = db
-        .email_sent_add(
-            0,
-            DbEmailSentReason::ConfirmInvite,
-            "prime@heyadora.com",
-            "wtf",
-        )
+        .email_sent_add(0, DbEmailSentReason::InviteAdd, "prime@heyadora.com", "wtf")
         .await
         .unwrap();
 
     assert_eq!(email.body, "wtf");
-    assert_eq!(email.reason, DbEmailSentReason::ConfirmInvite.to_string());
+    assert_eq!(email.reason, DbEmailSentReason::InviteAdd.to_string());
     assert_eq!(email.to_email, "prime@heyadora.com");
 }

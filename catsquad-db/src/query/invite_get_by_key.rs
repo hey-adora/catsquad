@@ -67,7 +67,7 @@ impl Db {
 async fn test_invite_get_by_key() {
     init_log();
 
-    let db = Db::mem().await;
+    let db = Db::mem(0).await;
 
     // success
     let invite_key = {

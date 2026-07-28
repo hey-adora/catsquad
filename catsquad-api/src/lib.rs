@@ -2,23 +2,44 @@ mod server;
 
 mod api;
 mod api_config;
+mod assets;
 mod state;
 
+pub mod auth;
 pub mod utils;
-pub mod validation;
-pub mod web;
+// pub mod validation;
+// pub mod web;
 
+#[cfg(test)]
+use std::os::unix::fs::MetadataExt;
+
+pub use catsquad_db::id_to_string;
 pub use server::server;
 
-#[cfg(test)]
+#[cfg(any(test, feature = "test_server"))]
 mod test_server;
-#[cfg(test)]
+#[cfg(any(test, feature = "test_server"))]
 pub use test_server::TestServer;
 
-pub const MAX_STORAGE_PER_FILE: u64 = 1024 * 30; // 30MB
-pub const MAX_STORAGE: u64 = 1024 * 1000 * 2; // 2GB
-pub const SUPPORTED_FILE_EXTENSIONS: &[&str] = &["ico", "svg", "jpg", "jpeg", "png", "webp"];
-pub const MAX_POST_DESCRIPTION_LENGTH: usize = 2000;
-pub const MAX_POST_COMMENT_LENGTH: usize = 2000;
-pub const MAX_POST_TAGS_LENGTH: usize = 2000;
-pub const MAX_POST_TITLE_LENGTH: usize = 120;
+#[cfg(test)]
+pub async fn get_file_size(file_path: impl AsRef<std::path::Path>) -> u64 {
+    let file = tokio::fs::metadata(file_path).await.unwrap();
+    file.size()
+}
+
+#[cfg(test)]
+pub async fn get_file_hash_for_testing_by_path(file_path: impl AsRef<str>) -> String {
+    let file = tokio::fs::read(file_path.as_ref()).await.unwrap();
+    get_file_hash_for_testing(&file)
+}
+
+#[cfg(test)]
+pub fn get_file_hash_for_testing(file: &[u8]) -> String {
+    use std::hash::Hasher;
+    // let file = tokio::fs::read(file_path.as_ref()).await.unwrap();
+    // let mut hasher = GxBuildHasher::default();
+    let mut hasher = std::hash::DefaultHasher::default();
+    // let mut hasher = GxHasher::with_seed(0);
+    hasher.write(&file);
+    hasher.finish().to_string()
+}

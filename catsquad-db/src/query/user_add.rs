@@ -6,9 +6,9 @@ use crate::{Db, SurrealCheckUtils, SurrealErrUtils, SurrealSerializeUtils, creat
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize, SurrealValue)]
 pub struct DbUser {
     pub id: RecordId,
-    pub used_storage_bytes: usize,
-    pub max_storage_per_file_bytes: usize,
-    pub max_storage_bytes: usize,
+    pub used_storage_bytes: u64,
+    pub max_storage_per_file_bytes: u64,
+    pub max_storage_bytes: u64,
     pub username: String,
     pub email: String,
     pub password: String,
@@ -37,8 +37,8 @@ pub enum DbUserAddErr {
     InviteExpired,
 }
 
-pub fn create_user_id(id: impl Into<String>) -> RecordId {
-    RecordId::new("user", id.into())
+pub fn create_user_id(key: impl Into<RecordIdKey>) -> RecordId {
+    RecordId::new("user", key.into())
 }
 
 impl Db {
@@ -126,7 +126,7 @@ impl Db {
 #[tokio::test]
 async fn test_user_add() {
     init_log();
-    let db = Db::mem().await;
+    let db = Db::mem(0).await;
 
     let result = db.user_add(0, "hey", "hey", "invalid", 10, 10).await;
     assert_eq!(result, Err(DbUserAddErr::InviteNotFound));

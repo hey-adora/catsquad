@@ -6,7 +6,7 @@ use crate::{Db, DbUser, SurrealCheckUtils, SurrealErrUtils, SurrealSerializeUtil
 #[derive(Debug, thiserror::Error, PartialEq)]
 pub enum DbUserGetByEmailErr {
     #[error("DB error {0}")]
-    DB(#[from] surrealdb::Error),
+    Db(#[from] surrealdb::Error),
 
     #[error("user not found")]
     NotFound,
@@ -28,7 +28,7 @@ impl Db {
             .check_good(|err| match err {
                 err => {
                     error!("unexpected db error {err}");
-                    DbUserGetByEmailErr::DB(err)
+                    DbUserGetByEmailErr::Db(err)
                 }
             })
             .and_then_take_or(0, DbUserGetByEmailErr::NotFound)
@@ -39,7 +39,7 @@ impl Db {
 async fn test_user_get_by_email() {
     init_log();
 
-    let db = Db::mem().await;
+    let db = Db::mem(0).await;
     let invite = db.invite_add(0, "hey@hey.com", 10).await.unwrap();
     db.user_add(0, "hey", "hey", invite.id.key.clone(), 10, 10)
         .await

@@ -1,84 +1,44 @@
 use axum::{
-    Form, Json,
+    Json,
     extract::{RawPathParams, State},
     http::StatusCode,
     response::IntoResponse,
 };
-use catsquad_db::{DbInvite, DbInviteAddErr, DbInviteGetByKeyErr, id_to_string};
+use catsquad_db::{DbInvite, DbInviteGetByKeyErr};
 use catsquad_log::prelude::*;
+use catsquad_shared::{
+    INVITE_GET_BY_KEY_REQ_FIELD_INVITE_KEY, InviteGetByKeyErr, InviteGetByKeyParams,
+    InviteGetByKeyRes,
+};
 
-use crate::{state::AppState, validation::validate_email, web::link_absolute_reg_finish};
+use crate::state::AppState;
 
-pub const INVITE_GET_BY_KEY_ENDPOINT: &'static str = "/api/invite/{invite_key}";
-
-pub fn link_relative_invite_get_by_key(invite_key: impl AsRef<str>) -> String {
-    format!("/api/invite/{}", invite_key.as_ref())
-}
-
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
-pub struct InviteGetByKeyRes {
-    pub email: String,
-    pub expires: u128,
-}
-
-impl From<DbInvite> for InviteGetByKeyRes {
-    fn from(value: DbInvite) -> Self {
-        Self {
-            email: value.email,
-            expires: value.expires,
-        }
+fn from_db_invite(value: DbInvite) -> InviteGetByKeyRes {
+    InviteGetByKeyRes {
+        email: value.email,
+        expires: value.expires,
     }
 }
 
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
-pub struct InviteGetByKeyReq {
-    pub invite_key: String,
-}
-pub const INVITE_GET_BY_KEY_REQ_FIELD_INVITE_KEY: &'static str = "invite_key";
-
-impl TryFrom<RawPathParams> for InviteGetByKeyReq {
-    type Error = InviteGetByKeyErr;
-
-    fn try_from(value: RawPathParams) -> Result<Self, Self::Error> {
-        value
-            .iter()
-            .find(|(name, _)| *name == INVITE_GET_BY_KEY_REQ_FIELD_INVITE_KEY)
-            .ok_or(InviteGetByKeyErr::BadRequest(
-                "missing invite_key param".to_string(),
-            ))
-            .map(|(_, value)| InviteGetByKeyReq {
-                invite_key: value.to_string(),
-            })
+pub fn from_db_invite_get_by_key_err(value: DbInviteGetByKeyErr) -> InviteGetByKeyErr {
+    match value {
+        DbInviteGetByKeyErr::InviteNotFound => InviteGetByKeyErr::InviteNotFound,
+        DbInviteGetByKeyErr::InviteExpired => InviteGetByKeyErr::InviteAlreadyUsed,
+        DbInviteGetByKeyErr::InviteAlreadyUsed => InviteGetByKeyErr::InviteExpired,
+        DbInviteGetByKeyErr::Db(_) => InviteGetByKeyErr::InternalServerErr,
     }
 }
 
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq, thiserror::Error)]
-pub enum InviteGetByKeyErr {
-    #[error("invite not found")]
-    InviteNotFound,
-
-    #[error("invite already used")]
-    InviteAlreadyUsed,
-
-    #[error("invite expired")]
-    InviteExpired,
-
-    #[error("bad request {0}")]
-    BadRequest(String),
-
-    #[error("internal server err")]
-    InternalServerErr,
-}
-
-impl From<DbInviteGetByKeyErr> for InviteGetByKeyErr {
-    fn from(value: DbInviteGetByKeyErr) -> Self {
-        match value {
-            DbInviteGetByKeyErr::InviteNotFound => Self::InviteNotFound,
-            DbInviteGetByKeyErr::InviteExpired => Self::InviteAlreadyUsed,
-            DbInviteGetByKeyErr::InviteAlreadyUsed => Self::InviteExpired,
-            DbInviteGetByKeyErr::Db(_) => Self::InternalServerErr,
-        }
-    }
+fn params_req(value: RawPathParams) -> Result<InviteGetByKeyParams, InviteGetByKeyErr> {
+    value
+        .iter()
+        .find(|(name, _)| *name == INVITE_GET_BY_KEY_REQ_FIELD_INVITE_KEY)
+        .ok_or(InviteGetByKeyErr::BadRequest(
+            "missing invite_key param".to_string(),
+        ))
+        .map(|(_, value)| InviteGetByKeyParams {
+            invite_key: value.to_string(),
+        })
 }
 
 pub fn status_code(result: &Result<InviteGetByKeyRes, InviteGetByKeyErr>) -> StatusCode {
@@ -98,11 +58,15 @@ pub async fn invite_get_by_key(
 ) -> impl IntoResponse {
     let time = app.get_time().await;
     let inner = async || -> Result<InviteGetByKeyRes, InviteGetByKeyErr> {
-        let req = InviteGetByKeyReq::try_from(params)?;
+        let req = params_req(params)?;
 
-        let invite = app.db.invite_get_by_key(time, req.invite_key).await?;
+        let invite = app
+            .db
+            .invite_get_by_key(time, req.invite_key)
+            .await
+            .map_err(from_db_invite_get_by_key_err)?;
 
-        Ok(InviteGetByKeyRes::from(invite))
+        Ok(from_db_invite(invite))
     };
 
     let result = inner().await;
@@ -111,43 +75,68 @@ pub async fn invite_get_by_key(
     (status_code, Json(result))
 }
 
-#[cfg(test)]
-mod invite_add_test_utils {
-    use crate::{
-        TestServer,
-        api::invite_get_by_key::{
-            INVITE_GET_BY_KEY_ENDPOINT, InviteGetByKeyErr, InviteGetByKeyRes,
-            link_relative_invite_get_by_key,
-        },
-    };
+// #[cfg(test)]
+// mod test_utils {
+//     use catsquad_shared::link_relative_invite_get_by_key;
 
-    impl TestServer {
-        pub async fn invite_get_by_key(
-            &self,
-            invite_key: impl AsRef<str>,
-        ) -> Result<InviteGetByKeyRes, InviteGetByKeyErr> {
-            let link = link_relative_invite_get_by_key(invite_key);
-            self.get::<Result<InviteGetByKeyRes, InviteGetByKeyErr>>(link)
-                .await
-        }
-    }
-}
+//     use crate::{
+//         TestServer,
+//         api::invite_get_by_key::{InviteGetByKeyErr, InviteGetByKeyRes},
+//     };
+
+//     impl TestServer {
+//         pub async fn invite_get_by_key(
+//             &self,
+//             invite_key: impl AsRef<str>,
+//         ) -> Result<InviteGetByKeyRes, InviteGetByKeyErr> {
+//             let link = link_relative_invite_get_by_key(invite_key);
+//             self.get::<Result<InviteGetByKeyRes, InviteGetByKeyErr>>(link)
+//                 .await
+//         }
+//     }
+// }
 
 #[tokio::test]
 async fn test_invite_get_by_key() {
+    use catsquad_db::id_to_string;
+
     init_log();
     let server = crate::TestServer::new().await;
 
-    server.invite_add("prime@heyadora.com").await.unwrap();
+    server
+        .client
+        .invite_add("prime@heyadora.com")
+        .await
+        .send()
+        .await
+        .into_res()
+        .await
+        .unwrap();
     let invite_key = id_to_string(
         server.state.db.invite_get_all().await.unwrap()[0]
             .id
             .clone(),
     );
 
-    let invite = server.invite_get_by_key(invite_key).await.unwrap();
+    let invite = server
+        .client
+        .invite_get_by_key(invite_key)
+        .await
+        .send()
+        .await
+        .into_res()
+        .await
+        .unwrap();
     assert_eq!(invite.email, "prime@heyadora.com");
 
-    let result = server.invite_get_by_key("invalid").await;
+    let result = server
+        .client
+        .invite_get_by_key("invalid")
+        .await
+        .send()
+        .await
+        .into_res()
+        .await;
+
     assert_eq!(result, Err(InviteGetByKeyErr::InviteNotFound));
 }

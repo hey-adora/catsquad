@@ -39,7 +39,7 @@ impl Db {
 async fn test_user_get_by_username() {
     init_log();
 
-    let db = Db::mem().await;
+    let db = Db::mem(0).await;
     let invite = db.invite_add(0, "hey@hey.com", 10).await.unwrap();
     let invite2 = db.invite_add(0, "hey2@hey.com", 10).await.unwrap();
 

@@ -1,7 +1,7 @@
 use crate::{Db, query::migration_get_latest::DbMigrationGetLatestErr};
 use catsquad_log::prelude::*;
 
-pub async fn migrate(db: &Db) {
+pub async fn migrate(time: u128, db: &Db) {
     let latest = db.migration_get_latest().await;
 
     match latest {
@@ -13,6 +13,14 @@ pub async fn migrate(db: &Db) {
             db.user_define().await;
             db.invite_define().await;
             db.email_sent_define().await;
+            db.session_define().await;
+            db.password_change_define().await;
+            db.email_change_define().await;
+            db.post_define().await;
+            db.post_like_define().await;
+            db.comment_define().await;
+
+            db.migration_add(time, 0).await.unwrap();
             info!("database migration successful");
         }
         Ok(migration) => panic!("migration unsupported version {}", migration.version),
@@ -23,5 +31,5 @@ pub async fn migrate(db: &Db) {
 #[tokio::test]
 async fn test_migrate() {
     init_log();
-    let db = Db::mem().await;
+    let db = Db::mem(0).await;
 }

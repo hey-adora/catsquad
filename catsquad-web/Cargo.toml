@@ -7,7 +7,19 @@ edition = "2024"
 crate-type = ["cdylib"]
 
 [dependencies]
+catsquad-client = { workspace = true, features = ["xml_http_request"] }
+catsquad-shared = { workspace = true }
+catsquad-log = { workspace = true }
+catsquad-web-utils = { workspace = true }
+console_error_panic_hook = { workspace = true }
+leptos_router = { workspace = true }
 leptos = { workspace = true }
 wasm-bindgen = { workspace = true }
-catsquad-log = { workspace = true }
-console_error_panic_hook = { workspace = true }
+web-sys = { workspace = true }
+strum = { workspace = true }
+hydration_context = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true }
+catsquad-api = { workspace = true, features=["test_server"] }
+catsquad-client = { workspace = true, features = ["axum_test"] }
