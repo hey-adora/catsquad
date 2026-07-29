@@ -1,4 +1,7 @@
+use std::fmt::Display;
+
 use catsquad_log::prelude::*;
+use catsquad_shared::{POST_STATE_ACTIVE, POST_STATE_DRAFT, POST_STATE_HIDDEN, PostState};
 use surrealdb::types::{RecordId, RecordIdKey, SurrealValue};
 
 use crate::{Db, DbUser, SurrealCheckUtils, SurrealErrUtils, SurrealSerializeUtils};
@@ -7,7 +10,7 @@ use crate::{Db, DbUser, SurrealCheckUtils, SurrealErrUtils, SurrealSerializeUtil
 pub struct DbPost {
     pub id: RecordId,
     pub user: DbUser,
-    pub show: bool,
+    pub state: String,
     pub title: String,
     pub tags: String,
     pub description: String,
@@ -46,7 +49,7 @@ impl Db {
         let query = "
                 DEFINE TABLE post SCHEMAFULL;
                 DEFINE FIELD user ON TABLE post TYPE record<user>;
-                DEFINE FIELD show ON TABLE post TYPE bool;
+                DEFINE FIELD state ON TABLE post TYPE string;
                 DEFINE FIELD title ON TABLE post TYPE string;
                 DEFINE FIELD size_bytes ON TABLE post TYPE number;
                 DEFINE FIELD description ON TABLE post TYPE string;
@@ -78,14 +81,40 @@ impl Db {
         let title = title.into();
         let description = description.into();
         let tags = tags.into();
+
+        let mut q_upadte = String::new();
+        if !title.is_empty() {
+            q_upadte += "title = $title,\n";
+        }
+        if !description.is_empty() {
+            q_upadte += "description = $description,\n";
+        }
+        if !tags.is_empty() {
+            q_upadte += "tags = $tags,\n";
+        }
+
         // let favorites = favorites.into();
 
-        let query = r#"
+        let query = format!("
                  BEGIN TRANSACTION;
+
                  LET $user = SELECT id FROM ONLY $user_id;
-                 CREATE post SET
-                    user = $user.id,
-                    show = true,
+
+                 IF !$user {{
+                    THROW \"user not found\";
+                 }};
+
+                 LET $existing_draft = SELECT id FROM ONLY post WHERE state = $post_state AND user = $user_id;
+
+                 LET $post = IF $existing_draft {{
+                    UPDATE ONLY $existing_draft.id SET 
+                       {q_upadte}
+                       modified_at = $time 
+                    RETURN *, user.*
+                 }} else {{
+                   CREATE post SET
+                    user = $user_id,
+                    state = $post_state,
                     title = $title,
                     description = $description,
                     tags = $tags,
@@ -94,12 +123,17 @@ impl Db {
                     file = [],
                     modified_at = $time,
                     created_at = $time
-                   RETURN *, user.*;
-                COMMIT TRANSACTION;
-                "#;
+                   RETURN *, user.*
+                 }};
+
+                 RETURN $post;
+
+                 COMMIT TRANSACTION;
+                ");
         trace!("about to run {query}");
         self.db
             .query(query)
+            .bind(("post_state", PostState::Draft.to_string()))
             .bind(("time", time))
             .bind(("user_id", user_id.clone()))
             .bind(("title", title))
@@ -107,13 +141,13 @@ impl Db {
             .bind(("tags", tags))
             .await
             .check_better(|err| match err {
-                err if err.field_value_null("user") => DbPostAddErr::UserNotFound,
+                err if err.thrown("user not found") => DbPostAddErr::UserNotFound,
                 err => {
                     error!("unexpected db error {err}");
                     DbPostAddErr::Db(err)
                 }
             })
-            .and_then_take_expect(2)
+            .and_then_take_expect(5)
     }
 }
 
@@ -135,9 +169,32 @@ async fn test_post_add() {
         .await
         .unwrap();
 
+    assert_eq!(post1.state, PostState::Draft.to_string());
     assert_eq!(post1.title, "title");
     assert_eq!(post1.description, "description");
     assert_eq!(post1.tags, "tags");
+
+    let post2 = db
+        .post_add(0, user.id.clone(), "title2", "description2", "tags2")
+        .await
+        .unwrap();
+
+    assert_eq!(post2.id, post1.id);
+    assert_eq!(post2.state, PostState::Draft.to_string());
+    assert_eq!(post2.title, "title2");
+    assert_eq!(post2.description, "description2");
+    assert_eq!(post2.tags, "tags2");
+
+    let post2 = db
+        .post_add(0, user.id.clone(), "title3", "", "")
+        .await
+        .unwrap();
+
+    assert_eq!(post2.id, post1.id);
+    assert_eq!(post2.state, PostState::Draft.to_string());
+    assert_eq!(post2.title, "title3");
+    assert_eq!(post2.description, "description2");
+    assert_eq!(post2.tags, "tags2");
 
     let result = db
         .post_add(0, create_user_id("invalid"), "title", "description", "tags")

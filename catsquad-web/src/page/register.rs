@@ -10,8 +10,6 @@ mod component_reg;
 use component_invite::InviteForm;
 use component_reg::RegisterForm;
 
-// use hook_register::use_register;
-
 #[component]
 pub fn Register() -> impl IntoView {
     // let api = ApiWeb::new();
@@ -25,22 +23,6 @@ pub fn Register() -> impl IntoView {
             .unwrap_or_default()
     };
     let email = RwQuery::<String>::new(RegisterPageParams::Email.to_string());
-
-    // let register_username: NodeRef<html::Input> = NodeRef::new();
-    // let register_email: NodeRef<html::Input> = NodeRef::new();
-    // let register_password: NodeRef<html::Input> = NodeRef::new();
-    // let register_password_confirmation: NodeRef<html::Input> = NodeRef::new();
-
-    // let a = RwQuery::<String>::new("");
-    // let a = a.fn_get;
-
-    // let reg = use_register(
-    //     // api,
-    //     register_username,
-    //     register_email,
-    //     register_password,
-    //     register_password_confirmation,
-    // );
 
     view! {
         <main node_ref=main_ref class="grid grid-rows-[auto_1fr] min-h-[100dvh]">

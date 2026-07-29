@@ -1,4 +1,5 @@
 use catsquad_log::prelude::*;
+use catsquad_shared::PostState;
 use surrealdb::types::{RecordId, RecordIdKey};
 
 use crate::{
@@ -100,7 +101,7 @@ async fn test_post_update_file_remove() {
 
     let invite1 = db.invite_add(0, "hey@heyadora.com", 1).await.unwrap();
     let user = db
-        .user_add(0, "hey", "hey", invite1.id.key.clone(), 10, 10)
+        .user_add(0, "hey", "hey", invite1.id.key.clone(), 25, 15)
         .await
         .unwrap();
 
@@ -112,6 +113,10 @@ async fn test_post_update_file_remove() {
 
     let post1 = db
         .post_add(0, user.id.clone(), "title1", "description1", "tags")
+        .await
+        .unwrap();
+    let post1 = db
+        .post_update_state(0, post1.id.key, PostState::Active)
         .await
         .unwrap();
     assert_eq!(post1.file.len(), 0);

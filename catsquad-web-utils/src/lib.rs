@@ -13,6 +13,7 @@ pub mod prelude {
 
     pub use super::mutation_observer::{self, AddMutationObserver, MutationObserverOptions};
     pub use super::random::{random_u8, random_u32, random_u32_ranged, random_u64};
+    pub use super::rem_to_px::rem_to_px;
     pub use super::resize_observer::{self, AddResizeObserver, GetContentBoxSize};
     pub use super::rw_signal_tree::RwSignalTree;
     pub use super::time::{ns_to_str, time_now_ms, time_now_ns};
@@ -968,6 +969,35 @@ pub mod leptos_helpers {
     }
 }
 
+pub mod rem_to_px {
+    use anyhow::anyhow;
+    use tracing::trace;
+    use wasm_bindgen::JsCast;
+    use web_sys::window;
+
+    pub fn rem_to_px(rem: u64) -> anyhow::Result<f64> {
+        let window = window().ok_or_else(|| anyhow!("window failed"))?;
+        let doc = window
+            .document()
+            .ok_or_else(|| anyhow!("document failed"))?;
+        let doc_elm = doc
+            .document_element()
+            .ok_or_else(|| anyhow!("document element failed"))?;
+        let style = window
+            .get_computed_style(&doc_elm)
+            .map_err(|_| anyhow!("get computed style failed"))?
+            .ok_or_else(|| anyhow!("get computed style is empty failed"))?;
+        let value = style
+            .get_property_value("font-size")
+            .map_err(|_| anyhow!("get computed property failed"))?;
+        let mut value = value.split("px");
+        let value = value
+            .next()
+            .ok_or_else(|| anyhow!("get pixel value failed"))?;
+        let value = u64::from_str_radix(value, 10)?;
+        Ok(rem as f64 * value as f64)
+    }
+}
 pub mod random {
 
     use web_sys::js_sys::Math::random;

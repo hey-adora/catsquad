@@ -1,4 +1,4 @@
-use crate::{Errs, Nav, PageState, hook::Spawner, page::create_client};
+use crate::{Display, Errs, Nav, PageState, hook::Spawner, page::create_client};
 use catsquad_client as api;
 use catsquad_log::prelude::*;
 use catsquad_shared::{
@@ -29,13 +29,19 @@ pub fn Login() -> impl IntoView {
     let input_password = NodeRef::new();
     let err_general = RwSignal::new(String::new());
 
-    let on_login = move |_| {
-        let (Some(email), Some(password)) = (
+    let on_login = move |e: web_sys::SubmitEvent| {
+        e.prevent_default();
+
+        let (Some(email), Some((elm_password, password))) = (
             input_email.get().map(|v: HtmlInputElement| v.value()),
-            input_password.get().map(|v: HtmlInputElement| v.value()),
+            input_password.get().map(|v: HtmlInputElement| {
+                let val = v.value();
+                (v, val)
+            }),
         ) else {
             return;
         };
+        elm_password.set_value("");
         let client = create_client();
         login_spawner.spawn(async move {
             let result = client
@@ -68,14 +74,13 @@ pub fn Login() -> impl IntoView {
                 <Show when=move||login_spawner.is_busy.get()>
                     <h1>"LOADING..."</h1>
                 </Show>
-                <Show when=move||!login_spawner.is_busy.get()>
+                <Display when=move||!login_spawner.is_busy.get() class=move||"">
                     <form method="POST" action="" on:submit=on_login class=move || format!("flex flex-col px-[4rem] max-w-[30rem] mx-auto w-full")>
                         <h1 class="text-[1.5rem]  text-center my-[4rem]">"LOGIN"</h1>
                         <div class=move||format!("text-red-600 {}", if err_general.with(|v| v.is_empty()) {"hidden"} else {""})>{move || { err_general.get() }}</div>
                         <div class="flex flex-col justify-center gap-[3rem]">
                             <div class="flex flex-col gap-0">
                                 <label for="email" class="text-[1.2rem] ">"Email"</label>
-
                                 <input placeholder="alice@mail.com" id="email" node_ref=input_email type="email" class="border-b-2 border-base05" />
                             </div>
                             <div class="flex flex-col gap-0">
@@ -89,7 +94,7 @@ pub fn Login() -> impl IntoView {
                             <a href=link_relative_register() class="underline">"or Register"</a>
                         </div>
                     </form>
-                </Show>
+                </Display>
             </div>
         </main>
     }

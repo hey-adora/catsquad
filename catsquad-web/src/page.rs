@@ -10,10 +10,12 @@ use leptos_router::path;
 mod index;
 mod login;
 mod register;
+mod upload;
 
 use index::Index as PageIndex;
 use login::Login as PageLogin;
 use register::Register as PageRegister;
+use upload::Upload as PageUpload;
 
 use crate::PageState;
 use crate::hook::Spawner;
@@ -40,6 +42,7 @@ pub fn App() -> impl IntoView {
             <Route path=path!("/") view=PageIndex />
             <ProtectedRoute path=path!("/login") condition=move||page.is_logged_in().map(|v|!v) redirect_path=move||"/" view=PageLogin />
             <ProtectedRoute path=path!("/register") condition=move||page.is_logged_in().map(|v|!v) redirect_path=move||"/" view=PageRegister />
+            <ProtectedRoute path=path!("/upload") condition=move||page.is_logged_in().map(|v|v) redirect_path=move||"/" view=PageUpload />
         </Routes>
       </Router>
     }

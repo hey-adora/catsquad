@@ -2,8 +2,8 @@ use axum::{Extension, Form, Json, extract::State, http::StatusCode, response::In
 use catsquad_db::{DbPost, DbPostAddErr, DbPostFile, DbUser, id_to_string};
 use catsquad_log::prelude::*;
 use catsquad_shared::{
-    PostAddErr, PostAddReq, PostFile, PostRes, validate_post_description, validate_post_tags,
-    validate_post_title,
+    PostAddErr, PostAddReq, PostFile, PostRes, PostState, validate_post_description,
+    validate_post_tags, validate_post_title,
 };
 
 use crate::{
@@ -15,7 +15,7 @@ pub fn from_db_post(value: DbPost) -> PostRes {
     PostRes {
         key: id_to_string(value.id),
         user: from_db_user_redacted(value.user),
-        show: value.show,
+        state: PostState::from(value.state),
         title: value.title,
         tags: value.tags,
         favorites: value.favorites,

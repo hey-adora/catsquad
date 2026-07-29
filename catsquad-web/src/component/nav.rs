@@ -2,8 +2,9 @@ use catsquad_log::prelude::*;
 use catsquad_shared::{LINK_WEB_INDEX, LINK_WEB_LOGIN};
 use leptos::{html, prelude::*};
 use leptos_router::hooks::use_navigate;
+use web_sys::SubmitEvent;
 
-use crate::PageState;
+use crate::{PageState, hook::Spawner, page::create_client};
 
 #[component]
 pub fn Nav() -> impl IntoView {
@@ -11,7 +12,13 @@ pub fn Nav() -> impl IntoView {
     let search_input = NodeRef::<html::Div>::new();
     let navigate = use_navigate();
 
+    // let on_login = move |_| {
+    //     // let
+
+    //     //
+    // };
     let on_logout = move |_| {
+
         //
     };
 
@@ -34,6 +41,7 @@ pub fn Nav() -> impl IntoView {
                 <a href=LINK_WEB_LOGIN>"Login"</a>
             </div>
             <div class=move||format!("flex gap-2 {}", if page_state.is_logged_in().unwrap_or_default() { "" } else { "hidden" })>
+                // <UploadForm/>
                 <a href="/upload">"Upload"</a>
                 // <form method="POST" action="" on:submit=on_upload >
                 //     <input type="submit" value="Upload" class="transition-all duration-300 ease-in hover:font-bold"/>
@@ -47,3 +55,36 @@ pub fn Nav() -> impl IntoView {
         </nav>
     }
 }
+
+// #[component]
+// pub fn UploadForm() -> impl IntoView {
+//     let spawner = Spawner::new();
+//     let on_upload = move |e: SubmitEvent| {
+//         e.prevent_default();
+//         let client = create_client();
+//         spawner.spawn(async move {
+//             let result = client
+//                 .post_add("", "", "")
+//                 .await
+//                 .send()
+//                 .await
+//                 .into_res()
+//                 .await;
+//             match result {
+//                 Ok(v) => {
+//                     // v.k
+//                 }
+
+//                 Err(err) => {
+//                     //
+//                 }
+//             }
+//         });
+//     };
+//     view! {
+//         <form on:submit=on_upload>
+
+//             <input type="submit" value="Upload" class="transition-all duration-300 ease-in hover:font-bold"/>
+//         </form>
+//     }
+// }

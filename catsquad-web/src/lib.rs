@@ -7,6 +7,8 @@ mod hook;
 mod page;
 mod page_state;
 
+pub use component::auto_text_area::AutoTextArea;
+pub use component::display::Display;
 pub use component::errors::Errs;
 pub use component::nav::Nav;
 pub use page_state::PageState;

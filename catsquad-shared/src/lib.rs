@@ -38,5 +38,7 @@ pub use api::user_update_username::*;
 pub use page::assets::*;
 pub use page::index::*;
 pub use page::login::*;
+pub use page::post::*;
 pub use page::register::*;
 pub use page::settings::*;
+pub use page::upload::*;

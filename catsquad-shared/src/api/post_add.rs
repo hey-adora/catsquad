@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use crate::{
     MAX_POST_DESCRIPTION_LENGTH, MAX_POST_TAGS_LENGTH, MAX_POST_TITLE_LENGTH, RedactedUserRes,
 };
@@ -9,7 +11,7 @@ pub const LINK_API_POST_ADD: &str = "/api/post";
 pub struct PostRes {
     pub key: String,
     pub user: RedactedUserRes,
-    pub show: bool,
+    pub state: PostState,
     pub title: String,
     pub description: String,
     pub tags: String,
@@ -17,6 +19,47 @@ pub struct PostRes {
     pub file: Vec<PostFile>,
     pub modified_at: u128,
     pub created_at: u128,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub enum PostState {
+    Draft,
+    Active,
+    Hidden,
+}
+
+// never change this, requres database migration
+pub const POST_STATE_DRAFT: &'static str = "draft";
+pub const POST_STATE_ACTIVE: &'static str = "active";
+pub const POST_STATE_HIDDEN: &'static str = "hidden";
+
+impl From<String> for PostState {
+    fn from(value: String) -> Self {
+        let value = value.as_str();
+        From::<&str>::from(value)
+    }
+}
+
+impl From<&str> for PostState {
+    fn from(value: &str) -> Self {
+        match value {
+            POST_STATE_DRAFT => Self::Draft,
+            POST_STATE_ACTIVE => Self::Active,
+            POST_STATE_HIDDEN => Self::Hidden,
+            _ => unreachable!("database has invalid state"),
+        }
+    }
+}
+
+impl Display for PostState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = match self {
+            PostState::Draft => POST_STATE_DRAFT,
+            PostState::Active => POST_STATE_ACTIVE,
+            PostState::Hidden => POST_STATE_HIDDEN,
+        };
+        write!(f, "{}", s)
+    }
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]

@@ -468,7 +468,7 @@ async fn test_post_update_file_add() {
     let server = crate::TestServer::new().await;
 
     let (user1, session_key1) = server
-        .user_add("prime", "prime@heyadora.com", "1234567890111GG11$")
+        .user_add("prime", "prime@heyadora.com", "1234567890111GGd11$")
         .await;
 
     let tmp_path = server.state.get_tmp_path().await;

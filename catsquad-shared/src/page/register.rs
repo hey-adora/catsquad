@@ -1,6 +1,6 @@
 pub const LINK_WEB_REGISTER: &str = "/register";
 
-pub const PATH_FRONT_END_REGISTER: &'static str = "/register";
+// pub const PATH_FRONT_END_REGISTER: &'static str = "/register";
 // pub const PATH_FRONT_END_PARAM_STAGE: &'static str = "stage";
 // pub const PATH_FRONT_END_PARAM_REG: &'static str = "reg";
 // pub const PATH_FRONT_END_PARAM_TOKEN: &'static str = "token";
@@ -32,7 +32,7 @@ pub fn link_relative_reg_check(email: impl AsRef<str>) -> String {
     format!(
         "{}?{}={}&{}={}",
         //
-        PATH_FRONT_END_REGISTER,
+        LINK_WEB_REGISTER,
         //
         RegisterPageParams::Stage.to_string(),
         RegisterPageStage::CheckEmail.to_string(),
@@ -47,7 +47,7 @@ pub fn link_absolute_reg_finish(address: impl AsRef<str>, token: impl AsRef<str>
         "{}{}?{}={}&{}={}",
         //
         address.as_ref(),
-        PATH_FRONT_END_REGISTER,
+        LINK_WEB_REGISTER,
         //
         RegisterPageParams::Stage.to_string(),
         RegisterPageStage::Register.to_string(),

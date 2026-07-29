@@ -3,7 +3,9 @@
 pub mod assets;
 pub mod index;
 pub mod login;
+pub mod post;
 pub mod register;
 pub mod settings;
+pub mod upload;
 
 // pub const PATH_FRONT_END_REGISTER: &'static str = "/register";

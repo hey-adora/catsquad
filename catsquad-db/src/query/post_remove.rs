@@ -1,4 +1,5 @@
 use catsquad_log::prelude::*;
+use catsquad_shared::PostState;
 use surrealdb::types::{RecordId, RecordIdKey, SurrealValue, ToSql};
 
 use crate::{
@@ -100,6 +101,10 @@ async fn test_post_remove() {
             .post_add(0, user.id.clone(), "title", "description", "tags")
             .await
             .unwrap();
+        let post1 = db
+            .post_update_state(0, post1.id.key, PostState::Active)
+            .await
+            .unwrap();
 
         db.post_like_add(0, user2.id.clone(), post1.id.key.clone())
             .await
@@ -132,6 +137,10 @@ async fn test_post_remove() {
     let post2_key = {
         let post2 = db
             .post_add(0, user.id.clone(), "title2", "description", "tags")
+            .await
+            .unwrap();
+        let post2 = db
+            .post_update_state(0, post2.id.key, PostState::Active)
             .await
             .unwrap();
 
