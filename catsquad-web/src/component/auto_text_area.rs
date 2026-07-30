@@ -1,4 +1,6 @@
+use crate::hook::Mutation;
 use catsquad_log::prelude::*;
+use catsquad_web_utils::prelude::MutationObserverOptions;
 use leptos::{html, prelude::*};
 use wasm_bindgen::prelude::*;
 use web_sys::{HtmlElement, HtmlTextAreaElement};
@@ -9,7 +11,9 @@ pub fn AutoTextArea(
     #[prop(optional, into)] placeholder: Option<Callback<(), String>>,
     #[prop(optional, into)] id: Option<Callback<(), String>>,
     #[prop(optional, into)] class: Option<Callback<(), String>>,
-    #[prop(optional, into)] on_input: Option<Callback<(HtmlTextAreaElement)>>,
+    #[prop(optional, into)] track: Option<Callback<()>>,
+    #[prop(optional, into)] on_input: Option<Callback<HtmlTextAreaElement>>,
+    #[prop(optional, into)] on_focusout: Option<Callback<HtmlTextAreaElement>>,
     #[prop(default = 500.0)] min_height: f64,
     children: Children,
 ) -> impl IntoView {
@@ -22,27 +26,82 @@ pub fn AutoTextArea(
 
     let height = RwSignal::new(min_height);
     let input = node_ref.unwrap_or_else(|| NodeRef::new());
-    let on_change = move || {
+
+    let fix_height = move || {
+        trace!("AutoTextArea fix height triggered");
+        let Some(input): Option<HtmlTextAreaElement> = input.get_untracked() else {
+            return;
+        };
+        let scroll_height = input.scroll_height() as f64;
+
+        if min_height >= scroll_height {
+            return;
+        }
+        height.set(scroll_height);
+    };
+
+    let fn_on_change = move || {
+        trace!("AutoTextArea input triggered");
         let Some(input): Option<HtmlTextAreaElement> = input.get_untracked() else {
             return;
         };
         if let Some(on_input) = on_input {
             on_input.run(input.clone());
         }
-        let scroll_height = input.scroll_height() as f64;
-
-        if min_height >= scroll_height {
-            return;
-        }
-
-        height.set(scroll_height);
+        fix_height();
     };
+    let mutation = Mutation::new(move |a, b| {
+        trace!("AutoTextArea mutation triggered");
+        let Some(target) = input.get_untracked().map(|v| Into::<HtmlElement>::into(v)) else {
+            return;
+        };
+
+        fix_height();
+        b.disconnect();
+    });
 
     Effect::new(move || {
-        input.track();
         trace!("AutoTextArea effect triggered");
-        on_change();
+        let Some(target) = input.get().map(|v| Into::<HtmlElement>::into(v)) else {
+            return;
+        };
+
+        // input.track();
+        // fn_on_change();
+        mutation.observe_only(
+            target,
+            MutationObserverOptions::new()
+                .character_data()
+                .set_child_list()
+                .subtree(),
+        );
     });
+
+    // Effect::new(move || {
+    //     if let Some(f) = track {
+    //         f.run(());
+    //     }
+    //     let Some(input): Option<HtmlTextAreaElement> = input.get_untracked() else {
+    //         return;
+    //     };
+    //     let scroll_height = input.scroll_height() as f64;
+
+    //     if min_height >= scroll_height {
+    //         return;
+    //     }
+
+    //     height.set(scroll_height);
+    // });
+
+    let on_focusout = move |_e: web_sys::FocusEvent| {
+        trace!("AutoTextArea focusout triggered");
+        let Some(input): Option<HtmlTextAreaElement> = input.get_untracked() else {
+            return;
+        };
+        if let Some(f) = on_focusout {
+            f.run(input.clone());
+        }
+    };
 
     // TODO maybe convert px to rem
     view! {
@@ -50,7 +109,8 @@ pub fn AutoTextArea(
             placeholder=placeholder_fn
             node_ref=input
             id=id_fn
-            on:input=move |_| on_change()
+            on:input=move |_| fn_on_change()
+            on:focusout=on_focusout
             style:height=move|| format!("{}px", height.get())
             class=class_fn
             >{children()}</textarea>

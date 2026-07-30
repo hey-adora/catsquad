@@ -141,7 +141,7 @@ pub async fn user_add(
     }
 }
 
-#[cfg(test)]
+#[cfg(any(test, feature = "test_server"))]
 mod test_utils {
     use axum::http::{
         HeaderName,

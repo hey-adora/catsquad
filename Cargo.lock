@@ -758,6 +758,7 @@ dependencies = [
  "catsquad-shared",
  "catsquad-web-utils",
  "console_error_panic_hook",
+ "http",
  "hydration_context",
  "leptos",
  "leptos_router",

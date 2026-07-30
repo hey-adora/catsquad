@@ -29,6 +29,7 @@ pub use api::password_change_update_confirm::*;
 pub use api::post_add::*;
 pub use api::post_search::*;
 pub use api::post_update_file_add::*;
+pub use api::post_update_title::*;
 pub use api::session_add::*;
 pub use api::session_delete::*;
 pub use api::user_add::*;

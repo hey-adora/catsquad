@@ -7,6 +7,9 @@ use crate::{
 
 #[derive(Debug, thiserror::Error, PartialEq)]
 pub enum DbPostUpdateTitleErr {
+    #[error("user not found")]
+    UserNotFound,
+
     #[error("post not found")]
     PostNotFound,
 
@@ -29,6 +32,10 @@ impl Db {
 
         let query = r#"
                     BEGIN TRANSACTION;
+
+                    IF !$user_id.exists() {
+                        THROW "user not found"
+                    };
 
                     LET $post = SELECT user FROM ONLY $post_id;
 
@@ -55,6 +62,7 @@ impl Db {
             .bind(("new_title", new_title.into()))
             .await
             .check_better(|err| match err {
+                err if err.thrown("user not found") => DbPostUpdateTitleErr::UserNotFound,
                 err if err.thrown("not found") => DbPostUpdateTitleErr::PostNotFound,
                 err if err.thrown("unauthorized") => DbPostUpdateTitleErr::Unauthorized,
                 err => {
@@ -62,12 +70,13 @@ impl Db {
                     DbPostUpdateTitleErr::Db(err)
                 }
             })
-            .and_then_take_expect(4)
+            .and_then_take_expect(5)
     }
 }
 
 #[tokio::test]
 async fn test_post_update_title() {
+    use crate::create_user_id;
     init_log();
 
     let db = Db::mem(0).await;
@@ -95,6 +104,11 @@ async fn test_post_update_title() {
         .await
         .unwrap();
     assert_eq!(post1.title, "title2");
+
+    let result = db
+        .post_update_title(0, create_user_id("invalid"), post1.id.key.clone(), "title2")
+        .await;
+    assert!(matches!(result, Err(DbPostUpdateTitleErr::UserNotFound)));
 
     let result = db
         .post_update_title(0, user2.id.clone(), post1.id.key.clone(), "title2")

@@ -6,16 +6,23 @@ use axum_test::{
     multipart::{MultipartForm, Part},
 };
 use catsquad_log::prelude::*;
+use http::HeaderName;
+use tokio::sync::RwLock;
 
 #[derive(Clone, Debug)]
 pub struct AxumTestSender {
     pub server: Arc<TestServer>,
+    pub inject_headers: Arc<RwLock<Vec<(HeaderName, String)>>>,
 }
 
 impl AxumTestSender {
-    pub fn new(test_server: Arc<TestServer>) -> Self {
+    pub fn new(
+        test_server: Arc<TestServer>,
+        inject_headers: Arc<RwLock<Vec<(HeaderName, String)>>>,
+    ) -> Self {
         Self {
             server: test_server,
+            inject_headers,
         }
     }
 }
@@ -41,7 +48,10 @@ impl Sender for AxumTestSender {
         let path = &params.path;
         let method = &params.method;
         let body = &params.body;
-        let headers = &params.headers;
+
+        let headers0 = self.inject_headers.read().await.clone();
+        let headers1 = params.headers.clone();
+        let headers = [headers0, headers1].concat();
 
         debug!("CLIENT SEND POST\n{}\n{:#?}", path, body);
         let inner = async || -> Result<axum_test::TestResponse, Error> {

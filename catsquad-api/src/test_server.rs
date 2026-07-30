@@ -3,7 +3,7 @@ use std::{fmt::Debug, marker::PhantomData, sync::Arc};
 use axum::{
     Router,
     body::Body,
-    http::{self, Request, Response, StatusCode, header},
+    http::{self, HeaderName, Request, Response, StatusCode, header},
 };
 use axum_test::Transport;
 use catsquad_client::{AxumTestSender, Client, Error, Sender};
@@ -23,6 +23,7 @@ use catsquad_log::prelude::*;
 pub struct TestServer {
     // app: Router,
     server: Arc<axum_test::TestServer>,
+    pub inject_headers: Arc<RwLock<Vec<(HeaderName, String)>>>,
     pub client: Client<AxumTestSender>,
     pub state: AppState,
 }
@@ -192,9 +193,10 @@ impl TestServer {
         // let server = axum_test::TestServer::new_with_config(router, config);
         let server = axum_test::TestServer::new(router);
         let server = Arc::new(server);
+        let inject_headers = Arc::new(RwLock::new(Vec::new()));
         // let origin = server.server_address().map(|v| v.to_string()).unwrap();
         // trace!("origin {origin}");
-        let client = Client::new(AxumTestSender::new(server.clone()));
+        let client = Client::new(AxumTestSender::new(server.clone(), inject_headers.clone()));
         // let client = Client::new(TestClient {
         //     // app: router.clone(),
         //     server: server.clone(),
@@ -205,6 +207,7 @@ impl TestServer {
             server,
             state,
             client,
+            inject_headers,
             // client,
         }
     }
@@ -216,6 +219,18 @@ impl TestServer {
     // pub async fn set_session_key(&self, session_key: impl Into<String>) {
     //     *self.client.client.session_key.write().await = session_key.into();
     // }
+    pub async fn inject_header(&self, name: HeaderName, value: String) {
+        let mut inject_headers = self.inject_headers.write().await;
+        inject_headers.push((name, value));
+    }
+
+    pub async fn remove_header(&self, name: HeaderName) {
+        let mut inject_headers = self.inject_headers.write().await;
+        let Some(pos) = inject_headers.iter().position(|v| v.0 == name) else {
+            return;
+        };
+        inject_headers.remove(pos);
+    }
 
     pub async fn email_sent_get_filtered(&self, reason: DbEmailSentReason) -> Vec<DbEmailSent> {
         let reason = reason.to_string();

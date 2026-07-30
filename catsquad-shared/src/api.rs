@@ -12,6 +12,7 @@ pub mod password_change_update_confirm;
 pub mod post_add;
 pub mod post_search;
 pub mod post_update_file_add;
+pub mod post_update_title;
 pub mod session_add;
 pub mod session_delete;
 pub mod user_add;

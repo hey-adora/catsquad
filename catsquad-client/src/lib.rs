@@ -444,4 +444,27 @@ where
         let sender = self.sender.clone();
         Builder::new(sender, params)
     }
+
+    pub async fn post_update_title(
+        &self,
+        post_key: impl Into<String>,
+        new_title: impl Into<String>,
+    ) -> Builder<TSender, catsquad_shared::PostRes, catsquad_shared::PostUpdateTitleErr> {
+        let req = catsquad_shared::PostUpdateTitleReq {
+            post_key: post_key.into(),
+            new_title: new_title.into(),
+            // password: password.into(),
+        }
+        .to_form()
+        .inspect_err(|err| error!("serializing failed {err}"))
+        .unwrap_or_default();
+        let params = SenderParams {
+            path: catsquad_shared::LINK_API_POST_UPDATE_TITLE.to_string(),
+            method: Method::Post,
+            body: Body::Form(req),
+            ..Default::default()
+        };
+        let sender = self.sender.clone();
+        Builder::new(sender, params)
+    }
 }
