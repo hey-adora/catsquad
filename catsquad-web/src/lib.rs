@@ -11,6 +11,7 @@ pub use component::auto_text_area::AutoTextArea;
 pub use component::display::Display;
 pub use component::errors::Errs;
 pub use component::nav::Nav;
+pub use component::svgs::*;
 pub use page_state::PageState;
 
 #[wasm_bindgen::prelude::wasm_bindgen]

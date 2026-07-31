@@ -1,6 +1,6 @@
 use std::{fmt::Debug, time::Duration};
 
-use crate::{AutoTextArea, Errs, Nav, hook::Spawner, page::create_client};
+use crate::{AutoTextArea, Errs, Nav, SVGTrash, hook::Spawner, page::create_client};
 use catsquad_client::{Client, Response, Sender};
 use catsquad_log::prelude::*;
 use catsquad_shared::{
@@ -8,12 +8,13 @@ use catsquad_shared::{
     validate_post_description, validate_post_tags, validate_post_title,
 };
 use catsquad_web_utils::{
+    file::GetFiles,
     interval,
     prelude::rem_to_px,
     time::{ns_to_str, time_now_ns},
 };
 use leptos::prelude::*;
-use web_sys::HtmlTextAreaElement;
+use web_sys::{File, HtmlInputElement, HtmlTextAreaElement, MouseEvent};
 
 const AUTO_SAVE_TIME: u128 = 3000000000; // 3s
 
@@ -443,6 +444,7 @@ pub fn Upload() -> impl IntoView {
         <Nav/>
         <div class="flex flex-col gap-4 max-w-[25rem] mx-auto" >
             <TitleEdit upload/>
+            <ImagesEdit upload/>
             <DescriptionEdit upload/>
             <TagsEdit upload/>
         </div>
@@ -453,6 +455,129 @@ pub fn Upload() -> impl IntoView {
 //     "auto save title - checking - {} - {} >= {} = elapsed({}) && saved({})",
 //     time, meta_data.set_at, AUTO_SAVE_TIME, elapsed, meta_data.saved
 // );
+
+#[derive(Clone)]
+pub struct ParsedFile {
+    pub file: File,
+    pub name: String,
+}
+
+#[component]
+pub fn ImagesEdit(upload: UploadState) -> impl IntoView {
+    let input_files = NodeRef::new();
+    let files = RwSignal::<Vec<ParsedFile>>::new(Vec::new());
+    let on_file_change = move |e| {
+        let Some(new_files) = (input_files.get_untracked() as Option<HtmlInputElement>)
+            .and_then(|f: HtmlInputElement| f.files())
+            .map(|f| f.get_files())
+        else {
+            return;
+        };
+        files.update(|v| {
+            v.extend(new_files.into_iter().map(|file| {
+                let name = file.name();
+
+                ParsedFile { file, name }
+            }))
+        });
+
+        //
+    };
+    let view_files = move || {
+        files
+            .get()
+            .into_iter()
+            .map(|file| {
+                let name = file.name.clone();
+                view! {
+                    <PreviewFile
+                        name=move|| name.clone()
+                    />
+                }
+            })
+            .collect_view()
+            .into_any()
+    };
+    let is_valid = move || ValidState::Empty;
+    view! {
+        <div class="flex flex-col gap-2">
+            <p class="text-[1.3rem] text-base0F ">"Images"</p>
+            <Errs error=move||upload.err_general.get() />
+            <EditArea
+                class=move||"flex gap-2"
+                required=false
+                is_valid=move||is_valid()
+                >
+                { view_files }
+                <PreviewAdd fn_for=move||"image"/>
+                <input class="absolute z-[-1] opacity-0" on:change=on_file_change type="file" id="image" name="image" node_ref=input_files multiple />
+            </EditArea>
+        </div>
+    }
+}
+
+#[component]
+pub fn PreviewFile(
+    #[prop(optional, into)] name: Option<Callback<(), String>>,
+    // #[prop(optional, into)] class: Option<Callback<(), String>>,
+    // #[prop(optional, into)] hash: Option<Callback<(), String>>,
+    // #[prop(optional, into)] on_click: Option<Callback<MouseEvent>>,
+) -> impl IntoView {
+    let fn_name = move || name.map(|v| v.run(())).unwrap_or_default();
+
+    // let location = use_location();
+
+    view! { <div
+            id="previw_add"
+            // for=move||fn_for()
+            class=move ||  {
+                // let hash = location.hash.get();
+                // trace!("hash: {hash}");
+                format!(" grid place-items-center h-[5rem] w-[5rem] rounded-xl bg-base05/10 bg-cover bg-center border-2 border-base05")
+            }
+            // style:background-image=move || format!("url(\"{url}\")")
+            >
+              <p class="text-[0.8rem] max-w-[100%] max-h-[100%] break-all overflow-hidden text-ellipsis">
+                  { fn_name }
+              </p>
+              <p class="text-[0.7rem]">
+                  "2.78 MB/s"
+              </p>
+              <p class="text-[0.9rem]">
+                  "45%"
+              </p>
+              <p class="text-[0.7rem]">
+                  "248MB/1GB"
+              </p>
+              <SVGTrash class="size-[1.1rem]" />
+            </div>
+    }
+}
+
+#[component]
+pub fn PreviewAdd(
+    #[prop(optional, into)] fn_for: Option<Callback<(), String>>,
+    #[prop(optional, into)] class: Option<Callback<(), String>>,
+    #[prop(optional, into)] hash: Option<Callback<(), String>>,
+    #[prop(optional, into)] on_click: Option<Callback<MouseEvent>>,
+) -> impl IntoView {
+    let fn_for = move || fn_for.map(|v| v.run(())).unwrap_or_default();
+
+    // let location = use_location();
+
+    view! { <label
+            id="previw_add"
+            for=move||fn_for()
+            class=move ||  {
+                // let hash = location.hash.get();
+                // trace!("hash: {hash}");
+                format!("text-[2rem] grid place-items-center h-[5rem] w-[5rem] rounded-xl bg-base05/10 bg-cover bg-center border-2 border-base05")
+            }
+            // style:background-image=move || format!("url(\"{url}\")")
+            >"+"</label>
+    }
+}
+
 #[component]
 pub fn TitleEdit(upload: UploadState) -> impl IntoView {
     let spawner = Spawner::new();
@@ -537,6 +662,14 @@ pub fn TagsEdit(upload: UploadState) -> impl IntoView {
     }
 }
 
+#[derive(Default, Clone, Copy, strum::EnumIs)]
+pub enum ValidState {
+    Empty,
+    #[default]
+    Error,
+    Valid,
+}
+
 #[component]
 pub fn TextEditArea(
     #[prop(optional, into)] title: String,
@@ -549,13 +682,6 @@ pub fn TextEditArea(
     input_text: RwSignal<String>,
     errors: RwSignal<String>,
 ) -> impl IntoView {
-    #[derive(Clone, Copy, strum::EnumIs)]
-    enum ValidState {
-        Empty,
-        Error,
-        Valid,
-    }
-
     let title_clone1 = title.clone();
     let title_clone2 = title.clone();
 
@@ -608,15 +734,6 @@ pub fn TextEditArea(
         input_text.track();
     };
 
-    let container_color = move || match is_valid() {
-        ValidState::Valid => "border-base0B bg-base0B/5",
-        ValidState::Error => "border-base08 bg-base08/5",
-        ValidState::Empty => match required {
-            true => "border-base08 bg-base08/5",
-            false => "border-base0A bg-base0A/5",
-        },
-    };
-
     let required_text_color = move || match is_valid() {
         ValidState::Valid => "text-base0B",
         ValidState::Error => "text-base08",
@@ -666,13 +783,19 @@ pub fn TextEditArea(
     view! {
         <div class="flex flex-col ">
             <div class="flex gap-2 flex-wrap place-items-center">
-                <h1 class="text-[1.3rem] text-base0F ">{ title_clone1 }</h1>
+                <p class="text-[1.3rem] text-base0F ">{ title_clone1 }</p>
                 <ul>
                     <li class=move|| format!("ml-[1rem] list-disc {}", required_text_color()) >{required_text}</li>
                 </ul>
             </div>
             <Errs class=move||"mb-2" error=move||errors.get()/>
-            <div class=move || format!("flex flex-col gap-2 border-2  rounded-lg px-3 py-2 {} ", container_color())>
+
+
+            <EditArea
+                required
+                is_valid=move||is_valid()
+                class=move||"flex flex-col gap-2"
+                >
                 <AutoTextArea
                     class=move||"w-full select-none"
                     placeholder=move||title.to_lowercase()
@@ -690,7 +813,35 @@ pub fn TextEditArea(
                         />
                     <div class=move||format!("{}", saved_text_color())>{saved_text}</div>
                 </div>
-            </div>
+
+            </EditArea>
+
+        </div>
+    }
+}
+
+#[component]
+pub fn EditArea(
+    #[prop(optional, into)] class: Option<Callback<(), String>>,
+    #[prop(optional, into)] is_valid: Option<Callback<(), ValidState>>,
+    #[prop(optional)] required: bool,
+    children: Children,
+) -> impl IntoView {
+    let is_valid = move || is_valid.map(|v| v.run(())).unwrap_or_default();
+    let fn_class = move || class.map(|v| v.run(())).unwrap_or_default();
+
+    let container_color = move || match is_valid() {
+        ValidState::Valid => "border-base0B bg-base0B/5",
+        ValidState::Error => "border-base08 bg-base08/5",
+        ValidState::Empty => match required {
+            true => "border-base08 bg-base08/5",
+            false => "border-base0A bg-base0A/5",
+        },
+    };
+
+    view! {
+        <div class=move || format!("border-2 rounded-lg px-3 py-2 {} {}", container_color(), fn_class() )>
+            {children()}
         </div>
     }
 }
