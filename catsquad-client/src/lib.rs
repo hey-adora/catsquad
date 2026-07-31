@@ -467,4 +467,49 @@ where
         let sender = self.sender.clone();
         Builder::new(sender, params)
     }
+
+    pub async fn post_update_description(
+        &self,
+        post_key: impl Into<String>,
+        new_description: impl Into<String>,
+    ) -> Builder<TSender, catsquad_shared::PostRes, catsquad_shared::PostUpdateDescriptionErr> {
+        let req = catsquad_shared::PostUpdateDescriptionReq {
+            post_key: post_key.into(),
+            new_description: new_description.into(),
+            // password: password.into(),
+        }
+        .to_form()
+        .inspect_err(|err| error!("serializing failed {err}"))
+        .unwrap_or_default();
+        let params = SenderParams {
+            path: catsquad_shared::LINK_API_POST_UPDATE_DESCRIPTION.to_string(),
+            method: Method::Post,
+            body: Body::Form(req),
+            ..Default::default()
+        };
+        let sender = self.sender.clone();
+        Builder::new(sender, params)
+    }
+
+    pub async fn post_update_tags(
+        &self,
+        post_key: impl Into<String>,
+        new_tags: impl Into<String>,
+    ) -> Builder<TSender, catsquad_shared::PostRes, catsquad_shared::PostUpdateTagsErr> {
+        let req = catsquad_shared::PostUpdateTagsReq {
+            post_key: post_key.into(),
+            new_tags: new_tags.into(),
+        }
+        .to_form()
+        .inspect_err(|err| error!("serializing failed {err}"))
+        .unwrap_or_default();
+        let params = SenderParams {
+            path: catsquad_shared::LINK_API_POST_UPDATE_TAGS.to_string(),
+            method: Method::Post,
+            body: Body::Form(req),
+            ..Default::default()
+        };
+        let sender = self.sender.clone();
+        Builder::new(sender, params)
+    }
 }

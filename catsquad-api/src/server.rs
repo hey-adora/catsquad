@@ -77,8 +77,16 @@ pub async fn app(state: AppState) -> Router {
             post(api::post_update_file_add),
         )
         .route(
+            catsquad_shared::LINK_API_POST_UPDATE_TAGS,
+            post(api::post_update_tags),
+        )
+        .route(
             catsquad_shared::LINK_API_POST_UPDATE_TITLE,
             post(api::post_update_title),
+        )
+        .route(
+            catsquad_shared::LINK_API_POST_UPDATE_DESCRIPTION,
+            post(api::post_update_description),
         )
         .route(
             catsquad_shared::LINK_API_EMAIL_CHANGE_UPDATE_CURRENT_ADD,

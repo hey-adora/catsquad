@@ -44,6 +44,7 @@ pub use query::post_update_file_add::*;
 pub use query::post_update_file_remove::*;
 pub use query::post_update_order::*;
 pub use query::post_update_proccesed::*;
+pub use query::post_update_tags::*;
 pub use query::post_update_title::*;
 pub use query::session_add::*;
 pub use query::session_get_by_key::*;

@@ -1,50 +1,50 @@
 use axum::{Extension, Form, Json, extract::State, http::StatusCode, response::IntoResponse};
-use catsquad_db::{DbPostUpdateTitleErr, DbUser};
+use catsquad_db::{DbPostUpdateTagsErr, DbUser};
 use catsquad_log::prelude::*;
-use catsquad_shared::{PostRes, PostUpdateTitleErr, PostUpdateTitleReq, validate_post_title};
+use catsquad_shared::{PostRes, PostUpdateTagsErr, PostUpdateTagsReq, validate_post_tags};
 
-use crate::{api::post_add::from_db_post, auth::verify_password, state::AppState};
+use crate::{api::post_add::from_db_post, state::AppState};
 
-fn from_db_post_update_title_err(value: DbPostUpdateTitleErr) -> PostUpdateTitleErr {
+fn from_db_post_update_tags_err(value: DbPostUpdateTagsErr) -> PostUpdateTagsErr {
     match value {
-        DbPostUpdateTitleErr::PostNotFound => PostUpdateTitleErr::PostNotFound,
-        DbPostUpdateTitleErr::Unauthorized => {
-            PostUpdateTitleErr::Unauthorized("unauthorized".to_string())
+        DbPostUpdateTagsErr::PostNotFound => PostUpdateTagsErr::PostNotFound,
+        DbPostUpdateTagsErr::Unauthorized => {
+            PostUpdateTagsErr::Unauthorized("unauthorized".to_string())
         }
-        DbPostUpdateTitleErr::UserNotFound => PostUpdateTitleErr::InternalServer,
-        DbPostUpdateTitleErr::Db(_) => PostUpdateTitleErr::InternalServer,
+        DbPostUpdateTagsErr::UserNotFound => PostUpdateTagsErr::InternalServer,
+        DbPostUpdateTagsErr::Db(_) => PostUpdateTagsErr::InternalServer,
     }
 }
 
-fn status_code(result: &Result<PostRes, PostUpdateTitleErr>) -> StatusCode {
+fn status_code(result: &Result<PostRes, PostUpdateTagsErr>) -> StatusCode {
     match result {
         Ok(_) => StatusCode::OK,
-        Err(PostUpdateTitleErr::PostNotFound) => StatusCode::NOT_FOUND,
-        Err(PostUpdateTitleErr::InvalidTitle(_)) => StatusCode::BAD_REQUEST,
-        Err(PostUpdateTitleErr::Unauthorized(_)) => StatusCode::UNAUTHORIZED,
-        Err(PostUpdateTitleErr::InternalServer) => StatusCode::INTERNAL_SERVER_ERROR,
+        Err(PostUpdateTagsErr::PostNotFound) => StatusCode::NOT_FOUND,
+        Err(PostUpdateTagsErr::InvalidTags(_)) => StatusCode::BAD_REQUEST,
+        Err(PostUpdateTagsErr::Unauthorized(_)) => StatusCode::UNAUTHORIZED,
+        Err(PostUpdateTagsErr::InternalServer) => StatusCode::INTERNAL_SERVER_ERROR,
     }
 }
 
-pub async fn post_update_title(
+pub async fn post_update_tags(
     db_user: Extension<DbUser>,
     State(app): State<AppState>,
-    Form(req): Form<PostUpdateTitleReq>,
+    Form(req): Form<PostUpdateTagsReq>,
 ) -> impl IntoResponse {
     let time = app.get_time().await;
 
-    let inner = async || -> Result<PostRes, PostUpdateTitleErr> {
+    let inner = async || -> Result<PostRes, PostUpdateTagsErr> {
         let user_id = db_user.id.clone();
         let post_key = req.post_key;
-        let new_title = req.new_title;
+        let new_tags = req.new_tags;
 
-        validate_post_title(&new_title).map_err(|err| PostUpdateTitleErr::InvalidTitle(err))?;
+        validate_post_tags(&new_tags).map_err(|err| PostUpdateTagsErr::InvalidTags(err))?;
 
         let result = app
             .db
-            .post_update_title(time, user_id, post_key, &new_title)
+            .post_update_tags(time, user_id, post_key, &new_tags)
             .await
-            .map_err(from_db_post_update_title_err)?;
+            .map_err(from_db_post_update_tags_err)?;
 
         Ok(from_db_post(result))
     };
@@ -56,7 +56,7 @@ pub async fn post_update_title(
 }
 
 #[tokio::test]
-async fn test_post_update_title() {
+async fn test_post_update_tags() {
     use crate::auth::create_auth_cookie_str;
     use axum::http::header;
 
@@ -64,11 +64,11 @@ async fn test_post_update_title() {
 
     let server = crate::TestServer::new().await;
 
-    let (user1, session_key1) = server
+    let (_user1, session_key1) = server
         .user_add("prime", "prime@heyadora.com", "1234567890111GGd11$")
         .await;
 
-    let (user2, session_key2) = server
+    let (_user2, session_key2) = server
         .user_add("prime2", "prime2@heyadora.com", "1234567890111GGd11$")
         .await;
 
@@ -85,7 +85,7 @@ async fn test_post_update_title() {
 
     let post1 = server
         .client
-        .post_update_title(post1.key.clone(), "title2")
+        .post_update_tags(post1.key.clone(), "tags2")
         .await
         .header_add(header::COOKIE, create_auth_cookie_str(session_key1.clone()))
         .send()
@@ -94,38 +94,38 @@ async fn test_post_update_title() {
         .await
         .unwrap();
 
-    assert_eq!(post1.title, "title2");
+    assert_eq!(post1.tags, "tags2");
 
     let result = server
         .client
-        .post_update_title(post1.key.clone(), "title3")
+        .post_update_tags(post1.key.clone(), "tags3")
         .await
         .header_add(header::COOKIE, create_auth_cookie_str(session_key2.clone()))
         .send()
         .await
         .into_res()
         .await;
-    assert!(matches!(result, Err(PostUpdateTitleErr::Unauthorized(_))));
+    assert!(matches!(result, Err(PostUpdateTagsErr::Unauthorized(_))));
 
     let result = server
         .client
-        .post_update_title("invalid", "title3")
+        .post_update_tags("invalid", "tags3")
         .await
         .header_add(header::COOKIE, create_auth_cookie_str(session_key1.clone()))
         .send()
         .await
         .into_res()
         .await;
-    assert!(matches!(result, Err(PostUpdateTitleErr::PostNotFound)));
+    assert!(matches!(result, Err(PostUpdateTagsErr::PostNotFound)));
 
     let result = server
         .client
-        .post_update_title("invalid", "title3")
+        .post_update_tags("invalid", "tags3")
         .await
         .header_add(header::COOKIE, create_auth_cookie_str(session_key1.clone()))
         .send()
         .await
         .into_res()
         .await;
-    assert!(matches!(result, Err(PostUpdateTitleErr::PostNotFound)));
+    assert!(matches!(result, Err(PostUpdateTagsErr::PostNotFound)));
 }

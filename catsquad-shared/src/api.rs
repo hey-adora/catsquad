@@ -6,18 +6,20 @@ pub mod email_change_update_new_add;
 pub mod email_change_update_new_confirm;
 pub mod invite_add;
 pub mod invite_get_by_key;
-// pub mod invite_get_email_by_key;
 pub mod password_change_add;
 pub mod password_change_update_confirm;
 pub mod post_add;
 pub mod post_search;
+pub mod post_update_description;
 pub mod post_update_file_add;
+pub mod post_update_tags;
 pub mod post_update_title;
 pub mod session_add;
 pub mod session_delete;
 pub mod user_add;
 pub mod user_get_by_session_key;
 pub mod user_update_username;
+// pub mod invite_get_email_by_key;
 
 pub trait ToForm {
     fn to_form(&self) -> Result<String, anyhow::Error>;

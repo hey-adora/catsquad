@@ -35,6 +35,7 @@ pub mod post_update_file_remove;
 pub mod post_update_order;
 pub mod post_update_proccesed;
 pub mod post_update_state;
+pub mod post_update_tags;
 pub mod post_update_title;
 pub mod session_add;
 pub mod session_get_by_key;
