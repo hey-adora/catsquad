@@ -773,11 +773,14 @@ name = "catsquad-web-utils"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "catsquad-log",
  "cfg-if",
+ "hydration_context",
  "leptos",
  "leptos_router",
  "send_wrapper",
  "thiserror 2.0.18",
+ "tokio",
  "tracing",
  "wasm-bindgen",
  "wasm-bindgen-futures",

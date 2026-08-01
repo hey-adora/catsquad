@@ -4,7 +4,7 @@ use crate::{Body, BodyField, Error, Method, Response, ResponseContainer, Sender,
 use catsquad_log::prelude::*;
 use http::{HeaderMap, StatusCode};
 use web_sys::{
-    Event, FormData, ProgressEvent, XmlHttpRequest,
+    Blob, Event, FormData, ProgressEvent, XmlHttpRequest,
     js_sys::{Function, Promise, Uint8Array, futures::JsFuture},
     wasm_bindgen::{JsCast, JsValue, prelude::Closure},
 };
@@ -208,7 +208,29 @@ impl Sender for XMLSender {
                             // v.to
                         }
                         Body::MultipartForm(data) => {
-                            todo!("not implemented yet");
+                            let form = FormData::new().unwrap();
+                            for (name, value) in data {
+                                match value {
+                                    BodyField::Text(v) => {
+                                        form.set_with_str(name, v).unwrap();
+                                    }
+                                    BodyField::Bytes(v) => {
+                                        let blob = Blob::new().unwrap();
+                                        form.set_with_blob(name, &blob).unwrap();
+                                        todo!("FIX LATER >:[");
+                                    }
+                                    BodyField::File(v) => {
+                                        let v = v.clone().into_web_file();
+                                        form.set_with_blob(name, v.unchecked_ref()).unwrap();
+                                    }
+                                };
+                            }
+
+                            req.send_with_opt_form_data(Some(&form)).unwrap();
+
+                            // form.set_with_blob("upload", file.unchecked_ref()).unwrap();
+
+                            // todo!("not implemented yet");
                             //
                         }
                     }

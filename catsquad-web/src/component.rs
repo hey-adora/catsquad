@@ -3,3 +3,4 @@ pub mod display;
 pub mod errors;
 pub mod nav;
 pub mod svgs;
+pub mod length_counter;

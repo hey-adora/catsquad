@@ -22,5 +22,5 @@ hydration_context = { workspace = true }
 [dev-dependencies]
 http = { workspace = true }
 tokio = { workspace = true }
-catsquad-api = { workspace = true, features=["test_server"] }
+catsquad-api = { workspace = true, features = ["test_server"] }
 catsquad-client = { workspace = true, features = ["axum_test"] }

@@ -11,6 +11,7 @@ pub mod prelude {
         ToQueryField,
     };
 
+    pub use super::bytes_to_str::bytes_to_str;
     pub use super::mutation_observer::{self, AddMutationObserver, MutationObserverOptions};
     pub use super::random::{random_u8, random_u32, random_u32_ranged, random_u64};
     pub use super::rem_to_px::rem_to_px;
@@ -370,15 +371,16 @@ pub mod debugger {
     pub mod tests {
         use std::sync::Arc;
 
-        use hydration_context::HydrateSharedContext;
+        use catsquad_log::init_log;
+        use hydration_context::SsrSharedContext;
         use leptos::prelude::*;
 
-        use crate::{init_test_log, view::toolbox::prelude::StoreSignal};
+        use crate::prelude::StoreSignal;
 
         #[tokio::test]
         pub async fn toolbox_signal_debugger() {
-            init_test_log();
-            let owner = Owner::new_root(Some(Arc::new(HydrateSharedContext::new())));
+            init_log();
+            let owner = Owner::new_root(Some(Arc::new(SsrSharedContext::new())));
 
             let run = |signal: StoreSignal<i32>| {
                 let result = signal.get();
@@ -505,11 +507,13 @@ pub mod time {
 
         use std::time::Duration;
 
-        use crate::{init_test_log, view::toolbox::time::ns_to_str};
+        use catsquad_log::init_log;
+
+        use crate::time::ns_to_str;
 
         #[test]
         fn time_to_str_test() {
-            init_test_log();
+            init_log();
 
             let result = ns_to_str(Duration::from_nanos(1).as_nanos());
             assert_eq!(result, "1 ns");
@@ -966,6 +970,46 @@ pub mod leptos_helpers {
                 //
             })));
         let a = v.to_fn();
+    }
+}
+pub mod bytes_to_str {
+    use tracing::trace;
+
+    pub fn bytes_to_str(bytes: u64) -> String {
+        let mut output = String::new();
+
+        let table = ["bytes", "kb", "mb", "gb", "tb", "pb"];
+
+        let mut total_size = 1;
+        for label in table.into_iter() {
+            let prev_size = total_size;
+            total_size *= 1000;
+            if bytes < total_size {
+                let result = bytes as f64 / prev_size as f64;
+                let result = (result * 100.0).round() / 100.0;
+                output.push_str(&result.to_string());
+                output.push(' ');
+                output.push_str(label);
+                return output;
+                // return format!("{result::.2} {label}");
+            }
+        }
+
+        output.push('∞');
+
+        output
+    }
+
+    #[test]
+    fn test_bytes_to_str() {
+        use catsquad_log::init_log;
+
+        init_log();
+
+        assert_eq!(bytes_to_str(10), "10 bytes");
+        assert_eq!(bytes_to_str(999), "999 bytes");
+        assert_eq!(bytes_to_str(1000), "1 kb");
+        assert_eq!(bytes_to_str(1100), "1.1 kb");
     }
 }
 

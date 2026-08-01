@@ -16,7 +16,6 @@ pub use sender::xml_http_request::XMLSender;
 
 #[derive(Clone)]
 pub struct Client<TSender: Sender + Debug + Clone> {
-    // origin: url::Url,
     pub sender: TSender,
 }
 
@@ -27,7 +26,6 @@ where
     TSender::TResponse: Response + Debug,
     TResult: for<'a> serde::Deserialize<'a> + Debug,
     TError: for<'a> serde::Deserialize<'a> + Debug + Default,
-    // TRequest: serde::Serialize + Debug,
 {
     pub sender: TSender,
     pub params: SenderParams,
@@ -36,26 +34,7 @@ where
 
 pub trait Sender {
     type TResponse;
-    // where
-    //     Self::TResponse: Response + Debug;
-    // type ResponseContainer<TResult, TError, TRequest>
-    // where
-    //     TResult: for<'a> serde::Deserialize<'a> + Debug,
-    //     TError: for<'a> serde::Deserialize<'a> + Debug + Default,
-    //     TRequest: serde::Serialize + Debug
-    // ;
-
     fn send(&self, params: &SenderParams) -> impl Future<Output = Result<Self::TResponse, Error>>;
-    // fn send<TResult, TError>(
-    //     &self,
-    //     params: SenderParams,
-    // ) -> impl Future<Output = ResponseContainer<TResult, TError, Self::TResponse>>
-    // where
-    //     TResult: for<'a> serde::Deserialize<'a> + Debug,
-    //     TError: for<'a> serde::Deserialize<'a> + Debug + Default;
-
-    // TResponse: Response + Debug;
-    // TRequest: serde::Serialize + Debug,
 }
 
 #[derive(Debug)]
@@ -63,33 +42,23 @@ pub struct ResponseContainer<TResult, TError, TResponse>
 where
     TResult: for<'a> serde::Deserialize<'a> + Debug,
     TError: for<'a> serde::Deserialize<'a> + Debug + Default,
-    // TRequest: serde::Serialize + Debug,
-    // TResponse: Response + Debug,
 {
     pub request: SenderParams,
     pub response: Result<TResponse, Error>,
     phantom: PhantomData<(TResult, TError)>,
 }
 
-// pub struct SenderParams<TRequest>
-// where
-//     TRequest: serde::Serialize + Debug,
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct SenderParams {
-    // pub origin: url::Url,
     pub path: String,
     pub method: Method,
     pub body: Body,
     pub headers: Vec<(HeaderName, String)>,
 }
 
-// impl<TRequest> Default for SenderParams<TRequest>
-// where
-//     TRequest: serde::Serialize + Debug,
 impl Default for SenderParams {
     fn default() -> Self {
         Self {
-            // origin: url::Url::parse("http://localhost:3000").unwrap(),
             path: String::default(),
             method: Method::default(),
             body: Body::None,
@@ -130,33 +99,52 @@ pub enum Method {
     Post,
 }
 
-#[derive(
-    Debug,
-    // Default,
-    // Clone,
-    PartialEq,
-    PartialOrd,
-    // serde::Serialize,
-    // serde::Deserialize,
-    // strum::EnumString,
-    // strum::Display,
-    // strum::EnumIter,
-    // strum::EnumIs,
-)]
-// pub enum Body<TRequest>
-// where
-//     TRequest: serde::Serialize + Debug,
+#[derive(Debug, Clone, PartialEq)]
 pub enum Body {
     None,
     Form(String),
     MultipartForm(Vec<(String, BodyField)>),
 }
 
-#[derive(Debug, Clone, PartialEq, PartialOrd)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum BodyField {
-    File(String),
+    File(SchrodingersFile),
     Text(String),
     Bytes(Vec<u8>),
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum SchrodingersFile {
+    FilePath(String),
+    WebFile(web_sys::File),
+}
+
+impl SchrodingersFile {
+    pub fn into_file_path(self) -> String {
+        match self {
+            SchrodingersFile::FilePath(v) => v,
+            SchrodingersFile::WebFile(_) => panic!("trying to run web stuff on non-web stuff"),
+        }
+    }
+
+    pub fn into_web_file(self) -> web_sys::File {
+        match self {
+            SchrodingersFile::FilePath(_) => panic!("trying to run non-web stuff on web stuff"),
+            SchrodingersFile::WebFile(v) => v,
+        }
+    }
+}
+
+impl From<web_sys::File> for SchrodingersFile {
+    fn from(value: web_sys::File) -> Self {
+        SchrodingersFile::WebFile(value)
+    }
+}
+
+impl From<String> for SchrodingersFile {
+    fn from(value: String) -> Self {
+        SchrodingersFile::FilePath(value)
+    }
 }
 
 pub trait Response {
@@ -169,7 +157,6 @@ impl<TResult, TError, TResponse> ResponseContainer<TResult, TError, TResponse>
 where
     TResult: for<'a> serde::Deserialize<'a> + Debug,
     TError: for<'a> serde::Deserialize<'a> + Debug + Default,
-    // TRequest: serde::Serialize + Debug,
     TResponse: Response + Debug,
 {
     pub fn new(req: SenderParams, res: Result<TResponse, Error>) -> Self {
@@ -181,12 +168,10 @@ where
     }
 
     pub fn get_status(&self) -> Option<StatusCode> {
-        // self.response.get_headers()
         self.response.as_ref().map(|v| v.get_status().clone()).ok()
     }
 
     pub fn get_headers(&self) -> Option<HeaderMap> {
-        // self.response.get_headers()
         self.response.as_ref().map(|v| v.get_headers().clone()).ok()
     }
 
@@ -212,11 +197,6 @@ where
         );
 
         let res = res?;
-        // let res = res
-        //     .json::<Result<R, E>>()
-        //     .await
-        //     .inspect_err(|err| error!("client post err {err}"))
-        //     .map_err(|_err| E::default())?;
 
         res
     }
@@ -228,8 +208,6 @@ where
     TSender::TResponse: Response + Debug,
     TResult: for<'a> serde::Deserialize<'a> + Debug,
     TError: for<'a> serde::Deserialize<'a> + Debug + Default,
-    // TRequest: serde::Serialize + Debug,
-    // TResponse: Response + Debug,
 {
     pub fn new(sender: TSender, params: SenderParams) -> Self {
         Self {
@@ -265,21 +243,13 @@ where
     TSender::TResponse: Response + Debug,
 {
     pub fn new(sender: TSender) -> Self {
-        Self {
-            // origin: url::Url::parse(origin.as_ref()).unwrap(),
-            sender,
-        }
+        Self { sender }
     }
 
     pub async fn invite_add(
         &self,
         email: impl Into<String>,
-    ) -> Builder<
-        TSender,
-        catsquad_shared::InviteRes,
-        catsquad_shared::InviteAddErr,
-        // TSender::ResponseContainer,
-    > {
+    ) -> Builder<TSender, catsquad_shared::InviteRes, catsquad_shared::InviteAddErr> {
         let req = catsquad_shared::InviteAddReq {
             email: email.into(),
         }
@@ -317,12 +287,7 @@ where
         username: impl Into<String>,
         invite_key: impl Into<String>,
         password: impl Into<String>,
-    ) -> Builder<
-        TSender,
-        catsquad_shared::SensitiveUserRes,
-        catsquad_shared::UserAddErr,
-        // catsquad_shared::UserAddReq,
-    > {
+    ) -> Builder<TSender, catsquad_shared::SensitiveUserRes, catsquad_shared::UserAddErr> {
         let req = catsquad_shared::UserAddReq {
             username: username.into(),
             password: password.into(),
@@ -346,13 +311,7 @@ where
         title: impl Into<String>,
         description: impl Into<String>,
         tags: impl Into<String>,
-    ) -> Builder<
-        TSender,
-        catsquad_shared::PostRes,
-        catsquad_shared::PostAddErr,
-        // catsquad_shared::PostAddReq,
-        // TSender::ResponseContainer,
-    > {
+    ) -> Builder<TSender, catsquad_shared::PostRes, catsquad_shared::PostAddErr> {
         let req = catsquad_shared::PostAddReq {
             title: title.into(),
             description: description.into(),
@@ -371,21 +330,15 @@ where
         Builder::new(sender, params)
     }
 
-    pub async fn post_update_file_add(
+    pub async fn post_update_file_add<F: Into<SchrodingersFile>>(
         &self,
         post_key: impl AsRef<str>,
-        files: Vec<String>,
-    ) -> Builder<
-        TSender,
-        catsquad_shared::PostRes,
-        catsquad_shared::PostUpdateFileAddErr,
-        // catsquad_shared::PostUpdateFileAddReq,
-        // TSender::ResponseContainer,
-    > {
+        files: Vec<F>,
+    ) -> Builder<TSender, catsquad_shared::PostRes, catsquad_shared::PostUpdateFileAddErr> {
         let body = files
             .into_iter()
             .enumerate()
-            .map(|(i, file)| (format!("file{i}"), BodyField::File(file)))
+            .map(|(i, file)| (format!("file{i}"), BodyField::File(file.into())))
             .collect::<Vec<(String, BodyField)>>();
 
         let params = SenderParams {
@@ -400,13 +353,8 @@ where
 
     pub async fn user_by_session_key(
         &self,
-    ) -> Builder<
-        TSender,
-        catsquad_shared::SensitiveUserRes,
-        catsquad_shared::UserGetBySessionKeyErr,
-        // (),
-        // TSender::ResponseContainer,
-    > {
+    ) -> Builder<TSender, catsquad_shared::SensitiveUserRes, catsquad_shared::UserGetBySessionKeyErr>
+    {
         let params = SenderParams {
             path: catsquad_shared::LINK_API_SESSION_GET_BY_SESSION_KEY.to_string(),
             method: Method::Get,
@@ -421,13 +369,7 @@ where
         &self,
         email: impl Into<String>,
         password: impl Into<String>,
-    ) -> Builder<
-        TSender,
-        catsquad_shared::SensitiveUserRes,
-        catsquad_shared::SessionAddErr,
-        // catsquad_shared::SessionAddReq,
-        // TSender::ResponseContainer,
-    > {
+    ) -> Builder<TSender, catsquad_shared::SensitiveUserRes, catsquad_shared::SessionAddErr> {
         let req = catsquad_shared::SessionAddReq {
             email: email.into(),
             password: password.into(),
@@ -453,7 +395,6 @@ where
         let req = catsquad_shared::PostUpdateTitleReq {
             post_key: post_key.into(),
             new_title: new_title.into(),
-            // password: password.into(),
         }
         .to_form()
         .inspect_err(|err| error!("serializing failed {err}"))
@@ -476,7 +417,6 @@ where
         let req = catsquad_shared::PostUpdateDescriptionReq {
             post_key: post_key.into(),
             new_description: new_description.into(),
-            // password: password.into(),
         }
         .to_form()
         .inspect_err(|err| error!("serializing failed {err}"))

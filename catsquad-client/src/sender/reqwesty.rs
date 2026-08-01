@@ -84,6 +84,7 @@ impl Sender for ReqwestSender {
                     for (name, value) in multi_form {
                         match value {
                             BodyField::File(file) => {
+                                let file = file.into_file_path();
                                 form = form
                                     .file(name, file)
                                     .await

@@ -4,9 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [features]
-xml_http_request = [
-    "dep:web-sys",
-]
+xml_http_request = []
 reqwest = [
     "dep:reqwest",
 ]
@@ -25,6 +23,6 @@ catsquad-shared = { workspace = true }
 http = { workspace = true }
 url = { workspace = true }
 axum-test = { workspace = true, optional = true }
-web-sys = { workspace = true, optional = true }
+web-sys = { workspace = true }
 reqwest = { workspace = true, optional = true }
 tokio = { workspace = true, features = ["macros", "fs"], optional = true }

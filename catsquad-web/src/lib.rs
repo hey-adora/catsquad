@@ -10,6 +10,7 @@ mod page_state;
 pub use component::auto_text_area::AutoTextArea;
 pub use component::display::Display;
 pub use component::errors::Errs;
+pub use component::length_counter::LengthCounter;
 pub use component::nav::Nav;
 pub use component::svgs::*;
 pub use page_state::PageState;
@@ -27,5 +28,6 @@ pub fn init_owner() -> leptos::prelude::Owner {
     use hydration_context::SsrSharedContext;
     use leptos::prelude::Owner;
     use std::sync::Arc;
+
     Owner::new_root(Some(Arc::new(SsrSharedContext::new())))
 }

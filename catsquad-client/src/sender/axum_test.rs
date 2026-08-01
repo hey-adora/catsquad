@@ -78,6 +78,7 @@ impl Sender for AxumTestSender {
                     for (name, value) in multi_form {
                         match value {
                             BodyField::File(file) => {
+                                let file = file.into_file_path();
                                 let file = Path::new(&file);
                                 let file_name =
                                     file.file_name().unwrap().to_string_lossy().to_string();
