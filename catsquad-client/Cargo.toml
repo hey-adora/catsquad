@@ -14,15 +14,16 @@ axum_test = [
 ]
 
 [dependencies]
-serde = { workspace = true }
-serde_json = { workspace = true }
-strum = { workspace = true }
-thiserror = { workspace = true }
+any_spawner = { workspace = true }
+axum-test = { workspace = true, optional = true }
 catsquad-log = { workspace = true }
 catsquad-shared = { workspace = true }
 http = { workspace = true }
-url = { workspace = true }
-axum-test = { workspace = true, optional = true }
-web-sys = { workspace = true }
 reqwest = { workspace = true, optional = true }
+serde_json = { workspace = true }
+serde = { workspace = true }
+strum = { workspace = true }
+thiserror = { workspace = true }
 tokio = { workspace = true, features = ["macros", "fs"], optional = true }
+url = { workspace = true }
+web-sys = { workspace = true }

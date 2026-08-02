@@ -12,6 +12,7 @@ pub mod post_add;
 pub mod post_search;
 pub mod post_update_description;
 pub mod post_update_file_add;
+pub mod post_update_file_remove;
 pub mod post_update_tags;
 pub mod post_update_title;
 pub mod session_add;

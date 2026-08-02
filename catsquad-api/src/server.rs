@@ -1,6 +1,6 @@
 use axum::{
     Router,
-    extract::{Path, State},
+    extract::{DefaultBodyLimit, Path, State},
     http::{HeaderMap, StatusCode},
     middleware,
     response::IntoResponse,
@@ -8,6 +8,7 @@ use axum::{
 };
 use catsquad_db::DbUser;
 use catsquad_log::prelude::*;
+use catsquad_shared::{DEFAULT_GLOBAL_MAX_UPLOAD_SIZE, MAX_STORAGE_PER_FILE};
 use tokio::fs;
 
 use crate::{
@@ -31,7 +32,8 @@ pub async fn app(state: AppState) -> Router {
     let router_web = Router::new()
         .route(catsquad_shared::LINK_WEB_INDEX, get(api::assets::index))
         .route(catsquad_shared::LINK_WEB_REGISTER, get(api::assets::index))
-        .route(catsquad_shared::LINK_WEB_LOGIN, get(api::assets::index));
+        .route(catsquad_shared::LINK_WEB_LOGIN, get(api::assets::index))
+        .route(catsquad_shared::LINK_WEB_UPLOAD, get(api::assets::index));
 
     let router_assets = Router::new()
         .route(catsquad_shared::LINK_WEB_CSS, get(api::assets::css))
@@ -56,6 +58,17 @@ pub async fn app(state: AppState) -> Router {
             get(api::invite_get_by_key),
         );
 
+    let api_router_upload = Router::new()
+        .route(
+            catsquad_shared::LINK_API_POST_UPDATE_FILE_ADD,
+            post(api::post_update_file_add),
+        )
+        .layer(DefaultBodyLimit::max(DEFAULT_GLOBAL_MAX_UPLOAD_SIZE))
+        .route_layer(middleware::from_fn_with_state(
+            state.clone(),
+            auth_middleware,
+        ));
+
     let router_optionanl_auth = Router::new()
         .route(
             catsquad_shared::LINK_API_PASSWORD_CHANGE_ADD,
@@ -71,11 +84,11 @@ pub async fn app(state: AppState) -> Router {
         ));
 
     let router_auth = Router::new()
-        .route(catsquad_shared::LINK_API_POST_ADD, post(api::post_add))
         .route(
-            catsquad_shared::LINK_API_POST_UPDATE_FILE_ADD,
-            post(api::post_update_file_add),
+            catsquad_shared::LINK_API_POST_UPDATE_FILE_REMOVE,
+            post(api::post_update_file_remove),
         )
+        .route(catsquad_shared::LINK_API_POST_ADD, post(api::post_add))
         .route(
             catsquad_shared::LINK_API_POST_UPDATE_TAGS,
             post(api::post_update_tags),
@@ -130,6 +143,7 @@ pub async fn app(state: AppState) -> Router {
         ));
 
     let app = Router::new()
+        .merge(api_router_upload)
         .merge(router_assets)
         .merge(router_web)
         .merge(router_public)

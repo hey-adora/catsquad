@@ -1,9 +1,10 @@
 use std::fmt::Debug;
 
-use catsquad_client::{Client, Response, Sender};
+use catsquad_client::{Client, Response, SchrodingersFile, Sender};
 use catsquad_log::prelude::*;
 use catsquad_shared::{
-    PostAddErr, validate_post_description, validate_post_tags, validate_post_title,
+    PostAddErr, PostFile, PostState, validate_post_description, validate_post_tags,
+    validate_post_title,
 };
 use leptos::prelude::*;
 
@@ -26,15 +27,97 @@ impl FieldSaved {
     }
 }
 
+#[derive(Clone)]
+pub struct ParsedPostFile {
+    pub name: String,
+    pub size: u64,
+    pub uploaded_bytes: u64,
+    pub uploaded_percentage: u64,
+    pub upload_speed_bytes_a_second: u64,
+    pub state: ParsedPostFileState,
+    pub err: String,
+}
+
+impl From<String> for ParsedPostFile {
+    fn from(value: String) -> Self {
+        Self {
+            name: value,
+            size: 0,
+            uploaded_bytes: 0,
+            upload_speed_bytes_a_second: 0,
+            uploaded_percentage: 0,
+            state: ParsedPostFileState::Queue,
+            err: String::new(),
+        }
+    }
+}
+
+impl From<&str> for ParsedPostFile {
+    fn from(value: &str) -> Self {
+        From::<String>::from(value.to_string())
+    }
+}
+
+impl From<PostFile> for ParsedPostFile {
+    fn from(value: PostFile) -> Self {
+        Self {
+            name: value.hash,
+            size: value.size_bytes,
+            uploaded_bytes: 0,
+            upload_speed_bytes_a_second: 0,
+            uploaded_percentage: 0,
+            state: match value.proccesed {
+                true => ParsedPostFileState::Proccesed,
+                false => ParsedPostFileState::Uploaded,
+            },
+            err: String::new(),
+        }
+    }
+}
+
+impl From<web_sys::File> for ParsedPostFile {
+    fn from(file: web_sys::File) -> Self {
+        let name = file.name();
+        let size = file.size();
+        Self {
+            name: name,
+            size: size as u64,
+            uploaded_bytes: 0,
+            upload_speed_bytes_a_second: 0,
+            uploaded_percentage: 0,
+            state: ParsedPostFileState::Queue,
+            err: String::new(),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum ParsedPostFileState {
+    Queue,
+    Uploading,
+    Uploaded,
+    Proccesed,
+    Error,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum UploadStateStage {
+    Loading,
+    Loaded,
+    Err,
+}
+
 #[derive(Clone, Copy)]
 pub struct UploadState {
     pub post_key: StoredValue<String>,
+    pub stage: RwSignal<UploadStateStage>,
     pub title: RwSignal<String>,
     pub title_saved: RwSignal<FieldSaved>,
     pub description: RwSignal<String>,
     pub description_saved: RwSignal<FieldSaved>,
     pub tags: RwSignal<String>,
     pub tags_saved: RwSignal<FieldSaved>,
+    pub files: RwSignal<Vec<ArcRwSignal<ParsedPostFile>>>,
     pub err_general: RwSignal<String>,
     pub err_title: RwSignal<String>,
     pub err_description: RwSignal<String>,
@@ -45,12 +128,14 @@ impl UploadState {
     pub fn new(time: u128) -> Self {
         Self {
             post_key: StoredValue::new(String::new()),
+            stage: RwSignal::new(UploadStateStage::Loading),
             title: RwSignal::new(String::new()),
             title_saved: RwSignal::new(FieldSaved::new(time)),
             description: RwSignal::new(String::new()),
             description_saved: RwSignal::new(FieldSaved::new(time)),
             tags: RwSignal::new(String::new()),
             tags_saved: RwSignal::new(FieldSaved::new(time)),
+            files: RwSignal::new(Vec::new()),
             err_general: RwSignal::new(String::new()),
             err_title: RwSignal::new(String::new()),
             err_description: RwSignal::new(String::new()),
@@ -91,18 +176,38 @@ impl UploadState {
                     error!("page was disposed");
                     return;
                 }
+
+                if self
+                    .files
+                    .try_set(
+                        v.file
+                            .into_iter()
+                            .map(|v| ArcRwSignal::new(ParsedPostFile::from(v)))
+                            .collect(),
+                    )
+                    .is_some()
+                {
+                    error!("page was disposed");
+                    return;
+                }
+
+                if self.stage.try_set(UploadStateStage::Loaded).is_some() {
+                    error!("page was disposed");
+                    return;
+                }
             }
             Err(PostAddErr::InvalidTitle(err)) => {
-                self.err_title.set(err);
+                self.err_title.try_set(err);
             }
             Err(PostAddErr::InvalidDescription(err)) => {
-                self.err_description.set(err);
+                self.err_description.try_set(err);
             }
             Err(PostAddErr::InvalidTags(err)) => {
-                self.err_tags.set(err);
+                self.err_tags.try_set(err);
             }
             Err(err) => {
-                self.err_general.set(err.to_string());
+                self.stage.try_set(UploadStateStage::Err);
+                self.err_general.try_set(err.to_string());
             }
         }
     }
@@ -261,6 +366,101 @@ impl UploadState {
             v.saved = true;
         });
     }
+
+    pub async fn set_files<I>(&self, files: I) -> Vec<ArcRwSignal<ParsedPostFile>>
+    where
+        I: IntoIterator + Clone,
+        I::Item: Into<ParsedPostFile>,
+    {
+        let files_signals = files
+            .into_iter()
+            .map(|v| ArcRwSignal::new(Into::<ParsedPostFile>::into(v)))
+            .collect::<Vec<ArcRwSignal<ParsedPostFile>>>();
+
+        self.files.update({
+            let files_signals = files_signals.clone();
+            |parsed_files| {
+                parsed_files.extend(files_signals);
+            }
+        });
+
+        files_signals
+    }
+
+    pub async fn update_files<TSender, File>(
+        &self,
+        client: &Client<TSender>,
+        source_file: File,
+        parsed_file: ArcRwSignal<ParsedPostFile>,
+    ) where
+        TSender: Sender + Debug + Clone,
+        TSender::TResponse: Response + Debug,
+        File: Into<SchrodingersFile>,
+    {
+        let post_key = self.post_key.get_value();
+        if post_key.is_empty() {
+            warn!("trying upload files when post wasn't initialized");
+            return;
+        };
+
+        let result = client
+            .post_update_file_add(post_key, vec![source_file])
+            .await
+            .on_progress({
+                let file = parsed_file.clone();
+                move |stats| {
+                    file.update(|parsed_file| {
+                        parsed_file.state = ParsedPostFileState::Uploaded;
+                        parsed_file.uploaded_bytes = stats.completed_bytes;
+                        parsed_file.upload_speed_bytes_a_second = stats.upload_speed_bytes;
+                        parsed_file.uploaded_percentage = stats.completed_precentage;
+                    });
+                }
+            })
+            .send()
+            .await
+            .into_res()
+            .await;
+
+        match result {
+            Ok(received_post) => {
+                if received_post.len() != 1 {
+                    warn!("received wrong data\n{received_post:#?}");
+                    parsed_file.update(|file| {
+                        file.state = ParsedPostFileState::Error;
+                        file.err = "received wrong response".to_string();
+                    });
+                    return;
+                }
+
+                let Some(_received) = received_post.first() else {
+                    return;
+                };
+
+                parsed_file.update(|file| {
+                    file.state = ParsedPostFileState::Uploaded;
+                });
+            }
+            Err(err) => {
+                parsed_file.update(|file| {
+                    file.state = ParsedPostFileState::Error;
+                    file.err = err.to_string();
+                });
+            }
+        }
+    }
+
+    pub async fn remove_file<TSender>(
+        &self,
+        client: &Client<TSender>,
+        parsed_file: ArcRwSignal<ParsedPostFile>,
+    ) where
+        TSender: Sender + Debug + Clone,
+        TSender::TResponse: Response + Debug,
+    {
+        //
+        client.post_update_file_add(post_key, files)
+    }
 }
 
 #[cfg(test)]
@@ -292,6 +492,7 @@ async fn test_upload_state() {
     let upload = UploadState::new(0);
 
     assert_eq!(upload.post_key.get_value(), "");
+    assert_eq!(upload.stage.get_untracked(), UploadStateStage::Loading);
     assert_eq!(upload.title_saved.get_untracked().saved, true);
     assert_eq!(upload.title_saved.get_untracked().saved_at, 0);
     assert_eq!(upload.title.get_untracked(), "");
@@ -312,6 +513,7 @@ async fn test_upload_state() {
     upload.update_tags(1, &server.client).await;
 
     assert!(!upload.post_key.get_value().is_empty());
+    assert_eq!(upload.stage.get_untracked(), UploadStateStage::Loaded);
 
     assert_eq!(upload.title_saved.get_untracked().saved, true);
     assert_eq!(upload.title_saved.get_untracked().saved_at, 0);
@@ -416,4 +618,24 @@ async fn test_upload_state() {
     assert_eq!(upload.tags_saved.get_untracked().set_at, 7);
     assert_ne!(upload.tags.get_untracked(), "tags1");
     assert!(!upload.err_tags.get_untracked().is_empty());
+
+    let input_files = vec!["../assets/favicon.ico".to_string()];
+    let result = upload.set_files(input_files.clone()).await;
+    let files_signals = upload.files.get_untracked();
+    assert_eq!(files_signals.len(), 1);
+
+    let result = upload
+        .update_files(
+            &server.client,
+            input_files[0].clone(),
+            files_signals[0].clone(),
+        )
+        .await;
+
+    let files_signals = upload.files.get_untracked();
+    assert_eq!(files_signals.len(), 1);
+    assert_eq!(
+        files_signals[0].get_untracked().state,
+        ParsedPostFileState::Uploaded
+    );
 }

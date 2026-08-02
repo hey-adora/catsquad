@@ -15,7 +15,7 @@ use bytes::Bytes;
 use catsquad_db::{DbPostFile, DbPostUpdateFileAddErr, DbUser, id_to_string};
 use catsquad_log::prelude::*;
 use catsquad_shared::{
-    POST_UPDATE_FILE_ADD_PARAMS_FIELD_POST_KEY, PostRes, PostUpdateFileAddErr,
+    POST_UPDATE_FILE_ADD_PARAMS_FIELD_POST_KEY, PostFile, PostRes, PostUpdateFileAddErr,
     PostUpdateFileAddParams, SUPPORTED_FILE_EXTENSIONS,
 };
 use futures::{Stream, TryStreamExt};
@@ -398,6 +398,7 @@ pub async fn post_update_file_add(
         )
         .await?;
 
+        // let mut post_files = Vec::new();
         let mut post = None;
         for file in files {
             let result = app
@@ -407,16 +408,30 @@ pub async fn post_update_file_add(
                     user_id.clone(),
                     post_key.clone(),
                     file.saved_file.size_bytes,
-                    file.saved_file.hash,
-                    file.extension,
+                    file.saved_file.hash.clone(),
+                    file.extension.clone(),
                     file.width,
                     file.height,
                 )
                 .await
                 .map_err(from_db_post_update_file_add)?;
+
             post = Some(result);
+            // post_files.push(PostFile {
+            //     extension: file.extension,
+            //     hash: file.saved_file.hash,
+            //     proccesed: false,
+            //     size_bytes: file.saved_file.size_bytes,
+            //     width: file.width,
+            //     height: file.height,
+            // });
         }
-        let post = post.ok_or(PostUpdateFileAddErr::NotFilesFound)?;
+
+        let post = post.ok_or_else(|| PostUpdateFileAddErr::NotFilesFound)?;
+
+        // if post_files.is_empty() {
+        //     return Err(PostUpdateFileAddErr::NotFilesFound);
+        // }
 
         Ok(from_db_post(post))
     };
@@ -564,12 +579,12 @@ async fn test_post_update_file_add() {
         .await
         .unwrap();
 
-    let post1 = add_file(&post1.key, &[favicon_path]).await.unwrap();
-    assert_eq!(post1.file.len(), 1);
-    assert_eq!(post1.file[0].extension, "ico");
-    assert_eq!(post1.file[0].size_bytes, favicon_size);
-    assert_eq!(post1.file[0].hash, favicon_hash);
-    assert_eq!(post1.file[0].proccesed, false);
+    let post = add_file(&post1.key, &[favicon_path]).await.unwrap();
+    assert_eq!(post.file.len(), 1);
+    assert_eq!(post.file[0].extension, "ico");
+    assert_eq!(post.file[0].size_bytes, favicon_size);
+    assert_eq!(post.file[0].hash, favicon_hash);
+    assert_eq!(post.file[0].proccesed, false);
 
     // assert_eq!(post1.file[0].width, favicon_size);
 

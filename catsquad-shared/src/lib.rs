@@ -1,6 +1,7 @@
 mod api;
 mod page;
 
+pub const DEFAULT_GLOBAL_MAX_UPLOAD_SIZE: usize = 1000000000; // 1GB i think
 pub const MAX_STORAGE_PER_FILE: u64 = 1024 * 1000 * 30; // 30MB
 pub const MAX_STORAGE: u64 = 1024 * 1000 * 1000 * 2; // 2GB
 pub const SUPPORTED_FILE_EXTENSIONS: &[&str] = &["ico", "svg", "jpg", "jpeg", "png", "webp"];
@@ -30,6 +31,7 @@ pub use api::post_add::*;
 pub use api::post_search::*;
 pub use api::post_update_description::*;
 pub use api::post_update_file_add::*;
+pub use api::post_update_file_remove::*;
 pub use api::post_update_tags::*;
 pub use api::post_update_title::*;
 pub use api::session_add::*;

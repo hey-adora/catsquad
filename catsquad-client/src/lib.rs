@@ -1,7 +1,13 @@
 use catsquad_log::prelude::*;
 use catsquad_shared::{ToForm, link_relative_invite_get_by_key};
 use http::{HeaderMap, HeaderName, StatusCode, header};
-use std::{fmt::Debug, marker::PhantomData};
+use std::{
+    cell::{Cell, RefCell},
+    fmt::Debug,
+    marker::PhantomData,
+    rc::Rc,
+    sync::Arc,
+};
 
 mod sender;
 
@@ -48,12 +54,118 @@ where
     phantom: PhantomData<(TResult, TError)>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct UploadStats {
+    pub total_bytes: u64,
+    pub completed_bytes: u64,
+    pub completed_precentage: u64,
+    pub upload_speed_bytes: u64,
+    pub upload_accumulator: u64,
+    pub updated_at: u128,
+    pub rate_speed_ns: u128,
+}
+
+impl UploadStats {
+    pub fn new(rate_speed_ns: u128) -> Self {
+        // let completed_precentage = ((completed_bytes as f64 / total_bytes as f64) * 100.0) as u64;
+        Self {
+            total_bytes: 0,
+            completed_bytes: 0,
+            completed_precentage: 0,
+            upload_speed_bytes: 0,
+            upload_accumulator: 0,
+            updated_at: 0,
+            rate_speed_ns,
+        }
+    }
+
+    pub fn set_total(&mut self, total_bytes: u64) {
+        self.total_bytes = total_bytes;
+    }
+
+    pub fn update_by_completed_bytes(&mut self, time: u128, completed_bytes: u64) {
+        let completed_diff = completed_bytes.saturating_sub(self.completed_bytes);
+
+        // percentage
+        {
+            self.completed_bytes = completed_bytes;
+            let completed_percentage = (completed_bytes as f64 / self.total_bytes as f64) * 100.0;
+            let completed_precentage = if completed_percentage.is_finite() {
+                completed_percentage as u64
+            } else {
+                0
+            };
+            self.completed_precentage = completed_precentage;
+        }
+
+        // speed
+        {
+            let time_diff = time.saturating_sub(self.updated_at);
+            trace!("{time_diff}");
+            if time_diff >= self.rate_speed_ns {
+                trace!("swapping the accumulator");
+                self.upload_speed_bytes = self.upload_accumulator;
+                self.upload_accumulator = completed_diff;
+                self.updated_at = time;
+            } else {
+                trace!("adding to accumulator");
+                self.upload_accumulator += completed_diff;
+            }
+        }
+    }
+}
+
+// impl From<web_sys::ProgressEvent> for ProgressEvent {
+//     fn from(value: web_sys::ProgressEvent) -> Self {
+//         //value.loaded() as u64,
+//         Self::new(value.total() as u64)
+//     }
+// }
+
+#[test]
+fn test_progress_event() {
+    init_log();
+
+    let mut event = UploadStats::new(1);
+    event.set_total(20);
+    event.update_by_completed_bytes(0, 10);
+    assert_eq!(event.completed_bytes, 10);
+    assert_eq!(event.total_bytes, 20);
+    assert_eq!(event.completed_precentage, 50);
+    assert_eq!(event.upload_speed_bytes, 0);
+    assert_eq!(event.upload_accumulator, 10);
+    assert_eq!(event.updated_at, 0);
+    assert_eq!(event.rate_speed_ns, 1);
+    event.update_by_completed_bytes(1, 20);
+    assert_eq!(event.completed_bytes, 20);
+    assert_eq!(event.total_bytes, 20);
+    assert_eq!(event.completed_precentage, 100);
+    assert_eq!(event.upload_speed_bytes, 10);
+    assert_eq!(event.upload_accumulator, 10);
+    assert_eq!(event.updated_at, 1);
+    assert_eq!(event.rate_speed_ns, 1);
+}
+
+#[derive(Clone)]
 pub struct SenderParams {
     pub path: String,
     pub method: Method,
     pub body: Body,
     pub headers: Vec<(HeaderName, String)>,
+    // pub on_progress: Option<Arc<RwLock<dyn FnMut()>>>,
+    // pub upload_stats: Rc<> ,
+    pub on_progress: Option<Rc<RefCell<dyn FnMut(UploadStats)>>>,
+}
+
+impl Debug for SenderParams {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SenderParams")
+            .field("path", &self.path)
+            .field("method", &self.method)
+            .field("body", &self.body)
+            .field("headers", &self.headers)
+            .finish()
+    }
 }
 
 impl Default for SenderParams {
@@ -61,8 +173,10 @@ impl Default for SenderParams {
         Self {
             path: String::default(),
             method: Method::default(),
+            // upload_stats: ProgressStats::default(),
             body: Body::None,
             headers: Vec::new(),
+            on_progress: None,
         }
     }
 }
@@ -223,6 +337,13 @@ where
         ResponseContainer::new(self.params, res)
     }
 
+    pub fn on_progress(mut self, f: impl FnMut(UploadStats) + 'static) -> Self {
+        self.params.on_progress = Some(Rc::new(RefCell::new(f)));
+
+        // self.params.headers.push((name, value.into()));
+        self
+    }
+
     pub fn header_add(mut self, name: header::HeaderName, value: impl Into<String>) -> Self {
         self.params.headers.push((name, value.into()));
         self
@@ -345,6 +466,31 @@ where
             path: catsquad_shared::link_relative_post_update_file_add(post_key),
             method: Method::Post,
             body: Body::MultipartForm(body),
+            ..Default::default()
+        };
+        let sender = self.sender.clone();
+        Builder::new(sender, params)
+    }
+
+    pub async fn post_update_file_remove(
+        &self,
+        post_key: impl Into<String>,
+        hash: impl Into<String>,
+    ) -> Builder<TSender, catsquad_shared::PostRes, catsquad_shared::PostUpdateFileRemoveErr> {
+        let req = catsquad_shared::PostUpdateFileRemoveReq {
+            post_key: post_key.into(),
+            hash: hash.into(),
+        };
+        trace!("input req {req:?}");
+        let req = req
+            .to_form()
+            .inspect_err(|err| error!("serializing failed {err}"))
+            .unwrap_or_default();
+
+        let params = SenderParams {
+            path: catsquad_shared::link_relative_post_update_file_remove().to_string(),
+            method: Method::Post,
+            body: Body::Form(req),
             ..Default::default()
         };
         let sender = self.sender.clone();
