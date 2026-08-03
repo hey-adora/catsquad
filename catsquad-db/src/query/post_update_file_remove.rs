@@ -29,7 +29,7 @@ impl Db {
         user_id: RecordId,
         post_key: impl Into<RecordIdKey>,
         file_hash: impl Into<String>,
-    ) -> Result<DbPost, DbPostUpdateFileRemoveErr> {
+    ) -> Result<DbPostFile, DbPostUpdateFileRemoveErr> {
         let file_hash = file_hash.into();
         let post_id = create_post_id(post_key);
 
@@ -52,19 +52,21 @@ impl Db {
                         THROW "file not found"
                     };
 
+                    $post.file[$file_index];
+
                     LET $file_size_bytes = $post.file[$file_index].size_bytes;
 
                     UPDATE $user_id SET 
                        used_storage_bytes -= $file_size_bytes, 
                        modified_at = $time
-                    RETURN id;
+                    RETURN NONE;
 
                     UPDATE ONLY post SET 
                        file = $post.file.remove($file_index), 
                        size_bytes -= $file_size_bytes, 
                        modified_at = $time 
                     WHERE id = $post_id AND user = $user_id
-                    RETURN *, user.*;
+                    RETURN NONE;
 
                     COMMIT TRANSACTION;
                     
@@ -89,7 +91,7 @@ impl Db {
                     DbPostUpdateFileRemoveErr::Db(err)
                 }
             })
-            .and_then_take_expect(8)
+            .and_then_take_expect(6)
     }
 }
 
@@ -116,7 +118,7 @@ async fn test_post_update_file_remove() {
         .await
         .unwrap();
     let post1 = db
-        .post_update_state(0, post1.id.key, PostState::Active)
+        .post_update_state(0, user.id.clone(), post1.id.key, PostState::Active)
         .await
         .unwrap();
     assert_eq!(post1.file.len(), 0);
@@ -186,10 +188,11 @@ async fn test_post_update_file_remove() {
         Err(DbPostUpdateFileRemoveErr::FileNotFound)
     ));
 
-    let post1 = db
+    let post1_file = db
         .post_update_file_remove(0, user.id.clone(), post1.id.key.clone(), "hash2")
         .await
         .unwrap();
+    // let post1 = db.post_get_all()
 
     assert_eq!(post1.file.len(), 1);
     assert_eq!(post1.file[0].hash, "hash1");
@@ -204,7 +207,8 @@ async fn test_post_update_file_remove() {
         Err(DbPostUpdateFileRemoveErr::FileNotFound)
     ));
 
-    let post1 = db
+    //
+    let post1_file = db
         .post_update_file_remove(0, user.id.clone(), post1.id.key.clone(), "hash1")
         .await
         .unwrap();

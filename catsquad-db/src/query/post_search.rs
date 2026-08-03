@@ -136,7 +136,7 @@ async fn test_post_search() {
         .await
         .unwrap();
     let post0 = db
-        .post_update_state(1, post0.id.key, PostState::Active)
+        .post_update_state(1, user.id.clone(), post0.id.key, PostState::Active)
         .await
         .unwrap();
     let post1 = db
@@ -144,7 +144,7 @@ async fn test_post_search() {
         .await
         .unwrap();
     let post1 = db
-        .post_update_state(2, post1.id.key, PostState::Active)
+        .post_update_state(2, user.id.clone(), post1.id.key, PostState::Active)
         .await
         .unwrap();
     let post2 = db
@@ -152,7 +152,7 @@ async fn test_post_search() {
         .await
         .unwrap();
     let post2 = db
-        .post_update_state(3, post2.id.key, PostState::Active)
+        .post_update_state(3, user.id.clone(), post2.id.key, PostState::Active)
         .await
         .unwrap();
     let post9 = db

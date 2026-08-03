@@ -9,6 +9,7 @@ pub mod invite_get_by_key;
 pub mod password_change_add;
 pub mod password_change_update_confirm;
 pub mod post_add;
+pub mod post_get_by_key;
 pub mod post_search;
 pub mod post_update_description;
 pub mod post_update_file_add;

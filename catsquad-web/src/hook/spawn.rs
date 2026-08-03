@@ -28,7 +28,7 @@ impl Spawner {
             trace!("finished callback");
             let result = is_busy.try_set(false);
             if result.is_some() {
-                warn!("spawner already disposed");
+                debug!("spawner already disposed");
             }
         });
     }

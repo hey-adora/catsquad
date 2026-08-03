@@ -32,6 +32,7 @@ pub use query::password_change_get_all::*;
 pub use query::password_change_update_confirm::*;
 pub use query::post_add::*;
 pub use query::post_get_all::*;
+pub use query::post_get_by_key::*;
 pub use query::post_get_unproccesed::*;
 pub use query::post_like_add::*;
 pub use query::post_like_get_all::*;

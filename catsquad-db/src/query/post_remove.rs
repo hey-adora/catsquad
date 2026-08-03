@@ -102,7 +102,7 @@ async fn test_post_remove() {
             .await
             .unwrap();
         let post1 = db
-            .post_update_state(0, post1.id.key, PostState::Active)
+            .post_update_state(0, user.id.clone(), post1.id.key, PostState::Active)
             .await
             .unwrap();
 
@@ -140,7 +140,7 @@ async fn test_post_remove() {
             .await
             .unwrap();
         let post2 = db
-            .post_update_state(0, post2.id.key, PostState::Active)
+            .post_update_state(0, user.id.clone(), post2.id.key, PostState::Active)
             .await
             .unwrap();
 

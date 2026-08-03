@@ -14,12 +14,14 @@ pub mod component_edit_files;
 pub mod component_edit_tags;
 pub mod component_edit_text;
 pub mod component_edit_title;
+pub mod component_publish;
 pub mod upload_state;
 
 use component_edit_description::DescriptionEdit;
 use component_edit_files::ImagesEdit;
 use component_edit_tags::TagsEdit;
 use component_edit_title::TitleEdit;
+use component_publish::Publish;
 
 #[component]
 pub fn Upload() -> impl IntoView {
@@ -37,6 +39,7 @@ pub fn Upload() -> impl IntoView {
     view! {
         <Nav/>
         <div class="flex flex-col gap-4 max-w-[25rem] mx-auto" >
+            <Publish/>
             <TitleEdit upload/>
             <ImagesEdit upload/>
             <DescriptionEdit upload/>

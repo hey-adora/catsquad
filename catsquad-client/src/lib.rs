@@ -1,5 +1,7 @@
 use catsquad_log::prelude::*;
-use catsquad_shared::{ToForm, link_relative_invite_get_by_key};
+use catsquad_shared::{
+    PostFile, ToForm, link_relative_invite_get_by_key, link_relative_post_get_by_key,
+};
 use http::{HeaderMap, HeaderName, StatusCode, header};
 use std::{
     cell::{Cell, RefCell},
@@ -455,7 +457,7 @@ where
         &self,
         post_key: impl AsRef<str>,
         files: Vec<F>,
-    ) -> Builder<TSender, catsquad_shared::PostRes, catsquad_shared::PostUpdateFileAddErr> {
+    ) -> Builder<TSender, Vec<PostFile>, catsquad_shared::PostUpdateFileAddErr> {
         let body = files
             .into_iter()
             .enumerate()
@@ -476,7 +478,7 @@ where
         &self,
         post_key: impl Into<String>,
         hash: impl Into<String>,
-    ) -> Builder<TSender, catsquad_shared::PostRes, catsquad_shared::PostUpdateFileRemoveErr> {
+    ) -> Builder<TSender, PostFile, catsquad_shared::PostUpdateFileRemoveErr> {
         let req = catsquad_shared::PostUpdateFileRemoveReq {
             post_key: post_key.into(),
             hash: hash.into(),
@@ -593,6 +595,21 @@ where
             path: catsquad_shared::LINK_API_POST_UPDATE_TAGS.to_string(),
             method: Method::Post,
             body: Body::Form(req),
+            ..Default::default()
+        };
+        let sender = self.sender.clone();
+        Builder::new(sender, params)
+    }
+
+    pub async fn post_get_by_key(
+        &self,
+        post_key: impl AsRef<str>,
+    ) -> Builder<TSender, catsquad_shared::PostRes, catsquad_shared::PostGetByKeyErr> {
+        let link = link_relative_post_get_by_key(post_key);
+        let params = SenderParams {
+            path: link,
+            method: Method::Get,
+            body: Body::None,
             ..Default::default()
         };
         let sender = self.sender.clone();

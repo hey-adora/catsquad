@@ -26,7 +26,7 @@ pub fn from_db_post(value: DbPost) -> PostRes {
     }
 }
 
-fn from_db_post_file(value: DbPostFile) -> PostFile {
+pub fn from_db_post_file(value: DbPostFile) -> PostFile {
     PostFile {
         extension: value.extension,
         hash: value.hash,

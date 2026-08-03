@@ -22,6 +22,7 @@ pub mod password_change_get_all;
 pub mod password_change_update_confirm;
 pub mod post_add;
 pub mod post_get_all;
+pub mod post_get_by_key;
 pub mod post_get_unproccesed;
 pub mod post_like_add;
 pub mod post_like_get_all;

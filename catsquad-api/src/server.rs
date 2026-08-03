@@ -48,6 +48,10 @@ pub async fn app(state: AppState) -> Router {
 
     let router_public = Router::new()
         .route(
+            catsquad_shared::LINK_API_POST_GET_BY_KEY,
+            get(api::post_get_by_key),
+        )
+        .route(
             catsquad_shared::LINK_API_SESSION_ADD,
             post(api::session_add),
         )

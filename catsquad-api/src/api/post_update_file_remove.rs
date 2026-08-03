@@ -3,7 +3,10 @@ use catsquad_db::{DbPostUpdateFileRemoveErr, DbUser};
 use catsquad_log::prelude::*;
 use catsquad_shared::{PostFile, PostRes, PostUpdateFileRemoveErr, PostUpdateFileRemoveReq};
 
-use crate::{api::post_add::from_db_post, state::AppState};
+use crate::{
+    api::post_add::{from_db_post, from_db_post_file},
+    state::AppState,
+};
 
 fn from_db_post_update_file_remove_err(
     value: DbPostUpdateFileRemoveErr,
@@ -13,12 +16,12 @@ fn from_db_post_update_file_remove_err(
         DbPostUpdateFileRemoveErr::Unauthorized => {
             PostUpdateFileRemoveErr::Unauthorized("unauthorized".to_string())
         }
-        DbPostUpdateFileRemoveErr::FileNotFound => PostUpdateFileRemoveErr::InternalServer,
+        DbPostUpdateFileRemoveErr::FileNotFound => PostUpdateFileRemoveErr::FileNotFound,
         DbPostUpdateFileRemoveErr::Db(_) => PostUpdateFileRemoveErr::InternalServer,
     }
 }
 
-fn status_code(result: &Result<PostRes, PostUpdateFileRemoveErr>) -> StatusCode {
+fn status_code(result: &Result<PostFile, PostUpdateFileRemoveErr>) -> StatusCode {
     match result {
         Ok(_) => StatusCode::OK,
         Err(PostUpdateFileRemoveErr::PostNotFound) => StatusCode::NOT_FOUND,
@@ -35,11 +38,12 @@ pub async fn post_update_file_remove(
 ) -> impl IntoResponse {
     let time = app.get_time().await;
 
-    let inner = async || -> Result<PostRes, PostUpdateFileRemoveErr> {
+    let inner = async || -> Result<PostFile, PostUpdateFileRemoveErr> {
         let user_id = db_user.id.clone();
         let post_key = req.post_key;
         let hash = req.hash;
-        let post = app
+
+        let post_file = app
             .db
             .post_update_file_remove(time, user_id.clone(), post_key.clone(), hash)
             .await
@@ -56,7 +60,8 @@ pub async fn post_update_file_remove(
         // }
         // let post = post.ok_or_else(|| PostUpdateFileRemoveErr::InternalServer)?;
 
-        Ok(from_db_post(post))
+        Ok(from_db_post_file(post_file))
+        // Ok(from_db_post(post))
     };
 
     let result = inner().await;
@@ -93,7 +98,7 @@ async fn test_post_update_file_remove() {
         .await
         .unwrap();
 
-    let result = server
+    let _result = server
         .client
         .post_update_file_add(post1.key.clone(), vec!["../assets/favicon.ico".to_string()])
         .await
@@ -104,14 +109,34 @@ async fn test_post_update_file_remove() {
         .await
         .unwrap();
 
+    let result = server
+        .client
+        .post_get_by_key(post1.key.clone())
+        .await
+        .send()
+        .await
+        .into_res()
+        .await
+        .unwrap();
+
     assert_eq!(result.file.len(), 1);
     let file1_hash = result.file[0].hash.clone();
 
-    let result = server
+    let _result = server
         .client
         .post_update_file_remove(post1.key.clone(), file1_hash)
         .await
         .header_add(header::COOKIE, create_auth_cookie_str(session_key1.clone()))
+        .send()
+        .await
+        .into_res()
+        .await
+        .unwrap();
+
+    let result = server
+        .client
+        .post_get_by_key(post1.key.clone())
+        .await
         .send()
         .await
         .into_res()

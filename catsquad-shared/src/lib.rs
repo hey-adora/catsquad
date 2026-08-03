@@ -28,6 +28,7 @@ pub use api::invite_get_by_key::*;
 pub use api::password_change_add::*;
 pub use api::password_change_update_confirm::*;
 pub use api::post_add::*;
+pub use api::post_get_by_key::*;
 pub use api::post_search::*;
 pub use api::post_update_description::*;
 pub use api::post_update_file_add::*;

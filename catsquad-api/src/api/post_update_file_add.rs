@@ -15,7 +15,7 @@ use bytes::Bytes;
 use catsquad_db::{DbPostFile, DbPostUpdateFileAddErr, DbUser, id_to_string};
 use catsquad_log::prelude::*;
 use catsquad_shared::{
-    POST_UPDATE_FILE_ADD_PARAMS_FIELD_POST_KEY, PostFile, PostRes, PostUpdateFileAddErr,
+    POST_UPDATE_FILE_ADD_PARAMS_FIELD_POST_KEY, PostFile, PostUpdateFileAddErr,
     PostUpdateFileAddParams, SUPPORTED_FILE_EXTENSIONS,
 };
 use futures::{Stream, TryStreamExt};
@@ -68,7 +68,7 @@ fn from_db_post_update_file_add(value: DbPostUpdateFileAddErr) -> PostUpdateFile
     }
 }
 
-fn status_code(result: &Result<PostRes, PostUpdateFileAddErr>) -> StatusCode {
+fn status_code(result: &Result<Vec<PostFile>, PostUpdateFileAddErr>) -> StatusCode {
     match result {
         Ok(_) => StatusCode::OK,
         Err(PostUpdateFileAddErr::NotFilesFound) => StatusCode::BAD_REQUEST,
@@ -383,7 +383,7 @@ pub async fn post_update_file_add(
     let storage_path = app.get_storage_path().await;
     let tmp_path = app.get_tmp_path().await;
 
-    let inner = async || -> Result<PostRes, PostUpdateFileAddErr> {
+    let inner = async || -> Result<Vec<PostFile>, PostUpdateFileAddErr> {
         let req = params_req(params)?;
 
         let post_key = req.post_key;
@@ -398,10 +398,10 @@ pub async fn post_update_file_add(
         )
         .await?;
 
-        // let mut post_files = Vec::new();
-        let mut post = None;
+        let mut post_files = Vec::new();
+        // let mut post = None;
         for file in files {
-            let result = app
+            let _result = app
                 .db
                 .post_update_file_add(
                     time,
@@ -416,24 +416,25 @@ pub async fn post_update_file_add(
                 .await
                 .map_err(from_db_post_update_file_add)?;
 
-            post = Some(result);
-            // post_files.push(PostFile {
-            //     extension: file.extension,
-            //     hash: file.saved_file.hash,
-            //     proccesed: false,
-            //     size_bytes: file.saved_file.size_bytes,
-            //     width: file.width,
-            //     height: file.height,
-            // });
+            // post = Some(result);
+            post_files.push(PostFile {
+                extension: file.extension,
+                hash: file.saved_file.hash,
+                proccesed: false,
+                size_bytes: file.saved_file.size_bytes,
+                width: file.width,
+                height: file.height,
+            });
         }
 
-        let post = post.ok_or_else(|| PostUpdateFileAddErr::NotFilesFound)?;
+        // let post = post.ok_or_else(|| PostUpdateFileAddErr::NotFilesFound)?;
 
-        // if post_files.is_empty() {
-        //     return Err(PostUpdateFileAddErr::NotFilesFound);
-        // }
+        if post_files.is_empty() {
+            return Err(PostUpdateFileAddErr::NotFilesFound);
+        }
 
-        Ok(from_db_post(post))
+        Ok(post_files)
+        // Ok(from_db_post(post))
     };
 
     let result = inner().await;
@@ -579,12 +580,12 @@ async fn test_post_update_file_add() {
         .await
         .unwrap();
 
-    let post = add_file(&post1.key, &[favicon_path]).await.unwrap();
-    assert_eq!(post.file.len(), 1);
-    assert_eq!(post.file[0].extension, "ico");
-    assert_eq!(post.file[0].size_bytes, favicon_size);
-    assert_eq!(post.file[0].hash, favicon_hash);
-    assert_eq!(post.file[0].proccesed, false);
+    let files = add_file(&post1.key, &[favicon_path]).await.unwrap();
+    assert_eq!(files.len(), 1);
+    assert_eq!(files[0].extension, "ico");
+    assert_eq!(files[0].size_bytes, favicon_size);
+    assert_eq!(files[0].hash, favicon_hash);
+    assert_eq!(files[0].proccesed, false);
 
     // assert_eq!(post1.file[0].width, favicon_size);
 

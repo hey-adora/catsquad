@@ -72,9 +72,60 @@ impl Sender for XMLSender {
                 &mut move |resolve: Function, reject: Function| {
                     let resolve_clone1 = resolve.clone();
                     let req_clone1 = req.clone();
-                    let req_upload = req.upload().unwrap();
 
-                    // req_upload
+                    //upload progress
+                    if let Some(f) = on_progress.clone() {
+                        let req_upload = req.upload().unwrap();
+                        // panic!("wowowowwo");
+                        // let total_bytes = match body {
+                        //     Body::None => 0,
+                        //     Body::Form(v) v.as_bytes().len(),
+                        // }
+                        trace!("progress callback set");
+                        let upload_stats = UploadStats::new(Duration::from_secs(1).as_nanos());
+                        let upload_stats_rc = Rc::new(Cell::new(upload_stats));
+                        req_upload
+                            .add_event_listener_with_callback(
+                                "progress",
+                                &Closure::<dyn FnMut(_)>::new(
+                                    move |event: web_sys::ProgressEvent| {
+                                        trace!("progress event fired");
+                                        let total = event.total() as u64;
+                                        let completed = event.loaded() as u64;
+                                        let mut upload_stats = upload_stats_rc.get();
+                                        upload_stats.set_total(total);
+                                        let time = {
+                                            use web_sys::js_sys::Date;
+                                            let time = Date::new_0();
+                                            let time = time.get_time() as u64;
+                                            let time = time as u128 * 1000000;
+                                            time
+                                        };
+                                        upload_stats.update_by_completed_bytes(time, completed);
+                                        upload_stats_rc.set(upload_stats.clone());
+                                        (f.borrow_mut())(upload_stats);
+                                        // let f = &*f;
+                                        // let mut f = &mut *f;
+                                        // f.get_mut()
+
+                                        // f();
+                                        // let v = &mut *f;
+                                        // v();
+                                        // let f = f.clone();
+                                        // Executor::spawn_local(async move {
+                                        //     (f.write().await)();
+                                        // });
+                                        // f();
+                                        // trace!("downloading... {}/{}", event.loaded(), event.total());
+                                    },
+                                )
+                                .into_js_value()
+                                .unchecked_into(),
+                            )
+                            .unwrap();
+                    }
+                    // download progress
+                    // req
                     //     .add_event_listener_with_callback(
                     //         "progress",
                     //         &Closure::<dyn FnMut(_)>::new(move |event: ProgressEvent| {
@@ -91,50 +142,6 @@ impl Sender for XMLSender {
                     //         .unchecked_into(),
                     //     )
                     //     .unwrap();
-
-                    if let Some(f) = on_progress.clone() {
-                        // let total_bytes = match body {
-                        //     Body::None => 0,
-                        //     Body::Form(v) v.as_bytes().len(),
-                        // }
-                        let upload_stats = UploadStats::new(Duration::from_secs(1).as_nanos());
-                        let upload_stats_rc = Rc::new(Cell::new(upload_stats));
-                        req.add_event_listener_with_callback(
-                            "progress",
-                            &Closure::<dyn FnMut(_)>::new(move |event: web_sys::ProgressEvent| {
-                                let total = event.total() as u64;
-                                let completed = event.loaded() as u64;
-                                let mut upload_stats = upload_stats_rc.get();
-                                upload_stats.set_total(total);
-                                let time = {
-                                    use web_sys::js_sys::Date;
-                                    let time = Date::new_0();
-                                    let time = time.get_time() as u64;
-                                    let time = time as u128 * 1000000;
-                                    time
-                                };
-                                upload_stats.update_by_completed_bytes(time, completed);
-                                upload_stats_rc.set(upload_stats.clone());
-                                (f.borrow_mut())(upload_stats);
-                                // let f = &*f;
-                                // let mut f = &mut *f;
-                                // f.get_mut()
-
-                                // f();
-                                // let v = &mut *f;
-                                // v();
-                                // let f = f.clone();
-                                // Executor::spawn_local(async move {
-                                //     (f.write().await)();
-                                // });
-                                // f();
-                                // trace!("downloading... {}/{}", event.loaded(), event.total());
-                            })
-                            .into_js_value()
-                            .unchecked_into(),
-                        )
-                        .unwrap();
-                    }
 
                     req.add_event_listener_with_callback(
                         "loaded",
@@ -263,6 +270,7 @@ impl Sender for XMLSender {
                                 };
                             }
 
+                            // req.open_with_async(method, url, r#async)
                             req.send_with_opt_form_data(Some(&form)).unwrap();
 
                             // form.set_with_blob("upload", file.unchecked_ref()).unwrap();

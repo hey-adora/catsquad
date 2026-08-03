@@ -98,6 +98,7 @@ pub enum ParsedPostFileState {
     Uploaded,
     Proccesed,
     Error,
+    Removing,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -367,7 +368,7 @@ impl UploadState {
         });
     }
 
-    pub async fn set_files<I>(&self, files: I) -> Vec<ArcRwSignal<ParsedPostFile>>
+    pub fn set_files<I>(&self, files: I) -> Vec<ArcRwSignal<ParsedPostFile>>
     where
         I: IntoIterator + Clone,
         I::Item: Into<ParsedPostFile>,
@@ -387,7 +388,7 @@ impl UploadState {
         files_signals
     }
 
-    pub async fn update_files<TSender, File>(
+    pub async fn update_file<TSender, File>(
         &self,
         client: &Client<TSender>,
         source_file: File,
@@ -397,7 +398,7 @@ impl UploadState {
         TSender::TResponse: Response + Debug,
         File: Into<SchrodingersFile>,
     {
-        let post_key = self.post_key.get_value();
+        let post_key = self.post_key.try_get_value().unwrap_or_default();
         if post_key.is_empty() {
             warn!("trying upload files when post wasn't initialized");
             return;
@@ -409,8 +410,9 @@ impl UploadState {
             .on_progress({
                 let file = parsed_file.clone();
                 move |stats| {
+                    trace!("UPLOADING {stats:?}");
                     file.update(|parsed_file| {
-                        parsed_file.state = ParsedPostFileState::Uploaded;
+                        parsed_file.state = ParsedPostFileState::Uploading;
                         parsed_file.uploaded_bytes = stats.completed_bytes;
                         parsed_file.upload_speed_bytes_a_second = stats.upload_speed_bytes;
                         parsed_file.uploaded_percentage = stats.completed_precentage;
@@ -433,11 +435,10 @@ impl UploadState {
                     return;
                 }
 
-                let Some(_received) = received_post.first() else {
-                    return;
-                };
+                let hash = received_post[0].hash.clone();
 
                 parsed_file.update(|file| {
+                    file.name = hash;
                     file.state = ParsedPostFileState::Uploaded;
                 });
             }
@@ -458,14 +459,65 @@ impl UploadState {
         TSender: Sender + Debug + Clone,
         TSender::TResponse: Response + Debug,
     {
-        //
-        client.post_update_file_add(post_key, files)
+        let post_key = self.post_key.get_value();
+        if post_key.is_empty() {
+            warn!("trying remove files when post wasn't initialized");
+            return;
+        };
+
+        let (name, state) = parsed_file.with_untracked(|v| (v.name.clone(), v.state.clone()));
+
+        if state != ParsedPostFileState::Uploaded {
+            self.remove_file_parsed(&parsed_file);
+
+            return;
+        }
+
+        parsed_file.update(|v| {
+            v.state = ParsedPostFileState::Removing;
+        });
+
+        let result = client
+            .post_update_file_remove(post_key, name)
+            .await
+            .send()
+            .await
+            .into_res()
+            .await;
+
+        match result {
+            Ok(v) => {
+                self.remove_file_parsed(&parsed_file);
+            }
+            Err(err) => {
+                parsed_file.update(|file| {
+                    file.state = ParsedPostFileState::Error;
+                    file.err = err.to_string();
+                });
+            }
+        }
+    }
+
+    fn remove_file_parsed(&self, remove_file: &ArcRwSignal<ParsedPostFile>) {
+        let Some(pos) = self
+            .files
+            .with_untracked(|v| v.iter().position(|v| *v == *remove_file))
+        else {
+            warn!("trying remove file that doesnt exist");
+            return;
+        };
+
+        self.files.update(|v| {
+            v.remove(pos);
+        });
+
+        trace!("remoevd {pos}");
     }
 }
 
 #[cfg(test)]
 #[tokio::test]
-async fn test_upload_state() {
+async fn test_upload_state_update() {
     use catsquad_api::{auth::create_auth_cookie_str, utils::rng_str};
     use catsquad_shared::{
         MAX_POST_DESCRIPTION_LENGTH, MAX_POST_TAGS_LENGTH, MAX_POST_TITLE_LENGTH,
@@ -475,7 +527,6 @@ async fn test_upload_state() {
     catsquad_log::init_log();
     let _owner = crate::init_owner();
     let server = catsquad_api::TestServer::new().await;
-    // server.state.set_time(0).await;
 
     let (_user1, session1) = server
         .user_add(
@@ -503,7 +554,6 @@ async fn test_upload_state() {
 
     assert_eq!(upload.tags.get_untracked(), "");
 
-    // server.state.set_time(1).await;
     upload.init(&server.client).await;
 
     // asserts that running update without set does nothing
@@ -618,19 +668,46 @@ async fn test_upload_state() {
     assert_eq!(upload.tags_saved.get_untracked().set_at, 7);
     assert_ne!(upload.tags.get_untracked(), "tags1");
     assert!(!upload.err_tags.get_untracked().is_empty());
+}
+
+#[cfg(test)]
+#[tokio::test]
+async fn test_upload_state_file_add() {
+    let (server, _owner, upload) = test_upload_init().await;
 
     let input_files = vec!["../assets/favicon.ico".to_string()];
-    let result = upload.set_files(input_files.clone()).await;
-    let files_signals = upload.files.get_untracked();
-    assert_eq!(files_signals.len(), 1);
+    let files_signals = upload.set_files(input_files.clone());
 
-    let result = upload
-        .update_files(
+    assert_eq!(files_signals.len(), 1);
+    assert_eq!(
+        files_signals[0].get_untracked().name,
+        "../assets/favicon.ico"
+    );
+
+    upload
+        .update_file(
             &server.client,
             input_files[0].clone(),
             files_signals[0].clone(),
         )
         .await;
+
+    assert_eq!(files_signals[0].get_untracked().name, "3905551641572326689");
+    assert_eq!(files_signals[0].get_untracked().err, "");
+    // assert_eq!(upload.er)
+
+    let post_key = upload.post_key.get_value();
+    let post1 = server
+        .client
+        .post_get_by_key(post_key)
+        .await
+        .send()
+        .await
+        .into_res()
+        .await
+        .unwrap();
+
+    assert_eq!(post1.file.len(), 1);
 
     let files_signals = upload.files.get_untracked();
     assert_eq!(files_signals.len(), 1);
@@ -638,4 +715,64 @@ async fn test_upload_state() {
         files_signals[0].get_untracked().state,
         ParsedPostFileState::Uploaded
     );
+}
+
+#[cfg(test)]
+#[tokio::test]
+async fn test_upload_state_file_remove() {
+    let (server, _owner, upload) = test_upload_init().await;
+
+    let input_files = vec!["../assets/favicon.ico".to_string()];
+    let files_signals = upload.set_files(input_files.clone());
+
+    upload
+        .update_file(
+            &server.client,
+            input_files[0].clone(),
+            files_signals[0].clone(),
+        )
+        .await;
+
+    upload
+        .remove_file(&server.client, files_signals[0].clone())
+        .await;
+
+    let post1 = server
+        .client
+        .post_get_by_key(upload.post_key.get_value())
+        .await
+        .send()
+        .await
+        .into_res()
+        .await
+        .unwrap();
+
+    assert_eq!(post1.file.len(), 0);
+}
+
+#[cfg(test)]
+async fn test_upload_init() -> (catsquad_api::TestServer, Owner, UploadState) {
+    use catsquad_api::auth::create_auth_cookie_str;
+    use http::header;
+
+    catsquad_log::init_log();
+    let owner = crate::init_owner();
+    let server = catsquad_api::TestServer::new().await;
+
+    let (_user1, session1) = server
+        .user_add(
+            "prime1",
+            "prime1@heyadora.com",
+            "235j4t49ngerigrog#IOTNOnfo",
+        )
+        .await;
+
+    server
+        .inject_header(header::COOKIE, create_auth_cookie_str(session1.clone()))
+        .await;
+
+    let upload = UploadState::new(0);
+    upload.init(&server.client).await;
+
+    (server, owner, upload)
 }
