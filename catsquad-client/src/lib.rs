@@ -1,6 +1,6 @@
 use catsquad_log::prelude::*;
 use catsquad_shared::{
-    PostFile, ToForm, link_relative_invite_get_by_key, link_relative_post_get_by_key,
+    PostFile, PostState, ToForm, link_relative_invite_get_by_key, link_relative_post_get_by_key,
 };
 use http::{HeaderMap, HeaderName, StatusCode, header};
 use std::{
@@ -593,6 +593,28 @@ where
         .unwrap_or_default();
         let params = SenderParams {
             path: catsquad_shared::LINK_API_POST_UPDATE_TAGS.to_string(),
+            method: Method::Post,
+            body: Body::Form(req),
+            ..Default::default()
+        };
+        let sender = self.sender.clone();
+        Builder::new(sender, params)
+    }
+
+    pub async fn post_update_state(
+        &self,
+        post_key: impl Into<String>,
+        new_state: PostState,
+    ) -> Builder<TSender, catsquad_shared::PostRes, catsquad_shared::PostUpdateStateErr> {
+        let req = catsquad_shared::PostUpdateStateReq {
+            post_key: post_key.into(),
+            new_state: new_state.into(),
+        }
+        .to_form()
+        .inspect_err(|err| error!("serializing failed {err}"))
+        .unwrap_or_default();
+        let params = SenderParams {
+            path: catsquad_shared::LINK_API_POST_UPDATE_STATE.to_string(),
             method: Method::Post,
             body: Body::Form(req),
             ..Default::default()

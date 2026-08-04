@@ -33,7 +33,8 @@ pub async fn app(state: AppState) -> Router {
         .route(catsquad_shared::LINK_WEB_INDEX, get(api::assets::index))
         .route(catsquad_shared::LINK_WEB_REGISTER, get(api::assets::index))
         .route(catsquad_shared::LINK_WEB_LOGIN, get(api::assets::index))
-        .route(catsquad_shared::LINK_WEB_UPLOAD, get(api::assets::index));
+        .route(catsquad_shared::LINK_WEB_UPLOAD, get(api::assets::index))
+        .route(catsquad_shared::LINK_WEB_POST, get(api::assets::index));
 
     let router_assets = Router::new()
         .route(catsquad_shared::LINK_WEB_CSS, get(api::assets::css))
@@ -96,6 +97,10 @@ pub async fn app(state: AppState) -> Router {
         .route(
             catsquad_shared::LINK_API_POST_UPDATE_TAGS,
             post(api::post_update_tags),
+        )
+        .route(
+            catsquad_shared::LINK_API_POST_UPDATE_STATE,
+            post(api::post_update_state),
         )
         .route(
             catsquad_shared::LINK_API_POST_UPDATE_TITLE,

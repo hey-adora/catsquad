@@ -1,7 +1,10 @@
 use crate::{
     Nav,
     hook::Spawner,
-    page::{create_client, upload::upload_state::UploadState},
+    page::{
+        create_client,
+        upload::upload_state::{UploadState, UploadStateStage},
+    },
 };
 use catsquad_web_utils::time::time_now_ns;
 use leptos::prelude::*;
@@ -37,14 +40,16 @@ pub fn Upload() -> impl IntoView {
     });
 
     view! {
-        <Nav/>
-        <div class="flex flex-col gap-4 max-w-[25rem] mx-auto" >
-            <Publish/>
-            <TitleEdit upload/>
-            <ImagesEdit upload/>
-            <DescriptionEdit upload/>
-            <TagsEdit upload/>
-        </div>
+        <main>
+            <Nav/>
+            <div class="flex flex-col gap-4 max-w-[25rem] mx-auto" >
+                <Publish upload/>
+                <TitleEdit upload/>
+                <ImagesEdit upload/>
+                <DescriptionEdit upload/>
+                <TagsEdit upload/>
+            </div>
+        </main>
     }
 }
 

@@ -33,6 +33,7 @@ pub use api::post_search::*;
 pub use api::post_update_description::*;
 pub use api::post_update_file_add::*;
 pub use api::post_update_file_remove::*;
+pub use api::post_update_state::*;
 pub use api::post_update_tags::*;
 pub use api::post_update_title::*;
 pub use api::session_add::*;

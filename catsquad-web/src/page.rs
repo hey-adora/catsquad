@@ -9,11 +9,13 @@ use leptos_router::path;
 
 mod index;
 mod login;
+mod post;
 mod register;
 mod upload;
 
 use index::Index as PageIndex;
 use login::Login as PageLogin;
+use post::Post as PagePost;
 use register::Register as PageRegister;
 use upload::Upload as PageUpload;
 
@@ -40,6 +42,7 @@ pub fn App() -> impl IntoView {
      <Router>
         <Routes fallback=|| "not found">
             <Route path=path!("/") view=PageIndex />
+            <Route path=path!("/p/:post") view=PagePost />
             <ProtectedRoute path=path!("/login") condition=move||page.is_logged_in().map(|v|!v) redirect_path=move||"/" view=PageLogin />
             <ProtectedRoute path=path!("/register") condition=move||page.is_logged_in().map(|v|!v) redirect_path=move||"/" view=PageRegister />
             <ProtectedRoute path=path!("/upload") condition=move||page.is_logged_in().map(|v|v) redirect_path=move||"/" view=PageUpload />

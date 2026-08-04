@@ -3,8 +3,8 @@ use std::fmt::Debug;
 use catsquad_client::{Client, Response, SchrodingersFile, Sender};
 use catsquad_log::prelude::*;
 use catsquad_shared::{
-    PostAddErr, PostFile, PostState, validate_post_description, validate_post_tags,
-    validate_post_title,
+    PostAddErr, PostFile, PostState, link_relative_post, validate_post_description,
+    validate_post_tags, validate_post_title,
 };
 use leptos::prelude::*;
 
@@ -103,6 +103,7 @@ pub enum ParsedPostFileState {
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum UploadStateStage {
+    Activating,
     Loading,
     Loaded,
     Err,
@@ -368,6 +369,37 @@ impl UploadState {
         });
     }
 
+    pub async fn update_state_active<TSender>(&self, client: &Client<TSender>) -> Option<String>
+    where
+        TSender: Sender + Debug + Clone,
+        TSender::TResponse: Response + Debug,
+    {
+        let post_key = self.post_key.get_value();
+
+        if post_key.is_empty() {
+            warn!("trying to set state while upload isn't initialized");
+            return None;
+        }
+
+        let result = client
+            .post_update_state(&post_key, PostState::Active)
+            .await
+            .send()
+            .await
+            .into_res()
+            .await;
+
+        match result {
+            Ok(v) => {
+                return Some(link_relative_post(v.key));
+            }
+            Err(v) => {
+                self.err_general.set(v.to_string());
+                return None;
+            }
+        }
+    }
+
     pub fn set_files<I>(&self, files: I) -> Vec<ArcRwSignal<ParsedPostFile>>
     where
         I: IntoIterator + Clone,
@@ -554,120 +586,158 @@ async fn test_upload_state_update() {
 
     assert_eq!(upload.tags.get_untracked(), "");
 
+    // try updating when not initialized
+    {
+        upload.update_title(1, &server.client).await;
+        upload.update_description(1, &server.client).await;
+        upload.update_tags(1, &server.client).await;
+
+        assert!(upload.err_general.get_untracked().is_empty());
+        assert!(upload.err_title.get_untracked().is_empty());
+        assert!(upload.err_description.get_untracked().is_empty());
+        assert!(upload.err_tags.get_untracked().is_empty());
+    }
+
     upload.init(&server.client).await;
 
     // asserts that running update without set does nothing
+    {
+        upload.update_title(1, &server.client).await;
+        upload.update_description(1, &server.client).await;
+        upload.update_tags(1, &server.client).await;
 
-    upload.update_title(1, &server.client).await;
-    upload.update_description(1, &server.client).await;
-    upload.update_tags(1, &server.client).await;
+        assert!(!upload.post_key.get_value().is_empty());
+        assert_eq!(upload.stage.get_untracked(), UploadStateStage::Loaded);
 
-    assert!(!upload.post_key.get_value().is_empty());
-    assert_eq!(upload.stage.get_untracked(), UploadStateStage::Loaded);
+        assert_eq!(upload.title_saved.get_untracked().saved, true);
+        assert_eq!(upload.title_saved.get_untracked().saved_at, 0);
+        assert_eq!(upload.title_saved.get_untracked().set_at, 0);
+        assert_eq!(upload.title.get_untracked(), "");
 
-    assert_eq!(upload.title_saved.get_untracked().saved, true);
-    assert_eq!(upload.title_saved.get_untracked().saved_at, 0);
-    assert_eq!(upload.title_saved.get_untracked().set_at, 0);
-    assert_eq!(upload.title.get_untracked(), "");
+        assert_eq!(upload.description_saved.get_untracked().saved, true);
+        assert_eq!(upload.description_saved.get_untracked().saved_at, 0);
+        assert_eq!(upload.description_saved.get_untracked().set_at, 0);
+        assert_eq!(upload.description.get_untracked(), "");
 
-    assert_eq!(upload.description_saved.get_untracked().saved, true);
-    assert_eq!(upload.description_saved.get_untracked().saved_at, 0);
-    assert_eq!(upload.description_saved.get_untracked().set_at, 0);
-    assert_eq!(upload.description.get_untracked(), "");
-
-    assert_eq!(upload.tags_saved.get_untracked().saved, true);
-    assert_eq!(upload.tags_saved.get_untracked().saved_at, 0);
-    assert_eq!(upload.tags_saved.get_untracked().set_at, 0);
-    assert_eq!(upload.tags.get_untracked(), "");
+        assert_eq!(upload.tags_saved.get_untracked().saved, true);
+        assert_eq!(upload.tags_saved.get_untracked().saved_at, 0);
+        assert_eq!(upload.tags_saved.get_untracked().set_at, 0);
+        assert_eq!(upload.tags.get_untracked(), "");
+    }
 
     // asserts set state change
+    {
+        upload.set_title(1, "title1");
+        upload.set_description(2, "description1");
+        upload.set_tags(3, "tags1");
 
-    upload.set_title(1, "title1");
-    upload.set_description(2, "description1");
-    upload.set_tags(3, "tags1");
+        assert_eq!(upload.title_saved.get_untracked().saved, false);
+        assert_eq!(upload.title_saved.get_untracked().saved_at, 0);
+        assert_eq!(upload.title_saved.get_untracked().set_at, 1);
+        assert_eq!(upload.title.get_untracked(), "title1");
 
-    assert_eq!(upload.title_saved.get_untracked().saved, false);
-    assert_eq!(upload.title_saved.get_untracked().saved_at, 0);
-    assert_eq!(upload.title_saved.get_untracked().set_at, 1);
-    assert_eq!(upload.title.get_untracked(), "title1");
+        assert_eq!(upload.description_saved.get_untracked().saved, false);
+        assert_eq!(upload.description_saved.get_untracked().saved_at, 0);
+        assert_eq!(upload.description_saved.get_untracked().set_at, 2);
+        assert_eq!(upload.description.get_untracked(), "description1");
 
-    assert_eq!(upload.description_saved.get_untracked().saved, false);
-    assert_eq!(upload.description_saved.get_untracked().saved_at, 0);
-    assert_eq!(upload.description_saved.get_untracked().set_at, 2);
-    assert_eq!(upload.description.get_untracked(), "description1");
-
-    assert_eq!(upload.tags_saved.get_untracked().saved, false);
-    assert_eq!(upload.tags_saved.get_untracked().saved_at, 0);
-    assert_eq!(upload.tags_saved.get_untracked().set_at, 3);
-    assert_eq!(upload.tags.get_untracked(), "tags1");
+        assert_eq!(upload.tags_saved.get_untracked().saved, false);
+        assert_eq!(upload.tags_saved.get_untracked().saved_at, 0);
+        assert_eq!(upload.tags_saved.get_untracked().set_at, 3);
+        assert_eq!(upload.tags.get_untracked(), "tags1");
+    }
 
     // asserts update state change
+    {
+        upload.update_title(3, &server.client).await;
+        upload.update_description(4, &server.client).await;
+        upload.update_tags(5, &server.client).await;
 
-    upload.update_title(3, &server.client).await;
-    upload.update_description(4, &server.client).await;
-    upload.update_tags(5, &server.client).await;
+        assert_eq!(upload.title_saved.get_untracked().saved, true);
+        assert_eq!(upload.title_saved.get_untracked().saved_at, 3);
+        assert_eq!(upload.title_saved.get_untracked().set_at, 1);
+        assert_eq!(upload.title.get_untracked(), "title1");
+        assert_eq!(upload.err_title.get_untracked(), "");
 
-    assert_eq!(upload.title_saved.get_untracked().saved, true);
-    assert_eq!(upload.title_saved.get_untracked().saved_at, 3);
-    assert_eq!(upload.title_saved.get_untracked().set_at, 1);
-    assert_eq!(upload.title.get_untracked(), "title1");
-    assert_eq!(upload.err_title.get_untracked(), "");
+        assert_eq!(upload.description_saved.get_untracked().saved, true);
+        assert_eq!(upload.description_saved.get_untracked().saved_at, 4);
+        assert_eq!(upload.description_saved.get_untracked().set_at, 2);
+        assert_eq!(upload.description.get_untracked(), "description1");
+        assert_eq!(upload.err_description.get_untracked(), "");
 
-    assert_eq!(upload.description_saved.get_untracked().saved, true);
-    assert_eq!(upload.description_saved.get_untracked().saved_at, 4);
-    assert_eq!(upload.description_saved.get_untracked().set_at, 2);
-    assert_eq!(upload.description.get_untracked(), "description1");
-    assert_eq!(upload.err_description.get_untracked(), "");
-
-    assert_eq!(upload.tags_saved.get_untracked().saved, true);
-    assert_eq!(upload.tags_saved.get_untracked().saved_at, 5);
-    assert_eq!(upload.tags_saved.get_untracked().set_at, 3);
-    assert_eq!(upload.tags.get_untracked(), "tags1");
-    assert_eq!(upload.err_tags.get_untracked(), "");
+        assert_eq!(upload.tags_saved.get_untracked().saved, true);
+        assert_eq!(upload.tags_saved.get_untracked().saved_at, 5);
+        assert_eq!(upload.tags_saved.get_untracked().set_at, 3);
+        assert_eq!(upload.tags.get_untracked(), "tags1");
+        assert_eq!(upload.err_tags.get_untracked(), "");
+    }
 
     // asserts that invalid value doesnt get pushed
 
-    let title = rng_str(MAX_POST_TITLE_LENGTH + 1);
-    let description = rng_str(MAX_POST_DESCRIPTION_LENGTH + 1);
-    let tags = rng_str(MAX_POST_TAGS_LENGTH + 1);
+    {
+        let title = rng_str(MAX_POST_TITLE_LENGTH + 1);
+        let description = rng_str(MAX_POST_DESCRIPTION_LENGTH + 1);
+        let tags = rng_str(MAX_POST_TAGS_LENGTH + 1);
 
-    upload.set_title(5, title);
-    upload.set_description(6, description);
-    upload.set_tags(7, tags);
+        upload.set_title(5, title);
+        upload.set_description(6, description);
+        upload.set_tags(7, tags);
 
-    assert_eq!(upload.title_saved.get_untracked().saved, true);
-    assert_eq!(upload.title_saved.get_untracked().saved_at, 3);
-    assert_eq!(upload.title_saved.get_untracked().set_at, 5);
+        assert_eq!(upload.title_saved.get_untracked().saved, true);
+        assert_eq!(upload.title_saved.get_untracked().saved_at, 3);
+        assert_eq!(upload.title_saved.get_untracked().set_at, 5);
 
-    assert_eq!(upload.description_saved.get_untracked().saved, true);
-    assert_eq!(upload.description_saved.get_untracked().saved_at, 4);
-    assert_eq!(upload.description_saved.get_untracked().set_at, 6);
+        assert_eq!(upload.description_saved.get_untracked().saved, true);
+        assert_eq!(upload.description_saved.get_untracked().saved_at, 4);
+        assert_eq!(upload.description_saved.get_untracked().set_at, 6);
 
-    assert_eq!(upload.tags_saved.get_untracked().saved, true);
-    assert_eq!(upload.tags_saved.get_untracked().saved_at, 5);
-    assert_eq!(upload.tags_saved.get_untracked().set_at, 7);
+        assert_eq!(upload.tags_saved.get_untracked().saved, true);
+        assert_eq!(upload.tags_saved.get_untracked().saved_at, 5);
+        assert_eq!(upload.tags_saved.get_untracked().set_at, 7);
 
-    upload.update_title(7, &server.client).await;
-    upload.update_description(8, &server.client).await;
-    upload.update_tags(9, &server.client).await;
+        upload.update_title(7, &server.client).await;
+        upload.update_description(8, &server.client).await;
+        upload.update_tags(9, &server.client).await;
 
-    assert_eq!(upload.title_saved.get_untracked().saved, true);
-    assert_eq!(upload.title_saved.get_untracked().saved_at, 3);
-    assert_eq!(upload.title_saved.get_untracked().set_at, 5);
-    assert_ne!(upload.title.get_untracked(), "title1");
-    assert!(!upload.err_title.get_untracked().is_empty());
+        assert_eq!(upload.title_saved.get_untracked().saved, true);
+        assert_eq!(upload.title_saved.get_untracked().saved_at, 3);
+        assert_eq!(upload.title_saved.get_untracked().set_at, 5);
+        assert_ne!(upload.title.get_untracked(), "title1");
+        assert!(!upload.err_title.get_untracked().is_empty());
 
-    assert_eq!(upload.description_saved.get_untracked().saved, true);
-    assert_eq!(upload.description_saved.get_untracked().saved_at, 4);
-    assert_eq!(upload.description_saved.get_untracked().set_at, 6);
-    assert_ne!(upload.description.get_untracked(), "description1");
-    assert!(!upload.err_description.get_untracked().is_empty());
+        assert_eq!(upload.description_saved.get_untracked().saved, true);
+        assert_eq!(upload.description_saved.get_untracked().saved_at, 4);
+        assert_eq!(upload.description_saved.get_untracked().set_at, 6);
+        assert_ne!(upload.description.get_untracked(), "description1");
+        assert!(!upload.err_description.get_untracked().is_empty());
 
-    assert_eq!(upload.tags_saved.get_untracked().saved, true);
-    assert_eq!(upload.tags_saved.get_untracked().saved_at, 5);
-    assert_eq!(upload.tags_saved.get_untracked().set_at, 7);
-    assert_ne!(upload.tags.get_untracked(), "tags1");
-    assert!(!upload.err_tags.get_untracked().is_empty());
+        assert_eq!(upload.tags_saved.get_untracked().saved, true);
+        assert_eq!(upload.tags_saved.get_untracked().saved_at, 5);
+        assert_eq!(upload.tags_saved.get_untracked().set_at, 7);
+        assert_ne!(upload.tags.get_untracked(), "tags1");
+        assert!(!upload.err_tags.get_untracked().is_empty());
+    }
+
+    // are errors cleared on success
+    {
+        upload.set_title(1, "title1");
+        upload.set_description(2, "description1");
+        upload.set_tags(3, "tags1");
+
+        upload.update_title(7, &server.client).await;
+        upload.update_description(8, &server.client).await;
+        upload.update_tags(9, &server.client).await;
+
+        assert!(upload.err_title.get_untracked().is_empty());
+        assert!(upload.err_description.get_untracked().is_empty());
+        assert!(upload.err_tags.get_untracked().is_empty());
+    }
+
+    // set state active
+    {
+        let link = upload.update_state_active(&server.client).await;
+        assert!(upload.err_general.get_untracked().is_empty());
+    }
 }
 
 #[cfg(test)]
