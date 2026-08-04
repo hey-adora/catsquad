@@ -7,7 +7,9 @@ pub struct EmailChangeUpdateCurrentConfirmReq {
     pub token: String,
 }
 
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq, thiserror::Error)]
+#[derive(
+    Default, Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq, thiserror::Error,
+)]
 pub enum EmailChangeUpdateCurrentConfirmErr {
     #[error("not found")]
     NotFound,
@@ -24,6 +26,7 @@ pub enum EmailChangeUpdateCurrentConfirmErr {
     #[error("unauthorized {0}")]
     Unauthorized(String),
 
+    #[default]
     #[error("internal server err")]
     InternalServer,
 }

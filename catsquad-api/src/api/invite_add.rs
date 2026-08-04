@@ -67,6 +67,38 @@ pub async fn invite_add(
     (status_code, Json(result))
 }
 
+#[cfg(test)]
+mod test_utils {
+    use crate::TestServer;
+    use catsquad_db::id_to_string;
+    use catsquad_shared as cs;
+
+    impl TestServer {
+        pub async fn invite_add(
+            &self,
+            email: impl Into<String>,
+        ) -> Result<cs::InviteRes, cs::InviteAddErr> {
+            self.client.invite_add(email).send().await.into_res().await
+        }
+
+        pub async fn invite_get_key(&self, email: impl AsRef<str>) -> String {
+            let email = email.as_ref();
+            id_to_string(
+                self.state
+                    .db
+                    .invite_get_all()
+                    .await
+                    .unwrap()
+                    .into_iter()
+                    .find(|v| !v.used && v.email == *email)
+                    .unwrap()
+                    .id
+                    .clone(),
+            )
+        }
+    }
+}
+
 // #[cfg(test)]
 // mod test_utils {
 //     use catsquad_shared::{InviteAddErr, InviteAddReq, InviteRes, LINK_API_INVITE_ADD, ToForm};

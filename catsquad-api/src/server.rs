@@ -111,7 +111,7 @@ pub async fn app(state: AppState) -> Router {
             post(api::post_update_description),
         )
         .route(
-            catsquad_shared::LINK_API_EMAIL_CHANGE_UPDATE_CURRENT_ADD,
+            catsquad_shared::LINK_API_EMAIL_CHANGE_ADD,
             post(api::email_change_add),
         )
         .route(
@@ -132,7 +132,7 @@ pub async fn app(state: AppState) -> Router {
         )
         .route(
             catsquad_shared::LINK_API_EMAIL_CHANGE_UPDATE_CANCEL,
-            post(api::email_change_update_finish),
+            post(api::email_change_update_cancel),
         )
         .route(
             catsquad_shared::LINK_API_USER_UPDATE_USERNAME,

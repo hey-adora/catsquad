@@ -1,5 +1,5 @@
+pub mod email_change_add;
 pub mod email_change_update_cancel;
-pub mod email_change_update_current_add;
 pub mod email_change_update_current_confirm;
 pub mod email_change_update_finish;
 pub mod email_change_update_new_add;

@@ -3,17 +3,14 @@ use catsquad_db::{
     DbEmailChange, DbEmailChangeAddErr, DbEmailChangeToken, DbEmailSentReason, DbUser, id_to_string,
 };
 use catsquad_log::prelude::*;
-use catsquad_shared::{
-    EmailChangeRes, EmailChangeToken, EmailChangeUpdateCurrentAddErr,
-    EmailChangeUpdateCurrentAddReq,
-};
+use catsquad_shared::{EmailChangeAddErr, EmailChangeRes, EmailChangeToken};
 
 use crate::state::AppState;
 
-fn from_db_email_change_add_err(value: DbEmailChangeAddErr) -> EmailChangeUpdateCurrentAddErr {
+fn from_db_email_change_add_err(value: DbEmailChangeAddErr) -> EmailChangeAddErr {
     match value {
-        DbEmailChangeAddErr::UserNotFound => EmailChangeUpdateCurrentAddErr::InternalServer,
-        DbEmailChangeAddErr::Db(_) => EmailChangeUpdateCurrentAddErr::InternalServer,
+        DbEmailChangeAddErr::UserNotFound => EmailChangeAddErr::InternalServer,
+        DbEmailChangeAddErr::Db(_) => EmailChangeAddErr::InternalServer,
     }
 }
 
@@ -36,11 +33,11 @@ fn from_db_email_change_token(value: DbEmailChangeToken) -> EmailChangeToken {
     }
 }
 
-pub fn status_code(result: &Result<EmailChangeRes, EmailChangeUpdateCurrentAddErr>) -> StatusCode {
+pub fn status_code(result: &Result<EmailChangeRes, EmailChangeAddErr>) -> StatusCode {
     match result {
         Ok(_) => StatusCode::OK,
-        Err(EmailChangeUpdateCurrentAddErr::Unauthorized(_)) => StatusCode::UNAUTHORIZED,
-        Err(EmailChangeUpdateCurrentAddErr::InternalServer) => StatusCode::INTERNAL_SERVER_ERROR,
+        Err(EmailChangeAddErr::Unauthorized(_)) => StatusCode::UNAUTHORIZED,
+        Err(EmailChangeAddErr::InternalServer) => StatusCode::INTERNAL_SERVER_ERROR,
     }
 }
 
@@ -61,7 +58,7 @@ pub async fn email_change_add(
 ) -> impl IntoResponse {
     let time = app.get_time().await;
     let email_change_expiration = app.get_email_change_expiration().await;
-    let inner = async || -> Result<EmailChangeRes, EmailChangeUpdateCurrentAddErr> {
+    let inner = async || -> Result<EmailChangeRes, EmailChangeAddErr> {
         let expires = time + email_change_expiration;
         let user_id = db_user.id.clone();
         let user_email = db_user.email.clone();
@@ -95,53 +92,78 @@ pub async fn email_change_add(
     (status_code, Json(result))
 }
 
-// #[cfg(test)]
-// mod test_utils {
-//     use catsquad_shared::{
-//         EmailChangeRes, EmailChangeUpdateCurrentAddErr, LINK_API_EMAIL_CHANGE_UPDATE_CURRENT_ADD,
-//     };
+#[cfg(test)]
+mod test_utils {
+    use crate::{TestServer, auth::create_auth_cookie_str};
+    use axum::http::header;
+    use catsquad_shared as cs;
 
-//     use crate::TestServer;
+    impl TestServer {
+        pub async fn email_change_add(
+            &self,
+            session_key: impl Into<String>,
+        ) -> Result<cs::EmailChangeRes, cs::EmailChangeAddErr> {
+            self.client
+                .email_change_add()
+                .header_add(header::COOKIE, create_auth_cookie_str(session_key.into()))
+                .send()
+                .await
+                .into_res()
+                .await
+        }
 
-//     impl TestServer {
-//         pub async fn email_change_add(
-//             &self,
-//             session_key: impl Into<String>,
-//         ) -> Result<EmailChangeRes, EmailChangeUpdateCurrentAddErr> {
-//             let session_key = session_key.into();
-//             self.post_auth_empty::<Result<EmailChangeRes, EmailChangeUpdateCurrentAddErr>>(
-//                 LINK_API_EMAIL_CHANGE_UPDATE_CURRENT_ADD,
-//                 session_key,
-//             )
-//             .await
-//             .0
-//         }
-//     }
-// }
+        pub async fn email_change_get_current_token(
+            &self,
+            email_change_key: impl Into<String>,
+        ) -> String {
+            self.state
+                .db
+                .email_change_get_by_key(email_change_key.into())
+                .await
+                .unwrap()
+                .current
+                .token
+        }
 
-// #[tokio::test]
-// async fn test_email_change_add() {
-//     init_log();
-//     let server = crate::TestServer::new().await;
+        pub async fn email_change_get_new_token(
+            &self,
+            email_change_key: impl Into<String>,
+        ) -> String {
+            self.state
+                .db
+                .email_change_get_by_key(email_change_key.into())
+                .await
+                .unwrap()
+                .new
+                .unwrap()
+                .token
+        }
+    }
+}
 
-//     let (user1, session_key) = server
-//         .user_add_2("hey", "hey@heyadora.com", "1234567890111GG11$")
-//         .await;
+#[cfg(test)]
+#[tokio::test]
+async fn test_email_change_add() {
+    use crate::auth::create_auth_cookie_str;
+    use axum::http::header;
+    init_log();
+    let server = crate::TestServer::new().await;
 
-//     let result = server.email_change_add("invalid").await;
-//     assert!(matches!(
-//         result,
-//         Err(EmailChangeUpdateCurrentAddErr::Unauthorized(_))
-//     ));
+    let (user1, session_key) = server
+        .user_add_full("hey", "hey@heyadora.com", "1g234567890111GG11$")
+        .await;
 
-//     let email_change = server.email_change_add(&session_key).await.unwrap();
+    let result = server.email_change_add("invalid").await;
+    assert!(matches!(result, Err(EmailChangeAddErr::Unauthorized(_))));
 
-//     let emails = server
-//         .email_sent_get_filtered(DbEmailSentReason::UserEmailChangeAddCurrent)
-//         .await;
-//     assert_eq!(emails.len(), 1);
-//     assert_eq!(
-//         emails[0].reason,
-//         DbEmailSentReason::UserEmailChangeAddCurrent.to_string()
-//     );
-// }
+    let _email_change = server.email_change_add(session_key).await.unwrap();
+
+    let emails = server
+        .email_sent_get_filtered(DbEmailSentReason::UserEmailChangeAddCurrent)
+        .await;
+    assert_eq!(emails.len(), 1);
+    assert_eq!(
+        emails[0].reason,
+        DbEmailSentReason::UserEmailChangeAddCurrent.to_string()
+    );
+}

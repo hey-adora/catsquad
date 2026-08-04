@@ -5,7 +5,9 @@ pub struct EmailChangeUpdateCancelReq {
     pub email_change_key: String,
 }
 
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq, thiserror::Error)]
+#[derive(
+    Default, Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq, thiserror::Error,
+)]
 pub enum EmailChangeUpdateCancelErr {
     #[error("not found")]
     NotFound,
@@ -19,6 +21,7 @@ pub enum EmailChangeUpdateCancelErr {
     #[error("expired")]
     Expired,
 
+    #[default]
     #[error("internal server err")]
     InternalServer,
 }

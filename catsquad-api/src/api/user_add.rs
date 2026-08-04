@@ -148,33 +148,45 @@ mod test_utils {
         header::{self, SET_COOKIE},
     };
     use catsquad_db::{DbUser, id_to_string};
-    use catsquad_shared::{LINK_API_USER_ADD, ToForm, UserAddReq};
+    use catsquad_shared as cs;
 
     use crate::{
         TestServer,
         api::user_add::{SensitiveUserRes, UserAddErr},
-        auth::auth_token_get,
+        auth::{auth_token_get, create_auth_cookie_str},
     };
 
     impl TestServer {
-        // pub async fn user_add(
-        //     &self,
-        //     username: impl Into<String>,
-        //     password: impl Into<String>,
-        //     invite_token: impl Into<String>,
-        // ) -> (Result<UserRes, UserAddErr>, Option<String>) {
-        //     let data = UserAddReq {
-        //         username: username.into(),
-        //         password: password.into(),
-        //         invite_key: invite_token.into(),
-        //     }
-        //     .to_form()
-        //     .unwrap();
-        //     self.post_and_get_auth_token::<Result<UserRes, UserAddErr>>(LINK_API_USER_ADD, data)
-        //         .await
-        // }
-
         pub async fn user_add(
+            &self,
+            username: impl Into<String>,
+            invite_key: impl Into<String>,
+            password: impl Into<String>,
+        ) -> Result<cs::SensitiveUserRes, cs::UserAddErr> {
+            self.client
+                .user_add(username, invite_key, password)
+                .send()
+                .await
+                .into_res()
+                .await
+        }
+        pub async fn user_add_with_session(
+            &self,
+            username: impl Into<String>,
+            invite_key: impl Into<String>,
+            password: impl Into<String>,
+        ) -> (cs::SensitiveUserRes, String) {
+            let res = self
+                .client
+                .user_add(username, invite_key, password)
+                .send()
+                .await;
+            let headers = res.get_headers().unwrap();
+            let session_key = auth_token_get(&headers, header::SET_COOKIE).unwrap();
+            let result = res.into_res().await.unwrap();
+            (result, session_key)
+        }
+        pub async fn user_add_full(
             &self,
             user: impl Into<String>,
             email: impl Into<String>,
@@ -221,40 +233,74 @@ mod test_utils {
     }
 }
 
-// #[tokio::test]
-// async fn test_user_add() {
-//     init_log();
-//     let server = crate::TestServer::new().await;
+// #[cfg(test)]
+// mod test_utils {
+//     use crate::{TestServer, auth::create_auth_cookie_str};
+//     use axum::http::header;
+//     use catsquad_shared as cs;
 
-//     let (result, _) = server.user_add("hey", "hello", "").await;
-//     assert!(
-//         matches!(result, Err(UserAddErr::InvalidInput { username, password }) if username.is_none() && password.is_some())
-//     );
-
-//     let (result, _) = server.user_add("he", "hello@P", "").await;
-//     assert!(
-//         matches!(result, Err(UserAddErr::InvalidInput { username, password }) if username.is_some() && password.is_some())
-//     );
-
-//     let (result, _) = server.user_add("hey", "hello1111111@1P", "invalid").await;
-//     assert!(matches!(result, Err(UserAddErr::InviteNotFound)));
-
-//     let _invite = server.invite_add("prime@heyadora.com").await.unwrap();
-//     let invite = id_to_string(
-//         server.state.db.invite_get_all().await.unwrap()[0]
-//             .id
-//             .clone(),
-//     );
-//     let (result, token) = server.user_add("hey", "hello1111111@1P", invite).await;
-//     assert!(matches!(result, Ok(_)));
-//     let _result = server
-//         .state
-//         .db
-//         .session_get_by_key(token.unwrap())
-//         .await
-//         .unwrap();
-
-//     // check if its encrypted
-//     let user = server.state.db.user_get_by_username("hey").await.unwrap();
-//     assert_ne!(user.password, "hello1111111@1P");
+//     impl TestServer {
+//         pub async fn email_change_update_cancel(
+//             &self,
+//             email_change_key: impl Into<String>,
+//             session_key: impl Into<String>,
+//         ) -> Result<cs::EmailChangeRes, cs::EmailChangeUpdateCancelErr> {
+//             self.client
+//                 .email_change_update_cancel(email_change_key)
+//                 .header_add(header::COOKIE, create_auth_cookie_str(session_key.into()))
+//                 .send()
+//                 .await
+//                 .into_res()
+//                 .await
+//         }
+//     }
 // }
+
+#[cfg(test)]
+#[tokio::test]
+async fn test_user_add() {
+    init_log();
+    let server = crate::TestServer::new().await;
+
+    // invalid input
+    {
+        let result = server.user_add("hey", "hello", "").await;
+        assert!(
+            matches!(result, Err(UserAddErr::InvalidInput { username, password }) if username.is_none() && password.is_some())
+        );
+
+        let result = server.user_add("he", "hello@P", "").await;
+        assert!(
+            matches!(result, Err(UserAddErr::InvalidInput { username, password }) if username.is_some() && password.is_some())
+        );
+    }
+
+    // invite not found
+    {
+        let result = server
+            .user_add("hey", "hello1111111@1P", "inesognf042n0NR)TN09nnfw9")
+            .await;
+        assert!(matches!(result, Err(UserAddErr::InviteNotFound)));
+    }
+
+    // check if creates session
+    {
+        let _invite = server.invite_add("prime@heyadora.com").await.unwrap();
+        let invite_key = server.invite_get_key("prime@heyadora.com").await;
+        let (_result, session_key) = server
+            .user_add_with_session("prime", invite_key, "inesognf042n0NR)TN09nnfw9")
+            .await;
+        let _result = server
+            .state
+            .db
+            .session_get_by_key(session_key)
+            .await
+            .unwrap();
+    }
+
+    // check if encrypted
+    {
+        let user = server.state.db.user_get_by_username("prime").await.unwrap();
+        assert_ne!(user.password, "hello1111111@1P");
+    }
+}

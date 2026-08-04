@@ -1,6 +1,9 @@
 use catsquad_log::prelude::*;
 use catsquad_shared::{
-    PostFile, PostState, ToForm, link_relative_invite_get_by_key, link_relative_post_get_by_key,
+    self as cs, LINK_API_EMAIL_CHANGE_ADD, LINK_API_EMAIL_CHANGE_UPDATE_CANCEL,
+    LINK_API_EMAIL_CHANGE_UPDATE_CURRENT_CONFIRM, LINK_API_EMAIL_CHANGE_UPDATE_FINISH,
+    LINK_API_EMAIL_CHANGE_UPDATE_NEW_ADD, LINK_API_EMAIL_CHANGE_UPDATE_NEW_CONFIRM, PostFile,
+    PostState, ToForm, link_relative_invite_get_by_key, link_relative_post_get_by_key,
 };
 use http::{HeaderMap, HeaderName, StatusCode, header};
 use std::{
@@ -369,6 +372,48 @@ where
         Self { sender }
     }
 
+    pub fn post_form<TReq, TResult, TError>(
+        &self,
+        link: impl Into<String>,
+        req: TReq,
+    ) -> Builder<TSender, TResult, TError>
+    where
+        TReq: serde::Serialize,
+        TResult: for<'a> serde::Deserialize<'a> + Debug,
+        TError: for<'a> serde::Deserialize<'a> + Debug + Default,
+    {
+        let req = req
+            .to_form()
+            .inspect_err(|err| error!("serializing failed {err}"))
+            .unwrap_or_default();
+        let params = SenderParams {
+            path: link.into(),
+            method: Method::Post,
+            body: Body::Form(req),
+            ..Default::default()
+        };
+        let sender = self.sender.clone();
+        Builder::new(sender, params)
+    }
+
+    pub fn post_form_empty<TResult, TError>(
+        &self,
+        link: impl Into<String>,
+    ) -> Builder<TSender, TResult, TError>
+    where
+        TResult: for<'a> serde::Deserialize<'a> + Debug,
+        TError: for<'a> serde::Deserialize<'a> + Debug + Default,
+    {
+        let params = SenderParams {
+            path: link.into(),
+            method: Method::Post,
+            body: Body::None,
+            ..Default::default()
+        };
+        let sender = self.sender.clone();
+        Builder::new(sender, params)
+    }
+
     pub fn invite_add(
         &self,
         email: impl Into<String>,
@@ -636,5 +681,89 @@ where
         };
         let sender = self.sender.clone();
         Builder::new(sender, params)
+    }
+
+    pub fn email_change_add(
+        &self,
+    ) -> Builder<TSender, catsquad_shared::EmailChangeRes, catsquad_shared::EmailChangeAddErr> {
+        self.post_form_empty(LINK_API_EMAIL_CHANGE_ADD)
+    }
+
+    pub fn email_change_update_current_confirm(
+        &self,
+        email_change_key: impl Into<String>,
+        token: impl Into<String>,
+    ) -> Builder<
+        TSender,
+        catsquad_shared::EmailChangeRes,
+        catsquad_shared::EmailChangeUpdateCurrentConfirmErr,
+    > {
+        self.post_form(
+            LINK_API_EMAIL_CHANGE_UPDATE_CURRENT_CONFIRM,
+            catsquad_shared::EmailChangeUpdateCurrentConfirmReq {
+                email_change_key: email_change_key.into(),
+                token: token.into(),
+            },
+        )
+    }
+
+    pub fn email_change_update_new_add(
+        &self,
+        email_change_key: impl Into<String>,
+        new_email: impl Into<String>,
+    ) -> Builder<
+        TSender,
+        catsquad_shared::EmailChangeRes,
+        catsquad_shared::EmailChangeUpdateNewAddErr,
+    > {
+        self.post_form(
+            LINK_API_EMAIL_CHANGE_UPDATE_NEW_ADD,
+            catsquad_shared::EmailChangeUpdateNewAddReq {
+                email_change_key: email_change_key.into(),
+                new_email: new_email.into(),
+            },
+        )
+    }
+
+    pub fn email_change_update_new_confirm(
+        &self,
+        email_change_key: impl Into<String>,
+        token: impl Into<String>,
+    ) -> Builder<
+        TSender,
+        catsquad_shared::EmailChangeRes,
+        catsquad_shared::EmailChangeUpdateNewConfirmErr,
+    > {
+        self.post_form(
+            LINK_API_EMAIL_CHANGE_UPDATE_NEW_CONFIRM,
+            catsquad_shared::EmailChangeUpdateNewConfirmReq {
+                email_change_key: email_change_key.into(),
+                token: token.into(),
+            },
+        )
+    }
+
+    pub fn email_change_update_finish(
+        &self,
+        email_change_key: impl Into<String>,
+    ) -> Builder<TSender, cs::EmailChangeRes, cs::EmailChangeUpdateFinishErr> {
+        self.post_form(
+            LINK_API_EMAIL_CHANGE_UPDATE_FINISH,
+            cs::EmailChangeUpdateFinishReq {
+                email_change_key: email_change_key.into(),
+            },
+        )
+    }
+
+    pub fn email_change_update_cancel(
+        &self,
+        email_change_key: impl Into<String>,
+    ) -> Builder<TSender, cs::EmailChangeRes, cs::EmailChangeUpdateCancelErr> {
+        self.post_form(
+            LINK_API_EMAIL_CHANGE_UPDATE_CANCEL,
+            cs::EmailChangeUpdateCancelReq {
+                email_change_key: email_change_key.into(),
+            },
+        )
     }
 }

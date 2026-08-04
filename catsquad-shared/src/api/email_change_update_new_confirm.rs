@@ -6,7 +6,9 @@ pub struct EmailChangeUpdateNewConfirmReq {
     pub token: String,
 }
 
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq, thiserror::Error)]
+#[derive(
+    Default, Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq, thiserror::Error,
+)]
 pub enum EmailChangeUpdateNewConfirmErr {
     #[error("not found")]
     NotFound,
@@ -26,6 +28,7 @@ pub enum EmailChangeUpdateNewConfirmErr {
     #[error("invalid token")]
     InvalidToken,
 
+    #[default]
     #[error("internal server err")]
     InternalServer,
 }

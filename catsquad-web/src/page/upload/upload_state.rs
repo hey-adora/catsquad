@@ -549,7 +549,7 @@ async fn test_upload_state_update() {
     let server = catsquad_api::TestServer::new().await;
 
     let (_user1, session1) = server
-        .user_add(
+        .user_add_full(
             "prime1",
             "prime1@heyadora.com",
             "235j4t49ngerigrog#IOTNOnfo",
@@ -816,7 +816,7 @@ async fn test_upload_init() -> (catsquad_api::TestServer, Owner, UploadState) {
     let server = catsquad_api::TestServer::new().await;
 
     let (_user1, session1) = server
-        .user_add(
+        .user_add_full(
             "prime1",
             "prime1@heyadora.com",
             "235j4t49ngerigrog#IOTNOnfo",

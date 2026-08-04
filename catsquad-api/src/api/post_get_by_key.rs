@@ -71,7 +71,7 @@ async fn test_post_get_by_key() {
     let server = crate::TestServer::new().await;
 
     let (user1, session_key1) = server
-        .user_add("prime", "prime@heyadora.com", "1234567890111GGd11$")
+        .user_add_full("prime", "prime@heyadora.com", "1234567890111GGd11$")
         .await;
 
     let post1 = server

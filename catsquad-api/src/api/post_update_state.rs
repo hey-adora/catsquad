@@ -70,11 +70,11 @@ async fn test_post_update_state() {
     let server = crate::TestServer::new().await;
 
     let (_user1, session_key1) = server
-        .user_add("prime", "prime@heyadora.com", "1234567890111GGd11$")
+        .user_add_full("prime", "prime@heyadora.com", "1234567890111GGd11$")
         .await;
 
     let (_user2, session_key2) = server
-        .user_add("prime2", "prime2@heyadora.com", "1234567890111GGd11$")
+        .user_add_full("prime2", "prime2@heyadora.com", "1234567890111GGd11$")
         .await;
 
     let post1 = server

@@ -79,129 +79,150 @@ pub async fn email_change_update_current_confirm(
     (status_code, Json(result))
 }
 
-// #[cfg(test)]
-// mod test_utils {
-//     use catsquad_shared::{
-//         EmailChangeRes, EmailChangeUpdateCurrentConfirmErr, EmailChangeUpdateCurrentConfirmReq,
-//         LINK_API_EMAIL_CHANGE_UPDATE_CURRENT_CONFIRM, ToForm,
-//     };
+#[cfg(test)]
+mod test_utils {
+    use crate::{TestServer, auth::create_auth_cookie_str};
+    use axum::http::header;
+    use catsquad_shared as cs;
 
-//     use crate::TestServer;
+    impl TestServer {
+        pub async fn email_change_update_current_confirm(
+            &self,
+            email_change_key: impl Into<String>,
+            token: impl Into<String>,
+            session_key: impl Into<String>,
+        ) -> Result<cs::EmailChangeRes, cs::EmailChangeUpdateCurrentConfirmErr> {
+            self.client
+                .email_change_update_current_confirm(email_change_key, token)
+                .header_add(header::COOKIE, create_auth_cookie_str(session_key.into()))
+                .send()
+                .await
+                .into_res()
+                .await
+        }
+    }
+}
 
-//     impl TestServer {
-//         pub async fn email_change_update_current_confirm(
-//             &self,
-//             email_change_key: impl Into<String>,
-//             token: impl Into<String>,
-//             session_key: impl Into<String>,
-//         ) -> Result<EmailChangeRes, EmailChangeUpdateCurrentConfirmErr> {
-//             let session_key = session_key.into();
-//             let data: String = EmailChangeUpdateCurrentConfirmReq {
-//                 email_change_key: email_change_key.into(),
-//                 token: token.into(),
-//             }
-//             .to_form()
-//             .unwrap();
+#[cfg(test)]
+#[tokio::test]
+async fn test_email_change_update_current_confirm() {
+    use crate::auth::create_auth_cookie_str;
+    use axum::http::header;
+    init_log();
+    let server = crate::TestServer::new().await;
 
-//             self.post_auth(
-//                 LINK_API_EMAIL_CHANGE_UPDATE_CURRENT_CONFIRM,
-//                 data,
-//                 session_key,
-//             )
-//             .await
-//             .0
-//         }
-//     }
-// }
+    let (user1, session_key) = server
+        .user_add_full("hey", "hey@heyadora.com", "1234567890111GG2f11$")
+        .await;
 
-// #[tokio::test]
-// async fn test_email_change_update_current_confirm() {
-//     init_log();
-//     let server = crate::TestServer::new().await;
+    let (user2, session_key2) = server
+        .user_add_full("hey2", "hey2@heyadora.com", "1234567890111GGg11$")
+        .await;
 
-//     let (user1, session_key) = server
-//         .user_add_2("hey", "hey@heyadora.com", "1234567890111GG11$")
-//         .await;
+    {
+        server.state.set_email_change_expiration(10).await;
 
-//     let (user2, session_key2) = server
-//         .user_add_2("hey2", "hey2@heyadora.com", "1234567890111GG11$")
-//         .await;
+        // let email_change = server.email_change_add(&session_key).await.unwrap();
+        let email_change = server
+            .client
+            .email_change_add()
+            .header_add(header::COOKIE, create_auth_cookie_str(session_key.clone()))
+            .send()
+            .await
+            .into_res()
+            .await
+            .unwrap();
 
-//     {
-//         server.state.set_email_change_expiration(10).await;
+        let current_token = server
+            .state
+            .db
+            .email_change_get_by_key(email_change.key.clone())
+            .await
+            .unwrap()
+            .current
+            .token;
 
-//         let email_change = server.email_change_add(&session_key).await.unwrap();
-//         let current_token = server
-//             .state
-//             .db
-//             .email_change_get_by_key(email_change.key.clone())
-//             .await
-//             .unwrap()
-//             .current
-//             .token;
+        let result = server
+            .client
+            .email_change_update_current_confirm("invalid", "")
+            .header_add(header::COOKIE, create_auth_cookie_str(session_key.clone()))
+            .send()
+            .await
+            .into_res()
+            .await;
 
-//         let result = server
-//             .email_change_update_current_confirm("invalid", "", &session_key)
-//             .await;
+        assert!(matches!(
+            result,
+            Err(EmailChangeUpdateCurrentConfirmErr::NotFound)
+        ));
 
-//         assert!(matches!(
-//             result,
-//             Err(EmailChangeUpdateCurrentConfirmErr::NotFound)
-//         ));
+        let result = server
+            .client
+            .email_change_update_current_confirm(email_change.key.clone(), "")
+            .header_add(header::COOKIE, create_auth_cookie_str(session_key.clone()))
+            .send()
+            .await
+            .into_res()
+            .await;
 
-//         let result = server
-//             .email_change_update_current_confirm(email_change.key.clone(), "", &session_key)
-//             .await;
+        assert!(matches!(
+            result,
+            Err(EmailChangeUpdateCurrentConfirmErr::InvalidToken)
+        ));
 
-//         assert!(matches!(
-//             result,
-//             Err(EmailChangeUpdateCurrentConfirmErr::InvalidToken)
-//         ));
+        let result = server
+            .client
+            .email_change_update_current_confirm(email_change.key.clone(), "")
+            .header_add(header::COOKIE, create_auth_cookie_str(session_key2.clone()))
+            .send()
+            .await
+            .into_res()
+            .await;
 
-//         let result = server
-//             .email_change_update_current_confirm(email_change.key.clone(), "", &session_key2)
-//             .await;
+        assert!(matches!(
+            result,
+            Err(EmailChangeUpdateCurrentConfirmErr::Unauthorized(_))
+        ));
 
-//         assert!(matches!(
-//             result,
-//             Err(EmailChangeUpdateCurrentConfirmErr::Unauthorized(_))
-//         ));
+        server.state.set_time(11).await;
 
-//         server.state.set_time(11).await;
-//         let result = server
-//             .email_change_update_current_confirm(
-//                 email_change.key.clone(),
-//                 current_token.clone(),
-//                 &session_key,
-//             )
-//             .await;
+        let result = server
+            .client
+            .email_change_update_current_confirm(email_change.key.clone(), current_token.clone())
+            .header_add(header::COOKIE, create_auth_cookie_str(session_key.clone()))
+            .send()
+            .await
+            .into_res()
+            .await;
 
-//         assert!(matches!(
-//             result,
-//             Err(EmailChangeUpdateCurrentConfirmErr::Expired)
-//         ));
-//         server.state.set_time(0).await;
+        assert!(matches!(
+            result,
+            Err(EmailChangeUpdateCurrentConfirmErr::Expired)
+        ));
+        server.state.set_time(0).await;
 
-//         let email_change = server
-//             .email_change_update_current_confirm(
-//                 email_change.key.clone(),
-//                 current_token.clone(),
-//                 &session_key,
-//             )
-//             .await
-//             .unwrap();
+        let email_change = server
+            .client
+            .email_change_update_current_confirm(email_change.key.clone(), current_token.clone())
+            .header_add(header::COOKIE, create_auth_cookie_str(session_key.clone()))
+            .send()
+            .await
+            .into_res()
+            .await
+            .unwrap();
 
-//         let result = server
-//             .email_change_update_current_confirm(
-//                 email_change.key.clone(),
-//                 current_token.clone(),
-//                 &session_key,
-//             )
-//             .await;
+        let result = server
+            .client
+            .email_change_update_current_confirm(email_change.key.clone(), current_token.clone())
+            .header_add(header::COOKIE, create_auth_cookie_str(session_key.clone()))
+            .send()
+            .await
+            .into_res()
+            .await;
 
-//         assert!(matches!(
-//             result,
-//             Err(EmailChangeUpdateCurrentConfirmErr::AlreadyUsed)
-//         ));
-//     }
-// }
+        assert!(matches!(
+            result,
+            Err(EmailChangeUpdateCurrentConfirmErr::AlreadyUsed)
+        ));
+    }
+}

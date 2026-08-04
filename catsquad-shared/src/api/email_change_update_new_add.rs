@@ -6,8 +6,10 @@ pub struct EmailChangeUpdateNewAddReq {
     pub new_email: String,
 }
 
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq, thiserror::Error)]
-pub enum EmailChangeNewAddErr {
+#[derive(
+    Default, Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq, thiserror::Error,
+)]
+pub enum EmailChangeUpdateNewAddErr {
     #[error("not found")]
     NotFound,
 
@@ -26,6 +28,7 @@ pub enum EmailChangeNewAddErr {
     #[error("email {0} already taken")]
     EmailIsTaken(String),
 
+    #[default]
     #[error("internal server err")]
     InternalServer,
 }

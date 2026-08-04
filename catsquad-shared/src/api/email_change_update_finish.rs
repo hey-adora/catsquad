@@ -5,7 +5,9 @@ pub struct EmailChangeUpdateFinishReq {
     pub email_change_key: String,
 }
 
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq, thiserror::Error)]
+#[derive(
+    Default, Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq, thiserror::Error,
+)]
 pub enum EmailChangeUpdateFinishErr {
     #[error("not found")]
     NotFound,
@@ -25,6 +27,7 @@ pub enum EmailChangeUpdateFinishErr {
     #[error("email already taken")]
     EmailIsTaken,
 
+    #[default]
     #[error("internal server err")]
     InternalServer,
 }
