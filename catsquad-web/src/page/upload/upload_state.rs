@@ -150,13 +150,7 @@ impl UploadState {
         TSender: Sender + Debug + Clone,
         TSender::TResponse: Response + Debug,
     {
-        let result = client
-            .post_add("", "", "")
-            .await
-            .send()
-            .await
-            .into_res()
-            .await;
+        let result = client.post_add("", "", "").send().await.into_res().await;
         match result {
             Ok(v) => {
                 if self.post_key.try_set_value(v.key).is_some() {
@@ -285,7 +279,6 @@ impl UploadState {
 
         let result = client
             .post_update_title(&post_key, new_title)
-            .await
             .send()
             .await
             .into_res()
@@ -317,7 +310,6 @@ impl UploadState {
 
         let result = client
             .post_update_description(&post_key, new_description)
-            .await
             .send()
             .await
             .into_res()
@@ -351,7 +343,6 @@ impl UploadState {
 
         let result = client
             .post_update_tags(&post_key, new_tags)
-            .await
             .send()
             .await
             .into_res()
@@ -383,7 +374,6 @@ impl UploadState {
 
         let result = client
             .post_update_state(&post_key, PostState::Active)
-            .await
             .send()
             .await
             .into_res()
@@ -438,7 +428,6 @@ impl UploadState {
 
         let result = client
             .post_update_file_add(post_key, vec![source_file])
-            .await
             .on_progress({
                 let file = parsed_file.clone();
                 move |stats| {
@@ -511,7 +500,6 @@ impl UploadState {
 
         let result = client
             .post_update_file_remove(post_key, name)
-            .await
             .send()
             .await
             .into_res()
@@ -770,7 +758,6 @@ async fn test_upload_state_file_add() {
     let post1 = server
         .client
         .post_get_by_key(post_key)
-        .await
         .send()
         .await
         .into_res()
@@ -810,7 +797,6 @@ async fn test_upload_state_file_remove() {
     let post1 = server
         .client
         .post_get_by_key(upload.post_key.get_value())
-        .await
         .send()
         .await
         .into_res()

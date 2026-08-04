@@ -75,7 +75,6 @@ async fn test_post_update_title() {
     let post1 = server
         .client
         .post_add("title", "description1", "tags1")
-        .await
         .header_add(header::COOKIE, create_auth_cookie_str(session_key1.clone()))
         .send()
         .await
@@ -86,7 +85,6 @@ async fn test_post_update_title() {
     let post1 = server
         .client
         .post_update_title(post1.key.clone(), "title2")
-        .await
         .header_add(header::COOKIE, create_auth_cookie_str(session_key1.clone()))
         .send()
         .await
@@ -99,7 +97,6 @@ async fn test_post_update_title() {
     let result = server
         .client
         .post_update_title(post1.key.clone(), "title3")
-        .await
         .header_add(header::COOKIE, create_auth_cookie_str(session_key2.clone()))
         .send()
         .await
@@ -110,7 +107,6 @@ async fn test_post_update_title() {
     let result = server
         .client
         .post_update_title("invalid", "title3")
-        .await
         .header_add(header::COOKIE, create_auth_cookie_str(session_key1.clone()))
         .send()
         .await
@@ -121,7 +117,6 @@ async fn test_post_update_title() {
     let result = server
         .client
         .post_update_title("invalid", "title3")
-        .await
         .header_add(header::COOKIE, create_auth_cookie_str(session_key1.clone()))
         .send()
         .await

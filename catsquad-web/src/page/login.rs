@@ -46,7 +46,6 @@ pub fn Login() -> impl IntoView {
         login_spawner.spawn(async move {
             let result = client
                 .session_add(email, password)
-                .await
                 .send()
                 .await
                 .into_res()

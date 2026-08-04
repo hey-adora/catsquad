@@ -80,7 +80,6 @@ async fn test_post_update_description() {
     let post1 = server
         .client
         .post_add("title", "description1", "tags1")
-        .await
         .header_add(header::COOKIE, create_auth_cookie_str(session_key1.clone()))
         .send()
         .await
@@ -91,7 +90,6 @@ async fn test_post_update_description() {
     let post1 = server
         .client
         .post_update_description(post1.key.clone(), "description2")
-        .await
         .header_add(header::COOKIE, create_auth_cookie_str(session_key1.clone()))
         .send()
         .await
@@ -104,7 +102,6 @@ async fn test_post_update_description() {
     let result = server
         .client
         .post_update_description(post1.key.clone(), "description3")
-        .await
         .header_add(header::COOKIE, create_auth_cookie_str(session_key2.clone()))
         .send()
         .await
@@ -118,7 +115,6 @@ async fn test_post_update_description() {
     let result = server
         .client
         .post_update_description("invalid", "title3")
-        .await
         .header_add(header::COOKIE, create_auth_cookie_str(session_key1.clone()))
         .send()
         .await
@@ -132,7 +128,6 @@ async fn test_post_update_description() {
     let result = server
         .client
         .post_update_description("invalid", "title3")
-        .await
         .header_add(header::COOKIE, create_auth_cookie_str(session_key1.clone()))
         .send()
         .await

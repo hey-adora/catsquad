@@ -77,7 +77,6 @@ async fn test_post_get_by_key() {
     let post1 = server
         .client
         .post_add("title", "description1", "tags1")
-        .await
         .header_add(header::COOKIE, create_auth_cookie_str(session_key1.clone()))
         .send()
         .await
@@ -88,7 +87,6 @@ async fn test_post_get_by_key() {
     let result = server
         .client
         .post_get_by_key("invalid")
-        .await
         .send()
         .await
         .into_res()
@@ -99,7 +97,6 @@ async fn test_post_get_by_key() {
     let result = server
         .client
         .post_get_by_key(post1.key.clone())
-        .await
         .send()
         .await
         .into_res()

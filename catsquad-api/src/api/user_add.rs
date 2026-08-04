@@ -186,7 +186,6 @@ mod test_utils {
             let _invite = self
                 .client
                 .invite_add(email.clone())
-                .await
                 .send()
                 .await
                 .into_res()
@@ -208,7 +207,6 @@ mod test_utils {
             let res = self
                 .client
                 .user_add(username, invite, password)
-                .await
                 .send()
                 .await;
             let headers = res.get_headers().unwrap();

@@ -90,7 +90,6 @@ async fn test_post_update_file_remove() {
     let post1 = server
         .client
         .post_add("title", "description1", "tags1")
-        .await
         .header_add(header::COOKIE, create_auth_cookie_str(session_key1.clone()))
         .send()
         .await
@@ -101,7 +100,6 @@ async fn test_post_update_file_remove() {
     let _result = server
         .client
         .post_update_file_add(post1.key.clone(), vec!["../assets/favicon.ico".to_string()])
-        .await
         .header_add(header::COOKIE, create_auth_cookie_str(session_key1.clone()))
         .send()
         .await
@@ -112,7 +110,6 @@ async fn test_post_update_file_remove() {
     let result = server
         .client
         .post_get_by_key(post1.key.clone())
-        .await
         .send()
         .await
         .into_res()
@@ -125,7 +122,6 @@ async fn test_post_update_file_remove() {
     let _result = server
         .client
         .post_update_file_remove(post1.key.clone(), file1_hash)
-        .await
         .header_add(header::COOKIE, create_auth_cookie_str(session_key1.clone()))
         .send()
         .await
@@ -136,7 +132,6 @@ async fn test_post_update_file_remove() {
     let result = server
         .client
         .post_get_by_key(post1.key.clone())
-        .await
         .send()
         .await
         .into_res()

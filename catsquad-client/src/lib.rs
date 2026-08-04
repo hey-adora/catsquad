@@ -369,7 +369,7 @@ where
         Self { sender }
     }
 
-    pub async fn invite_add(
+    pub fn invite_add(
         &self,
         email: impl Into<String>,
     ) -> Builder<TSender, catsquad_shared::InviteRes, catsquad_shared::InviteAddErr> {
@@ -389,7 +389,7 @@ where
         Builder::new(sender, params)
     }
 
-    pub async fn invite_get_by_key(
+    pub fn invite_get_by_key(
         &self,
         invite_key: impl AsRef<str>,
     ) -> Builder<TSender, catsquad_shared::InviteGetByKeyRes, catsquad_shared::InviteGetByKeyErr>
@@ -405,7 +405,7 @@ where
         Builder::new(sender, params)
     }
 
-    pub async fn user_add(
+    pub fn user_add(
         &self,
         username: impl Into<String>,
         invite_key: impl Into<String>,
@@ -429,7 +429,7 @@ where
         Builder::new(sender, params)
     }
 
-    pub async fn post_add(
+    pub fn post_add(
         &self,
         title: impl Into<String>,
         description: impl Into<String>,
@@ -453,7 +453,7 @@ where
         Builder::new(sender, params)
     }
 
-    pub async fn post_update_file_add<F: Into<SchrodingersFile>>(
+    pub fn post_update_file_add<F: Into<SchrodingersFile>>(
         &self,
         post_key: impl AsRef<str>,
         files: Vec<F>,
@@ -474,7 +474,7 @@ where
         Builder::new(sender, params)
     }
 
-    pub async fn post_update_file_remove(
+    pub fn post_update_file_remove(
         &self,
         post_key: impl Into<String>,
         hash: impl Into<String>,
@@ -499,7 +499,7 @@ where
         Builder::new(sender, params)
     }
 
-    pub async fn user_by_session_key(
+    pub fn user_by_session_key(
         &self,
     ) -> Builder<TSender, catsquad_shared::SensitiveUserRes, catsquad_shared::UserGetBySessionKeyErr>
     {
@@ -513,7 +513,7 @@ where
         Builder::new(sender, params)
     }
 
-    pub async fn session_add(
+    pub fn session_add(
         &self,
         email: impl Into<String>,
         password: impl Into<String>,
@@ -535,7 +535,7 @@ where
         Builder::new(sender, params)
     }
 
-    pub async fn post_update_title(
+    pub fn post_update_title(
         &self,
         post_key: impl Into<String>,
         new_title: impl Into<String>,
@@ -557,7 +557,7 @@ where
         Builder::new(sender, params)
     }
 
-    pub async fn post_update_description(
+    pub fn post_update_description(
         &self,
         post_key: impl Into<String>,
         new_description: impl Into<String>,
@@ -579,7 +579,7 @@ where
         Builder::new(sender, params)
     }
 
-    pub async fn post_update_tags(
+    pub fn post_update_tags(
         &self,
         post_key: impl Into<String>,
         new_tags: impl Into<String>,
@@ -601,7 +601,7 @@ where
         Builder::new(sender, params)
     }
 
-    pub async fn post_update_state(
+    pub fn post_update_state(
         &self,
         post_key: impl Into<String>,
         new_state: PostState,
@@ -623,7 +623,7 @@ where
         Builder::new(sender, params)
     }
 
-    pub async fn post_get_by_key(
+    pub fn post_get_by_key(
         &self,
         post_key: impl AsRef<str>,
     ) -> Builder<TSender, catsquad_shared::PostRes, catsquad_shared::PostGetByKeyErr> {

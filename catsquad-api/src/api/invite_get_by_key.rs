@@ -106,7 +106,6 @@ async fn test_invite_get_by_key() {
     server
         .client
         .invite_add("prime@heyadora.com")
-        .await
         .send()
         .await
         .into_res()
@@ -121,7 +120,6 @@ async fn test_invite_get_by_key() {
     let invite = server
         .client
         .invite_get_by_key(invite_key)
-        .await
         .send()
         .await
         .into_res()
@@ -132,7 +130,6 @@ async fn test_invite_get_by_key() {
     let result = server
         .client
         .invite_get_by_key("invalid")
-        .await
         .send()
         .await
         .into_res()

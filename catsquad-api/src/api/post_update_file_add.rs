@@ -514,7 +514,6 @@ async fn test_post_update_file_add() {
     let post1 = server
         .client
         .post_add("title", "description1", "tags1")
-        .await
         .header_add(header::COOKIE, create_auth_cookie_str(session_key1.clone()))
         .send()
         .await
@@ -526,7 +525,6 @@ async fn test_post_update_file_add() {
         server
             .client
             .post_update_file_add(post_key, files.into_iter().map(|v| v.to_string()).collect())
-            .await
             .header_add(header::COOKIE, create_auth_cookie_str(session_key1.clone()))
             .send()
             .await

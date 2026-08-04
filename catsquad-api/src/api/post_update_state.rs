@@ -80,7 +80,6 @@ async fn test_post_update_state() {
     let post1 = server
         .client
         .post_add("title", "description1", "tags1")
-        .await
         .header_add(header::COOKIE, create_auth_cookie_str(session_key1.clone()))
         .send()
         .await
@@ -91,7 +90,6 @@ async fn test_post_update_state() {
     let post1 = server
         .client
         .post_update_state(post1.key.clone(), PostState::Active)
-        .await
         .header_add(header::COOKIE, create_auth_cookie_str(session_key1.clone()))
         .send()
         .await

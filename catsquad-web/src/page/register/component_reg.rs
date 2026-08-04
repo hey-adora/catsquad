@@ -64,7 +64,6 @@ impl RegisterFormState {
 
         let result = client
             .user_add(username, invite_key, password)
-            .await
             .send()
             .await
             .into_res()
@@ -122,7 +121,6 @@ async fn test_register_form_state() {
 
     let result = client
         .invite_add("prime@heyadora.com")
-        .await
         .send()
         .await
         .into_res()
@@ -189,7 +187,6 @@ pub fn invite_key_to_email(
         spawn_local(async move {
             let result = client
                 .invite_get_by_key(invite_key)
-                .await
                 .send()
                 .await
                 .into_res()
