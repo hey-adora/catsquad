@@ -11,7 +11,9 @@ pub struct PasswordChangeUpdateConfirmReq {
     pub new_password: String,
 }
 
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq, thiserror::Error)]
+#[derive(
+    Default, Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq, thiserror::Error,
+)]
 pub enum PasswordChangeUpdateConfirmErr {
     #[error("expired")]
     Expired,
@@ -28,6 +30,7 @@ pub enum PasswordChangeUpdateConfirmErr {
     #[error("bad request {0}")]
     BadRequest(String),
 
+    #[default]
     #[error("internal server err")]
     InternalServer,
 }

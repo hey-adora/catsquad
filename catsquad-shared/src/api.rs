@@ -1,3 +1,6 @@
+pub mod comment_add;
+pub mod comment_remove;
+pub mod comment_update_text;
 pub mod email_change_add;
 pub mod email_change_update_cancel;
 pub mod email_change_update_current_confirm;

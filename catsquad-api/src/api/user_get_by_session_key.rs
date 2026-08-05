@@ -1,12 +1,8 @@
 use axum::{Extension, Json, http::StatusCode, response::IntoResponse};
-use catsquad_db::{DbUser, id_to_string};
-use catsquad_log::prelude::*;
+use catsquad_db::DbUser;
 use catsquad_shared::{SensitiveUserRes, UserGetBySessionKeyErr};
 
-use crate::{
-    api::user_add::from_db_user_sensitive,
-    auth::{ERR_MSG_COOKIE, ERR_MSG_SESSION},
-};
+use crate::api::user_add::from_db_user_sensitive;
 
 fn status_code(result: &Result<SensitiveUserRes, UserGetBySessionKeyErr>) -> StatusCode {
     match result {
@@ -23,71 +19,67 @@ pub async fn user_get_by_session_token(db_user: Extension<DbUser>) -> impl IntoR
     (status_code, Json(result))
 }
 
-// #[cfg(test)]
-// mod test_utils {
-//     use axum::http::StatusCode;
-//     use catsquad_shared::LINK_API_SESSION_GET_BY_SESSION_KEY;
+#[cfg(test)]
+mod test_utils {
+    use axum::http::header;
+    use catsquad_shared as cs;
 
-//     use crate::{
-//         TestServer,
-//         api::user_get_by_session_key::{UserGetBySessionKeyErr, UserGetBySessionKeyRes},
-//     };
+    use crate::{TestServer, auth::create_auth_cookie_str};
 
-//     impl TestServer {
-//         pub async fn user_get_by_session_key(
-//             &self,
-//             session_key: impl AsRef<str>,
-//         ) -> (
-//             Result<UserGetBySessionKeyRes, UserGetBySessionKeyErr>,
-//             StatusCode,
-//         ) {
-//             self.get_auth::<Result<UserGetBySessionKeyRes, UserGetBySessionKeyErr>>(
-//                 LINK_API_SESSION_GET_BY_SESSION_KEY,
-//                 session_key,
-//             )
-//             .await
-//         }
-//     }
-// }
+    impl TestServer {
+        pub async fn user_get_by_session_key(
+            &self,
+            session_key: impl Into<String>,
+        ) -> Result<cs::SensitiveUserRes, cs::UserGetBySessionKeyErr> {
+            self.client
+                .user_get_by_session_key()
+                .header_add(header::COOKIE, create_auth_cookie_str(session_key.into()))
+                .send()
+                .await
+                .into_res()
+                .await
+        }
+    }
+}
 
-// #[tokio::test]
-// async fn test_user_get_by_sessino_key() {
-//     init_log();
-//     let server = crate::TestServer::new().await;
+#[cfg(test)]
+#[tokio::test]
+async fn test_user_get_by_sessino_key() {
+    use catsquad_db::id_to_string;
+    use catsquad_log::prelude::*;
+    init_log();
+    let server = crate::TestServer::new().await;
 
-//     server.invite_add("prime@heyadora.com").await.unwrap();
+    let (user_add, session_key) = server
+        .user_add_full("hey", "prime@heyadora.com", "PAss$ord11111")
+        .await;
+    let user_get = server.user_get_by_session_key(session_key).await.unwrap();
+    assert_eq!(id_to_string(user_add.id), user_get.key);
+}
 
-//     let invite_token = id_to_string(
-//         server.state.db.invite_get_all().await.unwrap()[0]
-//             .id
-//             .clone(),
-//     );
-//     let (user_add, session_key) = server.user_add("hey", "PAss$ord11111", invite_token).await;
-//     let (user_get, status) = server.user_get_by_session_key(session_key.unwrap()).await;
-//     assert_eq!(status, StatusCode::OK);
-//     assert_eq!(user_add.unwrap().key, user_get.unwrap().key);
-// }
+#[cfg(test)]
+#[tokio::test]
+async fn security_test_user_get_by_sessino_key() {
+    use catsquad_log::prelude::*;
 
-// #[tokio::test]
-// async fn security_test_user_get_by_sessino_key() {
-//     init_log();
-//     let server = crate::TestServer::new().await;
+    use crate::auth::{ERR_MSG_COOKIE, ERR_MSG_SESSION};
 
-//     let (user_get, status) = server.user_get_by_session_key("INVALID").await;
-//     assert_eq!(status, StatusCode::UNAUTHORIZED);
-//     assert_eq!(
-//         user_get,
-//         Err(UserGetBySessionKeyErr::Unauthorized(
-//             ERR_MSG_COOKIE.to_string()
-//         ))
-//     );
+    init_log();
+    let server = crate::TestServer::new().await;
 
-//     let (user_get, status) = server.user_get_by_session_key("y4lu28oeddllera6275b").await;
-//     assert_eq!(status, StatusCode::UNAUTHORIZED);
-//     assert_eq!(
-//         user_get,
-//         Err(UserGetBySessionKeyErr::Unauthorized(
-//             ERR_MSG_SESSION.to_string()
-//         ))
-//     );
-// }
+    let user_get = server.user_get_by_session_key("INVALID").await;
+    assert_eq!(
+        user_get,
+        Err(UserGetBySessionKeyErr::Unauthorized(
+            ERR_MSG_COOKIE.to_string()
+        ))
+    );
+
+    let user_get = server.user_get_by_session_key("y4lu28oeddllera6275b").await;
+    assert_eq!(
+        user_get,
+        Err(UserGetBySessionKeyErr::Unauthorized(
+            ERR_MSG_SESSION.to_string()
+        ))
+    );
+}

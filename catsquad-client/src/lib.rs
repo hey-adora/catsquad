@@ -1,9 +1,7 @@
 use catsquad_log::prelude::*;
 use catsquad_shared::{
-    self as cs, LINK_API_EMAIL_CHANGE_ADD, LINK_API_EMAIL_CHANGE_UPDATE_CANCEL,
-    LINK_API_EMAIL_CHANGE_UPDATE_CURRENT_CONFIRM, LINK_API_EMAIL_CHANGE_UPDATE_FINISH,
-    LINK_API_EMAIL_CHANGE_UPDATE_NEW_ADD, LINK_API_EMAIL_CHANGE_UPDATE_NEW_CONFIRM, PostFile,
-    PostState, ToForm, link_relative_invite_get_by_key, link_relative_post_get_by_key,
+    self as cs, PostFile, PostState, ToForm, link_relative_invite_get_by_key,
+    link_relative_post_get_by_key,
 };
 use http::{HeaderMap, HeaderName, StatusCode, header};
 use std::{
@@ -425,7 +423,7 @@ where
         .inspect_err(|err| error!("serializing failed {err}"))
         .unwrap_or_default();
         let params = SenderParams {
-            path: catsquad_shared::LINK_API_INVITE_ADD.to_string(),
+            path: cs::LINK_API_INVITE_ADD.to_string(),
             method: Method::Post,
             body: Body::Form(req),
             ..Default::default()
@@ -465,13 +463,27 @@ where
         .inspect_err(|err| error!("serializing failed {err}"))
         .unwrap_or_default();
         let params = SenderParams {
-            path: catsquad_shared::LINK_API_USER_ADD.to_string(),
+            path: cs::LINK_API_USER_ADD.to_string(),
             method: Method::Post,
             body: Body::Form(req),
             ..Default::default()
         };
         let sender = self.sender.clone();
         Builder::new(sender, params)
+    }
+
+    pub fn user_update_username(
+        &self,
+        password: impl Into<String>,
+        new_username: impl Into<String>,
+    ) -> Builder<TSender, cs::UserUpdateUsernameRes, cs::UserUpdateUsernameErr> {
+        self.post_form(
+            cs::LINK_API_USER_UPDATE_USERNAME,
+            cs::UserUpdateUsernameReq {
+                password: password.into(),
+                new_username: new_username.into(),
+            },
+        )
     }
 
     pub fn post_add(
@@ -489,7 +501,7 @@ where
         .inspect_err(|err| error!("serializing failed {err}"))
         .unwrap_or_default();
         let params = SenderParams {
-            path: catsquad_shared::LINK_API_POST_ADD.to_string(),
+            path: cs::LINK_API_POST_ADD.to_string(),
             method: Method::Post,
             body: Body::Form(req),
             ..Default::default()
@@ -544,12 +556,12 @@ where
         Builder::new(sender, params)
     }
 
-    pub fn user_by_session_key(
+    pub fn user_get_by_session_key(
         &self,
     ) -> Builder<TSender, catsquad_shared::SensitiveUserRes, catsquad_shared::UserGetBySessionKeyErr>
     {
         let params = SenderParams {
-            path: catsquad_shared::LINK_API_SESSION_GET_BY_SESSION_KEY.to_string(),
+            path: cs::LINK_API_SESSION_GET_BY_SESSION_KEY.to_string(),
             method: Method::Get,
             body: Body::None,
             ..Default::default()
@@ -571,13 +583,20 @@ where
         .inspect_err(|err| error!("serializing failed {err}"))
         .unwrap_or_default();
         let params = SenderParams {
-            path: catsquad_shared::LINK_API_SESSION_ADD.to_string(),
+            path: cs::LINK_API_SESSION_ADD.to_string(),
             method: Method::Post,
             body: Body::Form(req),
             ..Default::default()
         };
         let sender = self.sender.clone();
         Builder::new(sender, params)
+    }
+
+    pub fn session_remove(
+        &self,
+    ) -> Builder<TSender, catsquad_shared::SessionDeleteRes, catsquad_shared::SessionDeleteErr>
+    {
+        self.post_form_empty(cs::LINK_API_SESSION_DELETE)
     }
 
     pub fn post_update_title(
@@ -593,7 +612,7 @@ where
         .inspect_err(|err| error!("serializing failed {err}"))
         .unwrap_or_default();
         let params = SenderParams {
-            path: catsquad_shared::LINK_API_POST_UPDATE_TITLE.to_string(),
+            path: cs::LINK_API_POST_UPDATE_TITLE.to_string(),
             method: Method::Post,
             body: Body::Form(req),
             ..Default::default()
@@ -615,7 +634,7 @@ where
         .inspect_err(|err| error!("serializing failed {err}"))
         .unwrap_or_default();
         let params = SenderParams {
-            path: catsquad_shared::LINK_API_POST_UPDATE_DESCRIPTION.to_string(),
+            path: cs::LINK_API_POST_UPDATE_DESCRIPTION.to_string(),
             method: Method::Post,
             body: Body::Form(req),
             ..Default::default()
@@ -637,7 +656,7 @@ where
         .inspect_err(|err| error!("serializing failed {err}"))
         .unwrap_or_default();
         let params = SenderParams {
-            path: catsquad_shared::LINK_API_POST_UPDATE_TAGS.to_string(),
+            path: cs::LINK_API_POST_UPDATE_TAGS.to_string(),
             method: Method::Post,
             body: Body::Form(req),
             ..Default::default()
@@ -659,7 +678,7 @@ where
         .inspect_err(|err| error!("serializing failed {err}"))
         .unwrap_or_default();
         let params = SenderParams {
-            path: catsquad_shared::LINK_API_POST_UPDATE_STATE.to_string(),
+            path: cs::LINK_API_POST_UPDATE_STATE.to_string(),
             method: Method::Post,
             body: Body::Form(req),
             ..Default::default()
@@ -686,7 +705,7 @@ where
     pub fn email_change_add(
         &self,
     ) -> Builder<TSender, catsquad_shared::EmailChangeRes, catsquad_shared::EmailChangeAddErr> {
-        self.post_form_empty(LINK_API_EMAIL_CHANGE_ADD)
+        self.post_form_empty(cs::LINK_API_EMAIL_CHANGE_ADD)
     }
 
     pub fn email_change_update_current_confirm(
@@ -699,7 +718,7 @@ where
         catsquad_shared::EmailChangeUpdateCurrentConfirmErr,
     > {
         self.post_form(
-            LINK_API_EMAIL_CHANGE_UPDATE_CURRENT_CONFIRM,
+            cs::LINK_API_EMAIL_CHANGE_UPDATE_CURRENT_CONFIRM,
             catsquad_shared::EmailChangeUpdateCurrentConfirmReq {
                 email_change_key: email_change_key.into(),
                 token: token.into(),
@@ -717,7 +736,7 @@ where
         catsquad_shared::EmailChangeUpdateNewAddErr,
     > {
         self.post_form(
-            LINK_API_EMAIL_CHANGE_UPDATE_NEW_ADD,
+            cs::LINK_API_EMAIL_CHANGE_UPDATE_NEW_ADD,
             catsquad_shared::EmailChangeUpdateNewAddReq {
                 email_change_key: email_change_key.into(),
                 new_email: new_email.into(),
@@ -735,7 +754,7 @@ where
         catsquad_shared::EmailChangeUpdateNewConfirmErr,
     > {
         self.post_form(
-            LINK_API_EMAIL_CHANGE_UPDATE_NEW_CONFIRM,
+            cs::LINK_API_EMAIL_CHANGE_UPDATE_NEW_CONFIRM,
             catsquad_shared::EmailChangeUpdateNewConfirmReq {
                 email_change_key: email_change_key.into(),
                 token: token.into(),
@@ -748,7 +767,7 @@ where
         email_change_key: impl Into<String>,
     ) -> Builder<TSender, cs::EmailChangeRes, cs::EmailChangeUpdateFinishErr> {
         self.post_form(
-            LINK_API_EMAIL_CHANGE_UPDATE_FINISH,
+            cs::LINK_API_EMAIL_CHANGE_UPDATE_FINISH,
             cs::EmailChangeUpdateFinishReq {
                 email_change_key: email_change_key.into(),
             },
@@ -760,9 +779,78 @@ where
         email_change_key: impl Into<String>,
     ) -> Builder<TSender, cs::EmailChangeRes, cs::EmailChangeUpdateCancelErr> {
         self.post_form(
-            LINK_API_EMAIL_CHANGE_UPDATE_CANCEL,
+            cs::LINK_API_EMAIL_CHANGE_UPDATE_CANCEL,
             cs::EmailChangeUpdateCancelReq {
                 email_change_key: email_change_key.into(),
+            },
+        )
+    }
+
+    pub fn password_change_add(
+        &self,
+        email: impl Into<String>,
+    ) -> Builder<TSender, cs::PasswordChangeRes, cs::PasswordChangeAddErr> {
+        self.post_form(
+            cs::LINK_API_PASSWORD_CHANGE_ADD,
+            cs::PasswordChangeAddReq {
+                email: email.into(),
+            },
+        )
+    }
+
+    pub fn password_change_update_confirm(
+        &self,
+        password_change_key: impl Into<String>,
+        new_password: impl Into<String>,
+    ) -> Builder<TSender, cs::PasswordChangeUpdateConfirmRes, cs::PasswordChangeUpdateConfirmErr>
+    {
+        self.post_form(
+            cs::LINK_API_PASSWORD_CHANGE_UPDATE_CONFIRM,
+            cs::PasswordChangeUpdateConfirmReq {
+                password_change_key: password_change_key.into(),
+                new_password: new_password.into(),
+            },
+        )
+    }
+
+    pub fn comment_add(
+        &self,
+        post_key: impl Into<String>,
+        comment_parent_key: Option<impl Into<String>>,
+        text: impl Into<String>,
+    ) -> Builder<TSender, cs::CommentRes, cs::CommentAddErr> {
+        self.post_form(
+            cs::LINK_API_COMMENT_ADD,
+            cs::CommentAddReq {
+                post_key: post_key.into(),
+                comment_key: comment_parent_key.map(|v| v.into()),
+                text: text.into(),
+            },
+        )
+    }
+
+    pub fn comment_update_text(
+        &self,
+        comment_key: impl Into<String>,
+        text: impl Into<String>,
+    ) -> Builder<TSender, cs::CommentRes, cs::CommentUpdateTextErr> {
+        self.post_form(
+            cs::LINK_API_COMMENT_UPDATE_TEXT,
+            cs::CommentUpdateTextReq {
+                comment_key: comment_key.into(),
+                text: text.into(),
+            },
+        )
+    }
+
+    pub fn comment_remove(
+        &self,
+        comment_key: impl Into<String>,
+    ) -> Builder<TSender, (), cs::CommentRemoveErr> {
+        self.post_form(
+            cs::LINK_API_COMMENT_REMOVE,
+            cs::CommentRemoveReq {
+                comment_key: comment_key.into(),
             },
         )
     }

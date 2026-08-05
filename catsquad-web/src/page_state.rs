@@ -52,7 +52,12 @@ impl PageState {
     pub async fn update_auth(&self) {
         let page = self;
         let client = create_client();
-        let result = client.user_by_session_key().send().await.into_res().await;
+        let result = client
+            .user_get_by_session_key()
+            .send()
+            .await
+            .into_res()
+            .await;
         match result {
             Ok(user) => {
                 page.acc.set(Some(user));

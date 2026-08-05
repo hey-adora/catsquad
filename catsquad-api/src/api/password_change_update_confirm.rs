@@ -1,7 +1,7 @@
 use axum::{Extension, Form, Json, extract::State, http::StatusCode, response::IntoResponse};
 use catsquad_db::{
     DbEmailSent, DbEmailSentReason, DbPasswordChangeAddErr, DbPasswordChangeUpdateConfirmErr,
-    DbUser, id_to_string,
+    DbUser,
 };
 use catsquad_log::prelude::*;
 use catsquad_shared::{
@@ -111,139 +111,119 @@ pub async fn user_password_change_confirm(
     (status_code, Json(result))
 }
 
-// #[cfg(test)]
-// mod test_utils {
+#[cfg(test)]
+mod test_utils {
+    use axum::http::header;
+    use catsquad_shared as cs;
 
-//     use axum::http::StatusCode;
-//     use catsquad_db::{DbPasswordChange, id_to_string};
-//     use catsquad_shared::{
-//         LINK_API_PASSWORD_CHANGE_UPDATE_CONFIRM, PasswordChangeUpdateConfirmErr,
-//         PasswordChangeUpdateConfirmReq, PasswordChangeUpdateConfirmRes, ToForm,
-//     };
+    use crate::{TestServer, auth::create_auth_cookie_str};
 
-//     use crate::TestServer;
+    impl TestServer {
+        pub async fn password_change_confirm(
+            &self,
+            password_change_key: impl Into<String>,
+            new_password: impl Into<String>,
+            session_key: impl Into<String>,
+        ) -> Result<cs::PasswordChangeUpdateConfirmRes, cs::PasswordChangeUpdateConfirmErr>
+        {
+            self.client
+                .password_change_update_confirm(password_change_key, new_password)
+                .header_add(header::COOKIE, create_auth_cookie_str(session_key.into()))
+                .send()
+                .await
+                .into_res()
+                .await
+        }
+    }
+}
 
-//     impl TestServer {
-//         pub async fn user_password_change_confirm(
-//             &self,
-//             password_change_key: impl Into<String>,
-//             new_password: impl Into<String>,
-//             session_key: impl Into<String>,
-//         ) -> Result<PasswordChangeUpdateConfirmRes, PasswordChangeUpdateConfirmErr> {
-//             let session_key = session_key.into();
-//             let data = PasswordChangeUpdateConfirmReq {
-//                 password_change_key: password_change_key.into(),
-//                 new_password: new_password.into(),
-//             }
-//             .to_form()
-//             .unwrap();
-//             self.post_auth(LINK_API_PASSWORD_CHANGE_UPDATE_CONFIRM, data, session_key)
-//                 .await
-//                 .0
-//         }
+#[cfg(test)]
+#[tokio::test]
+async fn test_user_password_change_confirm() {
+    use catsquad_db::id_to_string;
+    init_log();
+    let server = crate::TestServer::new().await;
 
-//         pub async fn user_password_change(
-//             &self,
-//             email: impl Into<String>,
-//             new_password: impl Into<String>,
-//             session_key: impl Into<String>,
-//         ) -> DbPasswordChange {
-//             let email = email.into();
-//             let session_key = session_key.into();
-//             let new_password = new_password.into();
+    let (user, session_key) = server
+        .user_add_full("hey", "hey@heyadora.com", "hello1111111@1P")
+        .await;
+    let (user2, session_key2) = server
+        .user_add_full("hey2", "hey2@heyadora.com", "hello1111111@1P")
+        .await;
 
-//             let (result, status) = self.password_change_add(&email, &session_key).await;
-//             let password_change = self
-//                 .state
-//                 .db
-//                 .password_change_get_all()
-//                 .await
-//                 .unwrap()
-//                 .into_iter()
-//                 .find(|v| v.user.email == email && !v.used)
-//                 .unwrap();
+    let result = server.user_get_by_session_key(session_key.clone()).await;
+    assert!(result.is_ok());
 
-//             let result = self
-//                 .user_password_change_confirm(
-//                     id_to_string(password_change.id.clone()),
-//                     new_password,
-//                     session_key,
-//                 )
-//                 .await
-//                 .unwrap();
+    // password change
+    let result = server
+        .password_change_add("hey@heyadora.com", session_key.clone())
+        .await
+        .unwrap();
 
-//             let password_change = self
-//                 .state
-//                 .db
-//                 .password_change_get_all()
-//                 .await
-//                 .unwrap()
-//                 .into_iter()
-//                 .find(|v| v.id == password_change.id)
-//                 .unwrap();
+    let pss_key = id_to_string(
+        server.state.db.password_change_get_all().await.unwrap()[0]
+            .id
+            .clone(),
+    );
 
-//             password_change
-//         }
-//     }
-// }
+    let result = server
+        .password_change_confirm(pss_key, "hello1111111@2P", session_key.clone())
+        .await
+        .unwrap();
 
-// #[tokio::test]
-// async fn test_user_password_change_confirm() {
-//     init_log();
-//     let server = crate::TestServer::new().await;
+    let db_user = server.state.db.user_get_by_username("hey").await.unwrap();
+    verify_password("hello1111111@2P", db_user.password).unwrap();
 
-//     let (user, session_key) = server
-//         .user_add_2("hey", "hey@heyadora.com", "hello1111111@1P")
-//         .await;
-//     let (user2, session_key2) = server
-//         .user_add_2("hey2", "hey2@heyadora.com", "hello1111111@1P")
-//         .await;
+    let emails = server
+        .email_sent_get_filtered(DbEmailSentReason::UserPasswordChangeConfirm)
+        .await;
 
-//     let result = server.user_get_by_session_key(session_key.clone()).await.0;
-//     assert!(result.is_ok());
+    assert_eq!(emails.len(), 1);
+    assert_eq!(
+        emails[0].reason,
+        DbEmailSentReason::UserPasswordChangeConfirm.to_string()
+    );
 
-//     // password change
-//     let result = server
-//         .user_password_change("hey@heyadora.com", "hello1111111@2P", session_key.clone())
-//         .await;
+    let result = server.user_get_by_session_key(session_key.clone()).await;
+    assert!(result.is_err());
 
-//     let result = verify_password("hello1111111@2P", result.user.password);
-//     assert!(result.is_ok());
-//     let emails = server
-//         .email_sent_get_filtered(DbEmailSentReason::UserPasswordChangeConfirm)
-//         .await;
+    // password reset
 
-//     assert_eq!(emails.len(), 1);
-//     assert_eq!(
-//         emails[0].reason,
-//         DbEmailSentReason::UserPasswordChangeConfirm.to_string()
-//     );
+    server.state.set_time(1).await;
 
-//     let result = server.user_get_by_session_key(session_key.clone()).await.0;
-//     assert!(result.is_err());
+    let result = server
+        .password_change_add("hey@heyadora.com", "invalid")
+        .await
+        .unwrap();
 
-//     // password reset
+    let pss_key = id_to_string(
+        server.state.db.password_change_get_all().await.unwrap()[0]
+            .id
+            .clone(),
+    );
 
-//     let result = server
-//         .user_password_change("hey@heyadora.com", "hello1111111@3P", "invalid")
-//         .await;
+    let result = server
+        .password_change_confirm(pss_key, "hello1111111@3P", session_key.clone())
+        .await
+        .unwrap();
 
-//     let result = verify_password("hello1111111@3P", result.user.password);
-//     assert!(result.is_ok());
+    let db_user = server.state.db.user_get_by_username("hey").await.unwrap();
+    let result = verify_password("hello1111111@3P", db_user.password);
+    assert!(result.is_ok());
 
-//     let emails = server
-//         .email_sent_get_filtered(DbEmailSentReason::UserPasswordResetConfirm)
-//         .await;
+    let emails = server
+        .email_sent_get_filtered(DbEmailSentReason::UserPasswordResetConfirm)
+        .await;
 
-//     assert_eq!(emails.len(), 1);
-//     assert_eq!(
-//         emails[0].reason,
-//         DbEmailSentReason::UserPasswordResetConfirm.to_string()
-//     );
+    assert_eq!(emails.len(), 1);
+    assert_eq!(
+        emails[0].reason,
+        DbEmailSentReason::UserPasswordResetConfirm.to_string()
+    );
 
-//     let result = server.user_get_by_session_key(session_key.clone()).await.0;
-//     assert!(result.is_err());
+    let result = server.user_get_by_session_key(session_key.clone()).await;
+    assert!(result.is_err());
 
-//     let result = server.user_get_by_session_key(session_key2.clone()).await.0;
-//     assert!(result.is_ok());
-// }
+    let result = server.user_get_by_session_key(session_key2.clone()).await;
+    assert!(result.is_ok());
+}

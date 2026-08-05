@@ -41,40 +41,42 @@ pub async fn session_delete(
     (status_code, headers, result)
 }
 
-// #[cfg(test)]
-// mod test_utils {
-//     use axum::http::StatusCode;
-//     use catsquad_shared::{LINK_API_SESSION_DELETE, SessionDeleteErr, SessionDeleteRes, ToForm};
+#[cfg(test)]
+mod test_utils {
+    use crate::{TestServer, auth::create_auth_cookie_str};
+    use axum::http::header;
+    use catsquad_shared as cs;
 
-//     use crate::TestServer;
+    impl TestServer {
+        pub async fn session_remove(
+            &self,
+            session_key: impl AsRef<str>,
+        ) -> Result<cs::SessionDeleteRes, cs::SessionDeleteErr> {
+            self.client
+                .session_remove()
+                .header_add(header::COOKIE, create_auth_cookie_str(session_key))
+                .send()
+                .await
+                .into_res()
+                .await
+        }
+    }
+}
+#[tokio::test]
+async fn test_session_delete() {
+    init_log();
+    let server = crate::TestServer::new().await;
 
-//     impl TestServer {
-//         pub async fn session_delete(
-//             &self,
-//             session_key: impl AsRef<str>,
-//         ) -> (Result<SessionDeleteRes, SessionDeleteErr>, StatusCode) {
-//             self.post_auth_empty(LINK_API_SESSION_DELETE, session_key)
-//                 .await
-//         }
-//     }
-// }
+    let email = "hey@heyadora.com";
+    let password = "1nnerogGeron@@$";
 
-// #[tokio::test]
-// async fn test_session_delete() {
-//     init_log();
-//     let server = crate::TestServer::new().await;
+    let (user, session_key) = server.user_add_full("hey", email, password).await;
 
-//     let email = "hey@heyadora.com";
-//     let password = "1nnerogGeron@@$";
+    let result = server.user_get_by_session_key(&session_key).await;
+    assert!(result.is_ok());
 
-//     let (user, session_key) = server.user_add_2("hey", email, password).await;
+    let _result = server.session_remove(&session_key).await.unwrap();
 
-//     let result = server.user_get_by_session_key(&session_key).await.0;
-//     assert!(result.is_ok());
-
-//     let result = server.session_delete(&session_key).await;
-//     assert_eq!(result.1, StatusCode::OK);
-
-//     let result = server.user_get_by_session_key(&session_key).await.0;
-//     assert!(result.is_err());
-// }
+    let result = server.user_get_by_session_key(&session_key).await;
+    assert!(result.is_err());
+}

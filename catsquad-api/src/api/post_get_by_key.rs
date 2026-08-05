@@ -62,46 +62,45 @@ pub async fn post_get_by_key(
     (status_code, Json(result))
 }
 
+#[cfg(test)]
+mod test_utils {
+    use crate::TestServer;
+    use catsquad_shared as cs;
+
+    impl TestServer {
+        pub async fn post_get_by_key(
+            &self,
+            post_key: impl AsRef<str>,
+        ) -> Result<cs::PostRes, cs::PostGetByKeyErr> {
+            self.client
+                .post_get_by_key(post_key)
+                .send()
+                .await
+                .into_res()
+                .await
+        }
+    }
+}
+
 #[tokio::test]
 async fn test_post_get_by_key() {
-    use crate::auth::create_auth_cookie_str;
-    use axum::http::header;
-
     init_log();
     let server = crate::TestServer::new().await;
 
-    let (user1, session_key1) = server
+    let (_user1, session_key1) = server
         .user_add_full("prime", "prime@heyadora.com", "1234567890111GGd11$")
         .await;
 
     let post1 = server
-        .client
-        .post_add("title", "description1", "tags1")
-        .header_add(header::COOKIE, create_auth_cookie_str(session_key1.clone()))
-        .send()
-        .await
-        .into_res()
+        .post_add("title", "description1", "tags1", session_key1.clone())
         .await
         .unwrap();
 
-    let result = server
-        .client
-        .post_get_by_key("invalid")
-        .send()
-        .await
-        .into_res()
-        .await;
+    let result = server.post_get_by_key("invalid").await;
 
     assert_eq!(result, Err(PostGetByKeyErr::PostNotFound));
 
-    let result = server
-        .client
-        .post_get_by_key(post1.key.clone())
-        .send()
-        .await
-        .into_res()
-        .await
-        .unwrap();
+    let result = server.post_get_by_key(post1.key.clone()).await.unwrap();
 
     assert_eq!(result.key, post1.key);
 }

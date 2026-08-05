@@ -6,11 +6,13 @@ pub struct PasswordChangeRes {
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
-pub struct PasswordChangeReq {
+pub struct PasswordChangeAddReq {
     pub email: String,
 }
 
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq, thiserror::Error)]
+#[derive(
+    Default, Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq, thiserror::Error,
+)]
 pub enum PasswordChangeAddErr {
     #[error("email is invalid")]
     InvalidEmail(String),
@@ -18,6 +20,7 @@ pub enum PasswordChangeAddErr {
     #[error("bad request {0}")]
     BadRequest(String),
 
+    #[default]
     #[error("internal server err")]
     InternalServer,
 }

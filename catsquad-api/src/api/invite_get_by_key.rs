@@ -75,26 +75,26 @@ pub async fn invite_get_by_key(
     (status_code, Json(result))
 }
 
-// #[cfg(test)]
-// mod test_utils {
-//     use catsquad_shared::link_relative_invite_get_by_key;
+#[cfg(test)]
+mod test_utils {
+    use catsquad_shared as cs;
 
-//     use crate::{
-//         TestServer,
-//         api::invite_get_by_key::{InviteGetByKeyErr, InviteGetByKeyRes},
-//     };
+    use crate::TestServer;
 
-//     impl TestServer {
-//         pub async fn invite_get_by_key(
-//             &self,
-//             invite_key: impl AsRef<str>,
-//         ) -> Result<InviteGetByKeyRes, InviteGetByKeyErr> {
-//             let link = link_relative_invite_get_by_key(invite_key);
-//             self.get::<Result<InviteGetByKeyRes, InviteGetByKeyErr>>(link)
-//                 .await
-//         }
-//     }
-// }
+    impl TestServer {
+        pub async fn invite_get_by_key(
+            &self,
+            invite_key: impl AsRef<str>,
+        ) -> Result<cs::InviteGetByKeyRes, cs::InviteGetByKeyErr> {
+            self.client
+                .invite_get_by_key(invite_key)
+                .send()
+                .await
+                .into_res()
+                .await
+        }
+    }
+}
 
 #[tokio::test]
 async fn test_invite_get_by_key() {
@@ -103,37 +103,17 @@ async fn test_invite_get_by_key() {
     init_log();
     let server = crate::TestServer::new().await;
 
-    server
-        .client
-        .invite_add("prime@heyadora.com")
-        .send()
-        .await
-        .into_res()
-        .await
-        .unwrap();
+    server.invite_add("prime@heyadora.com").await.unwrap();
     let invite_key = id_to_string(
         server.state.db.invite_get_all().await.unwrap()[0]
             .id
             .clone(),
     );
 
-    let invite = server
-        .client
-        .invite_get_by_key(invite_key)
-        .send()
-        .await
-        .into_res()
-        .await
-        .unwrap();
+    let invite = server.invite_get_by_key(invite_key).await.unwrap();
     assert_eq!(invite.email, "prime@heyadora.com");
 
-    let result = server
-        .client
-        .invite_get_by_key("invalid")
-        .send()
-        .await
-        .into_res()
-        .await;
+    let result = server.invite_get_by_key("invalid").await;
 
     assert_eq!(result, Err(InviteGetByKeyErr::InviteNotFound));
 }

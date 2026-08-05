@@ -12,7 +12,9 @@ pub struct UserUpdateUsernameReq {
     pub new_username: String,
 }
 
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq, thiserror::Error)]
+#[derive(
+    Default, Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq, thiserror::Error,
+)]
 pub enum UserUpdateUsernameErr {
     #[error("username alreay used")]
     UsernameAlreadyUsed,
@@ -26,6 +28,7 @@ pub enum UserUpdateUsernameErr {
     #[error("bad request {0}")]
     BadRequest(String),
 
+    #[default]
     #[error("internal server err")]
     InternalServer,
 }

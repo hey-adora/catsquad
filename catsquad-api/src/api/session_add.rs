@@ -106,6 +106,39 @@ pub async fn session_add(
     }
 }
 
+#[cfg(test)]
+mod test_utils {
+    use axum::http::header;
+    use catsquad_shared as cs;
+
+    use crate::{TestServer, auth::auth_token_get};
+
+    impl TestServer {
+        pub async fn session_add(
+            &self,
+            email: impl Into<String>,
+            password: impl Into<String>,
+        ) -> Result<cs::SensitiveUserRes, cs::SessionAddErr> {
+            self.client
+                .session_add(email, password)
+                .send()
+                .await
+                .into_res()
+                .await
+        }
+        pub async fn session_add_with_key(
+            &self,
+            email: impl Into<String>,
+            password: impl Into<String>,
+        ) -> (cs::SensitiveUserRes, String) {
+            let res = self.client.session_add(email, password).send().await;
+            let headers = res.get_headers().unwrap();
+            let session_key = auth_token_get(&headers, header::SET_COOKIE).unwrap();
+            let res = res.into_res().await.unwrap();
+            (res, session_key)
+        }
+    }
+}
 // #[cfg(test)]
 // mod test_utils {
 //     use catsquad_shared::{LINK_API_SESSION_ADD, SessionAddErr, SessionAddReq, SessionRes, ToForm};
@@ -130,18 +163,24 @@ pub async fn session_add(
 //     }
 // }
 
-// #[tokio::test]
-// async fn test_session_add() {
-//     init_log();
-//     let server = crate::TestServer::new().await;
+#[tokio::test]
+async fn test_session_add() {
+    init_log();
+    let server = crate::TestServer::new().await;
 
-//     let email = "hey@heyadora.com";
-//     let password = "1nnerogGeron@@$";
-//     let (user, session_key) = server.user_add_2("hey", email, password).await;
-//     let (session, session_key2) = server.session_add(email, password).await;
-//     let session_key2 = session_key2.unwrap();
-//     assert_ne!(session_key, session_key2);
-//     let (user, status) = server.user_get_by_session_key(session_key2).await;
-//     let user = user.unwrap();
-//     assert_eq!(user.email, email);
-// }
+    let email = "hey@heyadora.com";
+    let password = "1nnerogGeron@@$";
+
+    let result = server
+        .session_add("hey@heyadora.com", "1nnerogGeron@@$")
+        .await;
+    assert!(matches!(result, Err(SessionAddErr::InvalidCredentials)));
+    let result = server.session_add("hey@heyadora.com", "").await;
+    assert!(matches!(result, Err(SessionAddErr::InvalidCredentials)));
+
+    let (user, session_key) = server.user_add_full("hey", email, password).await;
+    let (session, session_key2) = server.session_add_with_key(email, password).await;
+    assert_ne!(session_key, session_key2);
+    let user = server.user_get_by_session_key(session_key2).await.unwrap();
+    assert_eq!(user.email, email);
+}

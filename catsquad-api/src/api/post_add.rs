@@ -88,51 +88,43 @@ pub async fn post_add(
     (status_code, Json(result))
 }
 
-// #[cfg(test)]
-// mod test_utils {
-//     use catsquad_shared::{LINK_API_SESSION_ADD, SessionAddErr, SessionAddReq, SessionRes, ToForm};
+#[cfg(test)]
+mod test_utils {
+    use axum::http::header;
+    use catsquad_shared as cs;
 
-//     use crate::TestServer;
+    use crate::{TestServer, auth::create_auth_cookie_str};
 
-//     impl TestServer {
-//         pub async fn session_add(
-//             &self,
-//             email: impl Into<String>,
-//             password: impl Into<String>,
-//         ) -> (Result<SessionRes, SessionAddErr>, Option<String>) {
-//             let data = SessionAddReq {
-//                 email: email.into(),
-//                 password: password.into(),
-//             }
-//             .to_form()
-//             .unwrap();
-//             self.post_and_get_auth_token(LINK_API_SESSION_ADD, data)
-//                 .await
-//         }
-//     }
-// }
+    impl TestServer {
+        pub async fn post_add(
+            &self,
+            title: impl Into<String>,
+            description: impl Into<String>,
+            tags: impl Into<String>,
+            session_key: impl Into<String>,
+        ) -> Result<cs::PostRes, cs::PostAddErr> {
+            self.client
+                .post_add(title, description, tags)
+                .header_add(header::COOKIE, create_auth_cookie_str(session_key.into()))
+                .send()
+                .await
+                .into_res()
+                .await
+        }
+    }
+}
 
-// #[tokio::test]
-// async fn test_post_add() {
-//     init_log();
-//     let server = crate::TestServer::new().await;
+#[tokio::test]
+async fn test_post_add() {
+    init_log();
+    let server = crate::TestServer::new().await;
 
-//     let email = "hey@heyadora.com";
-//     let password = "1nnerogGeron@@$";
-//     let (user, session_key) = server.user_add_2("hey", email, password).await;
-//     // let session_key2 = server.session_add(email, password).await.1.unwrap();
+    let email = "hey@heyadora.com";
+    let password = "1nnerogGeron@@$";
+    let (user, session_key) = server.user_add_full("hey", email, password).await;
 
-//     server.set_session_key(session_key).await;
-//     let result = server
-//         .client
-//         .api_post_add("title1", "description1", "tags1")
-//         .await
-//         .into_res()
-//         .await;
-
-//     // let session_key2 = session_key2.unwrap();
-//     // assert_ne!(session_key, session_key2);
-//     // let (user, status) = server.user_get_by_session_key(session_key2).await;
-//     // let user = user.unwrap();
-//     // assert_eq!(user.email, email);
-// }
+    let result = server
+        .post_add("title1", "description1", "tags1", session_key)
+        .await
+        .unwrap();
+}

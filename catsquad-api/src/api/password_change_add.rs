@@ -3,7 +3,9 @@ use catsquad_db::{
     DbEmailSentReason, DbPasswordChange, DbPasswordChangeAddErr, DbUser, id_to_string,
 };
 use catsquad_log::prelude::*;
-use catsquad_shared::{PasswordChangeAddErr, PasswordChangeReq, PasswordChangeRes, validate_email};
+use catsquad_shared::{
+    PasswordChangeAddErr, PasswordChangeAddReq, PasswordChangeRes, validate_email,
+};
 
 use crate::state::AppState;
 
@@ -39,7 +41,7 @@ fn send_email_password_reset(address: impl AsRef<str>, token: impl AsRef<str>) -
 pub async fn password_change_add(
     db_user: Extension<Option<DbUser>>,
     State(app): State<AppState>,
-    Form(req): Form<PasswordChangeReq>,
+    Form(req): Form<PasswordChangeAddReq>,
 ) -> impl IntoResponse {
     let time = app.get_time().await;
     let password_change_expiration = app.get_password_change_expiration().await;
@@ -96,70 +98,64 @@ pub async fn password_change_add(
     (status_code, Json(result))
 }
 
-// #[cfg(test)]
-// mod test_utils {
-//     use axum::http::StatusCode;
-//     use catsquad_shared::{
-//         LINK_API_PASSWORD_CHANGE_ADD, PasswordChangeAddErr, PasswordChangeReq, PasswordChangeRes,
-//         ToForm,
-//     };
+#[cfg(test)]
+mod test_utils {
+    use axum::http::header;
+    use catsquad_shared as cs;
 
-//     use crate::TestServer;
+    use crate::{TestServer, auth::create_auth_cookie_str};
 
-//     impl TestServer {
-//         pub async fn password_change_add(
-//             &self,
-//             email: impl Into<String>,
-//             session_key: impl Into<String>,
-//         ) -> (Result<PasswordChangeRes, PasswordChangeAddErr>, StatusCode) {
-//             let session_key = session_key.into();
-//             let data = PasswordChangeReq {
-//                 email: email.into(),
-//             }
-//             .to_form()
-//             .unwrap();
-//             self.post_auth::<Result<PasswordChangeRes, PasswordChangeAddErr>>(
-//                 LINK_API_PASSWORD_CHANGE_ADD,
-//                 data,
-//                 session_key,
-//             )
-//             .await
-//         }
-//     }
-// }
+    impl TestServer {
+        pub async fn password_change_add(
+            &self,
+            email: impl Into<String>,
+            session_key: impl Into<String>,
+        ) -> Result<cs::PasswordChangeRes, cs::PasswordChangeAddErr> {
+            self.client
+                .password_change_add(email.into())
+                .header_add(header::COOKIE, create_auth_cookie_str(session_key.into()))
+                .send()
+                .await
+                .into_res()
+                .await
+        }
+    }
+}
 
-// #[tokio::test]
-// async fn test_password_change_add() {
-//     init_log();
-//     let server = crate::TestServer::new().await;
+#[tokio::test]
+async fn test_password_change_add() {
+    init_log();
+    let server = crate::TestServer::new().await;
 
-//     let email = "hey@heyadora.com";
-//     let (user1, token) = server.user_add_2("hey", email, "1234567890111GG11$").await;
+    let email = "hey@heyadora.com";
+    let (_user1, token) = server
+        .user_add_full("hey", email, "a1234567890111GG11$")
+        .await;
 
-//     // password change
-//     let (result, status) = server.password_change_add(email, token).await;
-//     let password_change = server.state.db.password_change_get_all().await.unwrap()[0].clone();
+    // password change
+    let _result = server.password_change_add(email, token).await;
+    let _password_change = server.state.db.password_change_get_all().await.unwrap()[0].clone();
 
-//     let emails = server
-//         .email_sent_get_filtered(DbEmailSentReason::UserPasswordChangeAdd)
-//         .await;
-//     assert_eq!(emails.len(), 1);
-//     assert_eq!(
-//         emails[0].reason,
-//         DbEmailSentReason::UserPasswordChangeAdd.to_string()
-//     );
+    let emails = server
+        .email_sent_get_filtered(DbEmailSentReason::UserPasswordChangeAdd)
+        .await;
+    assert_eq!(emails.len(), 1);
+    assert_eq!(
+        emails[0].reason,
+        DbEmailSentReason::UserPasswordChangeAdd.to_string()
+    );
 
-//     // password reset
-//     let (result, status) = server.password_change_add(email, "invalid").await;
-//     let password_change = server.state.db.password_change_get_all().await.unwrap();
-//     assert_eq!(password_change.len(), 2);
+    // password reset
+    let _result = server.password_change_add(email, "invalid").await;
+    let password_change = server.state.db.password_change_get_all().await.unwrap();
+    assert_eq!(password_change.len(), 2);
 
-//     let emails = server
-//         .email_sent_get_filtered(DbEmailSentReason::UserPasswordResetAdd)
-//         .await;
-//     assert_eq!(emails.len(), 1);
-//     assert_eq!(
-//         emails[0].reason,
-//         DbEmailSentReason::UserPasswordResetAdd.to_string()
-//     );
-// }
+    let emails = server
+        .email_sent_get_filtered(DbEmailSentReason::UserPasswordResetAdd)
+        .await;
+    assert_eq!(emails.len(), 1);
+    assert_eq!(
+        emails[0].reason,
+        DbEmailSentReason::UserPasswordResetAdd.to_string()
+    );
+}

@@ -90,10 +90,22 @@ pub async fn app(state: AppState) -> Router {
 
     let router_auth = Router::new()
         .route(
+            catsquad_shared::LINK_API_COMMENT_ADD,
+            post(api::comment_add),
+        )
+        .route(
+            catsquad_shared::LINK_API_COMMENT_UPDATE_TEXT,
+            post(api::comment_update_text),
+        )
+        .route(
+            catsquad_shared::LINK_API_COMMENT_REMOVE,
+            post(api::comment_remove),
+        )
+        .route(catsquad_shared::LINK_API_POST_ADD, post(api::post_add))
+        .route(
             catsquad_shared::LINK_API_POST_UPDATE_FILE_REMOVE,
             post(api::post_update_file_remove),
         )
-        .route(catsquad_shared::LINK_API_POST_ADD, post(api::post_add))
         .route(
             catsquad_shared::LINK_API_POST_UPDATE_TAGS,
             post(api::post_update_tags),

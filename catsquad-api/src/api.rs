@@ -1,3 +1,6 @@
+mod comment_add;
+mod comment_remove;
+mod comment_update_text;
 mod email_change_add;
 mod email_change_update_cancel;
 mod email_change_update_current_confirm;
@@ -23,6 +26,9 @@ mod user_get_by_session_key;
 mod user_update_username;
 
 pub mod assets;
+pub use comment_add::comment_add;
+pub use comment_remove::comment_remove;
+pub use comment_update_text::comment_update_text;
 pub use email_change_add::email_change_add;
 pub use email_change_update_cancel::email_change_update_cancel;
 pub use email_change_update_current_confirm::email_change_update_current_confirm;

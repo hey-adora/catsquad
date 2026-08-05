@@ -80,7 +80,6 @@ mod test_utils {
         ) -> Result<cs::InviteRes, cs::InviteAddErr> {
             self.client.invite_add(email).send().await.into_res().await
         }
-
         pub async fn invite_get_key(&self, email: impl AsRef<str>) -> String {
             let email = email.as_ref();
             id_to_string(
@@ -99,37 +98,15 @@ mod test_utils {
     }
 }
 
-// #[cfg(test)]
-// mod test_utils {
-//     use catsquad_shared::{InviteAddErr, InviteAddReq, InviteRes, LINK_API_INVITE_ADD, ToForm};
+#[tokio::test]
+async fn test_invite_add() {
+    init_log();
+    let server = crate::TestServer::new().await;
 
-//     use crate::TestServer;
+    let result = server.invite_add("hello").await;
+    // let result = server.invite_add("hello").await;
+    assert!(matches!(result, Err(InviteAddErr::InvalidEmail(_))));
 
-//     impl TestServer {
-//         pub async fn invite_add(
-//             &self,
-//             email: impl Into<String>,
-//         ) -> Result<InviteRes, InviteAddErr> {
-//             let data = InviteAddReq {
-//                 email: email.into(),
-//             }
-//             .to_form()
-//             .unwrap();
-//             self.post::<Result<InviteRes, InviteAddErr>>(LINK_API_INVITE_ADD, data)
-//                 .await
-//         }
-//     }
-// }
-
-// #[tokio::test]
-// async fn test_invite_add() {
-//     init_log();
-//     let server = crate::TestServer::new().await;
-
-//     let result = server.client.api_invite_add("hello").await.into_res().await;
-//     // let result = server.invite_add("hello").await;
-//     assert!(matches!(result, Err(InviteAddErr::InvalidEmail(_))));
-
-//     let result = server.invite_add("prime@heyadora.com").await;
-//     assert!(result.is_ok());
-// }
+    let result = server.invite_add("prime@heyadora.com").await;
+    assert!(result.is_ok());
+}
