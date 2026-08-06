@@ -1,10 +1,10 @@
 use axum::{
-    Json,
+    Extension, Json,
     extract::{RawPathParams, State},
     http::{StatusCode, header},
     response::IntoResponse,
 };
-use catsquad_db::DbPostGetByKeyErr;
+use catsquad_db::{DbPostGetByKeyErr, DbUser};
 use catsquad_log::prelude::*;
 use catsquad_shared::{
     POST_GET_BY_KEY_REQ_FIELD_POST_KEY, PostGetByKeyErr, PostGetByKeyParams, PostRes,
@@ -14,6 +14,9 @@ use crate::{api::post_add::from_db_post, state::AppState};
 
 pub fn from_db_post_get_by_key_err(value: DbPostGetByKeyErr) -> PostGetByKeyErr {
     match value {
+        DbPostGetByKeyErr::Unauthorized => {
+            PostGetByKeyErr::Unauthorized("unauthorized".to_string())
+        }
         DbPostGetByKeyErr::PostNotFound => PostGetByKeyErr::PostNotFound,
         DbPostGetByKeyErr::Db(_) => PostGetByKeyErr::InternalServerErr,
     }
@@ -34,6 +37,7 @@ fn params_req(value: RawPathParams) -> Result<PostGetByKeyParams, PostGetByKeyEr
 pub fn status_code(result: &Result<PostRes, PostGetByKeyErr>) -> StatusCode {
     match result {
         Ok(_) => StatusCode::OK,
+        Err(PostGetByKeyErr::Unauthorized(_)) => StatusCode::UNAUTHORIZED,
         Err(PostGetByKeyErr::PostNotFound) => StatusCode::NOT_FOUND,
         Err(PostGetByKeyErr::BadRequest(_)) => StatusCode::BAD_REQUEST,
         Err(PostGetByKeyErr::InternalServerErr) => StatusCode::INTERNAL_SERVER_ERROR,
@@ -41,15 +45,17 @@ pub fn status_code(result: &Result<PostRes, PostGetByKeyErr>) -> StatusCode {
 }
 
 pub async fn post_get_by_key(
+    db_user: Extension<Option<DbUser>>,
     State(app): State<AppState>,
     params: axum::extract::RawPathParams,
 ) -> impl IntoResponse {
     let inner = async || -> Result<PostRes, PostGetByKeyErr> {
         let req = params_req(params)?;
+        let user_id = db_user.as_ref().map(|v| v.id.clone());
 
         let post = app
             .db
-            .post_get_by_key(req.post_key)
+            .post_get_by_key(user_id, req.post_key)
             .await
             .map_err(from_db_post_get_by_key_err)?;
 
@@ -64,16 +70,19 @@ pub async fn post_get_by_key(
 
 #[cfg(test)]
 mod test_utils {
-    use crate::TestServer;
+    use crate::{TestServer, auth::create_auth_cookie_str};
+    use axum::http::header;
     use catsquad_shared as cs;
 
     impl TestServer {
         pub async fn post_get_by_key(
             &self,
             post_key: impl AsRef<str>,
+            session_key: impl AsRef<str>,
         ) -> Result<cs::PostRes, cs::PostGetByKeyErr> {
             self.client
                 .post_get_by_key(post_key)
+                .header_add(header::COOKIE, create_auth_cookie_str(session_key.as_ref()))
                 .send()
                 .await
                 .into_res()
@@ -96,11 +105,28 @@ async fn test_post_get_by_key() {
         .await
         .unwrap();
 
-    let result = server.post_get_by_key("invalid").await;
+    let result = server.post_get_by_key("invalid", "").await;
 
     assert_eq!(result, Err(PostGetByKeyErr::PostNotFound));
 
-    let result = server.post_get_by_key(post1.key.clone()).await.unwrap();
+    let result = server.post_get_by_key(post1.key.clone(), "").await;
+    assert!(matches!(result, Err(PostGetByKeyErr::Unauthorized(_))));
 
+    let result = server
+        .post_get_by_key(post1.key.clone(), &session_key1)
+        .await
+        .unwrap();
+    assert_eq!(result.key, post1.key);
+
+    server
+        .post_update_state(
+            post1.key.clone(),
+            catsquad_shared::PostState::Active,
+            &session_key1,
+        )
+        .await
+        .unwrap();
+
+    let result = server.post_get_by_key(post1.key.clone(), "").await.unwrap();
     assert_eq!(result.key, post1.key);
 }

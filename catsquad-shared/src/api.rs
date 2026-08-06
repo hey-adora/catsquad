@@ -1,5 +1,6 @@
 pub mod comment_add;
 pub mod comment_remove;
+pub mod comment_search;
 pub mod comment_update_text;
 pub mod email_change_add;
 pub mod email_change_update_cancel;
@@ -57,10 +58,10 @@ pub fn to_form(data: impl serde::Serialize) -> Result<String, anyhow::Error> {
 pub enum TimeRange {
     #[default]
     None,
-    Less(u128),
-    LessOrEqual(u128),
-    More(u128),
-    MoreOrEqual(u128),
+    Less,
+    LessOrEqual,
+    More,
+    MoreOrEqual,
 }
 
 #[derive(

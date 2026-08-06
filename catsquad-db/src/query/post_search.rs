@@ -17,11 +17,12 @@ impl Db {
     pub async fn post_search(
         &self,
         state: PostState,
-        limit: usize,
-        time_range: TimeRange,
-        order: Order,
         tags: impl Into<String>,
         user: impl Into<String>,
+        time_range: u128,
+        limit: usize,
+        range: TimeRange,
+        order: Order,
     ) -> Result<Vec<DbPost>, DbPostSearchErr> {
         let tags = tags.into();
         let user = user.into();
@@ -29,14 +30,6 @@ impl Db {
         let tags = tags.to_lowercase();
         let tags = tags.split_whitespace();
         let tags = tags.map(|v| v.to_string()).collect::<Vec<String>>();
-
-        let time_range_val = match time_range {
-            TimeRange::None => 0,
-            TimeRange::Less(v)
-            | TimeRange::LessOrEqual(v)
-            | TimeRange::More(v)
-            | TimeRange::MoreOrEqual(v) => v,
-        };
 
         let q_tags = if tags.len() > 0 {
             "tags CONTAINSALL $tags"
@@ -50,12 +43,12 @@ impl Db {
             ""
         };
 
-        let q_time_after = match time_range {
+        let q_time_after = match range {
             TimeRange::None => "",
-            TimeRange::Less(_) => "created_at < $time_range",
-            TimeRange::LessOrEqual(_) => "created_at <= $time_range",
-            TimeRange::More(_) => "created_at > $time_range",
-            TimeRange::MoreOrEqual(_) => "created_at >= $time_range",
+            TimeRange::Less => "created_at < $time_range",
+            TimeRange::LessOrEqual => "created_at <= $time_range",
+            TimeRange::More => "created_at > $time_range",
+            TimeRange::MoreOrEqual => "created_at >= $time_range",
         };
 
         let q_order = match order {
@@ -104,7 +97,7 @@ impl Db {
         self.db
             .query(query)
             .bind(("get_limit", limit))
-            .bind(("time_range", time_range_val))
+            .bind(("time_range", time_range))
             .bind(("post_state", state.to_string()))
             .bind(("tags", tags))
             .bind(("user", user))
@@ -163,11 +156,12 @@ async fn test_post_search() {
     let result = db
         .post_search(
             PostState::Active,
+            "",
+            "",
+            0,
             4,
-            TimeRange::MoreOrEqual(0),
+            TimeRange::MoreOrEqual,
             Order::ThreeTwoOne,
-            "",
-            "",
         )
         .await
         .unwrap();
@@ -177,11 +171,12 @@ async fn test_post_search() {
         let result = db
             .post_search(
                 PostState::Active,
-                3,
-                TimeRange::LessOrEqual(3),
-                Order::ThreeTwoOne,
                 " three  two     ",
                 "hey",
+                3,
+                3,
+                TimeRange::LessOrEqual,
+                Order::ThreeTwoOne,
             )
             .await
             .unwrap();
@@ -191,11 +186,12 @@ async fn test_post_search() {
         let result = db
             .post_search(
                 PostState::Active,
-                3,
-                TimeRange::LessOrEqual(3),
-                Order::ThreeTwoOne,
                 " three  two     ",
                 "hey2",
+                3,
+                3,
+                TimeRange::LessOrEqual,
+                Order::ThreeTwoOne,
             )
             .await
             .unwrap();
@@ -205,11 +201,12 @@ async fn test_post_search() {
     let result = db
         .post_search(
             PostState::Active,
-            3,
-            TimeRange::LessOrEqual(3),
-            Order::ThreeTwoOne,
             " three  two     ",
             String::new(),
+            3,
+            3,
+            TimeRange::LessOrEqual,
+            Order::ThreeTwoOne,
         )
         .await
         .unwrap();
@@ -219,11 +216,12 @@ async fn test_post_search() {
     let result = db
         .post_search(
             PostState::Active,
-            3,
-            TimeRange::LessOrEqual(3),
-            Order::ThreeTwoOne,
             "three two",
             String::new(),
+            3,
+            3,
+            TimeRange::LessOrEqual,
+            Order::ThreeTwoOne,
         )
         .await
         .unwrap();
@@ -233,11 +231,12 @@ async fn test_post_search() {
     let result = db
         .post_search(
             PostState::Active,
-            3,
-            TimeRange::LessOrEqual(3),
-            Order::ThreeTwoOne,
             "two",
             String::new(),
+            3,
+            3,
+            TimeRange::LessOrEqual,
+            Order::ThreeTwoOne,
         )
         .await
         .unwrap();
@@ -248,11 +247,12 @@ async fn test_post_search() {
     let result = db
         .post_search(
             PostState::Active,
-            3,
-            TimeRange::LessOrEqual(3),
-            Order::OneTwoThree,
             "two",
             String::new(),
+            3,
+            3,
+            TimeRange::LessOrEqual,
+            Order::OneTwoThree,
         )
         .await
         .unwrap();
@@ -263,11 +263,12 @@ async fn test_post_search() {
     let result = db
         .post_search(
             PostState::Active,
-            3,
-            TimeRange::MoreOrEqual(1),
-            Order::OneTwoThree,
             "two",
             String::new(),
+            1,
+            3,
+            TimeRange::MoreOrEqual,
+            Order::OneTwoThree,
         )
         .await
         .unwrap();
@@ -278,11 +279,12 @@ async fn test_post_search() {
     let result = db
         .post_search(
             PostState::Active,
+            "two",
+            String::new(),
+            0,
             3,
             TimeRange::None,
             Order::OneTwoThree,
-            "two",
-            String::new(),
         )
         .await
         .unwrap();
@@ -293,11 +295,12 @@ async fn test_post_search() {
     let result = db
         .post_search(
             PostState::Active,
-            3,
-            TimeRange::Less(3),
-            Order::OneTwoThree,
             "two",
             String::new(),
+            3,
+            3,
+            TimeRange::Less,
+            Order::OneTwoThree,
         )
         .await
         .unwrap();
@@ -308,11 +311,12 @@ async fn test_post_search() {
     let result = db
         .post_search(
             PostState::Active,
-            3,
-            TimeRange::Less(2),
-            Order::OneTwoThree,
             "two",
             String::new(),
+            2,
+            3,
+            TimeRange::Less,
+            Order::OneTwoThree,
         )
         .await
         .unwrap();
@@ -322,11 +326,12 @@ async fn test_post_search() {
     let result = db
         .post_search(
             PostState::Active,
-            3,
-            TimeRange::More(1),
-            Order::OneTwoThree,
             "two",
             String::new(),
+            1,
+            3,
+            TimeRange::More,
+            Order::OneTwoThree,
         )
         .await
         .unwrap();

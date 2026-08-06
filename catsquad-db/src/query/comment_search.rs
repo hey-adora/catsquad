@@ -15,31 +15,26 @@ pub enum DbCommentSearchErr {
 impl Db {
     pub async fn comment_search(
         &self,
-        time: u128,
+        // time: u128,
         post_key: impl Into<RecordIdKey>,
         parent_key: Option<impl Into<RecordIdKey>>,
-        flatten: bool,
+        time_range: u128,
         limit: usize,
-        time_range: TimeRange,
+        range: TimeRange,
         order: Order,
+        flatten: bool,
     ) -> Result<Vec<DbComment>, DbCommentSearchErr> {
         let post_id = create_post_id(post_key);
         let parent_id = parent_key.map(|v| create_comment_id(v.into()));
 
-        let q_time_after = match time_range {
+        let q_time_after = match range {
             TimeRange::None => "",
-            TimeRange::Less(_) => "AND created_at < $time_range",
-            TimeRange::LessOrEqual(_) => "AND created_at <= $time_range",
-            TimeRange::More(_) => "AND created_at > $time_range",
-            TimeRange::MoreOrEqual(_) => "AND created_at >= $time_range",
+            TimeRange::Less => "AND created_at < $time_range",
+            TimeRange::LessOrEqual => "AND created_at <= $time_range",
+            TimeRange::More => "AND created_at > $time_range",
+            TimeRange::MoreOrEqual => "AND created_at >= $time_range",
         };
-        let time_range = match time_range {
-            TimeRange::None => 0,
-            TimeRange::Less(v)
-            | TimeRange::LessOrEqual(v)
-            | TimeRange::More(v)
-            | TimeRange::MoreOrEqual(v) => v,
-        };
+
         let q_order = match order {
             Order::OneTwoThree => "ASC",
             Order::ThreeTwoOne => "DESC",
@@ -66,7 +61,7 @@ impl Db {
 
         self.db
             .query(query)
-            .bind(("time", time))
+            // .bind(("time", time))
             .bind(("time_range", time_range))
             .bind(("parent_id", parent_id))
             .bind(("post_id", post_id))
@@ -101,13 +96,14 @@ async fn test_comment_search() {
 
     let comments = db
         .comment_search(
-            0,
+            // 0,
             post0.id.key.clone(),
             None::<RecordIdKey>,
-            false,
+            0,
             10,
-            TimeRange::MoreOrEqual(0),
+            TimeRange::MoreOrEqual,
             Order::ThreeTwoOne,
+            false,
         )
         .await
         .unwrap();
@@ -192,13 +188,14 @@ async fn test_comment_search() {
 
     let comments = db
         .comment_search(
-            0,
+            // 0,
             post0.id.key.clone(),
             None::<RecordIdKey>,
-            false,
+            0,
             10,
-            TimeRange::MoreOrEqual(0),
+            TimeRange::MoreOrEqual,
             Order::ThreeTwoOne,
+            false,
         )
         .await
         .unwrap();
@@ -209,13 +206,14 @@ async fn test_comment_search() {
 
     let comments = db
         .comment_search(
-            0,
+            // 0,
             post0.id.key.clone(),
             None::<RecordIdKey>,
-            false,
+            0,
             10,
-            TimeRange::MoreOrEqual(0),
+            TimeRange::MoreOrEqual,
             Order::OneTwoThree,
+            false,
         )
         .await
         .unwrap();
@@ -226,13 +224,14 @@ async fn test_comment_search() {
 
     let comments = db
         .comment_search(
-            0,
+            // 0,
             post0.id.key.clone(),
             Some(comment0.id.key.clone()),
-            false,
+            0,
             10,
-            TimeRange::MoreOrEqual(0),
+            TimeRange::MoreOrEqual,
             Order::OneTwoThree,
+            false,
         )
         .await
         .unwrap();
@@ -241,13 +240,14 @@ async fn test_comment_search() {
 
     let comments = db
         .comment_search(
-            0,
+            // 0,
             post0.id.key.clone(),
             Some(comment0_r0.id.key.clone()),
-            false,
+            0,
             10,
-            TimeRange::MoreOrEqual(0),
+            TimeRange::MoreOrEqual,
             Order::OneTwoThree,
+            false,
         )
         .await
         .unwrap();
@@ -256,13 +256,14 @@ async fn test_comment_search() {
 
     let comments = db
         .comment_search(
-            0,
+            // 0,
             post0.id.key.clone(),
             Some(comment0_r1.id.key.clone()),
-            false,
+            0,
             10,
-            TimeRange::MoreOrEqual(0),
+            TimeRange::MoreOrEqual,
             Order::OneTwoThree,
+            false,
         )
         .await
         .unwrap();
@@ -271,13 +272,14 @@ async fn test_comment_search() {
 
     let comments = db
         .comment_search(
-            0,
+            // 0,
             post0.id.key.clone(),
             Some(comment0_r2.id.key.clone()),
-            false,
+            0,
             10,
-            TimeRange::MoreOrEqual(0),
+            TimeRange::MoreOrEqual,
             Order::OneTwoThree,
+            false,
         )
         .await
         .unwrap();
@@ -285,13 +287,14 @@ async fn test_comment_search() {
 
     let comments = db
         .comment_search(
-            0,
+            // 0,
             post0.id.key.clone(),
             Some(comment0.id.key.clone()),
-            true,
+            0,
             10,
-            TimeRange::MoreOrEqual(0),
+            TimeRange::MoreOrEqual,
             Order::OneTwoThree,
+            true,
         )
         .await
         .unwrap();
@@ -302,13 +305,14 @@ async fn test_comment_search() {
 
     let comments = db
         .comment_search(
-            0,
+            // 0,
             post0.id.key.clone(),
             Some(comment0.id.key.clone()),
-            true,
+            0,
             10,
-            TimeRange::MoreOrEqual(0),
+            TimeRange::MoreOrEqual,
             Order::ThreeTwoOne,
+            true,
         )
         .await
         .unwrap();
@@ -319,13 +323,14 @@ async fn test_comment_search() {
 
     let comments = db
         .comment_search(
-            0,
+            // 0,
             post0.id.key.clone(),
             Some(comment0.id.key.clone()),
-            true,
+            2,
             10,
-            TimeRange::MoreOrEqual(2),
+            TimeRange::MoreOrEqual,
             Order::ThreeTwoOne,
+            true,
         )
         .await
         .unwrap();
@@ -335,13 +340,14 @@ async fn test_comment_search() {
 
     let comments = db
         .comment_search(
-            0,
+            // 0,
             post0.id.key.clone(),
             Some(comment0.id.key.clone()),
-            true,
+            2,
             10,
-            TimeRange::More(2),
+            TimeRange::More,
             Order::ThreeTwoOne,
+            true,
         )
         .await
         .unwrap();
@@ -350,13 +356,14 @@ async fn test_comment_search() {
 
     let comments = db
         .comment_search(
-            0,
+            // 0,
             post0.id.key.clone(),
             Some(comment0.id.key.clone()),
-            true,
+            2,
             10,
-            TimeRange::LessOrEqual(2),
+            TimeRange::LessOrEqual,
             Order::ThreeTwoOne,
+            true,
         )
         .await
         .unwrap();
@@ -366,13 +373,14 @@ async fn test_comment_search() {
 
     let comments = db
         .comment_search(
-            0,
+            // 0,
             post0.id.key.clone(),
             Some(comment0.id.key.clone()),
-            true,
+            2,
             10,
-            TimeRange::Less(2),
+            TimeRange::Less,
             Order::ThreeTwoOne,
+            true,
         )
         .await
         .unwrap();

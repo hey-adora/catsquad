@@ -20,6 +20,9 @@ pub enum PostGetByKeyErr {
     #[error("bad request {0}")]
     BadRequest(String),
 
+    #[error("unauthorized {0}")]
+    Unauthorized(String),
+
     #[default]
     #[error("internal server err")]
     InternalServerErr,

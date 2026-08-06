@@ -49,9 +49,10 @@ pub async fn app(state: AppState) -> Router {
 
     let router_public = Router::new()
         .route(
-            catsquad_shared::LINK_API_POST_GET_BY_KEY,
-            get(api::post_get_by_key),
+            catsquad_shared::LINK_API_COMMENT_SEARCH,
+            get(api::comment_search),
         )
+        .route(catsquad_shared::LINK_API_POST_SEARCH, get(api::post_search))
         .route(
             catsquad_shared::LINK_API_SESSION_ADD,
             post(api::session_add),
@@ -82,6 +83,10 @@ pub async fn app(state: AppState) -> Router {
         .route(
             catsquad_shared::LINK_API_PASSWORD_CHANGE_UPDATE_CONFIRM,
             post(api::user_password_change_confirm),
+        )
+        .route(
+            catsquad_shared::LINK_API_POST_GET_BY_KEY,
+            get(api::post_get_by_key),
         )
         .route_layer(middleware::from_fn_with_state(
             state.clone(),

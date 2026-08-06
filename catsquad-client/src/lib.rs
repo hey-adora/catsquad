@@ -1,7 +1,7 @@
 use catsquad_log::prelude::*;
 use catsquad_shared::{
-    self as cs, PostFile, PostState, ToForm, link_relative_invite_get_by_key,
-    link_relative_post_get_by_key,
+    self as cs, Order, PostFile, PostSearchParams, PostState, TimeRange, ToForm,
+    link_relative_invite_get_by_key, link_relative_post_get_by_key, link_relative_post_search,
 };
 use http::{HeaderMap, HeaderName, StatusCode, header};
 use std::{
@@ -370,6 +370,21 @@ where
         Self { sender }
     }
 
+    pub fn get<TResult, TError>(&self, link: impl Into<String>) -> Builder<TSender, TResult, TError>
+    where
+        TResult: for<'a> serde::Deserialize<'a> + Debug,
+        TError: for<'a> serde::Deserialize<'a> + Debug + Default,
+    {
+        let params = SenderParams {
+            path: link.into(),
+            method: Method::Get,
+            body: Body::None,
+            ..Default::default()
+        };
+        let sender = self.sender.clone();
+        Builder::new(sender, params)
+    }
+
     pub fn post_form<TReq, TResult, TError>(
         &self,
         link: impl Into<String>,
@@ -702,6 +717,25 @@ where
         Builder::new(sender, params)
     }
 
+    pub fn post_search(
+        &self,
+        tags: impl Into<String>,
+        username: impl Into<String>,
+        time: u128,
+        limit: usize,
+        range: TimeRange,
+        order: Order,
+    ) -> Builder<TSender, Vec<cs::PostRes>, cs::PostSearchErr> {
+        self.get(link_relative_post_search(cs::PostSearchParams {
+            time,
+            range,
+            order,
+            limit,
+            tags: tags.into(),
+            username: username.into(),
+        }))
+    }
+
     pub fn email_change_add(
         &self,
     ) -> Builder<TSender, catsquad_shared::EmailChangeRes, catsquad_shared::EmailChangeAddErr> {
@@ -853,5 +887,26 @@ where
                 comment_key: comment_key.into(),
             },
         )
+    }
+
+    pub fn comment_search(
+        &self,
+        post_key: impl Into<String>,
+        comment_key: impl Into<String>,
+        time: u128,
+        limit: usize,
+        range: TimeRange,
+        order: Order,
+        flatten: bool,
+    ) -> Builder<TSender, Vec<cs::CommentRes>, cs::CommentSearchErr> {
+        self.get(cs::link_relative_comment_search(cs::CommentSearchParams {
+            time,
+            post_key: post_key.into(),
+            comment_key: comment_key.into(),
+            limit,
+            range,
+            order,
+            flatten,
+        }))
     }
 }

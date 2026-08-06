@@ -59,6 +59,30 @@ pub async fn post_update_state(
     (status_code, Json(result))
 }
 
+#[cfg(test)]
+mod test_utils {
+    use crate::{TestServer, auth::create_auth_cookie_str};
+    use axum::http::header;
+    use catsquad_shared::{self as cs, PostState};
+
+    impl TestServer {
+        pub async fn post_update_state(
+            &self,
+            post_key: impl Into<String>,
+            new_state: PostState,
+            session_key: impl AsRef<str>,
+        ) -> Result<cs::PostRes, cs::PostUpdateStateErr> {
+            self.client
+                .post_update_state(post_key, new_state)
+                .header_add(header::COOKIE, create_auth_cookie_str(session_key.as_ref()))
+                .send()
+                .await
+                .into_res()
+                .await
+        }
+    }
+}
+
 #[tokio::test]
 async fn test_post_update_state() {
     // TODO test all errors
@@ -78,22 +102,12 @@ async fn test_post_update_state() {
         .await;
 
     let post1 = server
-        .client
-        .post_add("title", "description1", "tags1")
-        .header_add(header::COOKIE, create_auth_cookie_str(session_key1.clone()))
-        .send()
-        .await
-        .into_res()
+        .post_add("title", "description1", "tags1", session_key1.clone())
         .await
         .unwrap();
 
     let post1 = server
-        .client
-        .post_update_state(post1.key.clone(), PostState::Active)
-        .header_add(header::COOKIE, create_auth_cookie_str(session_key1.clone()))
-        .send()
-        .await
-        .into_res()
+        .post_update_state(post1.key.clone(), PostState::Active, session_key1.clone())
         .await
         .unwrap();
 

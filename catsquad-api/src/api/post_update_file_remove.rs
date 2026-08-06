@@ -108,11 +108,7 @@ async fn test_post_update_file_remove() {
         .unwrap();
 
     let result = server
-        .client
-        .post_get_by_key(post1.key.clone())
-        .send()
-        .await
-        .into_res()
+        .post_get_by_key(post1.key.clone(), &session_key1)
         .await
         .unwrap();
 
@@ -130,11 +126,7 @@ async fn test_post_update_file_remove() {
         .unwrap();
 
     let result = server
-        .client
-        .post_get_by_key(post1.key.clone())
-        .send()
-        .await
-        .into_res()
+        .post_get_by_key(post1.key.clone(), &session_key1)
         .await
         .unwrap();
 

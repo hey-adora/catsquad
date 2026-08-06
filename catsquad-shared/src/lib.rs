@@ -19,6 +19,7 @@ pub use api::TimeRange;
 pub use api::ToForm;
 pub use api::comment_add::*;
 pub use api::comment_remove::*;
+pub use api::comment_search::*;
 pub use api::comment_update_text::*;
 pub use api::email_change_add::*;
 pub use api::email_change_update_cancel::*;
@@ -52,3 +53,14 @@ pub use page::post::*;
 pub use page::register::*;
 pub use page::settings::*;
 pub use page::upload::*;
+
+fn serde_from_u128<S: serde::Serializer>(v: &u128, serializer: S) -> Result<S::Ok, S::Error> {
+    use serde::Serialize;
+    let v = v.to_string();
+    v.serialize(serializer)
+}
+
+fn serde_to_u128<'de, D: serde::Deserializer<'de>>(deserializer: D) -> Result<u128, D::Error> {
+    use serde::Deserialize;
+    String::deserialize(deserializer).map(|v| u128::from_str_radix(&v, 10).unwrap_or_default())
+}

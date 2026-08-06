@@ -192,7 +192,10 @@ async fn test_post_update_file_remove() {
         .post_update_file_remove(0, user.id.clone(), post1.id.key.clone(), "hash2")
         .await
         .unwrap();
-    let post1 = db.post_get_by_key(post1.id.key.clone()).await.unwrap();
+    let post1 = db
+        .post_get_by_key(Some(user.id.clone()), post1.id.key.clone())
+        .await
+        .unwrap();
 
     assert_eq!(post1.file.len(), 1);
     assert_eq!(post1.file[0].hash, "hash1");
@@ -212,7 +215,10 @@ async fn test_post_update_file_remove() {
         .post_update_file_remove(0, user.id.clone(), post1.id.key.clone(), "hash1")
         .await
         .unwrap();
-    let post1 = db.post_get_by_key(post1.id.key.clone()).await.unwrap();
+    let post1 = db
+        .post_get_by_key(Some(user.id.clone()), post1.id.key.clone())
+        .await
+        .unwrap();
 
     assert_eq!(post1.file.len(), 0);
     assert_eq!(post1.size_bytes, 0);
