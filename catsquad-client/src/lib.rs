@@ -525,6 +525,37 @@ where
         Builder::new(sender, params)
     }
 
+    pub fn post_like_add(
+        &self,
+        post_key: impl Into<String>,
+    ) -> Builder<TSender, catsquad_shared::PostLikeRes, catsquad_shared::PostLikeAddErr> {
+        self.post_form(
+            cs::LINK_API_POST_LIKE_ADD,
+            cs::PostLikeAddReq {
+                post_key: post_key.into(),
+            },
+        )
+    }
+
+    pub fn post_like_remove(
+        &self,
+        post_key: impl Into<String>,
+    ) -> Builder<TSender, catsquad_shared::PostLikeRes, catsquad_shared::PostLikeRemoveErr> {
+        self.post_form(
+            cs::LINK_API_POST_LIKE_REMOVE,
+            cs::PostLikeRemoveReq {
+                post_key: post_key.into(),
+            },
+        )
+    }
+
+    pub fn post_like_get_by_post(
+        &self,
+        post_key: impl AsRef<str>,
+    ) -> Builder<TSender, bool, catsquad_shared::PostLikeRemoveErr> {
+        self.get(cs::link_relative_post_like_get_by_post(post_key))
+    }
+
     pub fn post_update_file_add<F: Into<SchrodingersFile>>(
         &self,
         post_key: impl AsRef<str>,

@@ -53,7 +53,7 @@ impl Sender for AxumTestSender {
         let headers1 = params.headers.clone();
         let headers = [headers0, headers1].concat();
 
-        debug!("CLIENT SEND POST\n{}\n{:#?}", path, body);
+        debug!("CLIENT SEND {}\n{}\n{:#?}", method, path, body);
         let inner = async || -> Result<axum_test::TestResponse, Error> {
             let builder = match method {
                 Method::Post => self.server.post(path),

@@ -48,28 +48,42 @@ async fn test_post_like_get_by_post() {
     let db = Db::mem(0).await;
 
     let invite1 = db.invite_add(0, "hey@heyadora.com", 1).await.unwrap();
-    let user = db
+    let user1 = db
         .user_add(0, "hey", "hey", invite1.id.key.clone(), 10, 10)
         .await
         .unwrap();
 
-    let post1 = db
-        .post_add(0, user.id.clone(), "title", "description", "tags")
+    let invite2 = db.invite_add(0, "hey2@heyadora.com", 1).await.unwrap();
+    let user2 = db
+        .user_add(0, "hey2", "hey", invite2.id.key.clone(), 10, 10)
         .await
         .unwrap();
 
+    let post1 = db
+        .post_add(0, user1.id.clone(), "title", "description", "tags")
+        .await
+        .unwrap();
+    db.post_update_state(
+        0,
+        user1.id.clone(),
+        post1.id.key.clone(),
+        catsquad_shared::PostState::Active,
+    )
+    .await
+    .unwrap();
+
     let result = db
-        .post_like_get_by_post(0, user.id.clone(), post1.id.key.clone())
+        .post_like_get_by_post(0, user2.id.clone(), post1.id.key.clone())
         .await;
     assert!(matches!(result, Err(DbPostLikeGetByPostErr::NotFound)));
 
     let _post_like = db
-        .post_like_add(0, user.id.clone(), post1.id.key.clone())
+        .post_like_add(0, user2.id.clone(), post1.id.key.clone())
         .await
         .unwrap();
 
     let _post_like_id = db
-        .post_like_get_by_post(0, user.id.clone(), post1.id.key.clone())
+        .post_like_get_by_post(0, user2.id.clone(), post1.id.key.clone())
         .await
         .unwrap();
 }

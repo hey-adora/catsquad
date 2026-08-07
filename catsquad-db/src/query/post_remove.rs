@@ -144,7 +144,7 @@ async fn test_post_remove() {
             .await
             .unwrap();
 
-        db.post_like_add(0, user.id.clone(), post2.id.key.clone())
+        db.post_like_add(0, user2.id.clone(), post2.id.key.clone())
             .await
             .unwrap();
 

@@ -108,6 +108,18 @@ pub async fn app(state: AppState) -> Router {
         )
         .route(catsquad_shared::LINK_API_POST_ADD, post(api::post_add))
         .route(
+            catsquad_shared::LINK_API_POST_LIKE_ADD,
+            post(api::post_like_add),
+        )
+        .route(
+            catsquad_shared::LINK_API_POST_LIKE_REMOVE,
+            post(api::post_like_remove),
+        )
+        .route(
+            catsquad_shared::LINK_API_POST_LIKE_GET_BY_POST,
+            get(api::post_like_get_by_post),
+        )
+        .route(
             catsquad_shared::LINK_API_POST_UPDATE_FILE_REMOVE,
             post(api::post_update_file_remove),
         )
@@ -157,7 +169,7 @@ pub async fn app(state: AppState) -> Router {
         )
         .route(
             catsquad_shared::LINK_API_SESSION_DELETE,
-            post(api::session_delete),
+            post(api::session_remove),
         )
         .route(
             catsquad_shared::LINK_API_SESSION_GET_BY_SESSION_KEY,

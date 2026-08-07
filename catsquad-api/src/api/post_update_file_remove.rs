@@ -1,7 +1,9 @@
 use axum::{Extension, Form, Json, extract::State, http::StatusCode, response::IntoResponse};
 use catsquad_db::{DbPostUpdateFileRemoveErr, DbUser};
 use catsquad_log::prelude::*;
-use catsquad_shared::{PostFile, PostRes, PostUpdateFileRemoveErr, PostUpdateFileRemoveReq};
+use catsquad_shared::{
+    PostFile, PostRes, PostState, PostUpdateFileRemoveErr, PostUpdateFileRemoveReq,
+};
 
 use crate::{
     api::post_add::{from_db_post, from_db_post_file},
@@ -70,6 +72,7 @@ pub async fn post_update_file_remove(
     (status_code, Json(result))
 }
 
+#[cfg(test)]
 #[tokio::test]
 async fn test_post_update_file_remove() {
     use crate::auth::create_auth_cookie_str;
@@ -104,6 +107,11 @@ async fn test_post_update_file_remove() {
         .send()
         .await
         .into_res()
+        .await
+        .unwrap();
+
+    server
+        .post_update_state(post1.key.clone(), PostState::Active, &session_key1)
         .await
         .unwrap();
 

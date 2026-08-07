@@ -30,7 +30,11 @@ impl Db {
 
                 let $post = SELECT *, user.* FROM ONLY $post_id;
 
-                IF $post.user.id != $user_id && $post.state == $draft_state {
+                IF !$post || $post.state == $draft_state{
+                    THROW "not found"
+                };
+                
+                IF $post.state == $hidden_state && $post.user.id != $user_id {
                     THROW "unauthorized"
                 };
 
@@ -43,18 +47,21 @@ impl Db {
 
         self.db
             .query(query)
+            .bind(("active_state", PostState::Active.to_string()))
+            .bind(("hidden_state", PostState::Hidden.to_string()))
             .bind(("draft_state", PostState::Draft.to_string()))
             .bind(("user_id", user_id))
             .bind(("post_id", post_id))
             .await
             .check_better(|err| match err {
+                err if err.thrown("not found") => DbPostGetByKeyErr::PostNotFound,
                 err if err.thrown("unauthorized") => DbPostGetByKeyErr::Unauthorized,
                 err => {
                     error!("unexpected db error {err}");
                     DbPostGetByKeyErr::Db(err)
                 }
             })
-            .and_then_take_or(3, DbPostGetByKeyErr::PostNotFound)
+            .and_then_take_expect(4)
     }
 }
 
@@ -81,24 +88,47 @@ async fn test_post_get_by_key() {
         .await
         .unwrap();
 
-    let post2 = db
-        .post_get_by_key(Some(user1.id.clone()), post1.id.key.clone())
-        .await
-        .unwrap();
-    assert_eq!(post1.id, post2.id);
+    {
+        let result = db
+            .post_get_by_key(Some(user1.id.clone()), post1.id.key.clone())
+            .await;
+        assert!(matches!(result, Err(DbPostGetByKeyErr::PostNotFound)));
 
-    let result = db.post_get_by_key(None, post1.id.key.clone()).await;
-    assert!(matches!(result, Err(DbPostGetByKeyErr::Unauthorized)));
-
-    let result = db
-        .post_get_by_key(Some(user2.id.clone()), post1.id.key.clone())
-        .await;
-    assert!(matches!(result, Err(DbPostGetByKeyErr::Unauthorized)));
+        let result = db
+            .post_get_by_key(Some(user2.id.clone()), post1.id.key.clone())
+            .await;
+        assert!(matches!(result, Err(DbPostGetByKeyErr::PostNotFound)));
+    }
 
     db.post_update_state(0, user1.id.clone(), post1.id.key.clone(), PostState::Active)
         .await
         .unwrap();
 
-    let result = db.post_get_by_key(None, post1.id.key.clone()).await;
-    assert!(matches!(result, Ok(_)));
+    {
+        let result = db
+            .post_get_by_key(Some(user1.id.clone()), post1.id.key.clone())
+            .await;
+        assert!(matches!(result, Ok(_)));
+
+        let result = db
+            .post_get_by_key(Some(user2.id.clone()), post1.id.key.clone())
+            .await;
+        assert!(matches!(result, Ok(_)));
+    }
+
+    db.post_update_state(0, user1.id.clone(), post1.id.key.clone(), PostState::Hidden)
+        .await
+        .unwrap();
+
+    {
+        let result = db
+            .post_get_by_key(Some(user1.id.clone()), post1.id.key.clone())
+            .await;
+        assert!(matches!(result, Ok(_)));
+
+        let result = db
+            .post_get_by_key(Some(user2.id.clone()), post1.id.key.clone())
+            .await;
+        assert!(matches!(result, Err(DbPostGetByKeyErr::Unauthorized)));
+    }
 }

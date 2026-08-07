@@ -8,7 +8,7 @@ use crate::{
     state::AppState,
 };
 
-fn from_db_session_delete_err(value: DbSessionRemoveErr) -> SessionDeleteErr {
+fn from_db_session_remove_err(value: DbSessionRemoveErr) -> SessionDeleteErr {
     match value {
         DbSessionRemoveErr::Db(_) => SessionDeleteErr::InternalServer,
     }
@@ -22,7 +22,7 @@ fn status_code(result: &Result<SessionDeleteRes, SessionDeleteErr>) -> StatusCod
     }
 }
 
-pub async fn session_delete(
+pub async fn session_remove(
     State(app): State<AppState>,
     session_key: Extension<SessionKey>,
 ) -> impl IntoResponse {
@@ -30,7 +30,7 @@ pub async fn session_delete(
         app.db
             .session_remove(session_key.to_string())
             .await
-            .map_err(from_db_session_delete_err)?;
+            .map_err(from_db_session_remove_err)?;
 
         Ok(SessionDeleteRes {})
     };
@@ -63,7 +63,7 @@ mod test_utils {
     }
 }
 #[tokio::test]
-async fn test_session_delete() {
+async fn test_session_remove() {
     init_log();
     let server = crate::TestServer::new().await;
 

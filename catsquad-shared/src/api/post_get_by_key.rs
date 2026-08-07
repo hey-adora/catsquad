@@ -8,7 +8,7 @@ pub fn link_relative_post_get_by_key(post_key: impl AsRef<str>) -> String {
 pub struct PostGetByKeyParams {
     pub post_key: String,
 }
-pub const POST_GET_BY_KEY_REQ_FIELD_POST_KEY: &'static str = "post_key";
+// pub const POST_GET_BY_KEY_REQ_FIELD_POST_KEY: &'static str = "post_key";
 
 #[derive(
     Default, Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq, thiserror::Error,
@@ -17,9 +17,8 @@ pub enum PostGetByKeyErr {
     #[error("post not found")]
     PostNotFound,
 
-    #[error("bad request {0}")]
-    BadRequest(String),
-
+    // #[error("bad request {0}")]
+    // BadRequest(String),
     #[error("unauthorized {0}")]
     Unauthorized(String),
 
