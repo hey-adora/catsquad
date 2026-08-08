@@ -4,7 +4,7 @@ use axum::{
     http::{HeaderMap, StatusCode},
     middleware,
     response::IntoResponse,
-    routing::{get, post},
+    routing::{delete, get, post},
 };
 use catsquad_db::DbUser;
 use catsquad_log::prelude::*;
@@ -107,6 +107,10 @@ pub async fn app(state: AppState) -> Router {
             post(api::comment_remove),
         )
         .route(catsquad_shared::LINK_API_POST_ADD, post(api::post_add))
+        .route(
+            catsquad_shared::LINK_API_POST_REMOVE,
+            delete(api::post_remove),
+        )
         .route(
             catsquad_shared::LINK_API_POST_LIKE_ADD,
             post(api::post_like_add),

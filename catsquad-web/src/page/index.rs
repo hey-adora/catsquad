@@ -2,6 +2,8 @@ use crate::Nav;
 use catsquad_log::prelude::*;
 use leptos::prelude::*;
 
+mod api_gallery;
+
 #[component]
 pub fn Index() -> impl IntoView {
     view! {

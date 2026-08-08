@@ -104,7 +104,7 @@ async fn test_comment_remove() {
     let comment1 = server
         .comment_add(
             post1.key.clone(),
-            None::<String>,
+            String::new(),
             "text1",
             session_key1.clone(),
         )
@@ -114,7 +114,7 @@ async fn test_comment_remove() {
     let comment2 = server
         .comment_add(
             post1.key.clone(),
-            None::<String>,
+            String::new(),
             "text2",
             session_key1.clone(),
         )
@@ -124,7 +124,7 @@ async fn test_comment_remove() {
     let comment3 = server
         .comment_add(
             post1.key.clone(),
-            Some(comment2.key.clone()),
+            comment2.key.clone(),
             "text3",
             session_key1.clone(),
         )

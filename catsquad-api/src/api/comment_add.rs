@@ -48,7 +48,11 @@ pub async fn comment_add(
     let time = app.get_time().await;
     let inner = async || -> Result<CommentRes, CommentAddErr> {
         let post_key = req.post_key;
-        let comment_key = req.comment_key;
+        let comment_key = if req.comment_key.is_empty() {
+            None
+        } else {
+            Some(req.comment_key)
+        };
         let text = req.text.trim();
         let user_id = db_user.id.clone();
 
@@ -79,7 +83,7 @@ mod test_utils {
         pub async fn comment_add(
             &self,
             post_key: impl Into<String>,
-            comment_parent_key: Option<impl Into<String>>,
+            comment_parent_key: impl Into<String>,
             text: impl Into<String>,
             session_key: impl Into<String>,
         ) -> Result<cs::CommentRes, cs::CommentAddErr> {
@@ -115,23 +119,18 @@ async fn test_comment_add() {
         .unwrap();
 
     let comment1 = server
-        .comment_add(post1.key.clone(), None::<String>, "text", &session_key)
+        .comment_add(post1.key.clone(), String::new(), "text", &session_key)
         .await
         .unwrap();
 
     let result = server
-        .comment_add(post1.key.clone(), None::<String>, "", &session_key)
+        .comment_add(post1.key.clone(), String::new(), "", &session_key)
         .await;
     assert!(matches!(result, Err(CommentAddErr::InvalidText(_))));
 
     let text_invalid = rng_str(MAX_POST_COMMENT_LENGTH + 1);
     let result = server
-        .comment_add(
-            post1.key.clone(),
-            None::<String>,
-            text_invalid,
-            &session_key,
-        )
+        .comment_add(post1.key.clone(), String::new(), text_invalid, &session_key)
         .await;
     assert!(matches!(result, Err(CommentAddErr::InvalidText(_))));
 }

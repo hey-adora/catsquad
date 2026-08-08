@@ -36,6 +36,7 @@ pub use api::post_get_by_key::*;
 pub use api::post_like_add::*;
 pub use api::post_like_get_post::*;
 pub use api::post_like_remove::*;
+pub use api::post_remove::*;
 pub use api::post_search::*;
 pub use api::post_update_description::*;
 pub use api::post_update_file_add::*;

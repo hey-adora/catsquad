@@ -12,6 +12,8 @@
 //     },
 // };
 use catsquad_log::prelude::*;
+use catsquad_shared::CommentRes;
+use catsquad_web_utils::prelude::*;
 use leptos::{
     html::{ElementType, Textarea},
     prelude::*,
@@ -19,13 +21,21 @@ use leptos::{
 use wasm_bindgen::JsCast;
 use web_sys::{Element, HtmlElement, HtmlTextAreaElement, MutationObserver, MutationRecord};
 
+use crate::{
+    hook::{InfiniteScrollFn, Spawner},
+    page::{
+        create_client,
+        post::comments_api::{CommentKind2, CommentsApi2},
+    },
+};
+
 #[derive(Copy, Clone)]
 pub struct CommentsBaisc {
     pub reply_editor_show: RwSignal<bool, LocalStorage>,
     pub replies_count: RwSignal<usize, LocalStorage>,
-    // pub comments_manual: CommentsApi2<API>,
+    pub comments_manual: CommentsApi2,
     pub err_post: RwSignal<String, LocalStorage>,
-    pub items: RwSignal<Vec<UserPostComment>, LocalStorage>,
+    pub items: RwSignal<Vec<CommentRes>, LocalStorage>,
     pub spawner: Spawner,
     pub infinite_fn: InfiniteScrollFn,
     // pub observer: StoredValue<
@@ -39,14 +49,17 @@ impl CommentsBaisc {
     pub fn new(spawner: Spawner) -> Self {
         // let api = ApiWeb::new();
 
-        let comments_manual = CommentsApi2::new(api, 5, CommentKind2::Root);
+        let comments_manual = CommentsApi2::new(5, CommentKind2::Root);
         // let spawner = Spawner::new();
 
         // let async_callback = async move |a: &mut Vec<UserPostComment>, b: Option<InfiniteItem>| {
         //     comments_manual.fetch_btm();
         // };
         let infinite_fn = InfiniteScrollFn::new(move |_a| {
-            spawner.spawn(comments_manual.fetch());
+            spawner.spawn(async move {
+                let client = create_client();
+                comments_manual.fetch(&client).await;
+            });
         });
 
         // let observer = move |(post_elm, container_elm, post_id, comment_key, count)| {
@@ -85,9 +98,11 @@ impl CommentsBaisc {
         // comment_key: String,
         // count: usize,
     ) {
+        let client = create_client();
         self.comments_manual.observe_only(post_id);
         // self.spawner.spawn(self.comments_manual.fetch());
-        self.comments_manual.fetch().await;
+
+        self.comments_manual.fetch(&client).await;
         self.infinite_fn.observe_only(comment_container);
         // self.observer
         //     .run((post_input, comment_container, post_id, comment_key, count));

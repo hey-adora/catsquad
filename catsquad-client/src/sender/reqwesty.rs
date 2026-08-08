@@ -68,6 +68,7 @@ impl Sender for ReqwestSender {
             let builder = match method {
                 Method::Post => reqwest::Client::new().post(path.clone()),
                 Method::Get => reqwest::Client::new().get(path.clone()),
+                Method::Delete => reqwest::Client::new().delete(path.clone()),
             };
 
             let builder = match body {

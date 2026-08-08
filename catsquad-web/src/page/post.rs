@@ -57,9 +57,13 @@ use web_sys::{HtmlInputElement, HtmlTextAreaElement};
 
 use crate::PageState;
 use crate::hook::Spawner;
+use crate::page::create_client;
+use crate::page::post::comments_basic::CommentsBaisc;
+use crate::page::post::post_api::PostApi;
 
 mod comments_api;
 mod comments_basic;
+mod post_api;
 
 #[derive(Params, PartialEq, Clone)]
 pub struct PostParams {
@@ -82,7 +86,7 @@ pub fn Post() -> impl IntoView {
     let location = use_location();
 
     let spawner_post = Spawner::new();
-    // let post_api = PostApi::new(api_post);
+    let post_api = PostApi::new();
     let edit_tags_input = NodeRef::<html::Textarea>::new();
     let description_input_editor = NodeRef::<html::Textarea>::new();
     let title_input_editor = NodeRef::<html::Textarea>::new();
@@ -93,14 +97,15 @@ pub fn Post() -> impl IntoView {
     let spawner_comments = Spawner::new();
     let comment_container_ref = NodeRef::<html::Div>::new();
     let comment_input_ref = NodeRef::<html::Textarea>::new();
-    let comment_basic = CommentsBaisc::new(api_comments, spawner_post);
+    let comment_basic = CommentsBaisc::new(spawner_post);
     let post_comment = move || {
         let Some(input_elm) = comment_input_ref.get() else {
             return;
         };
         spawner_comments.spawn(async move {
             let text = input_elm.value();
-            comment_basic.comments_manual.post(text).await;
+            let client = create_client();
+            comment_basic.comments_manual.post(&client, text).await;
             let post_err = comment_basic.err_post.get_untracked();
             if !post_err.is_empty() {
                 return;
@@ -114,7 +119,10 @@ pub fn Post() -> impl IntoView {
             return;
         };
 
-        spawner_post.spawn(post_api.get(post_id));
+        spawner_post.spawn(async move {
+            let client = create_client();
+            post_api.get(&client, post_id).await;
+        });
     });
     Effect::new(move || {
         trace!("comments basic start");

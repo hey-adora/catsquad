@@ -58,6 +58,7 @@ impl Sender for AxumTestSender {
             let builder = match method {
                 Method::Post => self.server.post(path),
                 Method::Get => self.server.get(path),
+                Method::Delete => self.server.delete(path),
             };
 
             let builder = match body {

@@ -17,6 +17,7 @@ pub mod post_get_by_key;
 pub mod post_like_add;
 pub mod post_like_get_post;
 pub mod post_like_remove;
+pub mod post_remove;
 pub mod post_search;
 pub mod post_update_description;
 pub mod post_update_file_add;

@@ -130,7 +130,7 @@ async fn test_comment_search() {
     let comment1 = server
         .comment_add(
             post1.key.clone(),
-            None::<String>,
+            String::new(),
             "text1",
             session_key1.clone(),
         )

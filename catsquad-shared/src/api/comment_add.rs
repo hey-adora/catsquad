@@ -18,7 +18,7 @@ pub struct CommentRes {
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
 pub struct CommentAddReq {
     pub post_key: String,
-    pub comment_key: Option<String>,
+    pub comment_key: String,
     pub text: String,
 }
 

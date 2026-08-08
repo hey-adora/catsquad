@@ -1,7 +1,8 @@
 use catsquad_log::prelude::*;
 use catsquad_shared::{
     self as cs, Order, PostFile, PostSearchParams, PostState, TimeRange, ToForm,
-    link_relative_invite_get_by_key, link_relative_post_get_by_key, link_relative_post_search,
+    link_relative_invite_get_by_key, link_relative_post_get_by_key, link_relative_post_remove,
+    link_relative_post_search,
 };
 use http::{HeaderMap, HeaderName, StatusCode, header};
 use std::{
@@ -214,6 +215,7 @@ pub enum Method {
     #[default]
     Get,
     Post,
+    Delete,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -294,6 +296,7 @@ where
 
     pub async fn into_res(self) -> Result<TResult, TError> {
         let path = self.request.path;
+        let method = self.request.method;
         let res = self.response.map_err(|_err| TError::default())?;
         let status_code = res.get_status();
 
@@ -309,8 +312,8 @@ where
             .map_err(|_err| TError::default());
 
         debug!(
-            "CLIENT RECV {}\n{}\n{}\n{:#?}",
-            status_code, path, raw_str, res
+            "CLIENT RECV {} {}\n{}\n{}\n{:#?}",
+            method, status_code, path, raw_str, res
         );
 
         let res = res?;
@@ -378,6 +381,24 @@ where
         let params = SenderParams {
             path: link.into(),
             method: Method::Get,
+            body: Body::None,
+            ..Default::default()
+        };
+        let sender = self.sender.clone();
+        Builder::new(sender, params)
+    }
+
+    pub fn delete<TResult, TError>(
+        &self,
+        link: impl Into<String>,
+    ) -> Builder<TSender, TResult, TError>
+    where
+        TResult: for<'a> serde::Deserialize<'a> + Debug,
+        TError: for<'a> serde::Deserialize<'a> + Debug + Default,
+    {
+        let params = SenderParams {
+            path: link.into(),
+            method: Method::Delete,
             body: Body::None,
             ..Default::default()
         };
@@ -523,6 +544,13 @@ where
         };
         let sender = self.sender.clone();
         Builder::new(sender, params)
+    }
+
+    pub fn post_remove(
+        &self,
+        post_key: impl AsRef<str>,
+    ) -> Builder<TSender, (), catsquad_shared::PostRemoveErr> {
+        self.delete(link_relative_post_remove(post_key))
     }
 
     pub fn post_like_add(
@@ -881,14 +909,14 @@ where
     pub fn comment_add(
         &self,
         post_key: impl Into<String>,
-        comment_parent_key: Option<impl Into<String>>,
+        comment_parent_key: impl Into<String>,
         text: impl Into<String>,
     ) -> Builder<TSender, cs::CommentRes, cs::CommentAddErr> {
         self.post_form(
             cs::LINK_API_COMMENT_ADD,
             cs::CommentAddReq {
                 post_key: post_key.into(),
-                comment_key: comment_parent_key.map(|v| v.into()),
+                comment_key: comment_parent_key.into(),
                 text: text.into(),
             },
         )
