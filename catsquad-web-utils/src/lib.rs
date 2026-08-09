@@ -18,7 +18,7 @@ pub mod prelude {
     pub use super::resize_observer::{self, AddResizeObserver, GetContentBoxSize};
     pub use super::rw_signal_tree::RwSignalTree;
     pub use super::time::{ns_to_str, time_now_ms, time_now_ns};
-    pub use super::timeout::{SetTimeoutError, set_timeout};
+    pub use super::timeout::{SetTimeoutError, set_timeout_fn};
 
     // #[cfg(feature = "testing")]
     pub use super::debugger::{StoreSignal, debug_data_push};
@@ -1078,7 +1078,7 @@ pub mod timeout {
         SettingTimeout(String),
     }
 
-    pub fn set_timeout<F>(callback: F, duration: Duration) -> Result<i32, SetTimeoutError>
+    pub fn set_timeout_fn<F>(callback: F, duration: Duration) -> Result<i32, SetTimeoutError>
     where
         F: Fn() + Clone + 'static,
     {

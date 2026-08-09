@@ -30,6 +30,10 @@ impl PageState {
         expect_context::<Self>()
     }
 
+    pub fn get_time_ns(&self) -> u128 {
+        self.time.get()
+    }
+
     pub fn is_logged_in(&self) -> Option<bool> {
         let pending = self.acc_pending.get();
         let has_data = self.acc.with(|v| v.is_some());
@@ -47,6 +51,10 @@ impl PageState {
         self.acc
             .with(|v| v.as_ref().map(|v| v.username.clone()))
             .unwrap_or("error".to_string())
+    }
+
+    pub fn get_acc_id_tracked(&self) -> Option<String> {
+        self.acc.with(|acc| acc.as_ref().map(|acc| acc.key.clone()))
     }
 
     pub async fn update_auth(&self) {

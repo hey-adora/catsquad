@@ -9,6 +9,7 @@ mod page_state;
 
 pub use component::auto_text_area::AutoTextArea;
 pub use component::btn_primary::BtnPrimary;
+pub use component::btn_secondary::BtnSecondary;
 pub use component::display::Display;
 pub use component::errors::Errs;
 pub use component::length_counter::LengthCounter;

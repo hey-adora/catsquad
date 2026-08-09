@@ -57,8 +57,9 @@ impl CommentsBaisc {
         // };
         let infinite_fn = InfiniteScrollFn::new(move |_a| {
             spawner.spawn(async move {
+                let time = time_now_ns();
                 let client = create_client();
-                comments_manual.fetch(&client).await;
+                comments_manual.fetch(time, &client).await;
             });
         });
 
@@ -98,11 +99,12 @@ impl CommentsBaisc {
         // comment_key: String,
         // count: usize,
     ) {
+        let time = time_now_ns();
         let client = create_client();
         self.comments_manual.observe_only(post_id);
         // self.spawner.spawn(self.comments_manual.fetch());
 
-        self.comments_manual.fetch(&client).await;
+        self.comments_manual.fetch(time, &client).await;
         self.infinite_fn.observe_only(comment_container);
         // self.observer
         //     .run((post_input, comment_container, post_id, comment_key, count));

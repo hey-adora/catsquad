@@ -13,11 +13,11 @@ use leptos::prelude::*;
 // };
 // use tracing::{error, info, trace, warn};
 
-// #[derive(Clone, Copy)]
 // pub struct PostApi<TSender>
 // where
 //     TSender: Sender + Debug + Clone,
 //     TSender::TResponse: Response + Debug,
+#[derive(Clone, Copy)]
 pub struct PostApi {
     // ui
     // pub items: RwSignal<Vec<Img>, LocalStorage>,
@@ -256,7 +256,7 @@ impl PostApi {
         TSender::TResponse: Response + Debug,
     {
         let post_key = post_key.into();
-        // let (Some(username), Some(post_id)) = (param_username(), param_post.get()) else {
+        // let (Some(username), Some(post_id)) = (param_username(), param_post.get_untracked()) else {
         //     return;
         // };
 
@@ -315,6 +315,7 @@ impl PostApi {
 #[cfg(test)]
 pub mod tests {
     use catsquad_api::{TestServer, auth::create_auth_cookie_str};
+    use catsquad_shared::PostState;
     use http::header;
     // use crate::{
     //     api::{
@@ -346,79 +347,38 @@ pub mod tests {
 
     #[tokio::test]
     pub async fn hook_post_api_update_description() {
-        // println!("hello");
-        init_log();
-        let _owner = init_owner();
-        let app = TestServer::new().await;
-        let (user1, session_key1) = app
-            .user_add_full("hey", "hey@heyadora.com", "pas$word123456789")
-            .await;
-        app.inject_header(header::COOKIE, create_auth_cookie_str(session_key1.clone()))
-            .await;
-
-        // init_test_log();
-        // let owner = Owner::new_root(Some(Arc::new(HydrateSharedContext::new())));
-        // let mut app = ApiTestApp::new(10).await;
-        // let scroll_correction = ScrollCorrection::new();
-
-        let post_key = {
-            // let gallery_api = GalleryApi::new(&app.api, &app.api, scroll_correction.clone());
-            let post = app
-                .client
-                .post_add("title1", "0", "")
-                .send()
-                .await
-                .into_res()
-                .await
-                .unwrap();
-            app.state.set_time(1).await;
-            post.key.clone()
-            // gallery_api
-            //     .post(
-            //         GalleryContainerSize {
-            //             width: 100,
-            //             height: 100.0,
-            //             row_height: 50,
-            //         },
-            //         "title1",
-            //         "0",
-            //         "",
-            //         // vec![create_img_req("1", 50, 50).await],
-            //     )
-            //     .await;
-            // gallery_api.items.get()[0].clone().key
-        };
+        let (_owner, app, post_key) = post_setup("title", "0", "").await;
 
         // testing normal
         let post_api = PostApi::new();
         post_api.get(&app.client, &post_key).await;
-        assert_eq!(post_api.live_description_length.get(), 1);
-        assert_eq!(post_api.description.get(), "0");
+        assert_eq!(post_api.live_description_length.get_untracked(), 1);
+        assert_eq!(post_api.description.get_untracked(), "0");
         post_api.update_description_mode.set(true);
-        assert!(post_api.err_description.get().is_empty());
+        assert!(post_api.err_description.get_untracked().is_empty());
 
         post_api
             .update_description(&app.client, &post_key, "22")
             .await;
-        assert_eq!(post_api.live_description_length.get(), 2);
-        assert_eq!(post_api.description.get(), "22");
-        assert_eq!(post_api.update_tags_mode.get(), false);
-        assert!(post_api.err_description.get().is_empty());
+        assert_eq!(post_api.live_description_length.get_untracked(), 2);
+        assert_eq!(post_api.description.get_untracked(), "22");
+        assert_eq!(post_api.update_tags_mode.get_untracked(), false);
+        assert!(post_api.err_description.get_untracked().is_empty());
 
         let post_api = PostApi::new();
         post_api.get(&app.client, &post_key).await;
-        assert_eq!(post_api.live_description_length.get(), 2);
-        assert_eq!(post_api.description.get(), "22");
+        assert_eq!(post_api.live_description_length.get_untracked(), 2);
+        assert_eq!(post_api.description.get_untracked(), "22");
 
         post_api.delete(&app.client, &post_key).await;
 
         post_api
             .update_description(&app.client, &post_key, "2")
             .await;
-        assert_eq!(post_api.live_description_length.get(), 2);
-        assert!(!post_api.err_general.get().is_empty());
+        assert_eq!(post_api.live_description_length.get_untracked(), 2);
+        assert!(!post_api.err_general.get_untracked().is_empty());
 
-        // let items = gallery_api.items.get();
+        // let items = gallery_api.items.get_untracked();
         // assert_eq!(items.len(), 1);
     }
 
@@ -426,227 +386,125 @@ pub mod tests {
         title: impl Into<String>,
         description: impl Into<String>,
         tags: impl Into<String>,
-    ) -> (TestServer, String) {
+    ) -> (Owner, TestServer, String) {
         init_log();
-        let _owner = init_owner();
+        let owner = init_owner();
         let app = TestServer::new().await;
         let (user1, session_key1) = app
-            .user_add_full("hey", "hey@heyadora.com", "pas$word123456789")
+            .user_add_full("hey", "hey@heyadora.com", "pas$worFd123456789")
             .await;
         app.inject_header(header::COOKIE, create_auth_cookie_str(session_key1.clone()))
             .await;
-        // init_test_log();
-        // let mut app = ApiTestApp::new(10).await;
-        // let scroll_correction = ScrollCorrection::new();
-        // let auth_token = app
-        //     .register(0, "hey", "hey@heyadora.com", "pas$word123456789")
-        //     .await
-        //     .unwrap();
-        // app.api.auth_token_overwrite = auth_token.clone();
+
         let post_key = {
             let post = app
                 .client
-                .post_add("title1", "0", "")
+                .post_add(title, description, tags)
                 .send()
                 .await
                 .into_res()
                 .await
                 .unwrap();
-            app.state.set_time(1).await;
+            app.client
+                .post_update_state(&post.key, PostState::Active)
+                .send()
+                .await
+                .into_res()
+                .await
+                .unwrap();
+            // app.state.set_time(1).await;
             post.key.clone()
-            // let gallery_api = GalleryApi::new(&app.api, &app.api, scroll_correction.clone());
-            // app.set_time(1).await;
-            // gallery_api
-            //     .post(
-            //         GalleryContainerSize {
-            //             width: 100,
-            //             height: 100.0,
-            //             row_height: 50,
-            //         },
-            //         title,
-            //         description,
-            //         tags,
-            //     )
-            //     .await;
-            // gallery_api.items.get()[0].clone().key
         };
 
-        (app, post_key)
+        (owner, app, post_key)
     }
 
     #[tokio::test]
     pub async fn hook_post_api_update_title() {
-        let _owner = Owner::new_root(Some(Arc::new(HydrateSharedContext::new())));
-        let (app, post_key) = post_setup("title", "", "").await;
+        // let _owner = Owner::new_root(Some(Arc::new(HydrateSharedContext::new())));
+        let (_owner, app, post_key) = post_setup("title", "", "").await;
         // testing err
         let post_api = PostApi::new();
         post_api.get(&app.client, "invalid").await;
-        assert!(!post_api.err_general.get().is_empty());
-        assert_eq!(post_api.title.get(), "");
-        assert_eq!(post_api.live_title_length.get(), 0);
+        assert!(!post_api.err_general.get_untracked().is_empty());
+        assert_eq!(post_api.title.get_untracked(), "");
+        assert_eq!(post_api.live_title_length.get_untracked(), 0);
 
         // testing normal
         let post_api = PostApi::new();
         post_api.get(&app.client, &post_key).await;
-        assert_eq!(post_api.title.get(), "title");
+        assert_eq!(post_api.title.get_untracked(), "title");
         post_api.update_title_mode.set(true);
-        assert!(post_api.err_title.get().is_empty());
-        assert_eq!(post_api.live_title_length.get(), 5);
+        assert!(post_api.err_title.get_untracked().is_empty());
+        assert_eq!(post_api.live_title_length.get_untracked(), 5);
 
         post_api.update_title(&app.client, &post_key, "one").await;
-        assert_eq!(post_api.title.get(), "one");
-        assert_eq!(post_api.update_title_mode.get(), false);
-        assert_eq!(post_api.live_title_length.get(), 3);
+        assert_eq!(post_api.title.get_untracked(), "one");
+        assert_eq!(post_api.update_title_mode.get_untracked(), false);
+        assert_eq!(post_api.live_title_length.get_untracked(), 3);
 
         let post_api = PostApi::new();
         post_api.get(&app.client, &post_key).await;
-        assert_eq!(post_api.title.get(), "one");
-        assert_eq!(post_api.live_title_length.get(), 3);
+        assert_eq!(post_api.title.get_untracked(), "one");
+        assert_eq!(post_api.live_title_length.get_untracked(), 3);
 
-        // let items = gallery_api.items.get();
+        // let items = gallery_api.items.get_untracked();
         // assert_eq!(items.len(), 1);
     }
 
     #[tokio::test]
     pub async fn hook_post_api_update_tags() {
-        println!("hello");
-        init_test_log();
-        let owner = Owner::new_root(Some(Arc::new(HydrateSharedContext::new())));
-        let mut app = ApiTestApp::new(10).await;
-        let scroll_correction = ScrollCorrection::new();
-        let auth_token = app
-            .register(0, "hey", "hey@heyadora.com", "pas$word123456789")
-            .await
-            .unwrap();
-        app.api.auth_token_overwrite = auth_token.clone();
-        let post_key = {
-            let gallery_api = GalleryApi::new(&app.api, &app.api, scroll_correction.clone());
-            app.set_time(1).await;
-            gallery_api
-                .post(
-                    GalleryContainerSize {
-                        width: 100,
-                        height: 100.0,
-                        row_height: 50,
-                    },
-                    "title1",
-                    "0",
-                    "",
-                    // vec![create_img_req("1", 50, 50).await],
-                )
-                .await;
-            gallery_api.items.get()[0].clone().key
-        };
+        let (_owner, app, post_key) = post_setup("title", "", "").await;
 
         // testing err
-        let post_api = PostApi::new(&app.api);
-        post_api.get("invalid").await;
-        assert!(!post_api.err_general.get().is_empty());
-        assert_eq!(post_api.tags.get(), "");
-        assert_eq!(post_api.live_tags_length.get(), 0);
+        let post_api = PostApi::new();
+        post_api.get(&app.client, "invalid").await;
+        assert!(!post_api.err_general.get_untracked().is_empty());
+        assert_eq!(post_api.tags.get_untracked(), "");
+        assert_eq!(post_api.live_tags_length.get_untracked(), 0);
 
         // testing normal
-        let post_api = PostApi::new(&app.api);
-        post_api.get(&post_key).await;
-        assert_eq!(post_api.tags.get(), "");
+        let post_api = PostApi::new();
+        post_api.get(&app.client, &post_key).await;
+        assert_eq!(post_api.tags.get_untracked(), "");
         post_api.update_tags_mode.set(true);
-        assert!(post_api.err_tags.get().is_empty());
-        assert_eq!(post_api.live_tags_length.get(), 0);
+        assert!(post_api.err_tags.get_untracked().is_empty());
+        assert_eq!(post_api.live_tags_length.get_untracked(), 0);
 
-        post_api.update_tags(&post_key, "one").await;
-        assert_eq!(post_api.tags.get(), "one");
-        assert_eq!(post_api.update_tags_mode.get(), false);
-        assert_eq!(post_api.live_tags_length.get(), 3);
+        post_api.update_tags(&app.client, &post_key, "one").await;
+        assert_eq!(post_api.tags.get_untracked(), "one");
+        assert_eq!(post_api.update_tags_mode.get_untracked(), false);
+        assert_eq!(post_api.live_tags_length.get_untracked(), 3);
 
-        let post_api = PostApi::new(&app.api);
-        post_api.get(&post_key).await;
-        assert_eq!(post_api.tags.get(), "one");
-        assert_eq!(post_api.live_tags_length.get(), 3);
+        let post_api = PostApi::new();
+        post_api.get(&app.client, &post_key).await;
+        assert_eq!(post_api.tags.get_untracked(), "one");
+        assert_eq!(post_api.live_tags_length.get_untracked(), 3);
 
-        // let items = gallery_api.items.get();
+        // let items = gallery_api.items.get_untracked();
         // assert_eq!(items.len(), 1);
     }
 
     #[tokio::test]
     pub async fn hook_post_api_delete() {
-        println!("hello");
-        init_test_log();
-        let owner = Owner::new_root(Some(Arc::new(HydrateSharedContext::new())));
-        let mut app = ApiTestApp::new(10).await;
+        let (_owner, app, post_key) = post_setup("title", "", "").await;
 
-        let scroll_correction = ScrollCorrection::new();
+        let post_api = PostApi::new();
+        post_api.get(&app.client, &post_key).await;
 
-        let auth_token = app
-            .register(0, "hey", "hey@heyadora.com", "pas$word123456789")
-            .await
-            .unwrap();
-
-        app.api.auth_token_overwrite = auth_token.clone();
-
-        let gallery_api = GalleryApi::new(&app.api, &app.api, scroll_correction.clone());
-        let size = GalleryContainerSize {
-            width: 100,
-            height: 100.0,
-            row_height: 50,
-        };
-
-        app.set_time(1).await;
-        gallery_api
-            .post(
-                size, "title1", "0", "",
-                // vec![create_img_req("1", 50, 50).await],
-            )
-            .await;
-        let post0 = gallery_api.items.get()[0].clone();
-
-        let post_all = app.state.db.get_post_all().await.unwrap();
-        assert_eq!(post_all.len(), 1);
-
-        let post_api = PostApi::new(&app.api);
-        post_api.get(&post0.key).await;
-
-        let result = post_api.delete(post0.key.clone()).await;
+        let result = post_api.delete(&app.client, &post_key).await;
         assert!(result.is_some());
 
-        let post_all = app.state.db.get_post_all().await.unwrap();
+        let post_all = app.state.db.post_get_all().await.unwrap();
         assert_eq!(post_all.len(), 0);
     }
 
     #[tokio::test]
     pub async fn hook_post_api_post() {
-        println!("hello");
-        init_test_log();
-        let owner = Owner::new_root(Some(Arc::new(HydrateSharedContext::new())));
-        let mut app = ApiTestApp::new(10).await;
+        let (_owner, app, post_key) = post_setup("title", "", "").await;
 
-        let scroll_correction = ScrollCorrection::new();
-
-        let auth_token = app
-            .register(0, "hey", "hey@heyadora.com", "pas$word123456789")
-            .await
-            .unwrap();
-
-        app.api.auth_token_overwrite = auth_token.clone();
-
-        let gallery_api = GalleryApi::new(&app.api, &app.api, scroll_correction.clone());
-        let size = GalleryContainerSize {
-            width: 100,
-            height: 100.0,
-            row_height: 50,
-        };
-        app.set_time(1).await;
-        gallery_api
-            .post(
-                size, "title1", "0", "",
-                // vec![create_img_req("1", 50, 50).await],
-            )
-            .await;
-        let post0 = gallery_api.items.get()[0].clone();
-
-        let post_api = PostApi::new(&app.api);
-        post_api.get(&post0.key).await;
-        assert_eq!(post_api.title.get_untracked(), "title1");
-
-        //
+        let post_api = PostApi::new();
+        post_api.get(&app.client, &post_key).await;
+        assert_eq!(post_api.title.get_untracked(), "title");
     }
 }

@@ -754,10 +754,11 @@ async fn test_upload_state_file_add() {
     assert_eq!(files_signals[0].get_untracked().err, "");
     // assert_eq!(upload.er)
 
-    let post_key = upload.post_key.get_value();
+    // post_add in this context only GETS the post
+    // post_add doesn't create new draft if one already exists
     let post1 = server
         .client
-        .post_get_by_key(post_key)
+        .post_add("", "", "")
         .send()
         .await
         .into_res()
@@ -794,9 +795,11 @@ async fn test_upload_state_file_remove() {
         .remove_file(&server.client, files_signals[0].clone())
         .await;
 
+    // post_add in this context only GETS the post
+    // post_add doesn't create new draft if one already exists
     let post1 = server
         .client
-        .post_get_by_key(upload.post_key.get_value())
+        .post_add("", "", "")
         .send()
         .await
         .into_res()
@@ -827,6 +830,7 @@ async fn test_upload_init() -> (catsquad_api::TestServer, Owner, UploadState) {
         .inject_header(header::COOKIE, create_auth_cookie_str(session1.clone()))
         .await;
 
+    // upload.init creates new post draft
     let upload = UploadState::new(0);
     upload.init(&server.client).await;
 

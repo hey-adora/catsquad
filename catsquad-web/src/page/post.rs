@@ -42,7 +42,10 @@ use std::time::Duration;
 // use crate::view::app::hook::use_spawner::Spawner;
 // use crate::view::app::hook::use_text_length_counter::use_text_counter;
 use catsquad_log::prelude::*;
-use catsquad_shared::{MAX_POST_DESCRIPTION_LENGTH, MAX_POST_TAGS_LENGTH, MAX_POST_TITLE_LENGTH};
+use catsquad_shared::{
+    CommentRes, LINK_WEB_LOGIN, MAX_POST_DESCRIPTION_LENGTH, MAX_POST_TAGS_LENGTH,
+    MAX_POST_TITLE_LENGTH,
+};
 use catsquad_web_utils::prelude::*;
 use leptos::{Params, task::spawn_local};
 use leptos::{ev, html, prelude::*};
@@ -56,14 +59,18 @@ use web_sys::{
 use web_sys::{HtmlInputElement, HtmlTextAreaElement};
 
 use crate::PageState;
-use crate::hook::Spawner;
+use crate::hook::{EventListener, Spawner};
 use crate::page::create_client;
-use crate::page::post::comments_basic::CommentsBaisc;
-use crate::page::post::post_api::PostApi;
+use crate::page::post::comments_api::{CommentKind2, CommentsApi2};
+use crate::page::post::post_like_api::{PostLikeStage, use_post_like};
+use crate::{AutoTextArea, BtnPrimary, BtnSecondary, Errs, Nav, SVGStar};
+use comments_basic::CommentsBaisc;
+use post_api::PostApi;
 
 mod comments_api;
 mod comments_basic;
 mod post_api;
+mod post_like_api;
 
 #[derive(Params, PartialEq, Clone)]
 pub struct PostParams {
@@ -256,7 +263,12 @@ pub fn Post() -> impl IntoView {
         ) else {
             return;
         };
-        spawner_post.spawn(post_api.update_description(post_key, new_description));
+        spawner_post.spawn(async move {
+            let client = create_client();
+            post_api
+                .update_description(&client, post_key, new_description)
+                .await;
+        });
     };
     // let edit_description_cancel = move || {
     //     // post_api.description.update(|_v| ());
@@ -312,7 +324,10 @@ pub fn Post() -> impl IntoView {
             return;
         };
         trace!("{title}");
-        spawner_post.spawn(post_api.update_title(post_key, title));
+        spawner_post.spawn(async move {
+            let client = create_client();
+            post_api.update_title(&client, post_key, title).await;
+        });
     };
 
     let description = move || {
@@ -363,7 +378,10 @@ pub fn Post() -> impl IntoView {
         ) else {
             return;
         };
-        spawner_post.spawn(post_api.update_tags(post_key, tags));
+        spawner_post.spawn(async move {
+            let client = create_client();
+            post_api.update_tags(&client, post_key, tags).await;
+        });
     };
 
     let previews = move || {
@@ -412,10 +430,13 @@ pub fn Post() -> impl IntoView {
         let Some(post_id) = param_post.get() else {
             return;
         };
-        spawner_post.spawn(post_api.delete(post_id));
+        spawner_post.spawn(async move {
+            let client = create_client();
+            post_api.delete(&client, post_id).await;
+        });
     };
 
-    let uploader = FileUpload::new();
+    // let uploader = FileUpload::new();
     let upload_image = NodeRef::<html::Input>::new();
     let on_upload = move |_| {
         let (Some(files),): (Option<Vec<web_sys::File>>,) = (
@@ -429,7 +450,7 @@ pub fn Post() -> impl IntoView {
             return;
         };
 
-        uploader.upload(&files[..]);
+        // uploader.upload(&files[..]);
 
         trace!("files selected: {}", files.len());
     };
@@ -483,7 +504,7 @@ pub fn Post() -> impl IntoView {
                         <div class="flex flex-col gap-2">
                             <Show when=move || global_state.is_logged_in().unwrap_or_default() >
                                 <div class="flex gap-2 place-items-center">
-                                    <Errors
+                                    <Errs
                                         error=move||post_api.err_title.get()
                                     />
                                     <Show when=move|| post_api.update_title_mode.get()>
@@ -546,7 +567,7 @@ pub fn Post() -> impl IntoView {
                                 // <div>{move || post_api.favorites.get() }" favorites"</div>
                                 <BtnSecondary class=move || format!("flex gap-2 place-items-center ") id=move || "btn_favorite" on_click=move|_|post_like_fn()>
                                     <span class="mt-[0.1rem]">"Favorite"</span>
-                                    <Star class=move||"shrink-0 w-[1.5rem] pb-[0.1rem]" fill=move||is_post_liked_fn() />
+                                    <SVGStar class=move||"shrink-0 w-[1.5rem] pb-[0.1rem]" fill=move||is_post_liked_fn() />
                                 </BtnSecondary>
                             </div>
                         </div>
@@ -676,7 +697,7 @@ pub fn Post() -> impl IntoView {
                             <div class=move || format!( "bg-base01 rounded-xl grid place-items-center py-5 px-2 {}", if global_state.is_logged_in().unwrap_or_default() || global_state.acc_pending() { "hidden" } else { "" })>
                                 <div class="flex flex-col gap-2">
                                     <div class="text-base03">"You must login to comment"</div>
-                                    <a class="mx-auto rounded-full font-semibold text-[1rem] font-medium px-[0.8rem] py-[0.2rem] hover:bg-base05 bg-base0D text-base01" href=PATH_LOGIN >"Login"</a>
+                                    <a class="mx-auto rounded-full font-semibold text-[1rem] font-medium px-[0.8rem] py-[0.2rem] hover:bg-base05 bg-base0D text-base01" href=LINK_WEB_LOGIN >"Login"</a>
                                 </div>
                             </div>
                             // <form class=move || format!("flex bg-base01 rounded-xl flex-col gap-2 py-2 px-4 {}", if global_state.is_logged_in().unwrap_or_default()  { "" } else { "hidden" }) on:submit=post_comments.on_comment.to_fn() >
@@ -924,15 +945,15 @@ pub fn SVGTriangle(#[prop(optional, into)] class: String) -> impl IntoView {
 #[component]
 pub fn PostCommentElm(
     parent_key: String,
-    parent_items: RwSignal<Vec<UserPostComment>, LocalStorage>,
+    parent_items: RwSignal<Vec<CommentRes>, LocalStorage>,
     parent_reply_count: RwSignal<usize, LocalStorage>,
-    comment: UserPostComment,
+    comment: CommentRes,
     param_post: Memo<Option<String>>,
     max_depth: usize,
     parent_depth: usize,
 ) -> impl IntoView {
     let current_depth = parent_depth + 1;
-    let global_state = expect_context::<GlobalState>();
+    let global_state = PageState::get();
     let comment_container_ref = NodeRef::<html::Div>::new();
     let comment_edit_ref = NodeRef::new();
     let comment_input_ref = NodeRef::<html::Textarea>::new();
@@ -941,7 +962,7 @@ pub fn PostCommentElm(
     // let reply_btn_shown = RwSignal::new(false);
     let replies_shown = RwSignal::new(false);
     // let edit_enabled = RwSignal::new(false);
-    let api = ApiWeb::new();
+    // let api = ApiWeb::new();
     let comment_key = comment.key.clone();
     let is_owned_fn = {
         let key = comment.user.key.clone();
@@ -989,14 +1010,15 @@ pub fn PostCommentElm(
         }
     };
 
-    let comments_manual = CommentsApi2::new(api, 10, kind.clone());
+    let comments_manual = CommentsApi2::new(10, kind.clone());
     let post_comment = move |_| {
         let Some(input_elm) = comment_input_ref.get() else {
             return;
         };
         spawner.spawn(async move {
             let text = input_elm.value();
-            comments_manual.post(text).await;
+            let client = create_client();
+            comments_manual.post(&client, text).await;
             let post_err = comments_manual.err_post.get_untracked();
             if !post_err.is_empty() {
                 return;
@@ -1005,10 +1027,17 @@ pub fn PostCommentElm(
         });
     };
     let delete_comment = move |_| {
-        spawner.spawn(comments_manual.delete());
+        spawner.spawn(async move {
+            let client = create_client();
+            comments_manual.delete(&client).await;
+        });
     };
     let fetch_comments = move || {
-        spawner.spawn(comments_manual.fetch());
+        spawner.spawn(async move {
+            let time = time_now_ns();
+            let client = create_client();
+            comments_manual.fetch(time, &client).await;
+        });
     };
     let toggle_btn = move |_| {
         comments_manual.show_editor.update(|v| *v = !*v);
@@ -1017,7 +1046,11 @@ pub fn PostCommentElm(
             return;
         }
         replies_shown.set(true);
-        spawner.spawn(comments_manual.fetch());
+        spawner.spawn(async move {
+            let time = time_now_ns();
+            let client = create_client();
+            comments_manual.fetch(time, &client).await;
+        });
     };
     let toggle_replies = move |_| {
         trace!("KILL ME YOU FUCK");
@@ -1028,7 +1061,11 @@ pub fn PostCommentElm(
             return;
         }
         trace!("KILL ME YOU FUCK 3 {show}");
-        spawner.spawn(comments_manual.fetch());
+        spawner.spawn(async move {
+            let time = time_now_ns();
+            let client = create_client();
+            comments_manual.fetch(time, &client).await;
+        });
     };
 
     Effect::new(move || {
@@ -1090,7 +1127,8 @@ pub fn PostCommentElm(
             let classes = elm.class_list();
             let _ = classes.add_1(anim);
             // elm.set_class_name(anim);
-            let result = set_timeout(
+            // set_timeout(cb, duration);
+            let result = set_timeout_fn(
                 move || {
                     let _ = classes.remove_1(anim);
                 },
@@ -1114,7 +1152,10 @@ pub fn PostCommentElm(
             else {
                 return;
             };
-            spawner.spawn(comments_manual.update_comment(text));
+            spawner.spawn(async move {
+                let client = create_client();
+                comments_manual.update_comment(&client, text).await;
+            });
         }
 
         comments_manual.edit_mode.set(true);
