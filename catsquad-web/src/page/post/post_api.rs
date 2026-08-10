@@ -108,7 +108,7 @@ impl PostApi {
             .post_update_description(post_key, description)
             .send()
             .await
-            .into_res()
+            .into_json()
             .await;
 
         match result {
@@ -152,7 +152,7 @@ impl PostApi {
             .post_update_title(post_key, title)
             .send()
             .await
-            .into_res()
+            .into_json()
             .await;
 
         match result {
@@ -195,7 +195,7 @@ impl PostApi {
             .post_update_tags(post_key, tags)
             .send()
             .await
-            .into_res()
+            .into_json()
             .await;
 
         match result {
@@ -232,7 +232,7 @@ impl PostApi {
         TSender::TResponse: Response + Debug,
     {
         let post_id = post_id.into();
-        let result = client.post_remove(post_id).send().await.into_res().await;
+        let result = client.post_remove(post_id).send().await.into_json().await;
 
         match result {
             Ok(_) => {
@@ -264,7 +264,7 @@ impl PostApi {
             .post_get_by_key(post_key)
             .send()
             .await
-            .into_res()
+            .into_json()
             .await;
         match result {
             Ok(post) => {
@@ -402,14 +402,14 @@ pub mod tests {
                 .post_add(title, description, tags)
                 .send()
                 .await
-                .into_res()
+                .into_json()
                 .await
                 .unwrap();
             app.client
                 .post_update_state(&post.key, PostState::Active)
                 .send()
                 .await
-                .into_res()
+                .into_json()
                 .await
                 .unwrap();
             // app.state.set_time(1).await;

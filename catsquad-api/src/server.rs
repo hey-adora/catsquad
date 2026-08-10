@@ -88,6 +88,10 @@ pub async fn app(state: AppState) -> Router {
             catsquad_shared::LINK_API_POST_GET_BY_KEY,
             get(api::post_get_by_key),
         )
+        .route(
+            catsquad_shared::LINK_API_POST_FILE_GET_BY_HASH,
+            get(api::post_file_get_by_hash),
+        )
         .route_layer(middleware::from_fn_with_state(
             state.clone(),
             auth_optional_middleware,

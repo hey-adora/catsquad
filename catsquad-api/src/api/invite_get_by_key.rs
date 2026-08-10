@@ -90,7 +90,7 @@ mod test_utils {
                 .invite_get_by_key(invite_key)
                 .send()
                 .await
-                .into_res()
+                .into_json()
                 .await
         }
     }

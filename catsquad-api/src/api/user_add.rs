@@ -167,7 +167,7 @@ mod test_utils {
                 .user_add(username, invite_key, password)
                 .send()
                 .await
-                .into_res()
+                .into_json()
                 .await
         }
         pub async fn user_add_with_session(
@@ -183,7 +183,7 @@ mod test_utils {
                 .await;
             let headers = res.get_headers().unwrap();
             let session_key = auth_token_get(&headers, header::SET_COOKIE).unwrap();
-            let result = res.into_res().await.unwrap();
+            let result = res.into_json().await.unwrap();
             (result, session_key)
         }
         pub async fn user_add_full(
@@ -200,7 +200,7 @@ mod test_utils {
                 .invite_add(email.clone())
                 .send()
                 .await
-                .into_res()
+                .into_json()
                 .await
                 .unwrap();
             // let invite = self.invite_add(email.clone()).await.unwrap();
@@ -223,7 +223,7 @@ mod test_utils {
                 .await;
             let headers = res.get_headers().unwrap();
             let session_key = auth_token_get(&headers, header::SET_COOKIE).unwrap();
-            let _res = res.into_res().await.unwrap();
+            let _res = res.into_json().await.unwrap();
 
             // let session_key = res.get_auth_token().unwrap();
             // let res = res.into_res().await;

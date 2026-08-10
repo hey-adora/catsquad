@@ -763,6 +763,8 @@ dependencies = [
  "hydration_context",
  "leptos",
  "leptos_router",
+ "serde",
+ "serde_json",
  "strum",
  "tokio",
  "wasm-bindgen",

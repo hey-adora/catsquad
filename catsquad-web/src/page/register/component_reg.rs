@@ -66,7 +66,7 @@ impl RegisterFormState {
             .user_add(username, invite_key, password)
             .send()
             .await
-            .into_res()
+            .into_json()
             .await;
 
         match result {
@@ -123,7 +123,7 @@ async fn test_register_form_state() {
         .invite_add("prime@heyadora.com")
         .send()
         .await
-        .into_res()
+        .into_json()
         .await
         .unwrap();
 
@@ -189,7 +189,7 @@ pub fn invite_key_to_email(
                 .invite_get_by_key(invite_key)
                 .send()
                 .await
-                .into_res()
+                .into_json()
                 .await;
             match result {
                 Ok(res) => {

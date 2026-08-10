@@ -106,7 +106,7 @@ impl InviteState {
                 return;
             }
         }
-        let result = client.invite_add(email).send().await.into_res().await;
+        let result = client.invite_add(email).send().await.into_json().await;
         let _invite_res = match result {
             Ok(v) => v,
             Err(err) => {

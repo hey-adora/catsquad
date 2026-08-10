@@ -85,7 +85,7 @@ mod test_utils {
                 .header_add(header::COOKIE, create_auth_cookie_str(session_key.into()))
                 .send()
                 .await
-                .into_res()
+                .into_json()
                 .await
         }
     }
@@ -119,7 +119,7 @@ async fn test_email_change_update_new_confirm() {
         .header_add(header::COOKIE, create_auth_cookie_str(session_key.clone()))
         .send()
         .await
-        .into_res()
+        .into_json()
         .await
         .unwrap();
 
@@ -138,7 +138,7 @@ async fn test_email_change_update_new_confirm() {
         .header_add(header::COOKIE, create_auth_cookie_str(session_key.clone()))
         .send()
         .await
-        .into_res()
+        .into_json()
         .await
         .unwrap();
 
@@ -149,7 +149,7 @@ async fn test_email_change_update_new_confirm() {
             .header_add(header::COOKIE, create_auth_cookie_str(session))
             .send()
             .await
-            .into_res()
+            .into_json()
             .await
     };
 
@@ -165,7 +165,7 @@ async fn test_email_change_update_new_confirm() {
         .header_add(header::COOKIE, create_auth_cookie_str(session_key.clone()))
         .send()
         .await
-        .into_res()
+        .into_json()
         .await
         .unwrap();
 

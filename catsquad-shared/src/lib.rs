@@ -32,6 +32,7 @@ pub use api::invite_get_by_key::*;
 pub use api::password_change_add::*;
 pub use api::password_change_update_confirm::*;
 pub use api::post_add::*;
+pub use api::post_file_get_by_hash::*;
 pub use api::post_get_by_key::*;
 pub use api::post_like_add::*;
 pub use api::post_like_get_post::*;

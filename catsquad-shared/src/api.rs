@@ -13,6 +13,7 @@ pub mod invite_get_by_key;
 pub mod password_change_add;
 pub mod password_change_update_confirm;
 pub mod post_add;
+pub mod post_file_get_by_hash;
 pub mod post_get_by_key;
 pub mod post_like_add;
 pub mod post_like_get_post;

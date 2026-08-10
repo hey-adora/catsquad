@@ -64,7 +64,7 @@ impl PageState {
             .user_get_by_session_key()
             .send()
             .await
-            .into_res()
+            .into_json()
             .await;
         match result {
             Ok(user) => {

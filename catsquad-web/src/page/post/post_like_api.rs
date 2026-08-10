@@ -53,7 +53,7 @@ pub fn use_post_like(post_key: Memo<Option<String>>) -> PostLike {
                     .post_like_get_by_post(post_key)
                     .send()
                     .await
-                    .into_res()
+                    .into_json()
                     .await;
                 match result {
                     Ok(liked) => {
@@ -87,7 +87,7 @@ pub fn use_post_like(post_key: Memo<Option<String>>) -> PostLike {
                         .post_like_remove(post_id)
                         .send()
                         .await
-                        .into_res()
+                        .into_json()
                         .await;
                     match result {
                         Ok(_result) => {
@@ -103,7 +103,7 @@ pub fn use_post_like(post_key: Memo<Option<String>>) -> PostLike {
             PostLikeStage::Unliked => {
                 spawner.spawn(async move {
                     let client = create_client();
-                    let result = client.post_like_add(post_id).send().await.into_res().await;
+                    let result = client.post_like_add(post_id).send().await.into_json().await;
                     match result {
                         Ok(_result) => {
                             stage.set(PostLikeStage::Liked);

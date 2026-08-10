@@ -7,6 +7,24 @@ pub fn link_relative_post_update_file_add(post_key: impl AsRef<str>) -> String {
     format!("/api/post/{}", post_key.as_ref())
 }
 
+#[derive(
+    Default, Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq, thiserror::Error,
+)]
+pub enum PostFileGetByHashErr {
+    #[error("post not found")]
+    PostNotFound,
+
+    #[error("post file not found")]
+    FileNotFound,
+
+    #[error("unauthorized {0}")]
+    Unauthorized(String),
+
+    #[default]
+    #[error("internal server err")]
+    InternalServerErr,
+}
+
 // #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
 // pub struct PostRes {
 //     pub key: String,

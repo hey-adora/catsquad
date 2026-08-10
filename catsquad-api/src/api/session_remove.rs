@@ -57,7 +57,7 @@ mod test_utils {
                 .header_add(header::COOKIE, create_auth_cookie_str(session_key))
                 .send()
                 .await
-                .into_res()
+                .into_json()
                 .await
         }
     }

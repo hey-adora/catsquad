@@ -48,7 +48,7 @@ pub fn Login() -> impl IntoView {
                 .session_add(email, password)
                 .send()
                 .await
-                .into_res()
+                .into_json()
                 .await;
             match result {
                 Ok(_user) => {

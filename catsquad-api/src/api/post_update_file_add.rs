@@ -471,7 +471,7 @@ async fn test_post_update_file_add() {
         .header_add(header::COOKIE, create_auth_cookie_str(session_key1.clone()))
         .send()
         .await
-        .into_res()
+        .into_json()
         .await
         .unwrap();
 
@@ -482,7 +482,7 @@ async fn test_post_update_file_add() {
             .header_add(header::COOKIE, create_auth_cookie_str(session_key1.clone()))
             .send()
             .await
-            .into_res()
+            .into_json()
             .await
     };
     let result = add_file(&post1.key, &[txt_file]).await;

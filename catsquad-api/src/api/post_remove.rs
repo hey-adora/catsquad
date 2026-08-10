@@ -70,7 +70,7 @@ mod test_utils {
                 .header_add(header::COOKIE, create_auth_cookie_str(session_key.into()))
                 .send()
                 .await
-                .into_res()
+                .into_json()
                 .await
         }
     }
@@ -99,7 +99,7 @@ async fn test_post_remove() {
         .header_add(header::COOKIE, create_auth_cookie_str(session_key1.clone()))
         .send()
         .await
-        .into_res()
+        .into_json()
         .await
         .unwrap();
 
@@ -134,7 +134,7 @@ async fn test_post_remove() {
         .header_add(header::COOKIE, create_auth_cookie_str(session_key1.clone()))
         .send()
         .await
-        .into_res()
+        .into_json()
         .await
         .unwrap();
 

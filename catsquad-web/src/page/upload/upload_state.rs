@@ -150,7 +150,7 @@ impl UploadState {
         TSender: Sender + Debug + Clone,
         TSender::TResponse: Response + Debug,
     {
-        let result = client.post_add("", "", "").send().await.into_res().await;
+        let result = client.post_add("", "", "").send().await.into_json().await;
         match result {
             Ok(v) => {
                 if self.post_key.try_set_value(v.key).is_some() {
@@ -281,7 +281,7 @@ impl UploadState {
             .post_update_title(&post_key, new_title)
             .send()
             .await
-            .into_res()
+            .into_json()
             .await;
 
         match result {
@@ -312,7 +312,7 @@ impl UploadState {
             .post_update_description(&post_key, new_description)
             .send()
             .await
-            .into_res()
+            .into_json()
             .await;
 
         match result {
@@ -345,7 +345,7 @@ impl UploadState {
             .post_update_tags(&post_key, new_tags)
             .send()
             .await
-            .into_res()
+            .into_json()
             .await;
 
         match result {
@@ -376,7 +376,7 @@ impl UploadState {
             .post_update_state(&post_key, PostState::Active)
             .send()
             .await
-            .into_res()
+            .into_json()
             .await;
 
         match result {
@@ -442,7 +442,7 @@ impl UploadState {
             })
             .send()
             .await
-            .into_res()
+            .into_json()
             .await;
 
         match result {
@@ -502,7 +502,7 @@ impl UploadState {
             .post_update_file_remove(post_key, name)
             .send()
             .await
-            .into_res()
+            .into_json()
             .await;
 
         match result {
@@ -761,7 +761,7 @@ async fn test_upload_state_file_add() {
         .post_add("", "", "")
         .send()
         .await
-        .into_res()
+        .into_json()
         .await
         .unwrap();
 
@@ -802,7 +802,7 @@ async fn test_upload_state_file_remove() {
         .post_add("", "", "")
         .send()
         .await
-        .into_res()
+        .into_json()
         .await
         .unwrap();
 

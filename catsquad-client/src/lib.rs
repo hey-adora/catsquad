@@ -294,7 +294,40 @@ where
         self.response.as_ref().map(|v| v.get_headers().clone()).ok()
     }
 
-    pub async fn into_res(self) -> Result<TResult, TError> {
+    pub async fn into_bytes(self) -> Result<Vec<u8>, TError> {
+        let path = self.request.path;
+        let method = self.request.method;
+        let res = self.response.map_err(|_err| TError::default())?;
+        let status_code = res.get_status();
+
+        let bytes = res
+            .into_bytes()
+            .await
+            .inspect_err(|err| error!("client err getting bytes {err}"))
+            .map_err(|_err| TError::default())?;
+
+        if status_code != StatusCode::OK {
+            let raw_str = String::from_utf8_lossy(&bytes);
+            let res = serde_json::from_slice::<Result<Vec<u8>, TError>>(&bytes)
+                .inspect_err(|err| error!("client err parsing to json {err}"))
+                .map_err(|_err| TError::default());
+
+            debug!(
+                "CLIENT RECV {} {}\n{}\n{}\n{:#?}",
+                method, status_code, path, raw_str, res
+            );
+
+            let res = res?;
+
+            return res;
+        }
+
+        debug!("CLIENT RECV {} {}\n{}", method, status_code, path);
+
+        Ok(bytes)
+    }
+
+    pub async fn into_json(self) -> Result<TResult, TError> {
         let path = self.request.path;
         let method = self.request.method;
         let res = self.response.map_err(|_err| TError::default())?;
@@ -774,6 +807,14 @@ where
         };
         let sender = self.sender.clone();
         Builder::new(sender, params)
+    }
+
+    pub fn post_file_get_by_hash(
+        &self,
+        post_key: impl AsRef<str>,
+        file_hash: impl AsRef<str>,
+    ) -> Builder<TSender, Vec<u8>, cs::PostFileGetByHashErr> {
+        self.get(cs::link_relative_img(post_key, file_hash))
     }
 
     pub fn post_search(

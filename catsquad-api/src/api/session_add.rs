@@ -123,7 +123,7 @@ mod test_utils {
                 .session_add(email, password)
                 .send()
                 .await
-                .into_res()
+                .into_json()
                 .await
         }
         pub async fn session_add_with_key(
@@ -134,7 +134,7 @@ mod test_utils {
             let res = self.client.session_add(email, password).send().await;
             let headers = res.get_headers().unwrap();
             let session_key = auth_token_get(&headers, header::SET_COOKIE).unwrap();
-            let res = res.into_res().await.unwrap();
+            let res = res.into_json().await.unwrap();
             (res, session_key)
         }
     }

@@ -78,7 +78,7 @@ mod test_utils {
             &self,
             email: impl Into<String>,
         ) -> Result<cs::InviteRes, cs::InviteAddErr> {
-            self.client.invite_add(email).send().await.into_res().await
+            self.client.invite_add(email).send().await.into_json().await
         }
         pub async fn invite_get_key(&self, email: impl AsRef<str>) -> String {
             let email = email.as_ref();

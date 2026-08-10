@@ -78,7 +78,7 @@ async fn test_post_update_title() {
         .header_add(header::COOKIE, create_auth_cookie_str(session_key1.clone()))
         .send()
         .await
-        .into_res()
+        .into_json()
         .await
         .unwrap();
 
@@ -88,7 +88,7 @@ async fn test_post_update_title() {
         .header_add(header::COOKIE, create_auth_cookie_str(session_key1.clone()))
         .send()
         .await
-        .into_res()
+        .into_json()
         .await
         .unwrap();
 
@@ -100,7 +100,7 @@ async fn test_post_update_title() {
         .header_add(header::COOKIE, create_auth_cookie_str(session_key2.clone()))
         .send()
         .await
-        .into_res()
+        .into_json()
         .await;
     assert!(matches!(result, Err(PostUpdateTitleErr::Unauthorized(_))));
 
@@ -110,7 +110,7 @@ async fn test_post_update_title() {
         .header_add(header::COOKIE, create_auth_cookie_str(session_key1.clone()))
         .send()
         .await
-        .into_res()
+        .into_json()
         .await;
     assert!(matches!(result, Err(PostUpdateTitleErr::PostNotFound)));
 
@@ -120,7 +120,7 @@ async fn test_post_update_title() {
         .header_add(header::COOKIE, create_auth_cookie_str(session_key1.clone()))
         .send()
         .await
-        .into_res()
+        .into_json()
         .await;
     assert!(matches!(result, Err(PostUpdateTitleErr::PostNotFound)));
 }

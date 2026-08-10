@@ -84,7 +84,7 @@ mod test_utils {
                 .comment_search(post_key, comment_key, time, limit, range, order, flatten)
                 .send()
                 .await
-                .into_res()
+                .into_json()
                 .await
         }
     }

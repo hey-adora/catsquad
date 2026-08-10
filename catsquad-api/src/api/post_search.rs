@@ -85,7 +85,7 @@ mod test_utils {
                 .post_search(tags, username, time, limit, range, order)
                 .send()
                 .await
-                .into_res()
+                .into_json()
                 .await
         }
     }

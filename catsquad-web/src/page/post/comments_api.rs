@@ -177,7 +177,7 @@ impl CommentsApi2 {
             )
             .send()
             .await
-            .into_res()
+            .into_json()
             .await;
 
         self.handle_fetch_result(result)
@@ -216,7 +216,7 @@ impl CommentsApi2 {
             )
             .send()
             .await
-            .into_res()
+            .into_json()
             .await;
         // .get_post_comment(post_key, None, fetch_count, time_range, order, false)
         // .send_native()
@@ -347,7 +347,7 @@ impl CommentsApi2 {
             .comment_update_text(comment_key, text)
             .send()
             .await
-            .into_res()
+            .into_json()
             .await;
 
         match result {
@@ -383,7 +383,7 @@ impl CommentsApi2 {
             .comment_add(post_key, String::new(), text)
             .send()
             .await
-            .into_res()
+            .into_json()
             .await;
 
         self.handle_post_result(result)
@@ -410,7 +410,7 @@ impl CommentsApi2 {
             .comment_add(post_key, comment_key.into(), text)
             .send()
             .await
-            .into_res()
+            .into_json()
             .await;
 
         self.handle_post_result(result)
@@ -448,7 +448,7 @@ impl CommentsApi2 {
                     .comment_remove(comment.key.clone())
                     .send()
                     .await
-                    .into_res()
+                    .into_json()
                     .await;
 
                 match result {
@@ -626,14 +626,14 @@ pub mod tests {
             .post_add("title1", "cat", "one")
             .send()
             .await
-            .into_res()
+            .into_json()
             .await
             .unwrap();
         app.client
             .post_update_state(post.key.clone(), PostState::Active)
             .send()
             .await
-            .into_res()
+            .into_json()
             .await
             .unwrap();
 
@@ -1169,7 +1169,7 @@ pub mod tests {
                 .comment_add(post.key.clone(), parent, text)
                 .send()
                 .await
-                .into_res()
+                .into_json()
                 .await
                 .unwrap()
         };
