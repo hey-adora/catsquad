@@ -6,6 +6,7 @@ use catsquad_shared::{
     LINK_WEB_INDEX, PostGetByKeyErr, PostRemoveErr, PostUpdateDescriptionErr, PostUpdateTagsErr,
     PostUpdateTitleErr, link_relative_img,
 };
+use catsquad_web_utils::prelude::*;
 use leptos::prelude::*;
 // use crate::{
 //     api::{Api, Server404Err, ServerErr, ServerUpdatePostDescriptionErr},
@@ -31,6 +32,7 @@ pub struct PostApi {
     pub imgs_links: RwSignal<Vec<(String, f64)>, LocalStorage>,
     pub title: RwSignal<String, LocalStorage>,
     pub author: RwSignal<String, LocalStorage>,
+    pub author_key: RwSignal<String, LocalStorage>,
     pub author_link: RwSignal<String, LocalStorage>,
     pub tags: RwSignal<String, LocalStorage>,
     // pub tags_is_empty: RwSignal<bool, LocalStorage>,
@@ -72,6 +74,7 @@ impl PostApi {
             imgs_links: RwSignal::new_local(Vec::<(String, f64)>::new()),
             title: RwSignal::new_local(String::new()),
             author: RwSignal::new_local(String::new()),
+            author_key: RwSignal::new_local(String::new()),
             author_link: RwSignal::new_local(LINK_WEB_INDEX.to_string()),
             tags: RwSignal::new_local(String::new()),
             live_description_length: RwSignal::new_local(0),
@@ -102,6 +105,9 @@ impl PostApi {
         TSender: Sender + Debug + Clone,
         TSender::TResponse: Response + Debug,
     {
+        let description = description.into();
+        debug_data_push("post_description_mutation", description.clone());
+
         self.err_description.update(|v| v.clear());
 
         let result = client
@@ -268,9 +274,11 @@ impl PostApi {
             .await;
         match result {
             Ok(post) => {
+                let post_key = post.key.clone();
                 self.live_title_length.set(post.title.len());
                 self.title.set(post.title);
                 self.author.set(post.user.username.clone());
+                self.author_key.set(post.user.key.clone());
                 self.author_link.set("/404".to_string());
                 // self.author_link.set(link_user(post.user.username));
                 self.live_tags_length.set(post.tags.len());
@@ -291,7 +299,7 @@ impl PostApi {
                         .into_iter()
                         .map(|file| {
                             (
-                                link_relative_img(file.hash, file.extension),
+                                link_relative_img(post_key.clone(), file.hash),
                                 file.width as f64 / file.height as f64,
                             )
                         })
@@ -506,5 +514,6 @@ pub mod tests {
         let post_api = PostApi::new();
         post_api.get(&app.client, &post_key).await;
         assert_eq!(post_api.title.get_untracked(), "title");
+        assert_ne!(post_api.author_key.get_untracked(), "");
     }
 }

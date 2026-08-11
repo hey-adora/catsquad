@@ -529,10 +529,12 @@ pub fn GalleryImg(
     let img_height = img.height;
     let img_key = img.key.clone();
     let img_key2 = img.key.clone();
+    let img_key3 = img.key.clone();
     let img_username = img.username.clone();
     let post_link = img.get_post_link();
     // let post_link_with_history = img.get_post_link_with_history(9999);
     let img_link = img.get_img_link();
+    let files_count = img.files_count;
 
     let value_left = format!("{view_left}px");
     let value_top = format!("{view_top}px");
@@ -540,6 +542,8 @@ pub fn GalleryImg(
     let value_height = format!("{view_height}px");
     let value_width2 = value_width.clone();
     let value_height2 = value_height.clone();
+    let value_width3 = value_width.clone();
+    let value_height3 = value_height.clone();
 
     // let on_img_click = move |e: MouseEvent| {
     //     run_on_click(e, img.clone());
@@ -558,13 +562,25 @@ pub fn GalleryImg(
            style:width=value_width
            style:height=value_height
         >
-            <img
-                id=elm_id_img_thumbnail(img_key2)
-                style:width=value_width2
-                style:height=value_height2
-                // node_ref=img_ref
-                src=img_link
-            />
+            <Show when=move || files_count != 0>
+                <img
+                    id=elm_id_img_thumbnail(img_key2.clone())
+                    style:width=value_width2.clone()
+                    style:height=value_height2.clone()
+                    src=img_link.clone()
+                />
+            </Show>
+            <Show when=move || files_count == 0>
+                <div
+                    class="border-2 border-base05 bg-base02 grid items-center text-center"
+                    id=elm_id_img_thumbnail(img_key3.clone())
+                    style:width=value_width3.clone()
+                    style:height=value_height3.clone()
+                >
+                "No Images"
+                </div>
+            </Show>
+
         </a>
     }
 }
@@ -577,6 +593,7 @@ pub struct Img {
     pub extension: String,
     pub width: u32,
     pub height: u32,
+    pub files_count: usize,
     pub view_width: f64,
     pub view_height: f64,
     pub view_pos_x: f64,
@@ -593,6 +610,7 @@ fn from_u128_custom<S: serde::Serializer>(v: &u128, serializer: S) -> Result<S::
 
 impl From<PostRes> for Img {
     fn from(user_post: PostRes) -> Self {
+        let files_count = user_post.file.len();
         let post_thumbnail = user_post.file.first().cloned().unwrap_or(PostFile {
             width: 400,
             height: 400,
@@ -608,6 +626,7 @@ impl From<PostRes> for Img {
             height: post_thumbnail.height,
             hash: post_thumbnail.hash,
             extension: post_thumbnail.extension,
+            files_count,
             view_width: 0.0,
             view_height: 0.0,
             view_pos_x: 0.0,
@@ -643,7 +662,7 @@ impl ResizableImage for Img {
         // link_post(&self.username, &self.key)
     }
     fn get_img_link(&self) -> String {
-        link_relative_img(&self.hash, &self.extension)
+        link_relative_img(&self.key, &self.hash)
         // link_img(&self.hash, &self.extension)
     }
     fn get_width(&self) -> u32 {
@@ -691,6 +710,7 @@ impl Img {
             username: "bot".to_string(),
             hash: "404".to_string(),
             extension: "webp".to_string(),
+            files_count: 0,
             width,
             height,
             view_width: 0.0,
@@ -710,6 +730,7 @@ impl Img {
             username: "bot".to_string(),
             hash: "404".to_string(),
             extension: "webp".to_string(),
+            files_count: 0,
             width,
             height,
             view_width: 0.0,

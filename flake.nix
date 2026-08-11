@@ -176,6 +176,7 @@
           mkShell {
             packages = [
               ffmpeg-full
+              cargo-expand
               surrealdb
               rust_toolchain
               wild

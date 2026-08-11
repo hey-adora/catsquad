@@ -34,6 +34,7 @@ pub mod debugger {
         fmt::Debug,
         sync::{LazyLock, RwLock},
     };
+    use tracing::trace;
     use web_sys::js_sys::{Array, Object, Reflect};
 
     use wasm_bindgen::prelude::*;
@@ -156,6 +157,8 @@ pub mod debugger {
             label,
             data,
         };
+
+        trace!("debug data pushed {data_wrap:?}");
 
         let mut debug_data = DEBUG_STATE.write().unwrap();
         debug_data.manual_data.push(data_wrap);
@@ -446,17 +449,17 @@ pub mod time {
 
     pub fn time_now_ns() -> u128 {
         cfg_if::cfg_if! {
-            if #[cfg(feature = "ssr")] {
-                use std::time::{SystemTime, UNIX_EPOCH};
-                let time = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
-                time.as_nanos()
-            } else {
+            if #[cfg(target_arch = "wasm32")] {
                 use wasm_bindgen::JsValue;
                 use web_sys::js_sys::Date;
                 let time = Date::new_0();
                 let time = time.get_time() as u64;
                 let time = time as u128 * 1000000;
                 time
+            } else {
+                use std::time::{SystemTime, UNIX_EPOCH};
+                let time = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
+                time.as_nanos()
             }
         }
     }

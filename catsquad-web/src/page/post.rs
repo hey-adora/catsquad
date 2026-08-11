@@ -62,15 +62,17 @@ use crate::PageState;
 use crate::hook::{EventListener, Spawner};
 use crate::page::create_client;
 use crate::page::post::comments_api::{CommentKind2, CommentsApi2};
-use crate::page::post::post_like_api::{PostLikeStage, use_post_like};
+// use crate::page::post::post_like_api::LikeState;
 use crate::{AutoTextArea, BtnPrimary, BtnSecondary, Errs, Nav, SVGStar};
 use comments_basic::CommentsBaisc;
+use component_favorite::Favorite;
 use post_api::PostApi;
 
 mod comments_api;
 mod comments_basic;
+mod component_favorite;
 mod post_api;
-mod post_like_api;
+mod post_like_state;
 
 #[derive(Params, PartialEq, Clone)]
 pub struct PostParams {
@@ -87,7 +89,7 @@ pub fn Post() -> impl IntoView {
     let global_state = PageState::get();
 
     let param = use_params::<PostParams>();
-    let param_username = move || param.read().as_ref().ok().and_then(|v| v.username.clone());
+    // let param_username = move || param.read().as_ref().ok().and_then(|v| v.username.clone());
     let param_post = Memo::new(move |_| param.read().as_ref().ok().and_then(|v| v.post.clone()));
 
     let location = use_location();
@@ -97,6 +99,9 @@ pub fn Post() -> impl IntoView {
     let edit_tags_input = NodeRef::<html::Textarea>::new();
     let description_input_editor = NodeRef::<html::Textarea>::new();
     let title_input_editor = NodeRef::<html::Textarea>::new();
+
+    let post_auth_key = move || post_api.author_key.get();
+    let post_key = move || param_post.get().unwrap_or_default();
 
     // use_text_counter(description_input_editor, post_api.live_description_length);
     // use_text_counter(edit_tags_input, post_api.live_tags_length);
@@ -142,6 +147,7 @@ pub fn Post() -> impl IntoView {
         trace!("comments basic observe");
         spawner_comments.spawn(comment_basic.observe_only(comment_container_ref.into(), post_id));
     });
+
     // Effect::new(move || {
     //     // let (Some(description_ref), Some(edit_description_ref)) = (
     //     //     ) else {
@@ -173,33 +179,29 @@ pub fn Post() -> impl IntoView {
     //     // spawner_comments.spawn(comment_basic.observe_only(comment_container_ref.into(), post_id));
     // });
 
-    let post_like = use_post_like(param_post);
-    let post_like_fn = move || {
-        post_like.on_like.with_value(|f| {
-            (f)();
-        });
-    };
-    let is_post_liked_fn = move || {
-        post_like
-            .stage
-            .with_value(|f| (f)() == PostLikeStage::Liked)
-    };
-    let post_like_btn_style = move || {
-        format!(
-            "border-2 text-[1.3rem] font-bold px-4 py-1 {}",
-            match post_like.stage.run() {
-                PostLikeStage::Liked => "border-base01 bg-base05 text-base01",
-                PostLikeStage::Unliked =>
-                    "border-base05 bg-base01 text-base05 hover:bg-base05 hover:text-base01",
-                PostLikeStage::Loading => "border-base05 bg-base01 text-base05",
-            }
-        )
-    };
-    let post_like_btn_text = move || match post_like.stage.run() {
-        PostLikeStage::Liked => "Un-Favorite",
-        PostLikeStage::Unliked => "Favorite",
-        PostLikeStage::Loading => "Loading",
-    };
+    // let post_like = use_post_like(param_post);
+    // let post_like_fn = move || {
+    //     post_like.on_like.with_value(|f| {
+    //         (f)();
+    //     });
+    // };
+    // let is_post_liked_fn = move || post_like.stage.with_value(|f| (f)() == LikeState::Liked);
+    // let post_like_btn_style = move || {
+    //     format!(
+    //         "border-2 text-[1.3rem] font-bold px-4 py-1 {}",
+    //         match post_like.stage.run() {
+    //             LikeState::Liked => "border-base01 bg-base05 text-base01",
+    //             LikeState::Unliked =>
+    //                 "border-base05 bg-base01 text-base05 hover:bg-base05 hover:text-base01",
+    //             LikeState::Loading => "border-base05 bg-base01 text-base05",
+    //         }
+    //     )
+    // };
+    // let post_like_btn_text = move || match post_like.stage.run() {
+    //     LikeState::Liked => "Un-Favorite",
+    //     LikeState::Unliked => "Favorite",
+    //     LikeState::Loading => "Loading",
+    // };
 
     let selected_img = move || -> AnyView {
         let hash = location.hash.get();
@@ -455,6 +457,10 @@ pub fn Post() -> impl IntoView {
         trace!("files selected: {}", files.len());
     };
 
+    // let show_favorite_btn = move || -> bool {
+    //     global_state.is_logged_in().unwrap_or_default() && post
+    // };
+
     view! {
         <main node_ref=main_ref class="relative font-hi grid grid-rows-[auto_1fr] h-screen text-base05">
             <Nav/>
@@ -564,11 +570,14 @@ pub fn Post() -> impl IntoView {
                                         <p class="text-[1rem]">"9999 followers"</p>
                                     </div>
                                 </div>
+                                <Favorite auth_key_tracked=post_auth_key post_key_tracked=post_key />
+                                // <Show when=move||global_state.is_logged_in().unwrap_or_default()>
+                                //     <BtnSecondary class=move || format!("flex gap-2 place-items-center ") id=move || "btn_favorite" on_click=move|_|post_like_fn()>
+                                //         <span class="mt-[0.1rem]">"Favorite"</span>
+                                //         <SVGStar class=move||"shrink-0 w-[1.5rem] pb-[0.1rem]" fill=move||is_post_liked_fn() />
+                                //     </BtnSecondary>
+                                // </Show>
                                 // <div>{move || post_api.favorites.get() }" favorites"</div>
-                                <BtnSecondary class=move || format!("flex gap-2 place-items-center ") id=move || "btn_favorite" on_click=move|_|post_like_fn()>
-                                    <span class="mt-[0.1rem]">"Favorite"</span>
-                                    <SVGStar class=move||"shrink-0 w-[1.5rem] pb-[0.1rem]" fill=move||is_post_liked_fn() />
-                                </BtnSecondary>
                             </div>
                         </div>
                         // <div>
@@ -661,12 +670,11 @@ pub fn Post() -> impl IntoView {
                                     {move || post_api.err_tags.get().trim().split("\n").filter(|v| v.len() > 1).map(|v| v.to_string()).map(move |v: String| view! { <li>{v}</li> }).collect_view() }
                                 </ul>
                             </Show>
-                            <div class=move || format!("text-ellipsis flex flex-wrap gap-1 overflow-hidden padding max-w-[calc(100vw-1rem)] {} ",
-                                    if post_api.tags.with(|v| v.is_empty()) {"text-base03"} else {"text-base05"}
+                            <div class=move || format!("text-ellipsis flex flex-wrap gap-1 overflow-hidden padding max-w-[calc(100vw-1rem)] ",
                                 )>
 
                                 <Show when={move || post_api.update_tags_mode.get() } fallback={move || view!{
-                                    <Show when={move || post_api.tags.with(|v| !v.is_empty()) } fallback={move || "No tags." }>
+                                    <Show when={move || post_api.tags.with(|v| !v.is_empty()) } fallback={move || view!{<span class="text-base03">"No tags."</span>} }>
                                         { tags }
                                     </Show>
                                 } }>
@@ -966,12 +974,7 @@ pub fn PostCommentElm(
     let comment_key = comment.key.clone();
     let is_owned_fn = {
         let key = comment.user.key.clone();
-        move || {
-            global_state
-                .get_acc_id_tracked()
-                .map(|v| v == key)
-                .unwrap_or_default()
-        }
+        move || global_state.user_key() == key
     };
 
     let comment_edit_event = EventListener::new(ev::change, |a| {

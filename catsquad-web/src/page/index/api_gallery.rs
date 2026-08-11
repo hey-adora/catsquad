@@ -69,63 +69,63 @@ impl GalleryApi {
     //     self.size.set_value(size);
     // }
 
-    pub async fn post<TSender>(
-        &self,
-        client: &Client<TSender>,
-        size: GalleryContainerSize,
-        title: impl Into<String>,
-        description: impl Into<String>,
-        tags: impl Into<String>,
-        // files: Vec<ServerReqImg>,
-    ) -> f64
-    where
-        TSender: Sender + Debug + Clone,
-        TSender::TResponse: Response + Debug,
-    {
-        let items = self.items;
+    // pub async fn post<TSender>(
+    //     &self,
+    //     client: &Client<TSender>,
+    //     size: GalleryContainerSize,
+    //     title: impl Into<String>,
+    //     description: impl Into<String>,
+    //     tags: impl Into<String>,
+    //     // files: Vec<ServerReqImg>,
+    // ) -> f64
+    // where
+    //     TSender: Sender + Debug + Clone,
+    //     TSender::TResponse: Response + Debug,
+    // {
+    //     let items = self.items;
 
-        let result = client
-            .post_add(title, description, tags)
-            .send()
-            .await
-            .into_json()
-            .await;
-        // let result = self
-        //     .api_top
-        //     .add_post(title, description, tags)
-        //     .send_native()
-        //     .await;
+    //     let result = client
+    //         .post_add(title, description, tags)
+    //         .send()
+    //         .await
+    //         .into_json()
+    //         .await;
+    //     // let result = self
+    //     //     .api_top
+    //     //     .add_post(title, description, tags)
+    //     //     .send_native()
+    //     //     .await;
 
-        match result {
-            Ok(post) => {
-                let new_img = Img::from(post);
-                let new_imgs = Vec::from([new_img]);
-                let old_imgs = items.get_untracked();
+    //     match result {
+    //         Ok(post) => {
+    //             let new_img = Img::from(post);
+    //             let new_imgs = Vec::from([new_img]);
+    //             let old_imgs = items.get_untracked();
 
-                trace!("CAN I MAKE THIS OR NOT");
-                let (resized_imgs, scroll_by) = add_imgs_to_bottom(
-                    old_imgs,
-                    new_imgs,
-                    size.width,
-                    size.height,
-                    size.row_height,
-                );
-                items.set(resized_imgs);
-                return scroll_by;
-            }
-            Ok(err) => {
-                let err = format!("post comments basic: unexpected res: {err:?}");
-                error!(err);
-                // self.err_fetch.set(err);
-            }
-            Err(err) => {
-                let err = format!("post comments basic: {err}");
-                error!(err);
-                // self.err_fetch.set(err);
-            }
-        };
-        0.0
-    }
+    //             trace!("CAN I MAKE THIS OR NOT");
+    //             let (resized_imgs, scroll_by) = add_imgs_to_bottom(
+    //                 old_imgs,
+    //                 new_imgs,
+    //                 size.width,
+    //                 size.height,
+    //                 size.row_height,
+    //             );
+    //             items.set(resized_imgs);
+    //             return scroll_by;
+    //         }
+    //         Ok(err) => {
+    //             let err = format!("post comments basic: unexpected res: {err:?}");
+    //             error!(err);
+    //             // self.err_fetch.set(err);
+    //         }
+    //         Err(err) => {
+    //             let err = format!("post comments basic: {err}");
+    //             error!(err);
+    //             // self.err_fetch.set(err);
+    //         }
+    //     };
+    //     0.0
+    // }
 
     pub async fn fetch<TSender>(
         self,
@@ -314,6 +314,7 @@ pub mod tests {
     // };
     // use hydration_context::HydrateSharedContext;
     use catsquad_log::prelude::*;
+    use catsquad_shared::PostState;
     use http::header;
     use leptos::prelude::*;
     use std::sync::Arc;
@@ -339,11 +340,11 @@ pub mod tests {
         let mut app = TestServer::new().await;
 
         let (user1, session_key1) = app
-            .user_add_full("hey", "hey@heyadora.com", "pas$word123456789")
+            .user_add_full("hey", "hey@heyadora.com", "pasA$word123456789")
             .await;
 
         let (user2, session_key2) = app
-            .user_add_full("hey2", "hey2@heyadora.com", "pas$word123456789")
+            .user_add_full("hey2", "hey2@heyadora.com", "paAs$word123456789")
             .await;
 
         app.inject_header(header::COOKIE, create_auth_cookie_str(session_key1.clone()))
@@ -362,42 +363,63 @@ pub mod tests {
         //     row_height: 50,
         // });
 
+        let post_add = async |title: &str, description: &str, tags: &str| {
+            let post1 = app
+                .client
+                .post_add(title, description, tags)
+                .send()
+                .await
+                .into_json()
+                .await
+                .unwrap();
+            app.client
+                .post_update_state(post1.key.clone(), PostState::Active)
+                .send()
+                .await
+                .into_json()
+                .await
+                .unwrap();
+        };
         app.state.set_time(1).await;
-        post_api
-            .post(
-                &app.client,
-                size,
-                "title1",
-                "0",
-                "",
-                // vec![create_img_req("1", 50, 50).await],
-            )
-            .await;
+        post_add("title1", "0", "").await;
+        // post_api
+        //     .post(
+        //         &app.client,
+        //         size,
+        //         "title1",
+        //         "0",
+        //         "",
+        //         // vec![create_img_req("1", 50, 50).await],
+        //     )
+        //     .await;
         app.state.set_time(2).await;
-        post_api
-            .post(
-                &app.client,
-                size,
-                "title2",
-                "0",
-                "",
-                // vec![create_img_req("2", 50, 50).await],
-            )
-            .await;
+        post_add("title2", "0", "").await;
+        // post_api
+        //     .post(
+        //         &app.client,
+        //         size,
+        //         "title2",
+        //         "0",
+        //         "",
+        //         // vec![create_img_req("2", 50, 50).await],
+        //     )
+        //     .await;
         app.state.set_time(3).await;
-        post_api
-            .post(
-                &app.client,
-                size,
-                "title3",
-                "0",
-                "",
-                // vec![create_img_req("3", 50, 50).await],
-            )
-            .await;
+        post_add("title3", "0", "").await;
+        // post_api
+        //     .post(
+        //         &app.client,
+        //         size,
+        //         "title3",
+        //         "0",
+        //         "",
+        //         // vec![create_img_req("3", 50, 50).await],
+        //     )
+        //     .await;
+
         let items = post_api.items.get_untracked();
         trace!("aaaaa {items:#?}");
-        assert_eq!(items.len(), 3);
+        assert_eq!(items.len(), 0);
 
         app.state.set_time(4).await;
         let post_api2 = GalleryApi::new(scroll_corerction.clone());
@@ -486,38 +508,41 @@ pub mod tests {
         let post_api = GalleryApi::new(scroll_corerction.clone());
 
         app.state.set_time(5).await;
-        post_api
-            .post(
-                &app.client,
-                size,
-                "title1",
-                "0",
-                "one two three",
-                // vec![create_img_req("1", 50, 50).await],
-            )
-            .await;
+        post_add("title1", "0", "one two three").await;
+        // post_api
+        //     .post(
+        //         &app.client,
+        //         size,
+        //         "title1",
+        //         "0",
+        //         "one two three",
+        //         // vec![create_img_req("1", 50, 50).await],
+        //     )
+        //     .await;
         app.state.set_time(6).await;
-        post_api
-            .post(
-                &app.client,
-                size,
-                "title2",
-                "0",
-                "one two",
-                // vec![create_img_req("2", 50, 50).await],
-            )
-            .await;
+        post_add("title2", "0", "one two").await;
+        // post_api
+        //     .post(
+        //         &app.client,
+        //         size,
+        //         "title2",
+        //         "0",
+        //         "one two",
+        //         // vec![create_img_req("2", 50, 50).await],
+        //     )
+        //     .await;
         app.state.set_time(7).await;
-        post_api
-            .post(
-                &app.client,
-                size,
-                "title3",
-                "0",
-                "one",
-                // vec![create_img_req("3", 50, 50).await],
-            )
-            .await;
+        post_add("title2", "0", "one").await;
+        // post_api
+        //     .post(
+        //         &app.client,
+        //         size,
+        //         "title3",
+        //         "0",
+        //         "one",
+        //         // vec![create_img_req("3", 50, 50).await],
+        //     )
+        //     .await;
 
         app.state.set_time(8).await;
         let post_api2 = GalleryApi::new(scroll_corerction.clone());
