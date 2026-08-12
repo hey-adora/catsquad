@@ -48,7 +48,7 @@ impl AppState {
         Self {
             db: Db::local(time, &conf.database_path).await,
             conf: Arc::new(RwLock::new(conf)),
-            time: Some(Arc::new(RwLock::new(time))),
+            time: None, // dont set time here, it will never update, used only in tests
             assets: Arc::new(assets),
         }
     }

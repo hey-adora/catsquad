@@ -44,6 +44,26 @@ pub fn create_post_id(key: impl Into<RecordIdKey>) -> RecordId {
     RecordId::new("post", key.into())
 }
 
+pub fn proccess_tags(tags: impl Into<String>) -> String {
+    let tags = tags.into();
+    let tags_len = tags.len();
+    let tags = tags.to_lowercase();
+    let tags_iter = tags.split_ascii_whitespace();
+    let mut tags = String::with_capacity(tags_len);
+    tags.push(' ');
+    for tag in tags_iter {
+        tags.push_str(tag);
+        tags.push(' ');
+    }
+
+    // no tags = clear spaces
+    if tags.len() == 1 {
+        tags.clear();
+    }
+
+    tags
+}
+
 impl Db {
     pub async fn post_define(&self) {
         let query = "
@@ -80,7 +100,7 @@ impl Db {
         // let user_id = create_user_id(user_key);
         let title = title.into();
         let description = description.into();
-        let tags = tags.into();
+        let tags = proccess_tags(tags);
 
         let mut q_upadte = String::new();
         if !title.is_empty() {
@@ -172,7 +192,7 @@ async fn test_post_add() {
     assert_eq!(post1.state, PostState::Draft.to_string());
     assert_eq!(post1.title, "title");
     assert_eq!(post1.description, "description");
-    assert_eq!(post1.tags, "tags");
+    assert_eq!(post1.tags, " tags ");
 
     let post2 = db
         .post_add(0, user.id.clone(), "title2", "description2", "tags2")
@@ -183,7 +203,7 @@ async fn test_post_add() {
     assert_eq!(post2.state, PostState::Draft.to_string());
     assert_eq!(post2.title, "title2");
     assert_eq!(post2.description, "description2");
-    assert_eq!(post2.tags, "tags2");
+    assert_eq!(post2.tags, " tags2 ");
 
     let post2 = db
         .post_add(0, user.id.clone(), "title3", "", "")
@@ -194,10 +214,22 @@ async fn test_post_add() {
     assert_eq!(post2.state, PostState::Draft.to_string());
     assert_eq!(post2.title, "title3");
     assert_eq!(post2.description, "description2");
-    assert_eq!(post2.tags, "tags2");
+    assert_eq!(post2.tags, " tags2 ");
 
     let result = db
         .post_add(0, create_user_id("invalid"), "title", "description", "tags")
         .await;
     assert_eq!(result, Err(DbPostAddErr::UserNotFound));
+
+    // tags are proccessed
+
+    let post1 = db
+        .post_add(0, user.id.clone(), "title", "description", " tAgs     tWo")
+        .await
+        .unwrap();
+
+    assert_eq!(post1.state, PostState::Draft.to_string());
+    assert_eq!(post1.title, "title");
+    assert_eq!(post1.description, "description");
+    assert_eq!(post1.tags, " tags two ");
 }

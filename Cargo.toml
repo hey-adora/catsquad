@@ -1,7 +1,7 @@
 
 [workspace]
 resolver = "2"
-members = ["catsquad-api", "catsquad-client", "catsquad-db", "catsquad-log", "catsquad-web", "catsquad-shared"]
+members = ["catsquad-api", "catsquad-client", "catsquad-db", "catsquad-log", "catsquad-web", "catsquad-shared", "catsquad-seed"]
 default-members = ["catsquad-api"]
 
 [workspace.dependencies]
@@ -49,6 +49,10 @@ serde_json = { version = "1.0.151" }
 tokio-util = "0.7.18"
 thiserror = { version = "2.0.12" }
 rand = "0.9.1"
+
+ab_glyph = "0.2.31"
+clap = "4.5.45"
+imageproc = "0.25.0"
 
 # chromiumoxide = "0.9.1"
 leptos_axum = { version = "0.8.8" }

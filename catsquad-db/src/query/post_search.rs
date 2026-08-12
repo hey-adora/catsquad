@@ -29,7 +29,15 @@ impl Db {
 
         let tags = tags.to_lowercase();
         let tags = tags.split_whitespace();
-        let tags = tags.map(|v| v.to_string()).collect::<Vec<String>>();
+        let tags = tags
+            .map(|v| {
+                let mut tag = String::new();
+                tag.push(' ');
+                tag.push_str(v);
+                tag.push(' ');
+                tag
+            })
+            .collect::<Vec<String>>();
 
         let q_tags = if tags.len() > 0 {
             "tags CONTAINSALL $tags"
@@ -337,4 +345,18 @@ async fn test_post_search() {
         .unwrap();
     assert_eq!(result.len(), 1);
     assert_eq!(&result[0].title, "2");
+
+    let result = db
+        .post_search(
+            PostState::Active,
+            "tw",
+            String::new(),
+            1,
+            3,
+            TimeRange::More,
+            Order::OneTwoThree,
+        )
+        .await
+        .unwrap();
+    assert_eq!(result.len(), 0);
 }

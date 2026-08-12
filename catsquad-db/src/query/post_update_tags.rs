@@ -3,6 +3,7 @@ use surrealdb::types::{RecordId, RecordIdKey};
 
 use crate::{
     Db, DbPost, SurrealCheckUtils, SurrealErrUtils, SurrealSerializeUtils, create_post_id,
+    proccess_tags,
 };
 
 #[derive(Debug, thiserror::Error, PartialEq)]
@@ -29,6 +30,7 @@ impl Db {
         new_tags: impl Into<String>,
     ) -> Result<DbPost, DbPostUpdateTagsErr> {
         let post_id = create_post_id(post_key);
+        let tags = proccess_tags(new_tags);
 
         let query = r#"
                     BEGIN TRANSACTION;
@@ -59,7 +61,7 @@ impl Db {
             .bind(("time", time))
             .bind(("user_id", user_id))
             .bind(("post_id", post_id))
-            .bind(("new_tags", new_tags.into()))
+            .bind(("new_tags", tags))
             .await
             .check_better(|err| match err {
                 err if err.thrown("user not found") => DbPostUpdateTagsErr::UserNotFound,
@@ -100,10 +102,10 @@ async fn test_post_update_tags() {
     assert_eq!(post1.title, "title1");
 
     let post1 = db
-        .post_update_tags(0, user.id.clone(), post1.id.key.clone(), "tags2")
+        .post_update_tags(0, user.id.clone(), post1.id.key.clone(), " tags2   Tag3")
         .await
         .unwrap();
-    assert_eq!(post1.tags, "tags2");
+    assert_eq!(post1.tags, " tags2 tag3 ");
 
     let result = db
         .post_update_tags(0, create_user_id("invalid"), post1.id.key.clone(), "tags2")

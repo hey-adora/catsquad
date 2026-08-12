@@ -1,0 +1,17 @@
+[package]
+name = "catsquad-seed"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+catsquad-shared = { workspace = true }
+catsquad-client = { workspace = true, features = ["reqwest"] }
+catsquad-log = { workspace = true }
+tokio = { workspace = true, features = ["macros", "rt-multi-thread", "fs"] }
+rand = { workspace = true }
+image = { workspace = true }
+http = { workspace = true }
+ab_glyph = { workspace = true }
+clap = { workspace = true }
+imageproc = { workspace = true }
+

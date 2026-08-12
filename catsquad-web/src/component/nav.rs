@@ -1,8 +1,8 @@
 use catsquad_log::prelude::*;
-use catsquad_shared::{LINK_WEB_INDEX, LINK_WEB_LOGIN};
+use catsquad_shared::{LINK_WEB_INDEX, LINK_WEB_LOGIN, link_relative_index_search};
 use leptos::{html, prelude::*};
-use leptos_router::hooks::use_navigate;
-use web_sys::SubmitEvent;
+use leptos_router::hooks::{query_signal, use_navigate};
+use web_sys::{HtmlDivElement, KeyboardEvent, SubmitEvent};
 
 use crate::{PageState, hook::Spawner, page::create_client};
 
@@ -11,6 +11,7 @@ pub fn Nav() -> impl IntoView {
     let page_state = PageState::get();
     let search_input = NodeRef::<html::Div>::new();
     let navigate = use_navigate();
+    let (get_query_tags, set_query_tags) = query_signal::<String>("tags");
 
     // let on_login = move |_| {
     //     // let
@@ -22,6 +23,42 @@ pub fn Nav() -> impl IntoView {
         //
     };
 
+    let on_enter = move |e: KeyboardEvent| {
+        let key = e.key();
+        trace!("key pressed {key}");
+        if key.to_lowercase() != "enter" {
+            return;
+        }
+        e.prevent_default();
+
+        let search_text = search_input
+            .get_untracked()
+            .and_then(|v: HtmlDivElement| v.text_content())
+            .unwrap_or_default();
+
+        if search_text.is_empty() {
+            navigate(LINK_WEB_INDEX, Default::default());
+            // None
+        } else {
+            navigate(&link_relative_index_search(search_text), Default::default());
+            // Some(search_text)
+        }
+    };
+
+    Effect::new(move || {
+        let (Some(search_elm), val): (Option<HtmlDivElement>, Option<String>) =
+            (search_input.get(), get_query_tags.get())
+        else {
+            return;
+        };
+        if let Some(v) = val {
+            search_elm.set_text_content(Some(&v));
+        } else {
+            search_elm.set_text_content(None);
+        }
+        // let val = ;
+    });
+
     view! {
         <nav class="text-gray-200 flex gap-2 px-4 h-[3rem] items-center justify-between">
             <a id="banner" href=LINK_WEB_INDEX class="font-lucky font-black text-[1.3rem]">
@@ -30,9 +67,9 @@ pub fn Nav() -> impl IntoView {
             <div contenteditable=true
                  id="search"
                  node_ref=search_input
-                 //on:keydown=on_enter
+                 on:keydown=on_enter
                  class={move || format!("w-full rounded text-[1rem] px-[0.8rem] py-[0.2rem] text-base05 bg-base01")}>
-                 //{move || get_query_tags.get()}
+                 {move || get_query_tags.get()}
             </div>
             <div class=move||format!("{}", if page_state.acc_pending() { "" } else { "hidden" })>
                 <p>"loading..."</p>

@@ -154,7 +154,7 @@ test("scroll_save_position", async ({ page }) => {
     .first()
     .evaluate((elm) => elm.getBoundingClientRect().y);
   let gallery = page.locator('[id="gallery"]');
-  let offset = 1;
+  let offset = -5;
   let scroll_iter_index = 0;
 
 

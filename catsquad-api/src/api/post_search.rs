@@ -5,7 +5,7 @@ use axum::{
     response::IntoResponse,
 };
 use catsquad_db::{DbPost, DbPostSearchErr};
-use catsquad_shared::{PostRes, PostSearchErr, PostSearchParams, PostState};
+use catsquad_shared::{Order, PostRes, PostSearchErr, PostSearchParams, PostState, TimeRange};
 
 use crate::{api::post_add::from_db_post, state::AppState};
 
@@ -42,18 +42,19 @@ pub async fn post_search(
     State(app): State<AppState>,
     Query(req): Query<PostSearchParams>,
 ) -> impl IntoResponse {
+    let tags = req.tags.unwrap_or_default();
+    let username = req.username.unwrap_or_default();
+    let time = req
+        .time
+        .map(|v| u128::from_str_radix(&v, 10).unwrap_or_default())
+        .unwrap_or_default();
+    let limit = req.limit.unwrap_or(50);
+    let range = req.range.unwrap_or(TimeRange::MoreOrEqual);
+    let order = req.order.unwrap_or(Order::ThreeTwoOne);
     let inner = async || -> Result<Vec<PostRes>, PostSearchErr> {
         let posts = app
             .db
-            .post_search(
-                PostState::Active,
-                req.tags,
-                req.username,
-                req.time,
-                req.limit,
-                req.range,
-                req.order,
-            )
+            .post_search(PostState::Active, tags, username, time, limit, range, order)
             .await
             .map_err(from_db_post_search_err)?;
 

@@ -123,8 +123,35 @@ async fn test_post_add() {
     let password = "1nnerogGeron@@$";
     let (user, session_key) = server.user_add_full("hey", email, password).await;
 
-    let result = server
-        .post_add("title1", "description1", "tags1", session_key)
+    server.state.set_time(1).await;
+
+    let post1 = server
+        .post_add("title1", "description1", "tags1", &session_key)
         .await
         .unwrap();
+
+    assert_eq!(post1.created_at, 1);
+
+    let post1 = server
+        .post_update_state(post1.key.clone(), PostState::Active, &session_key)
+        .await
+        .unwrap();
+
+    assert_eq!(post1.created_at, 1);
+
+    server.state.set_time(2).await;
+
+    let post2 = server
+        .post_add("title2", "description2", "tags2", &session_key)
+        .await
+        .unwrap();
+
+    assert_eq!(post2.created_at, 2);
+
+    let post2 = server
+        .post_update_state(post2.key.clone(), PostState::Active, &session_key)
+        .await
+        .unwrap();
+
+    assert_eq!(post2.created_at, 2);
 }

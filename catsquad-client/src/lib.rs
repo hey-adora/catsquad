@@ -266,6 +266,12 @@ impl From<String> for SchrodingersFile {
     }
 }
 
+impl From<&str> for SchrodingersFile {
+    fn from(value: &str) -> Self {
+        SchrodingersFile::FilePath(value.to_string())
+    }
+}
+
 pub trait Response {
     fn get_status(&self) -> StatusCode;
     fn get_headers(&self) -> HeaderMap;
@@ -827,12 +833,12 @@ where
         order: Order,
     ) -> Builder<TSender, Vec<cs::PostRes>, cs::PostSearchErr> {
         self.get(link_relative_post_search(cs::PostSearchParams {
-            time,
-            range,
-            order,
-            limit,
-            tags: tags.into(),
-            username: username.into(),
+            time: Some(time.to_string()),
+            range: Some(range),
+            order: Some(order),
+            limit: Some(limit),
+            tags: Some(tags.into()),
+            username: Some(username.into()),
         }))
     }
 

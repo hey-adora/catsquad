@@ -69,3 +69,20 @@ fn serde_to_u128<'de, D: serde::Deserializer<'de>>(deserializer: D) -> Result<u1
     use serde::Deserialize;
     String::deserialize(deserializer).map(|v| u128::from_str_radix(&v, 10).unwrap_or_default())
 }
+
+fn serde_from_option_u128<S: serde::Serializer>(
+    v: &Option<u128>,
+    serializer: S,
+) -> Result<S::Ok, S::Error> {
+    use serde::Serialize;
+    let v = v.map(|v| v.to_string());
+    v.serialize(serializer)
+}
+
+fn serde_to_option_u128<'de, D: serde::Deserializer<'de>>(
+    deserializer: D,
+) -> Result<Option<u128>, D::Error> {
+    use serde::Deserialize;
+    <Option<String>>::deserialize(deserializer)
+        .map(|v| v.map(|v| u128::from_str_radix(&v, 10).unwrap_or_default()))
+}

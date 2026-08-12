@@ -3,8 +3,8 @@ import { test, expect } from "@playwright/test";
 export let login = async (page)=>{
   await page.goto("http://localhost:3000/login");
 
-  await page.locator('[id="email"]').fill("prime3@heyadora.com");
-  await page.locator('[id="password"]').fill("A5%prime3@heyadora.com");
+  await page.locator('[id="email"]').fill("prime1@heyadora.com");
+  await page.locator('[id="password"]').fill("A5%prime1@heyadora.com");
   await page.locator('[id="login_btn"]').click();
 };
 

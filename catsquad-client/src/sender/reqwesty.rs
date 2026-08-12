@@ -63,7 +63,7 @@ impl Sender for ReqwestSender {
 
         let path = origin.join(&path).unwrap();
         // let path = gen_url(path);
-        debug!("CLIENT SEND POST\n{}\n{:#?}", path, body);
+        // debug!("CLIENT SEND POST\n{}\n{:#?}", path, body);
         let inner = async || -> Result<reqwest::Response, Error> {
             let builder = match method {
                 Method::Post => reqwest::Client::new().post(path.clone()),
