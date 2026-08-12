@@ -386,6 +386,24 @@ pub fn Post() -> impl IntoView {
         });
     };
 
+    let upload_image = NodeRef::<html::Input>::new();
+    let on_upload = move |_| {
+        let (Some(files),): (Option<Vec<web_sys::File>>,) = (
+            (upload_image.get_untracked())
+                .and_then(|f: HtmlInputElement| f.files())
+                .map(|f| f.get_files()),
+            // upload_title.get_untracked() as Option<HtmlInputElement>,
+            // upload_description.get_untracked() as Option<HtmlTextAreaElement>,
+            // upload_tags.get_untracked() as Option<HtmlTextAreaElement>,
+        ) else {
+            return;
+        };
+
+        // uploader.upload(&files[..]);
+
+        trace!("files selected: {}", files.len());
+    };
+
     let previews = move || {
         let mut imgs = post_api.imgs_links.get();
 
@@ -410,16 +428,15 @@ pub fn Post() -> impl IntoView {
             // let id = format!("#id{i}");
             // let id2 = id.clone();
 
-            view! { <button
-                    id="previw_add"
-                    // href=id2
-                    class=move ||  {
-                        let hash = location.hash.get();
-                        trace!("hash: {hash}");
-                        format!("text-[2rem] grid place-items-center h-[5rem] w-[5rem] rounded-xl bg-base05/10 bg-cover bg-center border-2 border-base05")
-                    }
-                    // style:background-image=move || format!("url(\"{url}\")")
-                    >"+"</button>
+            view! {
+                <div>
+                    <label
+                        id="previw_add"
+                        for="image"
+                        class="text-[2rem] grid place-items-center h-[5rem] w-[5rem] rounded-xl bg-base05/10 bg-cover bg-center border-2 border-base05"
+                        >"+"</label>
+                    <input class="absolute z-[-1] opacity-0" on:change=on_upload type="file" id="image" name="image" node_ref=upload_image multiple />
+                </div>
             }
         };
 
@@ -439,23 +456,6 @@ pub fn Post() -> impl IntoView {
     };
 
     // let uploader = FileUpload::new();
-    let upload_image = NodeRef::<html::Input>::new();
-    let on_upload = move |_| {
-        let (Some(files),): (Option<Vec<web_sys::File>>,) = (
-            (upload_image.get_untracked())
-                .and_then(|f: HtmlInputElement| f.files())
-                .map(|f| f.get_files()),
-            // upload_title.get_untracked() as Option<HtmlInputElement>,
-            // upload_description.get_untracked() as Option<HtmlTextAreaElement>,
-            // upload_tags.get_untracked() as Option<HtmlTextAreaElement>,
-        ) else {
-            return;
-        };
-
-        // uploader.upload(&files[..]);
-
-        trace!("files selected: {}", files.len());
-    };
 
     // let show_favorite_btn = move || -> bool {
     //     global_state.is_logged_in().unwrap_or_default() && post
@@ -481,7 +481,7 @@ pub fn Post() -> impl IntoView {
                 let state = post_api.post_state.get();
                 state.is_normal() || state.is_loading()
             } >
-                <div class=move || format!("flex flex-col lg:grid grid-cols-[2fr_1fr] grid-cols-[2fr_1fr] lg:max-h-[calc(100vh-3rem)] gap-2  md:gap-6 flex")>
+                <div class=move || format!("flex flex-col lg:grid grid-rows-[auto_1fr] grid-cols-[2fr_1fr] lg:max-h-[calc(100vh-3rem)] gap-2  md:gap-6")>
                     <div class="col-span-2 flex justify-between px-4 md:px-6 ">
                         <div></div>
                         <div>
@@ -501,10 +501,6 @@ pub fn Post() -> impl IntoView {
                             { previews }
                         </div>
 
-                        <div>
-                            <input on:change=on_upload type="file" id="image" name="image" node_ref=upload_image multiple />
-                            // <input on:change=on_file_change type="file" id="image" name="image" node_ref=upload_image multiple />
-                        </div>
 
 
                         <div class="flex flex-col gap-2">
@@ -695,7 +691,7 @@ pub fn Post() -> impl IntoView {
                                 </Show>
                              </div>
                         </div>
-                        <div  class="flex flex-col gap-2 md:gap-4 justify-between mt-4 pb-1">
+                        <div class="flex flex-col gap-2 md:gap-4 justify-between mt-4 pb-[7rem]">
                             <h1 class="text-[1.3rem] text-base0F ">"Comments"</h1>
                             <div class=move || format!( "bg-base01 rounded-xl grid place-items-center py-5 px-2 {}", if  global_state.acc_pending() { "" } else { "hidden" })>
                                 <div class="flex flex-col gap-2">
