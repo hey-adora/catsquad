@@ -17,7 +17,7 @@ pub fn BtnSecondary(
     let class_fn = move || class.map(|v| v.run(())).unwrap_or_default();
 
     view! {
-        <button id=id_fn  on:click=on_click_handler class=format!("text-center rounded-xl font-medium text-[1rem] font-bold px-[1rem] pt-[0.1rem] hover:bg-base0D bg-base03 text-base05 {}", class_fn())>
+        <button id=id_fn  on:click=on_click_handler class=format!("text-center rounded-xl font-medium text-[1rem] leading-[1rem] font-bold px-[1rem] py-[0.5rem] hover:bg-base0D bg-base03 text-base05 {}", class_fn())>
             {children()}
         </button>
     }

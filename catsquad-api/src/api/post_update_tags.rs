@@ -84,7 +84,7 @@ async fn test_post_update_tags() {
 
     let post1 = server
         .client
-        .post_update_tags(post1.key.clone(), "tags2")
+        .post_update_tags(post1.key.clone(), "     tagS2")
         .header_add(header::COOKIE, create_auth_cookie_str(session_key1.clone()))
         .send()
         .await
@@ -92,7 +92,7 @@ async fn test_post_update_tags() {
         .await
         .unwrap();
 
-    assert_eq!(post1.tags, "tags2");
+    assert_eq!(post1.tags, " tags2 ");
 
     let result = server
         .client

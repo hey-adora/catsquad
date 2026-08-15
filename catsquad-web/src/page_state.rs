@@ -53,6 +53,20 @@ impl PageState {
             .unwrap_or("error".to_string())
     }
 
+    pub fn acc_username_set(&self, new_username: impl Into<String>) {
+        self.acc.update(|v| {
+            if let Some(v) = v.as_mut() {
+                v.username = new_username.into();
+            }
+        });
+    }
+
+    pub fn acc_email(&self) -> String {
+        self.acc
+            .with(|v| v.as_ref().map(|v| v.email.clone()))
+            .unwrap_or("error".to_string())
+    }
+
     pub fn user_key(&self) -> String {
         self.acc
             .with(|acc| acc.as_ref().map(|acc| acc.key.clone()))

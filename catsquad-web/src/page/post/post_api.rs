@@ -479,15 +479,17 @@ pub mod tests {
         assert!(post_api.err_tags.get_untracked().is_empty());
         assert_eq!(post_api.live_tags_length.get_untracked(), 0);
 
-        post_api.update_tags(&app.client, &post_key, "one").await;
-        assert_eq!(post_api.tags.get_untracked(), "one");
+        post_api
+            .update_tags(&app.client, &post_key, "oNe     ")
+            .await;
+        assert_eq!(post_api.tags.get_untracked(), " one ");
         assert_eq!(post_api.update_tags_mode.get_untracked(), false);
-        assert_eq!(post_api.live_tags_length.get_untracked(), 3);
+        assert_eq!(post_api.live_tags_length.get_untracked(), 5);
 
         let post_api = PostApi::new();
         post_api.get(&app.client, &post_key).await;
-        assert_eq!(post_api.tags.get_untracked(), "one");
-        assert_eq!(post_api.live_tags_length.get_untracked(), 3);
+        assert_eq!(post_api.tags.get_untracked(), " one ");
+        assert_eq!(post_api.live_tags_length.get_untracked(), 5);
 
         // let items = gallery_api.items.get_untracked();
         // assert_eq!(items.len(), 1);

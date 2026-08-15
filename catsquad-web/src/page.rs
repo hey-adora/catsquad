@@ -15,12 +15,14 @@ mod index;
 mod login;
 mod post;
 mod register;
+mod settings;
 mod upload;
 
 use index::Index as PageIndex;
 use login::Login as PageLogin;
 use post::Post as PagePost;
 use register::Register as PageRegister;
+use settings::Settings as PageSettings;
 use upload::Upload as PageUpload;
 
 use crate::PageState;
@@ -58,6 +60,7 @@ pub fn App() -> impl IntoView {
             <ProtectedRoute path=path!("/login") condition=move||page.is_logged_in().map(|v|!v) redirect_path=move||"/" view=PageLogin />
             <ProtectedRoute path=path!("/register") condition=move||page.is_logged_in().map(|v|!v) redirect_path=move||"/" view=PageRegister />
             <ProtectedRoute path=path!("/upload") condition=move||page.is_logged_in().map(|v|v) redirect_path=move||"/" view=PageUpload />
+            <ProtectedRoute path=path!("/settings") condition=move||page.is_logged_in().map(|v|v) redirect_path=move||"/" view=PageSettings />
         </Routes>
       </Router>
     }
