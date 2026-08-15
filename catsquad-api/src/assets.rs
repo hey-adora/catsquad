@@ -14,7 +14,7 @@ pub struct Assets {
 }
 
 impl Assets {
-    pub async fn new(assets_path: impl AsRef<str>) -> Self {
+    pub async fn new(assets_path: impl AsRef<Path>) -> Self {
         let assets_path = assets_path.as_ref();
 
         let read_file = async |file_name: &str| {

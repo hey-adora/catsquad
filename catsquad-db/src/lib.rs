@@ -77,7 +77,7 @@ impl Db {
         migrate(time, &db).await;
         db
     }
-    pub async fn local(time: u128, database_path: impl AsRef<str>) -> Self {
+    pub async fn local(time: u128, database_path: impl AsRef<std::path::Path>) -> Self {
         let db = Surreal::new::<SurrealKv>(database_path.as_ref())
             .await
             .unwrap();

@@ -5,6 +5,7 @@ pub mod display;
 pub mod error_general;
 pub mod errors;
 pub mod length_counter;
+pub mod link_primary;
 pub mod link_secondary;
 pub mod nav;
 pub mod svgs;

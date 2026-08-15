@@ -3,13 +3,17 @@ use std::time::Duration;
 
 use catsquad_client::{Client, Response, Sender};
 use catsquad_log::prelude::*;
-use catsquad_shared::LINK_WEB_SETTINGS;
+use catsquad_shared::{EmailChangeRes, LINK_WEB_SETTINGS};
 use catsquad_web_utils::prelude::*;
 use leptos::html;
 use leptos::{prelude::*, task::spawn_local};
 use leptos_router::params::Params;
 use leptos_router::{NavigateOptions, hooks::use_query};
 use web_sys::{HtmlInputElement, SubmitEvent};
+
+// pub enum EmailState {
+
+// }
 
 pub struct EmailChangeState<TSender>
 where
@@ -18,7 +22,7 @@ where
 {
     // pub state: RwSignal<FormState>,
     // pub token: RwSignal<String>,
-    pub email_change_key: RwSignal<String>,
+    // pub email_change_key: RwSignal<String>,
     pub err_general: RwSignal<String>,
     pub client: StoredValue<Client<TSender>, LocalStorage>,
 }
@@ -32,7 +36,7 @@ where
         Self {
             client: self.client.clone(),
             // token: self.token.clone(),
-            email_change_key: self.email_change_key.clone(),
+            // email_change_key: self.email_change_key.clone(),
             err_general: self.err_general.clone(),
             // state: self.state.clone(),
         }
@@ -80,11 +84,11 @@ where
     TSender: Sender + Debug + Clone + 'static,
     TSender::TResponse: Response + Debug,
 {
-    pub fn new(client: Client<TSender>, email_change_token: impl Into<String>) -> Self {
+    pub fn new(client: Client<TSender>) -> Self {
         Self {
             // state: RwSignal::new(FormState::Loading),
             // token: RwSignal::new(String::new()),
-            email_change_key: RwSignal::new(email_change_token.into()),
+            // email_change_key: RwSignal::new(email_change_token.into()),
             err_general: RwSignal::new(String::new()),
             client: StoredValue::new_local(client),
         }
@@ -98,98 +102,100 @@ where
     //     self.token.set(token.into());
     // }
 
-    pub async fn current_add(&self) {
+    pub async fn current_add(&self) -> Option<EmailChangeRes> {
         let client = self.client.get_value();
         let result = client.email_change_add().send().await.into_json().await;
         match result {
             Ok(v) => {
-                self.email_change_key.set(v.key.clone());
+                return Some(v);
             }
             Err(err) => {
                 self.err_general.set(err.to_string());
             }
         }
-    }
 
-    pub async fn current_confirm(&self, token: impl Into<String>) {
-        let client = self.client.get_value();
-        let token = token.into();
-        let email_change_key = self.email_change_key.get_untracked();
-        let result = client
-            .email_change_update_current_confirm(email_change_key, token)
-            .send()
-            .await
-            .into_json()
-            .await;
-        match result {
-            Ok(v) => {
-                // v.
-                // self.email_change_key.set(v.key.clone());
-            }
-            Err(err) => {
-                self.err_general.set(err.to_string());
-            }
-        }
+        None
     }
+    // , email_change_token: impl Into<String>
+    // pub async fn current_confirm(&self, token: impl Into<String>) {
+    //     let client = self.client.get_value();
+    //     let token = token.into();
+    //     let email_change_key = self.email_change_key.get_untracked();
+    //     let result = client
+    //         .email_change_update_current_confirm(email_change_key, token)
+    //         .send()
+    //         .await
+    //         .into_json()
+    //         .await;
+    //     match result {
+    //         Ok(v) => {
+    //             // v.
+    //             // self.email_change_key.set(v.key.clone());
+    //         }
+    //         Err(err) => {
+    //             self.err_general.set(err.to_string());
+    //         }
+    //     }
+    // }
 
-    pub async fn new_add(&self, new_email: impl Into<String>) {
-        let client = self.client.get_value();
-        let new_email = new_email.into();
-        let email_change_key = self.email_change_key.get_untracked();
-        let result = client
-            .email_change_update_new_add(email_change_key, new_email)
-            .send()
-            .await
-            .into_json()
-            .await;
-        match result {
-            Ok(v) => {
-                // self.email_change_key.set(v.key.clone());
-            }
-            Err(err) => {
-                self.err_general.set(err.to_string());
-            }
-        }
-    }
+    // pub async fn new_add(&self, new_email: impl Into<String>) {
+    //     let client = self.client.get_value();
+    //     let new_email = new_email.into();
+    //     let email_change_key = self.email_change_key.get_untracked();
+    //     let result = client
+    //         .email_change_update_new_add(email_change_key, new_email)
+    //         .send()
+    //         .await
+    //         .into_json()
+    //         .await;
+    //     match result {
+    //         Ok(v) => {
+    //             // self.email_change_key.set(v.key.clone());
+    //         }
+    //         Err(err) => {
+    //             self.err_general.set(err.to_string());
+    //         }
+    //     }
+    // }
 
-    pub async fn new_confirm(&self, token: impl Into<String>) {
-        let client = self.client.get_value();
-        let token = token.into();
-        let email_change_key = self.email_change_key.get_untracked();
-        let result = client
-            .email_change_update_new_confirm(email_change_key, token)
-            .send()
-            .await
-            .into_json()
-            .await;
-        match result {
-            Ok(v) => {
-                // self.email_change_key.set(v.key.clone());
-            }
-            Err(err) => {
-                self.err_general.set(err.to_string());
-            }
-        }
-    }
+    // pub async fn new_confirm(&self, token: impl Into<String>) {
+    //     let client = self.client.get_value();
+    //     let token = token.into();
+    //     let email_change_key = self.email_change_key.get_untracked();
+    //     let result = client
+    //         .email_change_update_new_confirm(email_change_key, token)
+    //         .send()
+    //         .await
+    //         .into_json()
+    //         .await;
+    //     match result {
+    //         Ok(v) => {
+    //             // self.email_change_key.set(v.key.clone());
+    //         }
+    //         Err(err) => {
+    //             self.err_general.set(err.to_string());
+    //         }
+    //     }
+    // }
 
-    pub async fn finish(&self) {
-        let client = self.client.get_value();
-        let email_change_key = self.email_change_key.get_untracked();
-        let result = client
-            .email_change_update_finish(email_change_key)
-            .send()
-            .await
-            .into_json()
-            .await;
-        match result {
-            Ok(v) => {
-                // self.email_change_key.set(v.key.clone());
-            }
-            Err(err) => {
-                self.err_general.set(err.to_string());
-            }
-        }
-    }
+    // pub async fn finish(&self) {
+    //     let client = self.client.get_value();
+    //     let email_change_key = self.email_change_key.get_untracked();
+    //     let result = client
+    //         .email_change_update_finish(email_change_key)
+    //         .send()
+    //         .await
+    //         .into_json()
+    //         .await;
+    //     match result {
+    //         Ok(v) => {
+    //             // self.email_change_key.set(v.key.clone());
+    //         }
+    //         Err(err) => {
+    //             self.err_general.set(err.to_string());
+    //         }
+    //     }
+    // }
 
     // pub async fn next(&self) {
     //     let client = self.client.get_value();

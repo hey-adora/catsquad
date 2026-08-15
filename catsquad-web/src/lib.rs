@@ -14,6 +14,7 @@ pub use component::display::Display;
 pub use component::error_general::ErrGeneral;
 pub use component::errors::Errs;
 pub use component::length_counter::LengthCounter;
+pub use component::link_primary::LinkPrimary;
 pub use component::link_secondary::LinkSecondary;
 pub use component::nav::Nav;
 pub use component::svgs::*;

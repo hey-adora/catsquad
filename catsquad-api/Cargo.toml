@@ -28,6 +28,7 @@ futures-util = { workspace = true }
 tower= { workspace = true, features = ["util"], optional = true }
 axum-test = { workspace = true , optional = true } 
 catsquad-client = { workspace = true, features = ["axum_test"], optional = true }
+url = { workspace = true }
 # tower-http = { workspace = true }
 # tower= { workspace = true, features = ["timeout", "util"] }
 

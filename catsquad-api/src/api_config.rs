@@ -6,19 +6,20 @@ use std::{
 
 use catsquad_log::prelude::*;
 use tokio::fs;
+use url::Url;
 
 #[derive(Clone, PartialEq, Debug)]
 pub struct ApiConfig {
-    pub address: String,
+    pub address: Url,
     pub bind: String,
     pub secret: String,
     pub invite_expiration_ns: u128,
     pub password_change_expiration_ns: u128,
     pub email_change_expiration_ns: u128,
-    pub database_path: String,
-    pub storage_path: String,
-    pub assets_path: String,
-    pub tmp_path: String,
+    pub database_path: PathBuf,
+    pub storage_path: PathBuf,
+    pub assets_path: PathBuf,
+    pub tmp_path: PathBuf,
 }
 
 pub const FIELD_ADDRESS: &'static str = "address";
@@ -52,19 +53,19 @@ impl ApiConfig {
             let tmp_path = tmp_path.into();
 
             if !database_path.is_empty() {
-                conf.database_path = database_path;
+                conf.database_path = PathBuf::from(database_path);
             }
 
             if !storage_path.is_empty() {
-                conf.storage_path = storage_path;
+                conf.storage_path = PathBuf::from(storage_path);
             }
 
             if !assets_path.is_empty() {
-                conf.assets_path = assets_path;
+                conf.assets_path = PathBuf::from(assets_path);
             }
 
             if !tmp_path.is_empty() {
-                conf.tmp_path = tmp_path;
+                conf.tmp_path = PathBuf::from(tmp_path);
             }
 
             conf
@@ -135,10 +136,10 @@ async fn test_api_config_new() {
                              tmp_path: &str| {
         let confa = read_or_create(conf_path, || {
             let mut conf = ApiConfig::default();
-            conf.database_path = db_path.to_string();
-            conf.storage_path = storage_path.to_string();
-            conf.assets_path = assets_path.to_string();
-            conf.tmp_path = tmp_path.to_string();
+            conf.database_path = PathBuf::from(db_path);
+            conf.storage_path = PathBuf::from(storage_path);
+            conf.assets_path = PathBuf::from(assets_path);
+            conf.tmp_path = PathBuf::from(tmp_path);
 
             conf
         })
@@ -172,16 +173,16 @@ async fn test_api_config_new() {
 impl Default for ApiConfig {
     fn default() -> Self {
         Self {
-            address: "http://localhost:3000".to_string(),
+            address: Url::parse("http://localhost:3000").unwrap(),
             bind: "localhost:3000".to_string(),
             secret: "test".to_string(),
             invite_expiration_ns: 1800000000000,
             password_change_expiration_ns: 1800000000000,
             email_change_expiration_ns: 1800000000000,
-            database_path: "target/db".to_string(),
-            storage_path: "target/storage".to_string(),
-            assets_path: "target/dist".to_string(),
-            tmp_path: "target/tmp".to_string(),
+            database_path: PathBuf::from("target/db"),
+            storage_path: PathBuf::from("target/storage"),
+            assets_path: PathBuf::from("target/dist"),
+            tmp_path: PathBuf::from("target/tmp"),
         }
     }
 }
@@ -198,7 +199,7 @@ impl<T: AsRef<str>> From<T> for ApiConfig {
             };
 
             match name {
-                FIELD_ADDRESS => conf.address = value.to_string(),
+                FIELD_ADDRESS => conf.address = Url::parse(value).unwrap(),
                 FIELD_BIND => conf.bind = value.to_string(),
                 FIELD_SECRET => conf.secret = value.to_string(),
                 FIELD_INVITE_EXPIRATION => {
@@ -224,10 +225,10 @@ impl<T: AsRef<str>> From<T> for ApiConfig {
                             continue;
                         }
                 }
-                FIELD_DATABASE_PATH => conf.database_path = value.to_string(),
-                FIELD_STORAGE_PATH => conf.storage_path = value.to_string(),
-                FIELD_ASSETS_PATH => conf.assets_path = value.to_string(),
-                FIELD_TMP_PATH => conf.tmp_path = value.to_string(),
+                FIELD_DATABASE_PATH => conf.database_path = PathBuf::from(value),
+                FIELD_STORAGE_PATH => conf.storage_path = PathBuf::from(value),
+                FIELD_ASSETS_PATH => conf.assets_path = PathBuf::from(value),
+                FIELD_TMP_PATH => conf.tmp_path = PathBuf::from(value),
                 _ => (),
             }
         }
@@ -246,7 +247,7 @@ impl From<&ApiConfig> for String {
             output.push_str(value);
         };
 
-        push(&mut output, FIELD_ADDRESS, &value.address);
+        push(&mut output, FIELD_ADDRESS, value.address.as_str());
         output.push('\n');
         push(&mut output, FIELD_BIND, &value.bind);
         output.push('\n');
@@ -270,13 +271,29 @@ impl From<&ApiConfig> for String {
             &value.password_change_expiration_ns.to_string(),
         );
         output.push('\n');
-        push(&mut output, FIELD_DATABASE_PATH, &value.database_path);
+        push(
+            &mut output,
+            FIELD_DATABASE_PATH,
+            &value.database_path.as_os_str().to_str().unwrap(),
+        );
         output.push('\n');
-        push(&mut output, FIELD_STORAGE_PATH, &value.storage_path);
+        push(
+            &mut output,
+            FIELD_STORAGE_PATH,
+            &value.storage_path.as_os_str().to_str().unwrap(),
+        );
         output.push('\n');
-        push(&mut output, FIELD_ASSETS_PATH, &value.assets_path);
+        push(
+            &mut output,
+            FIELD_ASSETS_PATH,
+            &value.assets_path.as_os_str().to_str().unwrap(),
+        );
         output.push('\n');
-        push(&mut output, FIELD_TMP_PATH, &value.tmp_path);
+        push(
+            &mut output,
+            FIELD_TMP_PATH,
+            &value.tmp_path.as_os_str().to_str().unwrap(),
+        );
 
         output
     }
@@ -297,7 +314,7 @@ impl ToString for ApiConfig {
 #[test]
 fn test_api_config_from_str() {
     let input = format!(
-        "{}=hello\n{}=111\n{}=hello2\n{}=123\n{}=124\n{}=124\n{}=hello3\n{}=tmp\n{}=tmp2\n{}=tmp3",
+        "{}=http://localhost/\n{}=111\n{}=hello2\n{}=123\n{}=124\n{}=124\n{}=hello3\n{}=tmp\n{}=tmp2\n{}=tmp3",
         FIELD_ADDRESS,
         FIELD_BIND,
         FIELD_SECRET,

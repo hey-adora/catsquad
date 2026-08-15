@@ -1,7 +1,8 @@
 use catsquad_db::Db;
 use rand::distr::SampleString;
-use std::sync::Arc;
+use std::{path::PathBuf, sync::Arc};
 use tokio::{fs, sync::RwLock};
+use url::Url;
 
 use crate::{api_config::ApiConfig, assets::Assets, utils::get_time_ns};
 
@@ -42,7 +43,9 @@ impl AppState {
 
     pub async fn local() -> Self {
         let conf = ApiConfig::new("catsquad.conf").await;
-        let assets_path = std::env::var("CATSQUAD_WEB_LIB").unwrap_or(conf.assets_path.clone());
+        let assets_path = std::env::var("CATSQUAD_WEB_LIB")
+            .map(|v| PathBuf::from(v))
+            .unwrap_or(conf.assets_path.clone());
         let assets = Assets::new(&assets_path).await;
         let time = get_time_ns();
         Self {
@@ -72,15 +75,15 @@ impl AppState {
         self.conf.read().await.secret.clone()
     }
 
-    pub async fn get_tmp_path(&self) -> String {
+    pub async fn get_tmp_path(&self) -> PathBuf {
         self.conf.read().await.tmp_path.clone()
     }
 
-    pub async fn get_storage_path(&self) -> String {
+    pub async fn get_storage_path(&self) -> PathBuf {
         self.conf.read().await.storage_path.clone()
     }
 
-    pub async fn get_assets_path(&self) -> String {
+    pub async fn get_assets_path(&self) -> PathBuf {
         self.conf.read().await.assets_path.clone()
     }
 
@@ -100,7 +103,7 @@ impl AppState {
         self.conf.write().await.email_change_expiration_ns = duration;
     }
 
-    pub async fn get_address(&self) -> String {
+    pub async fn get_address(&self) -> Url {
         self.conf.read().await.address.clone()
     }
 

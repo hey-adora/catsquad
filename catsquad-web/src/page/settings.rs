@@ -2,16 +2,18 @@ use std::str::FromStr;
 
 use crate::{BtnPrimary, BtnSecondary, LinkSecondary, Nav, PageState};
 use catsquad_shared::{
-    SettingsPageParams, SettingsPageStage, link_relative_settings_email_change_current_add,
-    link_relative_settings_username_change,
+    EmailCangeStage, SettingsPageParams, SettingsPageStage,
+    link_relative_settings_email_change_current_add, link_relative_settings_username_change,
 };
 use catsquad_web_utils::prelude::*;
 use leptos::prelude::*;
 
+mod email_change_component;
 mod email_change_state;
 mod username_change_component;
 mod username_change_state;
 
+use email_change_component::EmailChange;
 use username_change_component::UsernameChange;
 
 #[component]
@@ -20,22 +22,37 @@ pub fn Settings() -> impl IntoView {
     let username = move || page.acc_username();
     let email = move || page.acc_email();
 
-    let stage = RwQuery::<String>::new(SettingsPageParams::Stage.to_string());
-    let stage = move || {
-        stage
-            .get()
-            .and_then(|v| SettingsPageStage::from_str(&v).ok())
-            .unwrap_or_default()
-    };
+    let stage = RwQuery::<SettingsPageStage>::new(SettingsPageParams::Stage.to_string());
+    let stage = move || stage.get_or_default();
+    // let stage = move || {
+    //     stage
+    //         .get()
+    //         .and_then(|v| SettingsPageStage::from_str(&v).ok())
+    //         .unwrap_or_default()
+    // };
+    let email_stage =
+        RwQuery::<EmailCangeStage>::new(SettingsPageParams::EmailChangeStage.to_string());
+    let email_stage = move || email_stage.get_or_default();
+    // let email_stage = move || {
+    //     email_stage
+    //         .get()
+    //         .and_then(|v| SettingsPageStage::from_str(&v).ok())
+    //         .unwrap_or_default()
+    // };
 
     let link_username_change = move || link_relative_settings_username_change();
+    let link_email_change = move || link_relative_settings_email_change_current_add();
     let when_stage_username_change = move || stage() == SettingsPageStage::UsernameChange;
+    let when_stage_email_change = move || stage() == SettingsPageStage::EmailChange;
 
     view! {
         <main class="relative font-hi text-base05 grid grid-rows-[auto_1fr] gap-4">
             <Nav/>
             <Show when=when_stage_username_change>
                 <UsernameChange/>
+            </Show>
+            <Show when=when_stage_email_change>
+                <EmailChange email_change_stage=email_stage/>
             </Show>
             <div class="px-[2rem] mx-auto max-w-[30rem] w-full">
                 <h1 class="text-[1.5rem] text-base0A font-bold mb-[2rem]">"Settings"</h1>
@@ -53,7 +70,7 @@ pub fn Settings() -> impl IntoView {
                             <div class="flex flex-col gap-2">
                                 <div class="flex justify-between place-items-center">
                                     <p class="text-[1.1rem]">"Email"</p>
-                                    <BtnSecondary>"Edit"</BtnSecondary>
+                                    <LinkSecondary link=link_email_change>"Edit"</LinkSecondary>
                                 </div>
                                 <input type="email" class="rounded-xl bg-base01 px-2 py-1 text-base0B" value=email/>
                             </div>

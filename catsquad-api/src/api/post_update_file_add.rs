@@ -92,8 +92,8 @@ pub struct File {
 
 pub async fn parse_multipart(
     mut multipart: Multipart,
-    storage_path: impl AsRef<str>,
-    tmp_path: impl AsRef<str>,
+    storage_path: impl AsRef<Path>,
+    tmp_path: impl AsRef<Path>,
     max_storage: u64,
     max_storage_per_file: u64,
     mut used_storage: u64,
@@ -218,9 +218,9 @@ pub enum SaveFileErr {
 pub async fn handle_file_saving<S, StreamErr>(
     mut stream: S,
     extension: impl AsRef<str>,
-    save_path: impl AsRef<str>,
+    save_path: impl AsRef<Path>,
     max_storage_per_file: u64,
-    tmp_path: impl AsRef<str>,
+    tmp_path: impl AsRef<Path>,
     // used_storage: usize,
     // max_storage: usize,
 ) -> Result<SavedFile, SaveFileErr>
@@ -232,12 +232,11 @@ where
     use rand::distr::SampleString;
     use std::hash::Hasher;
     let tmp_path = tmp_path.as_ref();
+    let save_path = save_path.as_ref();
     let extension = extension.as_ref();
     let mut tmp_name = rand::distr::Alphanumeric.sample_string(&mut rand::rng(), 16);
     tmp_name.push_str("_upload");
-    let file_path_tmp = Path::new(tmp_path)
-        .join(&tmp_name)
-        .with_extension(extension);
+    let file_path_tmp = tmp_path.join(&tmp_name).with_extension(extension);
     // let file_path_tmp = Path::new("/tmp/").join(&tmp_name).with_extension("part");
     // extension.as_ref()
     let file = fs::File::create(&file_path_tmp).await?;
@@ -268,9 +267,7 @@ where
     trace!("hashing in prod {file_path_tmp:?} = {hash}");
 
     let file_path = {
-        let file_path = Path::new(save_path.as_ref())
-            .join(&hash)
-            .with_extension(extension);
+        let file_path = save_path.join(&hash).with_extension(extension);
         if file_path.exists() {
             trace!("file removed");
             tokio::fs::remove_file(file_path_tmp).await?;
@@ -448,9 +445,7 @@ async fn test_post_update_file_add() {
         let file_path = Path::new(file_path_str);
         let file_extension = file_path.extension().unwrap();
         let hash = get_file_hash_for_testing_by_path(file_path_str).await;
-        let storage_path = Path::new(&storage_path)
-            .join(&hash)
-            .with_extension(file_extension);
+        let storage_path = storage_path.join(&hash).with_extension(file_extension);
         let file_path = storage_path.to_str().unwrap().to_string();
         (hash, PathBuf::from(file_path))
     };
