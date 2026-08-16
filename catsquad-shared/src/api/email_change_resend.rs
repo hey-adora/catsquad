@@ -1,15 +1,14 @@
-pub const LINK_API_EMAIL_CHANGE_UPDATE_NEW_ADD: &str = "/api/email_change_update_new_add";
+pub const LINK_API_EMAIL_CHANGE_RESEND: &str = "/api/email_change_resend";
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
-pub struct EmailChangeUpdateNewAddReq {
+pub struct EmailChangeResendReq {
     pub email_change_key: String,
-    pub new_email: String,
 }
 
 #[derive(
     Default, Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq, thiserror::Error,
 )]
-pub enum EmailChangeUpdateNewAddErr {
+pub enum EmailChangeResendErr {
     #[error("not found")]
     NotFound,
 
@@ -22,14 +21,8 @@ pub enum EmailChangeUpdateNewAddErr {
     #[error("expired")]
     Expired,
 
-    #[error("current email not confirmed")]
-    NotConfirmed,
-
-    #[error("email \"{0}\" already taken")]
-    EmailIsTaken(String),
-
-    #[error("email is invalid")]
-    EmailIsInvalid(String),
+    #[error("email change is not in email confirmation state")]
+    NothingToResend,
 
     #[default]
     #[error("internal server err")]

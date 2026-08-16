@@ -61,6 +61,14 @@ impl PageState {
         });
     }
 
+    pub fn acc_email_set(&self, new_email: impl Into<String>) {
+        self.acc.update(|v| {
+            if let Some(v) = v.as_mut() {
+                v.email = new_email.into();
+            }
+        });
+    }
+
     pub fn acc_email(&self) -> String {
         self.acc
             .with(|v| v.as_ref().map(|v| v.email.clone()))

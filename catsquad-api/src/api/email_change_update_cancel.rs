@@ -99,7 +99,7 @@ async fn test_email_chang_updatee_cancel() {
         let email_change = server.email_change_add(&session_key).await.unwrap();
 
         let current_token = server
-            .email_change_get_current_token(email_change.key.clone())
+            .email_change_get_current_token(0, &user1, email_change.key.clone())
             .await;
 
         let email_change = server
@@ -121,7 +121,7 @@ async fn test_email_chang_updatee_cancel() {
             .unwrap();
 
         let new_token = server
-            .email_change_get_new_token(email_change.key.clone())
+            .email_change_get_new_token(0, &user1, email_change.key.clone())
             .await;
 
         let email_change = server

@@ -19,7 +19,7 @@ pub async fn user_get_by_session_token(db_user: Extension<DbUser>) -> impl IntoR
     (status_code, Json(result))
 }
 
-#[cfg(test)]
+#[cfg(any(test, feature = "test_server"))]
 mod test_utils {
     use axum::http::header;
     use catsquad_shared as cs;

@@ -1,9 +1,15 @@
+use std::fmt::Display;
+
 use axum::{Extension, Form, Json, extract::State, http::StatusCode, response::IntoResponse};
 use catsquad_db::{
     DbEmailChange, DbEmailChangeAddErr, DbEmailChangeToken, DbEmailSentReason, DbUser, id_to_string,
 };
 use catsquad_log::prelude::*;
-use catsquad_shared::{EmailChangeAddErr, EmailChangeRes, EmailChangeToken};
+use catsquad_shared::{
+    EmailChangeAddErr, EmailChangeRes, EmailChangeToken,
+    link_absolute_settings_email_change_current_confirm,
+};
+use url::Url;
 
 use crate::state::AppState;
 
@@ -42,14 +48,17 @@ pub fn status_code(result: &Result<EmailChangeRes, EmailChangeAddErr>) -> Status
 }
 
 pub fn send_email_email_change_add(
-    address: impl Into<String>,
-    email_change_key: impl Into<String>,
-    token: impl Into<String>,
+    address: Url,
+    email_change_key: impl Display,
+    token: impl Display,
 ) -> String {
     // let link = link_absolute_reg_finish(address, token);
-    let link = "placeholder change".to_string();
-    debug!("EMAIL SENT {link}");
-    link
+    // let link = "placeholder change".to_string();
+    let link =
+        link_absolute_settings_email_change_current_confirm(address, email_change_key, token)
+            .unwrap();
+    // debug!("EMAIL SENT {link}");
+    link.to_string()
 }
 
 pub async fn email_change_add(
@@ -92,10 +101,11 @@ pub async fn email_change_add(
     (status_code, Json(result))
 }
 
-#[cfg(test)]
+#[cfg(any(test, feature = "test_server"))]
 mod test_utils {
     use crate::{TestServer, auth::create_auth_cookie_str};
     use axum::http::header;
+    use catsquad_db::DbUser;
     use catsquad_shared as cs;
 
     impl TestServer {
@@ -114,11 +124,13 @@ mod test_utils {
 
         pub async fn email_change_get_current_token(
             &self,
+            time: u128,
+            user: &DbUser,
             email_change_key: impl Into<String>,
         ) -> String {
             self.state
                 .db
-                .email_change_get_by_key(email_change_key.into())
+                .email_change_get_by_key(time, user.id.clone(), email_change_key.into())
                 .await
                 .unwrap()
                 .current
@@ -127,11 +139,13 @@ mod test_utils {
 
         pub async fn email_change_get_new_token(
             &self,
+            time: u128,
+            user: &DbUser,
             email_change_key: impl Into<String>,
         ) -> String {
             self.state
                 .db
-                .email_change_get_by_key(email_change_key.into())
+                .email_change_get_by_key(time, user.id.clone(), email_change_key.into())
                 .await
                 .unwrap()
                 .new

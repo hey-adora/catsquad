@@ -11,18 +11,11 @@ use leptos_router::params::Params;
 use leptos_router::{NavigateOptions, hooks::use_query};
 use web_sys::{HtmlInputElement, SubmitEvent};
 
-// pub enum EmailState {
-
-// }
-
 pub struct EmailChangeState<TSender>
 where
     TSender: Sender + Debug + Clone,
     TSender::TResponse: Response + Debug,
 {
-    // pub state: RwSignal<FormState>,
-    // pub token: RwSignal<String>,
-    // pub email_change_key: RwSignal<String>,
     pub err_general: RwSignal<String>,
     pub client: StoredValue<Client<TSender>, LocalStorage>,
 }
@@ -50,35 +43,6 @@ where
 {
 }
 
-// #[derive(
-//     Clone,
-//     Copy,
-//     Debug,
-//     PartialEq,
-//     // PartialOrd,
-//     // Default,
-//     // serde::Serialize,
-//     // serde::Deserialize,
-//     // strum::EnumString,
-//     // strum::EnumIter,
-//     // strum::EnumIs,
-//     // strum::Display,
-// )]
-// #[strum(serialize_all = "lowercase")]
-// pub enum FormState {
-//     // #[default]
-//     Loading,
-//     None,
-//     CurrentSendConfirm,
-//     CurrentClickConfirm,
-//     CurrentConfirm,
-//     NewEnterEmail,
-//     NewClickConfirm,
-//     NewConfirmEmail,
-//     FinalConfirm,
-//     Completed,
-// }
-
 impl<TSender> EmailChangeState<TSender>
 where
     TSender: Sender + Debug + Clone + 'static,
@@ -94,17 +58,110 @@ where
         }
     }
 
-    // pub fn init(&self, state: FormState) {
-    //     self.state.set(state);
-    // }
-
-    // pub fn provide_token(&self, token: impl Into<String>) {
-    //     self.token.set(token.into());
-    // }
-
     pub async fn current_add(&self) -> Option<EmailChangeRes> {
+        self.err_general.update(|v| v.clear());
         let client = self.client.get_value();
         let result = client.email_change_add().send().await.into_json().await;
+        self.handle_result(result)
+    }
+
+    pub async fn current_confirm(
+        &self,
+        email_change_key: impl Into<String>,
+        token: impl Into<String>,
+    ) -> Option<EmailChangeRes> {
+        self.err_general.update(|v| v.clear());
+        let client = self.client.get_value();
+        let token = token.into();
+        let result = client
+            .email_change_update_current_confirm(email_change_key, token)
+            .send()
+            .await
+            .into_json()
+            .await;
+        self.handle_result(result)
+    }
+
+    pub async fn new_add(
+        &self,
+        email_change_key: impl Into<String>,
+        new_email: impl Into<String>,
+    ) -> Option<EmailChangeRes> {
+        self.err_general.update(|v| v.clear());
+        let client = self.client.get_value();
+        let new_email = new_email.into();
+        let result = client
+            .email_change_update_new_add(email_change_key, new_email)
+            .send()
+            .await
+            .into_json()
+            .await;
+
+        self.handle_result(result)
+    }
+
+    pub async fn new_confirm(
+        &self,
+        email_change_key: impl Into<String>,
+        token: impl Into<String>,
+    ) -> Option<EmailChangeRes> {
+        self.err_general.update(|v| v.clear());
+        let client = self.client.get_value();
+        let result = client
+            .email_change_update_new_confirm(email_change_key, token)
+            .send()
+            .await
+            .into_json()
+            .await;
+
+        self.handle_result(result)
+    }
+
+    pub async fn finish(&self, email_change_key: impl Into<String>) -> Option<EmailChangeRes> {
+        self.err_general.update(|v| v.clear());
+        let client = self.client.get_value();
+        let result = client
+            .email_change_update_finish(email_change_key)
+            .send()
+            .await
+            .into_json()
+            .await;
+
+        self.handle_result(result)
+    }
+
+    pub async fn resend(&self, email_change_key: impl Into<String>) -> Option<EmailChangeRes> {
+        self.err_general.update(|v| v.clear());
+        let client = self.client.get_value();
+
+        let result = client
+            .email_change_resend(email_change_key)
+            .send()
+            .await
+            .into_json()
+            .await;
+
+        self.handle_result(result)
+    }
+
+    pub async fn cancel(&self, email_change_key: impl Into<String>) -> Option<EmailChangeRes> {
+        self.err_general.update(|v| v.clear());
+        let client = self.client.get_value();
+
+        let result = client
+            .email_change_update_cancel(email_change_key)
+            .send()
+            .await
+            .into_json()
+            .await;
+
+        self.handle_result(result)
+    }
+
+    pub fn handle_result<E: ToString>(
+        &self,
+        result: Result<EmailChangeRes, E>,
+    ) -> Option<EmailChangeRes> {
         match result {
             Ok(v) => {
                 return Some(v);
@@ -113,147 +170,8 @@ where
                 self.err_general.set(err.to_string());
             }
         }
-
         None
     }
-    // , email_change_token: impl Into<String>
-    // pub async fn current_confirm(&self, token: impl Into<String>) {
-    //     let client = self.client.get_value();
-    //     let token = token.into();
-    //     let email_change_key = self.email_change_key.get_untracked();
-    //     let result = client
-    //         .email_change_update_current_confirm(email_change_key, token)
-    //         .send()
-    //         .await
-    //         .into_json()
-    //         .await;
-    //     match result {
-    //         Ok(v) => {
-    //             // v.
-    //             // self.email_change_key.set(v.key.clone());
-    //         }
-    //         Err(err) => {
-    //             self.err_general.set(err.to_string());
-    //         }
-    //     }
-    // }
-
-    // pub async fn new_add(&self, new_email: impl Into<String>) {
-    //     let client = self.client.get_value();
-    //     let new_email = new_email.into();
-    //     let email_change_key = self.email_change_key.get_untracked();
-    //     let result = client
-    //         .email_change_update_new_add(email_change_key, new_email)
-    //         .send()
-    //         .await
-    //         .into_json()
-    //         .await;
-    //     match result {
-    //         Ok(v) => {
-    //             // self.email_change_key.set(v.key.clone());
-    //         }
-    //         Err(err) => {
-    //             self.err_general.set(err.to_string());
-    //         }
-    //     }
-    // }
-
-    // pub async fn new_confirm(&self, token: impl Into<String>) {
-    //     let client = self.client.get_value();
-    //     let token = token.into();
-    //     let email_change_key = self.email_change_key.get_untracked();
-    //     let result = client
-    //         .email_change_update_new_confirm(email_change_key, token)
-    //         .send()
-    //         .await
-    //         .into_json()
-    //         .await;
-    //     match result {
-    //         Ok(v) => {
-    //             // self.email_change_key.set(v.key.clone());
-    //         }
-    //         Err(err) => {
-    //             self.err_general.set(err.to_string());
-    //         }
-    //     }
-    // }
-
-    // pub async fn finish(&self) {
-    //     let client = self.client.get_value();
-    //     let email_change_key = self.email_change_key.get_untracked();
-    //     let result = client
-    //         .email_change_update_finish(email_change_key)
-    //         .send()
-    //         .await
-    //         .into_json()
-    //         .await;
-    //     match result {
-    //         Ok(v) => {
-    //             // self.email_change_key.set(v.key.clone());
-    //         }
-    //         Err(err) => {
-    //             self.err_general.set(err.to_string());
-    //         }
-    //     }
-    // }
-
-    // pub async fn next(&self) {
-    //     let client = self.client.get_value();
-    //     let state = self.state.get_untracked();
-    //     match state {
-    //         FormState::Loading => {
-    //             //
-    //         }
-    //         FormState::None => {
-    //             //
-    //         }
-    //         FormState::CurrentSendConfirm => {
-    //             self.email_change_key.set(v.key.clone());
-    //             //
-    //         }
-    //         FormState::CurrentClickConfirm => {
-    //             let result = client.email_change_add().send().await.into_json().await;
-    //             match result {
-    //                 Ok(v) => {
-    //                     self.email_change_key.set(v.key.clone());
-    //                     self.state.set(FormState::CurrentClickConfirm);
-    //                 }
-    //                 Err(err) => {
-    //                     self.err_general.set(err.to_string());
-    //                 }
-    //             }
-    //         }
-    //         FormState::CurrentConfirm => {
-    //             let token = self.token.get_untracked();
-    //             let email_email_key = self.email_change_key.get_untracked();
-    //             if email_email_key.is_empty() {
-    //                 self.err_general
-    //                     .set("email_change_key not provided".to_string());
-    //                 return;
-    //             }
-    //             if token.is_empty() {
-    //                 self.err_general.set("token not provided".to_string());
-    //                 return;
-    //             }
-    //             let result = client
-    //                 .email_change_update_current_confirm(email_email_key, token)
-    //                 .send()
-    //                 .await
-    //                 .into_json()
-    //                 .await;
-    //             match result {
-    //                 Ok(v) => {
-    //                     self.state.set(FormState::NewEnterEmail);
-    //                 }
-    //                 Err(err) => {
-    //                     self.err_general.set(err.to_string());
-    //                 }
-    //             }
-    //         }
-    //         _ => todo!("wow"),
-    //     }
-    //     //
-    // }
 }
 
 #[cfg(test)]
@@ -267,7 +185,7 @@ async fn test_email_change_state() {
     let _owner = crate::init_owner();
     let server = catsquad_api::TestServer::new().await;
 
-    let (_user1, session1) = server
+    let (user1, session1) = server
         .user_add_full(
             "prime1",
             "prime1@heyadora.com",
@@ -279,599 +197,72 @@ async fn test_email_change_state() {
         .inject_header(header::COOKIE, create_auth_cookie_str(session1.clone()))
         .await;
 
-    // let email_change = EmailChangeState::new(server.client.clone());
-    // email_change.init(FormState::None);
-    // assert_eq!(email_change.state.get_untracked(), FormState::None);
+    let email_change = EmailChangeState::new(server.client.clone());
 
-    // email_change.next().await;
-    // assert_eq!(
-    //     email_change.state.get_untracked(),
-    //     FormState::CurrentClickConfirm
-    // );
+    let email_change_res = email_change.current_add().await.unwrap();
+    let current_token = server
+        .email_change_get_current_token(0, &user1, email_change_res.key.clone())
+        .await;
+    assert!(email_change.err_general.get_untracked().is_empty());
 
-    // let (_user2, session2) = server
-    //     .user_add_full(
-    //         "prime2",
-    //         "prime2@heyadora.com",
-    //         "235j4t49ngerigrog#IOTNOnfo",
-    //     )
-    //     .await;
+    {
+        let result = email_change
+            .current_confirm(email_change_res.key.clone(), "invalid")
+            .await;
+        assert!(!email_change.err_general.get_untracked().is_empty());
+        assert!(result.is_none());
+    }
 
-    // server
-    //     .inject_header(header::COOKIE, create_auth_cookie_str(session1.clone()))
-    //     .await;
+    let email_change_res = email_change
+        .current_confirm(email_change_res.key.clone(), current_token.clone())
+        .await
+        .unwrap();
+    assert!(email_change.err_general.get_untracked().is_empty());
 
-    // let post1 = server
-    //     .client
-    //     .post_add("", "", "")
-    //     .send()
-    //     .await
-    //     .into_json()
-    //     .await
-    //     .unwrap();
+    {
+        let result = email_change
+            .current_confirm(email_change_res.key.clone(), current_token)
+            .await;
+        assert!(!email_change.err_general.get_untracked().is_empty());
+        assert!(result.is_none());
+    }
 
-    // server
-    //     .client
-    //     .post_update_state(post1.key.clone(), PostState::Active)
-    //     .send()
-    //     .await
-    //     .into_json()
-    //     .await
-    //     .unwrap();
+    {
+        let result = email_change
+            .new_add(email_change_res.key.clone(), "prime2")
+            .await;
+        assert!(!email_change.err_general.get_untracked().is_empty());
+        assert!(result.is_none());
+    }
 
-    // server.remove_header(header::COOKIE).await;
+    let email_change_res = email_change
+        .new_add(email_change_res.key.clone(), "prime2@heyadora.com")
+        .await
+        .unwrap();
 
-    // server
-    //     .inject_header(header::COOKIE, create_auth_cookie_str(session2.clone()))
-    //     .await;
+    let new_token = server
+        .email_change_get_new_token(0, &user1, email_change_res.key.clone())
+        .await;
 
-    // let post_like_state = PostLikeState::new(server.client.clone());
-    // assert_eq!(post_like_state.state.get_untracked(), LikeState::Loading);
-    // post_like_state.init(post1.key.clone()).await;
-    // assert_eq!(post_like_state.state.get_untracked(), LikeState::Unliked);
-    // post_like_state.toggle_like().await;
-    // assert_eq!(post_like_state.state.get_untracked(), LikeState::Liked);
-    // post_like_state.toggle_like().await;
-    // assert_eq!(post_like_state.state.get_untracked(), LikeState::Unliked);
+    {
+        let result = email_change
+            .new_confirm(email_change_res.key.clone(), "invalid")
+            .await;
+
+        assert!(!email_change.err_general.get_untracked().is_empty());
+        assert!(result.is_none());
+    }
+
+    let result = email_change
+        .new_confirm(email_change_res.key.clone(), new_token)
+        .await
+        .unwrap();
+
+    let email_change_res = email_change
+        .finish(email_change_res.key.clone())
+        .await
+        .unwrap();
+
+    let result = server.user_get_by_session_key(&session1).await.unwrap();
+    assert_eq!(result.email, "prime2@heyadora.com");
 }
-// use crate::api::{
-//     Api, ApiWeb, ApiWebTmp, EmailChangeErr, EmailChangeNewErr, EmailChangeStage,
-//     EmailChangeTokenErr, ServerErr, ServerRes,
-// };
-// use crate::path::{
-//     link_settings, link_settings_form_email_completed, link_settings_form_email_current_click,
-//     link_settings_form_email_current_confirm, link_settings_form_email_current_send,
-//     link_settings_form_email_final_confirm, link_settings_form_email_new_click,
-//     link_settings_form_email_new_confirm, link_settings_form_email_new_send,
-// };
-// use crate::valid::auth::proccess_email;
-
-// #[derive(Params, PartialEq, Clone, Default)]
-// pub struct ParamsChangeEmail {
-//     pub old_email: Option<String>,
-//     pub new_email: Option<String>,
-//     pub confirm_token: Option<String>,
-//     pub change_id: Option<String>,
-//     pub email_stage: Option<EmailChangeFormStage>,
-//     pub general_info: Option<String>,
-//     pub stage_error: Option<String>,
-//     pub expires: Option<u128>,
-// }
-
-// impl EmailChangeFormStage {
-//     pub fn link(
-//         &self,
-//         old_email: String,
-//         email_change_id: Option<String>,
-//         token: Option<String>,
-//         new_email: Option<String>,
-//         stage_error: Option<String>,
-//         general_info: Option<String>,
-//         expires: u128,
-//     ) -> Result<String, String> {
-//         let err_token = String::from("missing token");
-//         let err_email = String::from("missing email");
-//         let err_id = String::from("missing id");
-//         let link = match self {
-//             Self::None => LINK_WEB_SETTINGS.to_string(),
-
-//             Self::CurrentSendConfirm => {
-//                 link_settings_form_email_current_send(old_email, stage_error, general_info)
-//             }
-//             Self::CurrentClickConfirm => link_settings_form_email_current_click(
-//                 email_change_id.ok_or(err_id)?,
-//                 expires,
-//                 old_email,
-//                 stage_error,
-//                 general_info,
-//             ),
-//             Self::CurrentConfirm => link_settings_form_email_current_confirm(
-//                 email_change_id.ok_or(err_id)?,
-//                 expires,
-//                 old_email,
-//                 token.ok_or(err_token)?,
-//                 stage_error,
-//                 general_info,
-//             ),
-//             Self::NewEnterEmail => link_settings_form_email_new_send(
-//                 email_change_id.ok_or(err_id)?,
-//                 expires,
-//                 old_email,
-//                 stage_error,
-//                 general_info,
-//             ),
-//             Self::NewClickConfirm => link_settings_form_email_new_click(
-//                 email_change_id.ok_or(err_id)?,
-//                 expires,
-//                 old_email,
-//                 new_email.ok_or(err_email)?,
-//                 stage_error,
-//                 general_info,
-//             ),
-//             Self::NewConfirmEmail => link_settings_form_email_new_confirm(
-//                 email_change_id.ok_or(err_id)?,
-//                 expires,
-//                 old_email,
-//                 new_email.ok_or(err_email)?,
-//                 token.ok_or(err_token)?,
-//                 stage_error,
-//                 general_info,
-//             ),
-//             Self::FinalConfirm => link_settings_form_email_final_confirm(
-//                 email_change_id.ok_or(err_id)?,
-//                 expires,
-//                 old_email,
-//                 new_email.ok_or(err_email)?,
-//                 stage_error,
-//                 general_info,
-//             ),
-//             Self::Completed => link_settings_form_email_completed(
-//                 email_change_id.ok_or(err_id)?,
-//                 old_email,
-//                 new_email.ok_or(err_email)?,
-//                 stage_error,
-//                 general_info,
-//             ),
-//         };
-//         Ok(link)
-//     }
-// }
-
-// #[derive(Clone, Debug, Copy, PartialEq, Eq, PartialOrd, Ord)]
-// pub enum BtnStage {
-//     Send,
-//     Resend,
-//     Confirm,
-//     None,
-// }
-
-// #[derive(Clone, Copy)]
-// pub struct EmailChange {
-//     pub get_old_email: StoredValue<Box<dyn Fn() -> String + Sync + Send + 'static>>,
-//     pub check_old_email: StoredValue<Box<dyn Fn() -> bool + Sync + Send + 'static>>,
-//     pub get_new_email: StoredValue<Box<dyn Fn() -> String + Sync + Send + 'static>>,
-//     pub check_new_email: StoredValue<Box<dyn Fn() -> bool + Sync + Send + 'static>>,
-//     pub get_token: StoredValue<Box<dyn Fn() -> String + Sync + Send + 'static>>,
-//     pub check_token: StoredValue<Box<dyn Fn() -> bool + Sync + Send + 'static>>,
-//     pub get_form_stage: StoredValue<Box<dyn Fn() -> EmailChangeFormStage + Sync + Send + 'static>>,
-//     pub check_form_stage: StoredValue<Box<dyn Fn() -> bool + Sync + Send + 'static>>,
-//     pub get_info: StoredValue<Box<dyn Fn() -> String + Sync + Send + 'static>>,
-//     pub check_info: StoredValue<Box<dyn Fn() -> bool + Sync + Send + 'static>>,
-//     pub get_err: StoredValue<Box<dyn Fn() -> String + Sync + Send + 'static>>,
-//     pub check_err: StoredValue<Box<dyn Fn() -> bool + Sync + Send + 'static>>,
-//     pub get_expires: StoredValue<Box<dyn Fn() -> u128 + Sync + Send + 'static>>,
-//     pub check_expires: StoredValue<Box<dyn Fn() -> bool + Sync + Send + 'static>>,
-//     pub expires_str: RwSignal<String>,
-//     pub get_btn_stage: StoredValue<Box<dyn Fn() -> BtnStage + Sync + Send + 'static>>,
-//     pub post_cancel: StoredValue<Box<dyn Fn(SubmitEvent) -> () + Sync + Send + 'static>>,
-//     pub post_run: StoredValue<Box<dyn Fn(SubmitEvent) + Sync + Send + 'static>>,
-// }
-
-// pub fn use_change_email<API: Api + Sync + Send + Clone + Copy + 'static>(
-//     api: API,
-//     input_new_email: NodeRef<html::Input>,
-// ) -> EmailChange {
-//     const EXPIRED_STR: &'static str = "expired";
-
-//     let global_state = expect_context::<GlobalState>();
-//     let time_until_expires = RwSignal::new(String::new());
-//     let query = use_query::<ParamsChangeEmail>();
-//     let fn_get_old_email = move || {
-//         query
-//             .with(|v| v.as_ref().ok().and_then(|v| v.old_email.clone()))
-//             .unwrap_or_else(|| "404".to_string())
-//     };
-//     let fn_check_old_email = move || {
-//         query
-//             .with(|v| v.as_ref().ok().map(|v| v.old_email.is_some()))
-//             .unwrap_or_default()
-//     };
-//     let fn_get_new_email = move || {
-//         query
-//             .with(|v| v.as_ref().ok().and_then(|v| v.new_email.clone()))
-//             .unwrap_or_else(|| "new email".to_string())
-//     };
-//     let fn_check_new_email = move || {
-//         query
-//             .with(|v| v.as_ref().ok().map(|v| v.new_email.is_some()))
-//             .unwrap_or_default()
-//     };
-//     let fn_get_confirm_token = move || {
-//         query
-//             .with(|v| v.as_ref().ok().and_then(|v| v.confirm_token.clone()))
-//             .unwrap_or_default()
-//     };
-//     let fn_check_confirm_token = move || {
-//         query
-//             .with(|v| v.as_ref().ok().map(|v| v.confirm_token.is_some()))
-//             .unwrap_or_default()
-//     };
-//     let fn_get_form_stage = move || {
-//         query
-//             .with(|v| v.as_ref().ok().and_then(|v| v.email_stage.clone()))
-//             .unwrap_or_default()
-//     };
-//     let fn_check_email_stage = move || {
-//         query
-//             .with(|v| v.as_ref().ok().map(|v| v.email_stage.is_some()))
-//             .unwrap_or_default()
-//     };
-//     let fn_get_general_info = move || {
-//         query
-//             .with(|v| v.as_ref().ok().and_then(|v| v.general_info.clone()))
-//             .unwrap_or_default()
-//     };
-//     let fn_check_general_info = move || {
-//         query
-//             .with(|v| v.as_ref().ok().map(|v| v.general_info.is_some()))
-//             .unwrap_or_default()
-//     };
-//     let fn_get_stage_err = move || {
-//         query
-//             .with(|v| v.as_ref().ok().and_then(|v| v.stage_error.clone()))
-//             .unwrap_or_default()
-//     };
-//     let fn_check_stage_err = move || {
-//         query
-//             .with(|v| v.as_ref().ok().map(|v| v.stage_error.is_some()))
-//             .unwrap_or_default()
-//     };
-//     let fn_get_expires = move || {
-//         query
-//             .with(|v| v.as_ref().ok().and_then(|v| v.expires.clone()))
-//             .unwrap_or_default()
-//     };
-//     let fn_check_expires = move || {
-//         query
-//             .with(|v| v.as_ref().ok().map(|v| v.expires.is_some()))
-//             .unwrap_or_default()
-//     };
-//     let fn_btn_stage = move || -> BtnStage {
-//         let stage = fn_get_form_stage();
-//         if time_until_expires.with(|v| v == EXPIRED_STR)
-//             && stage != EmailChangeFormStage::CurrentSendConfirm
-//         {
-//             return BtnStage::None;
-//         }
-//         match stage {
-//             EmailChangeFormStage::None => BtnStage::None,
-//             EmailChangeFormStage::CurrentSendConfirm => BtnStage::Send,
-//             EmailChangeFormStage::CurrentClickConfirm => BtnStage::Resend,
-//             EmailChangeFormStage::CurrentConfirm => BtnStage::Confirm,
-//             EmailChangeFormStage::NewEnterEmail => BtnStage::Send,
-//             EmailChangeFormStage::NewClickConfirm => BtnStage::Resend,
-//             EmailChangeFormStage::NewConfirmEmail => BtnStage::Confirm,
-//             EmailChangeFormStage::FinalConfirm => BtnStage::Confirm,
-//             EmailChangeFormStage::Completed => BtnStage::None,
-//         }
-//     };
-
-//     let get_query = move || query.get().ok().unwrap_or_default();
-//     let get_query_untracked = move || query.get_untracked().ok().unwrap_or_default();
-//     let create_err_link = move |err: String| -> String {
-//         let query = get_query_untracked();
-//         query
-//             .email_stage
-//             .unwrap_or_default()
-//             .link(
-//                 query.old_email.unwrap_or(String::from("404")),
-//                 query.change_id,
-//                 query.confirm_token,
-//                 query.new_email,
-//                 Some(err),
-//                 None,
-//                 query.expires.unwrap_or_default(),
-//             )
-//             .unwrap_or_else(|err| {
-//                 EmailChangeFormStage::CurrentSendConfirm
-//                     .link(
-//                         String::from("404"),
-//                         None,
-//                         None,
-//                         None,
-//                         Some(err),
-//                         None,
-//                         query.expires.unwrap_or_default(),
-//                     )
-//                     .unwrap()
-//             })
-//     };
-//     let navigate = leptos_router::hooks::use_navigate();
-//     let _ = interval::new(
-//         move || {
-//             let time = time_now_ns();
-//             let Some(expires) = get_query_untracked().expires else {
-//                 let is_empty = time_until_expires.with_untracked(|v| v.is_empty());
-//                 if !is_empty {
-//                     time_until_expires.update(|v| v.clear());
-//                 }
-//                 return;
-//             };
-//             let elapsed = expires.saturating_sub(time);
-//             let output = if elapsed == 0 {
-//                 EXPIRED_STR.to_string()
-//             } else {
-//                 let elapsed = Duration::from_nanos(elapsed as u64);
-//                 // TODO make human time
-//                 format!("{elapsed:?}")
-//             };
-//             let _ = time_until_expires.try_set(output);
-//         },
-//         Duration::from_secs(1),
-//     );
-//     Effect::new({
-//         let navigate = navigate.clone();
-//         move || {
-//             let navigate = navigate.clone();
-//             let query = get_query();
-//             if let Some(id) = query.change_id
-//                 && query.email_stage == Some(EmailChangeFormStage::CurrentSendConfirm)
-//                 && query.general_info.is_none()
-//             {
-//                 api.change_email_status(id).send_web(async move |result| {
-//                     let result = match result {
-//                         Ok(ServerRes::EmailChangeStage(stage)) => Ok(stage),
-//                         Ok(err) => {
-//                             error!("expected EmailChangeState, received {err:?}");
-//                             Err("SERVER ERROR, wrong response.".to_string())
-//                         }
-//                         Err(err) => {
-//                             error!("received {err:?}");
-//                             Err(err.to_string())
-//                         }
-//                     };
-//                     let link = match result {
-//                         Ok(stage) => stage.link(None, None),
-//                         Err(err) => create_err_link(format!("error getting status {err}")),
-//                     };
-//                     navigate(&link, NavigateOptions::default());
-//                 });
-//             }
-//         }
-//     });
-
-//     let fn_cancel = {
-//         let navigate = navigate.clone();
-//         move |e: SubmitEvent| {
-//             e.prevent_default();
-//             let query = get_query_untracked();
-//             let navigate = navigate.clone();
-//             let Some(id) = query.change_id else {
-//                 return;
-//             };
-//             api.cancel_email_change(id).send_web(async move |result| {
-//                 let result = match result {
-//                     Ok(ServerRes::EmailChangeStage(EmailChangeStage::Cancelled {
-//                         id,
-//                         old_email,
-//                         expires,
-//                     })) => Ok((old_email, "Succesfully canceled".to_string())),
-//                     Ok(err) => Err(format!("unexpected response: {err:?}, expected Cancelled")),
-//                     Err(err) => Err(format!("unexpected response: {err}")),
-//                 };
-
-//                 let link = match result {
-//                     Ok((old_email, msg)) => {
-//                         link_settings_form_email_current_send(old_email, None, Some(msg))
-//                     }
-//                     Err(msg) => create_err_link(msg),
-//                 };
-
-//                 navigate(&link, NavigateOptions::default());
-//             });
-//         }
-//     };
-//     let fn_run = {
-//         let navigate = navigate.clone();
-//         move |e: SubmitEvent| {
-//             e.prevent_default();
-//             let navigate = navigate.clone();
-//             let query = get_query_untracked();
-//             let email_stage = query.email_stage.clone().unwrap_or_default();
-
-//             let handler = {
-//                 let navigate = navigate.clone();
-//                 let query = query.clone();
-//                 move |result: Result<ServerRes, ServerErr>| {
-//                     let navigate = navigate.clone();
-//                     //
-//                     async move {
-//                         let result = match result {
-//                             Ok(ServerRes::EmailChangeStage(stage)) => Ok(stage),
-//                             Ok(err) => {
-//                                 error!("expected EmailChangeState, received {err:?}");
-//                                 Err("SERVER ERROR, wrong response.".to_string())
-//                             }
-//                             Err(ServerErr::EmailChange(EmailChangeErr::InvalidStage(_)))
-//                             | Err(ServerErr::EmailChangeNew(EmailChangeNewErr::InvalidStage(_)))
-//                             | Err(ServerErr::EmailChangeToken(
-//                                 EmailChangeTokenErr::InvalidStage(_),
-//                             )) => {
-//                                 let id = query
-//                                     .change_id
-//                                     .ok_or(String::from("missing id param from url"));
-
-//                                 match id {
-//                                     Ok(id) => {
-//                                         let result = ApiWebTmp::new()
-//                                             .change_email_status(id)
-//                                             .send_native()
-//                                             .await;
-//                                         match result {
-//                                             Ok(ServerRes::EmailChangeStage(stage)) => Ok(stage),
-//                                             Ok(err) => {
-//                                                 error!(
-//                                                     "expected EmailChangeState, received {err:?}"
-//                                                 );
-//                                                 Err("SERVER ERROR, wrong response.".to_string())
-//                                             }
-//                                             Err(err) => {
-//                                                 error!("received {err:?}");
-//                                                 Err(err.to_string())
-//                                             }
-//                                         }
-//                                     }
-//                                     Err(err) => {
-//                                         error!("{err:?}");
-//                                         Err(err.to_string())
-//                                     }
-//                                 }
-//                             }
-//                             Err(err) => {
-//                                 error!("received {err:?}");
-//                                 Err(err.to_string())
-//                             }
-//                         };
-
-//                         if let Ok(EmailChangeStage::Complete { new_email, .. }) = &result {
-//                             global_state.change_email(new_email);
-//                         }
-
-//                         let link = match result {
-//                             Ok(v) => v.link(None, None),
-//                             Err(err) => create_err_link(err),
-//                         };
-//                         navigate(&link, NavigateOptions::default());
-//                     }
-//                 }
-//             };
-//             let error = match email_stage {
-//                 EmailChangeFormStage::None => None,
-//                 EmailChangeFormStage::CurrentSendConfirm => {
-//                     api.send_email_change().send_web(handler.clone());
-//                     None
-//                 }
-//                 EmailChangeFormStage::CurrentClickConfirm => {
-//                     let id = query
-//                         .change_id
-//                         .ok_or(String::from("missing id param from url"));
-
-//                     match id {
-//                         Ok(id) => {
-//                             api.resend_email_change(id).send_web(handler.clone());
-//                             None
-//                         }
-//                         Err(err) => Some(err),
-//                     }
-//                 }
-//                 EmailChangeFormStage::CurrentConfirm => {
-//                     let confirm_token = get_query_untracked()
-//                         .confirm_token
-//                         .ok_or("missing confirm_token.".to_string());
-//                     match confirm_token {
-//                         Ok(confirm_token) => {
-//                             api.confirm_email_change(confirm_token)
-//                                 .send_web(handler.clone());
-//                             None
-//                         }
-//                         Err(err) => Some(err),
-//                     }
-//                 }
-//                 EmailChangeFormStage::NewEnterEmail => {
-//                     let new_email = input_new_email
-//                         .get_untracked()
-//                         .ok_or("missing the input box.".to_string())
-//                         .and_then(|v| proccess_email(v.value()))
-//                         .and_then(|v| {
-//                             query
-//                                 .change_id
-//                                 .ok_or(String::from("missing id param from url"))
-//                                 .map(|id| (id, v))
-//                         });
-
-//                     match new_email {
-//                         Ok((id, new_email)) => {
-//                             api.send_email_new(id, new_email).send_web(handler.clone());
-//                             None
-//                         }
-//                         Err(err) => Some(err),
-//                     }
-//                 }
-//                 EmailChangeFormStage::NewClickConfirm => {
-//                     let id = query
-//                         .change_id
-//                         .ok_or(String::from("missing id param from url"));
-
-//                     match id {
-//                         Ok(id) => {
-//                             api.resend_email_new(id).send_web(handler.clone());
-//                             None
-//                         }
-//                         Err(err) => Some(err),
-//                     }
-//                 }
-//                 EmailChangeFormStage::NewConfirmEmail => {
-//                     let confirm_token = get_query_untracked()
-//                         .confirm_token
-//                         .ok_or("missing confirm_token.".to_string());
-//                     match confirm_token {
-//                         Ok(confirm_token) => {
-//                             api.confirm_email_new(confirm_token)
-//                                 .send_web(handler.clone());
-//                             None
-//                         }
-//                         Err(err) => Some(err),
-//                     }
-//                 }
-//                 EmailChangeFormStage::FinalConfirm => {
-//                     let id = query
-//                         .change_id
-//                         .ok_or(String::from("missing id param from url"));
-
-//                     match id {
-//                         Ok(id) => {
-//                             api.change_email(id).send_web(handler.clone());
-//                             None
-//                         }
-//                         Err(err) => Some(err),
-//                     }
-//                 }
-//                 EmailChangeFormStage::Completed => None,
-//             };
-//             if let Some(err) = error {
-//                 let link = create_err_link(err);
-//                 navigate(&link, NavigateOptions::default());
-//             }
-//         }
-//     };
-//     EmailChange {
-//         get_old_email: StoredValue::new(Box::new(fn_get_old_email)),
-//         check_old_email: StoredValue::new(Box::new(fn_check_old_email)),
-//         get_new_email: StoredValue::new(Box::new(fn_get_new_email)),
-//         check_new_email: StoredValue::new(Box::new(fn_check_new_email)),
-//         get_token: StoredValue::new(Box::new(fn_get_confirm_token)),
-//         check_token: StoredValue::new(Box::new(fn_check_confirm_token)),
-//         get_form_stage: StoredValue::new(Box::new(fn_get_form_stage)),
-//         check_form_stage: StoredValue::new(Box::new(fn_check_email_stage)),
-//         get_info: StoredValue::new(Box::new(fn_get_general_info)),
-//         check_info: StoredValue::new(Box::new(fn_check_general_info)),
-//         get_err: StoredValue::new(Box::new(fn_get_stage_err)),
-//         check_err: StoredValue::new(Box::new(fn_check_stage_err)),
-//         get_expires: StoredValue::new(Box::new(fn_get_expires)),
-//         check_expires: StoredValue::new(Box::new(fn_check_expires)),
-//         expires_str: time_until_expires,
-//         get_btn_stage: StoredValue::new(Box::new(fn_btn_stage)),
-//         post_cancel: StoredValue::new(Box::new(fn_cancel)),
-//         post_run: StoredValue::new(Box::new(fn_run)),
-//     }
-// }

@@ -28,7 +28,7 @@ pub enum DbEmailChangeConfirmUpdateCurrentErr {
 }
 
 impl Db {
-    pub async fn email_change_confirm_update_current(
+    pub async fn email_change_update_current_confirm(
         &self,
         time: u128,
         user_id: RecordId,
@@ -128,17 +128,17 @@ async fn test_email_change_confirm_update_current() {
     let email_change = db.email_change_add(0, user.id.clone(), 10).await.unwrap();
 
     let result = db
-        .email_change_confirm_update_current(0, user.id.clone(), "invalid", "invalid")
+        .email_change_update_current_confirm(0, user.id.clone(), "invalid", "invalid")
         .await;
     assert_eq!(result, Err(DbEmailChangeConfirmUpdateCurrentErr::NotFound));
 
     let result = db
-        .email_change_confirm_update_current(0, user.id.clone(), "", "")
+        .email_change_update_current_confirm(0, user.id.clone(), "", "")
         .await;
     assert_eq!(result, Err(DbEmailChangeConfirmUpdateCurrentErr::NotFound));
 
     let result = db
-        .email_change_confirm_update_current(
+        .email_change_update_current_confirm(
             0,
             user2.id.clone(),
             email_change.id.key.clone(),
@@ -151,7 +151,7 @@ async fn test_email_change_confirm_update_current() {
     );
 
     let result = db
-        .email_change_confirm_update_current(
+        .email_change_update_current_confirm(
             11,
             user.id.clone(),
             email_change.id.key.clone(),
@@ -161,7 +161,7 @@ async fn test_email_change_confirm_update_current() {
     assert_eq!(result, Err(DbEmailChangeConfirmUpdateCurrentErr::Expired));
 
     let result = db
-        .email_change_confirm_update_current(0, user.id.clone(), email_change.id.key.clone(), "")
+        .email_change_update_current_confirm(0, user.id.clone(), email_change.id.key.clone(), "")
         .await;
     assert_eq!(
         result,
@@ -169,7 +169,7 @@ async fn test_email_change_confirm_update_current() {
     );
 
     let result = db
-        .email_change_confirm_update_current(
+        .email_change_update_current_confirm(
             0,
             user.id.clone(),
             email_change.id.key.clone(),
@@ -179,7 +179,7 @@ async fn test_email_change_confirm_update_current() {
     assert!(matches!(result, Ok(_)));
 
     let result = db
-        .email_change_confirm_update_current(
+        .email_change_update_current_confirm(
             0,
             user.id.clone(),
             email_change.id.key.clone(),

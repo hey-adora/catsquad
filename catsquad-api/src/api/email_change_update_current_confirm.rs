@@ -61,7 +61,7 @@ pub async fn email_change_update_current_confirm(
 
         let email_change = app
             .db
-            .email_change_confirm_update_current(
+            .email_change_update_current_confirm(
                 time,
                 user_id,
                 email_change_key,
@@ -134,13 +134,8 @@ async fn test_email_change_update_current_confirm() {
             .unwrap();
 
         let current_token = server
-            .state
-            .db
-            .email_change_get_by_key(email_change.key.clone())
-            .await
-            .unwrap()
-            .current
-            .token;
+            .email_change_get_current_token(0, &user1, email_change.key.clone())
+            .await;
 
         let result = server
             .client

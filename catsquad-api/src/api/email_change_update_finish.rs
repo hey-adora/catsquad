@@ -127,13 +127,8 @@ async fn test_email_change_update_finish() {
             .unwrap();
 
         let current_token = server
-            .state
-            .db
-            .email_change_get_by_key(email_change.key.clone())
-            .await
-            .unwrap()
-            .current
-            .token;
+            .email_change_get_current_token(0, &user1, email_change.key.clone())
+            .await;
 
         let email_change = server
             .client
@@ -162,14 +157,8 @@ async fn test_email_change_update_finish() {
             .unwrap();
 
         let new_token = server
-            .state
-            .db
-            .email_change_get_by_key(email_change.key.clone())
-            .await
-            .unwrap()
-            .new
-            .unwrap()
-            .token;
+            .email_change_get_new_token(0, &user1, email_change.key.clone())
+            .await;
 
         let result = finish(email_change.key.clone(), session_key.clone()).await;
         assert!(matches!(
@@ -224,13 +213,8 @@ async fn test_email_change_update_finish() {
             .unwrap();
 
         let current_token = server
-            .state
-            .db
-            .email_change_get_by_key(email_change.key.clone())
-            .await
-            .unwrap()
-            .current
-            .token;
+            .email_change_get_current_token(0, &user1, email_change.key.clone())
+            .await;
 
         let email_change = server
             .client
@@ -253,14 +237,8 @@ async fn test_email_change_update_finish() {
             .unwrap();
 
         let new_token = server
-            .state
-            .db
-            .email_change_get_by_key(email_change.key.clone())
-            .await
-            .unwrap()
-            .new
-            .unwrap()
-            .token;
+            .email_change_get_new_token(0, &user1, email_change.key.clone())
+            .await;
 
         let email_change = server
             .client

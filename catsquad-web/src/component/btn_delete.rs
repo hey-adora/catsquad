@@ -3,7 +3,7 @@ use leptos::prelude::*;
 use web_sys::MouseEvent;
 
 #[component]
-pub fn BtnSecondary(
+pub fn BtnDelete(
     #[prop(optional, into)] id: Option<Callback<(), String>>,
     #[prop(optional, into)] class: Option<Callback<(), String>>,
     #[prop(optional, into)] is_loading: Option<Callback<(), bool>>,
@@ -22,8 +22,8 @@ pub fn BtnSecondary(
     let disabled_fn = move || disabled.map(|v| v.run(())).unwrap_or_default();
     let is_disabled_fn = move || is_loading_fn() || disabled_fn();
 
-    let class_on_disable = move || "bg-base02 text-base01";
-    let class_on_active = move || "hover:bg-base0D bg-base03 text-base05";
+    let class_on_disable = move || "bg-base03 font-bold text-base01";
+    let class_on_active = move || "hover:bg-base05 bg-base08 font-bold text-base01";
 
     view! {
         <Btn

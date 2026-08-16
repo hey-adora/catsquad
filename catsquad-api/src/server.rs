@@ -153,6 +153,10 @@ pub async fn app(state: AppState) -> Router {
             post(api::email_change_add),
         )
         .route(
+            catsquad_shared::LINK_API_EMAIL_CHANGE_RESEND,
+            post(api::email_change_resend),
+        )
+        .route(
             catsquad_shared::LINK_API_EMAIL_CHANGE_UPDATE_CURRENT_CONFIRM,
             post(api::email_change_update_current_confirm),
         )

@@ -1,4 +1,4 @@
-use crate::SVGSpinner;
+use crate::Btn;
 use leptos::prelude::*;
 use web_sys::MouseEvent;
 
@@ -20,31 +20,21 @@ pub fn BtnPrimary(
     let class_fn = move || class.map(|v| v.run(())).unwrap_or_default();
     let is_loading_fn = move || is_loading.map(|v| v.run(())).unwrap_or_default();
     let disabled_fn = move || disabled.map(|v| v.run(())).unwrap_or_default();
-
     let is_disabled_fn = move || is_loading_fn() || disabled_fn();
 
-    let class_fn = move || {
-        format!(
-            "flex gap-2 place-content-center rounded-xl font-medium text-[1rem] leading-[1rem] font-bold px-[1rem] py-[0.5rem]  text-base01 {} {}",
-            if is_disabled_fn() {
-                "bg-base03"
-            } else {
-                "hover:bg-base05 bg-base0D"
-            },
-            class_fn()
-        )
-    };
+    let class_on_disable = move || "bg-base03 font-bold text-base01";
+    let class_on_active = move || "hover:bg-base05 bg-base0D font-bold text-base01";
 
     view! {
-        <button
+        <Btn
             id=id_fn
             disabled=is_disabled_fn
             on:click=on_click_handler
-            class=class_fn>
-            <Show when=is_loading_fn>
-                <SVGSpinner class=move||"size-4"/>
-            </Show>
+            class=class_fn
+            class_on_disable=class_on_disable
+            class_on_active=class_on_active
+            >
             {children()}
-        </button>
+        </Btn>
     }
 }

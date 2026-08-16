@@ -9,6 +9,7 @@ test_server = [
     "dep:axum-test",
     "dep:catsquad-client",
 ]
+test_backdoors = []
 
 [dependencies]
 anyhow = { workspace = true }

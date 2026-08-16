@@ -3,6 +3,7 @@ pub mod comment_remove;
 pub mod comment_search;
 pub mod comment_update_text;
 pub mod email_change_add;
+pub mod email_change_resend;
 pub mod email_change_update_cancel;
 pub mod email_change_update_current_confirm;
 pub mod email_change_update_finish;

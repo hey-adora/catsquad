@@ -8,6 +8,8 @@ mod page;
 mod page_state;
 
 pub use component::auto_text_area::AutoTextArea;
+pub use component::btn::Btn;
+pub use component::btn_delete::BtnDelete;
 pub use component::btn_primary::BtnPrimary;
 pub use component::btn_secondary::BtnSecondary;
 pub use component::display::Display;

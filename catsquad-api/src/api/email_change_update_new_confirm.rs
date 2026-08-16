@@ -102,7 +102,7 @@ async fn test_email_change_update_new_confirm() {
     init_log();
     let server = crate::TestServer::new().await;
 
-    let (_user1, session_key) = server
+    let (user1, session_key) = server
         .user_add_full("hey", "hey@heyadora.com", "w1234567890111GG11$")
         .await;
 
@@ -124,13 +124,8 @@ async fn test_email_change_update_new_confirm() {
         .unwrap();
 
     let current_token = server
-        .state
-        .db
-        .email_change_get_by_key(email_change.key.clone())
-        .await
-        .unwrap()
-        .current
-        .token;
+        .email_change_get_current_token(0, &user1, email_change.key.clone())
+        .await;
 
     let email_change = server
         .client
@@ -170,14 +165,8 @@ async fn test_email_change_update_new_confirm() {
         .unwrap();
 
     let new_token = server
-        .state
-        .db
-        .email_change_get_by_key(email_change.key.clone())
-        .await
-        .unwrap()
-        .new
-        .unwrap()
-        .token;
+        .email_change_get_new_token(0, &user1, email_change.key.clone())
+        .await;
 
     let result = new_confirm(email_change.key.clone(), &new_token, session_key2.clone()).await;
     assert!(matches!(

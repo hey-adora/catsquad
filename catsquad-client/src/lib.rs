@@ -848,6 +848,19 @@ where
         self.post_form_empty(cs::LINK_API_EMAIL_CHANGE_ADD)
     }
 
+    pub fn email_change_resend(
+        &self,
+        email_change_key: impl Into<String>,
+    ) -> Builder<TSender, catsquad_shared::EmailChangeRes, catsquad_shared::EmailChangeResendErr>
+    {
+        self.post_form(
+            cs::LINK_API_EMAIL_CHANGE_RESEND,
+            catsquad_shared::EmailChangeResendReq {
+                email_change_key: email_change_key.into(),
+            },
+        )
+    }
+
     pub fn email_change_update_current_confirm(
         &self,
         email_change_key: impl Into<String>,

@@ -1,4 +1,6 @@
 pub mod auto_text_area;
+pub mod btn;
+pub mod btn_delete;
 pub mod btn_primary;
 pub mod btn_secondary;
 pub mod display;

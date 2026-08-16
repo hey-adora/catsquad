@@ -33,6 +33,15 @@ pub fn Settings() -> impl IntoView {
     let email_stage =
         RwQuery::<EmailCangeStage>::new(SettingsPageParams::EmailChangeStage.to_string());
     let email_stage = move || email_stage.get_or_default();
+
+    let email_change_key = RwQuery::<String>::new(SettingsPageParams::EmailChangeKey.to_string());
+    let email_change_key_untracked = move || email_change_key.get_untracked().unwrap_or_default();
+
+    let token = RwQuery::<String>::new(SettingsPageParams::Token.to_string());
+    let token_untracked = move || token.get_untracked().unwrap_or_default();
+
+    let new_email = RwQuery::<String>::new(SettingsPageParams::NewEmail.to_string());
+    let new_email_tracked = move || new_email.get().unwrap_or_default();
     // let email_stage = move || {
     //     email_stage
     //         .get()
@@ -52,7 +61,12 @@ pub fn Settings() -> impl IntoView {
                 <UsernameChange/>
             </Show>
             <Show when=when_stage_email_change>
-                <EmailChange email_change_stage=email_stage/>
+                <EmailChange
+                    email_change_stage_tracked=email_stage
+                    email_change_key_untracked
+                    token_untracked
+                    new_email_tracked
+                    />
             </Show>
             <div class="px-[2rem] mx-auto max-w-[30rem] w-full">
                 <h1 class="text-[1.5rem] text-base0A font-bold mb-[2rem]">"Settings"</h1>

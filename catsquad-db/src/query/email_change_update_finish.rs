@@ -129,7 +129,7 @@ async fn test_email_change_update_finish() {
         let email_change = db.email_change_add(0, user.id.clone(), 10).await.unwrap();
 
         let email_change = db
-            .email_change_confirm_update_current(
+            .email_change_update_current_confirm(
                 0,
                 user.id.clone(),
                 email_change.id.key.clone(),
@@ -199,7 +199,7 @@ async fn test_email_change_update_finish() {
         let email_change = db.email_change_add(0, user.id.clone(), 10).await.unwrap();
 
         let email_change = db
-            .email_change_confirm_update_current(
+            .email_change_update_current_confirm(
                 0,
                 user.id.clone(),
                 email_change.id.key.clone(),
@@ -231,7 +231,7 @@ async fn test_email_change_update_finish() {
         let email_change = db.email_change_add(0, user.id.clone(), 10).await.unwrap();
 
         let email_change = db
-            .email_change_confirm_update_current(
+            .email_change_update_current_confirm(
                 0,
                 user.id.clone(),
                 email_change.id.key.clone(),
