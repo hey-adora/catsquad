@@ -84,7 +84,7 @@ pub async fn email_change_update_new_add(
         let _ = app
             .db
             .email_sent_add(
-                0,
+                time,
                 DbEmailSentReason::UserEmailChangeAddNew,
                 user_email,
                 email_body,

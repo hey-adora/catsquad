@@ -76,7 +76,7 @@ pub async fn email_change_resend(
             let _ = app
                 .db
                 .email_sent_add(
-                    0,
+                    time,
                     catsquad_db::DbEmailSentReason::UserEmailChangeAddCurrent,
                     user_email,
                     email_body_current,

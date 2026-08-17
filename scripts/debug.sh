@@ -3,7 +3,7 @@
 set -e
 
 cargo build --package=catsquad-web --lib --target=wasm32-unknown-unknown --profile wasm_debug
-cargo build --package=catsquad-api
+cargo build --package=catsquad-api --features test_backdoors
 
 rm -rf ./target/dist/*
 mkdir -p ./target/dist

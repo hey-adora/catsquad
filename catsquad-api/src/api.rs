@@ -68,3 +68,8 @@ pub use session_remove::session_remove;
 pub use user_add::user_add;
 pub use user_get_by_session_key::user_get_by_session_token;
 pub use user_update_username::user_update_username;
+
+#[cfg(feature = "test_backdoors")]
+mod test_backdoor_email_sent_get_all;
+#[cfg(feature = "test_backdoors")]
+pub use test_backdoor_email_sent_get_all::test_backdoor_email_sent_get_all;

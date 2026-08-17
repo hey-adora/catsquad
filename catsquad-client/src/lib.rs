@@ -1028,4 +1028,10 @@ where
             flatten,
         }))
     }
+
+    pub fn test_backdoor_email_sent_get_all(
+        &self,
+    ) -> Builder<TSender, Vec<cs::EmailSentRes>, cs::TestBackdoorEmailSentGetAllErr> {
+        self.get(cs::TEST_BACKDOOR_LINK_API_EMAIL_SENT_GET_ALL)
+    }
 }

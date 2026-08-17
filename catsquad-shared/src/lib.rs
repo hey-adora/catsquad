@@ -48,6 +48,7 @@ pub use api::post_update_tags::*;
 pub use api::post_update_title::*;
 pub use api::session_add::*;
 pub use api::session_delete::*;
+pub use api::test_backdoor_email_sent_get_all::*;
 pub use api::user_add::*;
 pub use api::user_get_by_session_key::*;
 pub use api::user_update_username::*;

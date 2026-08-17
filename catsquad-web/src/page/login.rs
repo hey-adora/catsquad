@@ -8,8 +8,7 @@ use catsquad_shared::{
 use leptos::{html, prelude::*};
 use web_sys::HtmlInputElement;
 
-mod hook_change_password;
-mod hook_login;
+mod login_state;
 
 // fn hello()  {
 //     let a = 10;

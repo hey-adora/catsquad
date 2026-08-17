@@ -106,7 +106,7 @@ pub async fn session_add(
     }
 }
 
-#[cfg(test)]
+#[cfg(any(test, feature = "test_server"))]
 mod test_utils {
     use axum::http::header;
     use catsquad_shared as cs;

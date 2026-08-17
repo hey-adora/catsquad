@@ -34,9 +34,9 @@ test("infinite_scroll", async ({ page }) => {
     return y;
   };
 
-  let round_fn = (num) => {
-    return num - (num % 5);
-  };
+  // let round_fn = (num) => {
+  //   return num - (num % 5);
+  // };
 
   let parsed_debug1 = await get_parsed_debug_state_fn(page);
   let first_anchor_last = await page.locator(`[id="${get_signal_data_latest(parsed_debug1.anchor_last).id}"]`);
@@ -78,6 +78,9 @@ test("infinite_scroll", async ({ page }) => {
 
     // SCROLL 1
     await page.mouse.wheel(0, scroll_by);
+
+    await page.waitForTimeout(1000);
+
     let anchor_y_before = await get_elm_y(anchor_last);
     // await page.screenshot({ path: `${scroll_iter_index}_down_0.jpg` });
 
@@ -86,10 +89,14 @@ test("infinite_scroll", async ({ page }) => {
 
     await page.locator(`[id="${last_item_id}"] + a`).waitFor();
     // await page.screenshot({ path: `${scroll_iter_index}_down_1.jpg` });
+    await page.waitForTimeout(1000);
 
     let anchor_y_after = await get_elm_y(anchor_last);
 
-    expect(round_fn(anchor_y_before)).toBe(round_fn(anchor_y_after));
+    let sum = anchor_y_before - anchor_y_after;
+    let sum_expect = Math.abs(sum) < 5;
+    console.log(`sum ${anchor_y_before} - ${anchor_y_after} = ${sum}`);
+    expect(sum_expect).toBe(true);
 
     scroll_iter_index += 1;
   };
@@ -117,6 +124,8 @@ test("infinite_scroll", async ({ page }) => {
     // SCROLL 1
     await page.mouse.wheel(0, scroll_by);
     await page.locator(first_item_id_str).first().waitFor();
+    await page.waitForTimeout(1000);
+
     let anchor_y_before = await get_elm_y(anchor);
     // await page.screenshot({ path: `${scroll_iter_index}_up_0.jpg` });
 
@@ -127,7 +136,11 @@ test("infinite_scroll", async ({ page }) => {
     let anchor_y_after = await get_elm_y(anchor);
     // await page.screenshot({ path: `${scroll_iter_index}_up_1.jpg` });
 
-    expect(round_fn(anchor_y_before)).toBe(round_fn(anchor_y_after));
+    let sum = anchor_y_before - anchor_y_after;
+    let sum_expect = Math.abs(sum) < 5;
+    console.log(`sum ${anchor_y_before} - ${anchor_y_after} = ${sum}`);
+    expect(sum_expect).toBe(true);
+    // expect(round_fn(anchor_y_before)).toBe(round_fn(anchor_y_after));
 
     scroll_iter_index += 1;
   };
@@ -154,7 +167,7 @@ test("scroll_save_position", async ({ page }) => {
     .first()
     .evaluate((elm) => elm.getBoundingClientRect().y);
   let gallery = page.locator('[id="gallery"]');
-  let offset = -5;
+  let offset = 1;
   let scroll_iter_index = 0;
 
 
@@ -176,9 +189,13 @@ test("scroll_save_position", async ({ page }) => {
     await page.mouse.wheel(0, scroll_by);
     await page.locator(`[id="${last_item_id}"]`).waitFor();
 
+    await page.waitForTimeout(100);
+    // return;
+
     // SCROLL 2
     await page.mouse.wheel(0, offset);
     await page.locator(`[id="${last_item_id}"] + a`).waitFor();
+
 
     scroll_iter_index += 1;
   };
@@ -186,6 +203,9 @@ test("scroll_save_position", async ({ page }) => {
   // let parsed_debug1 = await get_parsed_debug_state_fn(page);
 
   await scroll_down_fn();
+  // await page.waitForTimeout(100);
+
+  await page.waitForTimeout(1000);
 
   let top_before = await gallery.evaluate((elm) => elm.scrollTop);
   let params = await page.evaluate(() => {
@@ -196,13 +216,34 @@ test("scroll_save_position", async ({ page }) => {
     return `direction=${direction}&time=${time}&scroll=${scroll}`;
   });
 
+  console.log(`look at url ${params}`);
+
+  await page.reload();
+  await page.locator('[id="gallery"] > a').first().waitFor();
+
+  // let params2 = await page.evaluate(() => {
+  //   let params = new URLSearchParams(document.location.search);
+  //   let direction = params.get("direction");
+  //   let time = params.get("time");
+  //   let scroll = params.get("scroll");
+  //   return `direction=${direction}&time=${time}&scroll=${scroll}`;
+  // });
+
+  // console.log(`look at url2 ${params2}`);
+
   let parsed_debug2 = await get_parsed_debug_state_fn(page);
   let gallery_items = get_signal_data_latest(parsed_debug2.gallery_items);
 
   let time = gallery_items[0].created_at;
+  let params3 = `direction=down&time=${time}&scroll=${top_before}`;
   expect(params).toBe(
-    `direction=down&time=${time}&scroll=${top_before}`,
+    params3,
   );
+
+  console.log(`look at url3 ${params3}`);
+
+  // return;
+
 
   await page.reload();
   let first_elm_id_after = await page

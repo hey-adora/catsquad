@@ -1,11 +1,21 @@
 import { test, expect } from "@playwright/test";
 
-export let login = async (page)=>{
+export const USER1_USERNAME = "prime1";
+export const USER1_EMAIL = "prime1@heyadora.com";
+export const USER1_PASSWORD = "A5%prime1@heyadora.com";
+
+export const USER99_USERNAME = "prime99";
+export const USER99_EMAIL = "prime99@heyadora.com";
+export const USER99_PASSWORD = "A5%prime1@heyadora.com";
+
+export let login = async (page, email, password)=>{
   await page.goto("http://localhost:3000/login");
 
-  await page.locator('[id="email"]').fill("prime1@heyadora.com");
-  await page.locator('[id="password"]').fill("A5%prime1@heyadora.com");
+  await page.locator('[id="email"]').fill(email);
+  await page.locator('[id="password"]').fill(password);
   await page.locator('[id="login_btn"]').click();
+
+  await page.locator('[id="gallery"] > a').first().waitFor();
 };
 
 export let gallery_search = async (
@@ -137,4 +147,33 @@ export let scroll_down_fn = async (
   await page.locator(`[id="${last_item_id}"] + a`).waitFor();
 
   scroll_iter_index += 1;
+};
+
+export let get_email_change_current = async (page, email) => {
+  const result = await page.evaluate(async () => {
+    let result = await fetch("http://localhost:3000/api/test_backdoor_email_sent_get_all");
+    return result.json();
+  });
+  // const response = await page.evaluate(async () => {
+  //   return await fetch("http://localhost:3000/api/test_backdoor_email_sent_get_all")
+  //     .then(r => r.ok ? r.json() : Promise.reject(r))
+  // });
+  // let result = JSON.parse(response);
+  // console.log(`look at me ${result}`);
+  console.log(`look at me ${JSON.stringify(result, null, 2)}`);
+
+  let link = result["Ok"].find((v)=>(v["to_email"] == email && v["reason"] == "user_email_change_add_current")).body;
+  // let link = result["Ok"][0]["body"];
+  // console.log(`look at a ${JSON.stringify(a, null, 2)}`);
+
+  return link;
+};
+
+export let get_email_change_new = async (page, email) => {
+  const result = await page.evaluate(async () => {
+    let result = await fetch("http://localhost:3000/api/test_backdoor_email_sent_get_all");
+    return result.json();
+  });
+  let link = result["Ok"].find((v)=>(v["to_email"] == email && v["reason"] == "user_email_change_add_new")).body;
+  return link;
 };

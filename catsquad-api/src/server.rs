@@ -48,6 +48,16 @@ pub async fn app(state: AppState) -> Router {
             get(api::assets::font_lucky),
         );
 
+    let mut test_backdoors = Router::new();
+
+    #[cfg(feature = "test_backdoors")]
+    {
+        test_backdoors = test_backdoors.route(
+            catsquad_shared::TEST_BACKDOOR_LINK_API_EMAIL_SENT_GET_ALL,
+            get(api::test_backdoor_email_sent_get_all),
+        );
+    }
+
     let router_public = Router::new()
         .route(
             catsquad_shared::LINK_API_COMMENT_SEARCH,
@@ -194,6 +204,7 @@ pub async fn app(state: AppState) -> Router {
         ));
 
     let app = Router::new()
+        .merge(test_backdoors)
         .merge(api_router_upload)
         .merge(router_assets)
         .merge(router_web)

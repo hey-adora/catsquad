@@ -20,14 +20,20 @@ use web_sys::{HtmlInputElement, MouseEvent};
 #[component]
 pub fn EmailChange(
     #[prop(optional, into)] email_change_stage_tracked: Option<Callback<(), EmailCangeStage>>,
+    #[prop(optional, into)] email_change_stage_untracked: Option<Callback<(), EmailCangeStage>>,
     #[prop(optional, into)] email_change_key_untracked: Option<Callback<(), String>>,
     #[prop(optional, into)] token_untracked: Option<Callback<(), String>>,
     #[prop(optional, into)] new_email_tracked: Option<Callback<(), String>>,
 ) -> impl IntoView {
     let page = PageState::get();
     let link_back = move || link_relative_settings();
-    let email_change_stage = move || {
+    let email_change_stage_tracked = move || {
         email_change_stage_tracked
+            .map(|v| v.run(()))
+            .unwrap_or_default()
+    };
+    let email_change_stage_untracked = move || {
+        email_change_stage_untracked
             .map(|v| v.run(()))
             .unwrap_or_default()
     };
@@ -69,7 +75,7 @@ pub fn EmailChange(
             let navigate = navigate.clone();
 
             spawner.spawn(async move {
-                match email_change_stage() {
+                match email_change_stage_untracked() {
                     EmailCangeStage::ChangeEmailCurrentAdd => {
                         let Some(result) = email_change.current_add().await else {
                             return;
@@ -166,22 +172,22 @@ pub fn EmailChange(
         });
     };
 
-    let when_cancel = move || match email_change_stage() {
+    let when_cancel = move || match email_change_stage_tracked() {
         EmailCangeStage::ChangeEmailCurrentAdd
         | EmailCangeStage::ChangeEmailFinished
         | EmailCangeStage::ChangeEmailCanceled => false,
         _ => true,
     };
 
-    let when_primary = move || match email_change_stage() {
+    let when_primary = move || match email_change_stage_tracked() {
         EmailCangeStage::ChangeEmailCanceled | EmailCangeStage::ChangeEmailFinished => false,
         _ => true,
     };
 
     let view_msg = move || {
-        match email_change_stage() {
+        match email_change_stage_tracked() {
         EmailCangeStage::ChangeEmailCurrentAdd => view! {
-            <p class="text-center">
+            <p id="current_add_component" class="text-center">
                 "Send confirmation email to "
                 <span class="text-base0E">{move || page.acc_email()}</span>
                 "."
@@ -189,7 +195,7 @@ pub fn EmailChange(
         }
         .into_any(),
         EmailCangeStage::ChangeEmailCurrentCheckEmail => view! {
-            <p class="text-center">
+            <p id="current_check_component" class="text-center">
                 "Email Confirmation was sent to your email "
                 <span class="text-base0E">{move || page.acc_email()}</span>
                 ", confirm it to continue."
@@ -197,18 +203,18 @@ pub fn EmailChange(
         }
         .into_any(),
         EmailCangeStage::ChangeEmailCurrentConfirm => view! {
-            <p class="text-center">"Confirm to continue."</p>
+            <p id="current_confirm_component" class="text-center">"Confirm to continue."</p>
         }
         .into_any(),
         EmailCangeStage::ChangeEmailNewAdd => view! {
-            <div class="flex flex-col gap-2 ">
+            <div id="new_add_component" class="flex flex-col gap-2 ">
                 <label for="new_email" class="">"New Email"</label>
                 <input name="new_email" id="new_email" node_ref=input_new_email type="email" placeholder="alice@example.com" class="rounded-xl bg-base01 px-2 py-1 text-base0B" />
             </div>
         }
         .into_any(),
         EmailCangeStage::ChangeEmailNewCheckEmail => view! {
-            <p class="text-center">
+            <p id="new_check_component" class="text-center">
                 "Email Confirmation was sent to "
                 <span class="text-base0E">{new_email_tracked}</span>
                 ", confirm it to continue."
@@ -216,25 +222,25 @@ pub fn EmailChange(
         }
         .into_any(),
         EmailCangeStage::ChangeEmailNewConfirm => view! {
-            <p class="text-center">"Confirm to continue."</p>
+            <p id="new_confirm_component" class="text-center">"Confirm to continue."</p>
         }
         .into_any(),
         EmailCangeStage::ChangeEmailFinish => view! {
-            <p class="text-center">"final confirm."</p>
+            <p id="finish_component" class="text-center">"final confirm."</p>
         }
         .into_any(),
         EmailCangeStage::ChangeEmailFinished => view! {
-            <p class="text-center">"completed."</p>
+            <p id="finished_component" class="text-center">"completed."</p>
         }
         .into_any(),
         EmailCangeStage::ChangeEmailCanceled => view! {
-            <p class="text-center">"canceled."</p>
+            <p id="canceled_component" class="text-center">"canceled."</p>
         }
         .into_any(),
     }
     };
 
-    let primary_btn_text = move || match email_change_stage() {
+    let primary_btn_text = move || match email_change_stage_tracked() {
         EmailCangeStage::ChangeEmailCurrentAdd => "Send",
         EmailCangeStage::ChangeEmailCurrentCheckEmail => "Resend",
         EmailCangeStage::ChangeEmailCurrentConfirm => "Confirm",
@@ -254,16 +260,16 @@ pub fn EmailChange(
                 <Show when=when_success>
                     <p class="text-base0B text-center">{ move || success_msg.get() }</p>
                 </Show>
-                <ErrGeneral error=general_errs />
+                <ErrGeneral id=move||"err_general" error=general_errs />
                 {view_msg}
                 <div class="flex flex-wrap justify-end gap-2 ">
                     <Show when=when_cancel>
-                        <BtnDelete class=move||"mr-auto" is_loading on_click=on_cancel.clone()>"Cancel"</BtnDelete>
+                        <BtnDelete id=move||"cancel_btn" class=move||"mr-auto" is_loading on_click=on_cancel.clone()>"Cancel"</BtnDelete>
                     </Show>
                     <Show when=when_primary>
-                        <BtnPrimary class=move||"" is_loading on_click=on_click.clone() >{primary_btn_text}</BtnPrimary>
+                        <BtnPrimary id=move||"confirm_btn" class=move||"" is_loading on_click=on_click.clone() >{primary_btn_text}</BtnPrimary>
                     </Show>
-                    <LinkSecondary link=link_back>"Close"</LinkSecondary>
+                    <LinkSecondary id=move||"close_btn" link=link_back>"Close"</LinkSecondary>
                 </div>
 
             </div>

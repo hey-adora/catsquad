@@ -34,7 +34,7 @@ fn status_code(
 ) -> StatusCode {
     match result {
         Ok(_) => StatusCode::OK,
-        Err(PasswordChangeUpdateConfirmErr::NewPasswordInvalid) => StatusCode::BAD_REQUEST,
+        Err(PasswordChangeUpdateConfirmErr::NewPasswordInvalid(_)) => StatusCode::BAD_REQUEST,
         Err(PasswordChangeUpdateConfirmErr::PasswordKeyNotFound) => StatusCode::BAD_REQUEST,
         Err(PasswordChangeUpdateConfirmErr::AlreadyUsed) => StatusCode::BAD_REQUEST,
         Err(PasswordChangeUpdateConfirmErr::Expired) => StatusCode::BAD_REQUEST,
@@ -65,7 +65,7 @@ pub async fn user_password_change_confirm(
     let inner =
         async || -> Result<PasswordChangeUpdateConfirmRes, PasswordChangeUpdateConfirmErr> {
             validate_password(&req.new_password)
-                .map_err(|_err| PasswordChangeUpdateConfirmErr::NewPasswordInvalid)?;
+                .map_err(|err| PasswordChangeUpdateConfirmErr::NewPasswordInvalid(err))?;
             let new_password = hash_password(&req.new_password)
                 .map_err(|_err| PasswordChangeUpdateConfirmErr::InternalServer)?;
 
@@ -111,9 +111,10 @@ pub async fn user_password_change_confirm(
     (status_code, Json(result))
 }
 
-#[cfg(test)]
+#[cfg(any(test, feature = "test_server"))]
 mod test_utils {
     use axum::http::header;
+    use catsquad_db::id_to_string;
     use catsquad_shared as cs;
 
     use crate::{TestServer, auth::create_auth_cookie_str};
@@ -133,6 +134,14 @@ mod test_utils {
                 .await
                 .into_json()
                 .await
+        }
+
+        pub async fn password_change_get_latest_key(&self) -> String {
+            id_to_string(
+                self.state.db.password_change_get_all().await.unwrap()[0]
+                    .id
+                    .clone(),
+            )
         }
     }
 }
@@ -165,6 +174,14 @@ async fn test_user_password_change_confirm() {
             .id
             .clone(),
     );
+
+    let result = server
+        .password_change_confirm(pss_key.clone(), "invalid", session_key.clone())
+        .await;
+    assert!(matches!(
+        result,
+        Err(PasswordChangeUpdateConfirmErr::NewPasswordInvalid(_))
+    ));
 
     let result = server
         .password_change_confirm(pss_key, "hello1111111@2P", session_key.clone())

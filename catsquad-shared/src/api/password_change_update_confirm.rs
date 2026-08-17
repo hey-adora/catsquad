@@ -25,7 +25,7 @@ pub enum PasswordChangeUpdateConfirmErr {
     PasswordKeyNotFound,
 
     #[error("new password is invalid")]
-    NewPasswordInvalid,
+    NewPasswordInvalid(String),
 
     #[error("bad request {0}")]
     BadRequest(String),

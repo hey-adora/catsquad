@@ -29,6 +29,7 @@ pub mod post_update_tags;
 pub mod post_update_title;
 pub mod session_add;
 pub mod session_delete;
+pub mod test_backdoor_email_sent_get_all;
 pub mod user_add;
 pub mod user_get_by_session_key;
 pub mod user_update_username;

@@ -1,53 +1,56 @@
-use super::username_change_state::UsernameChangeState;
+use super::password_change_state::PasswordChangeState;
 use crate::{
     BtnPrimary, ErrGeneral, Errs, LinkSecondary, PageState, hook::Spawner, page::create_client,
 };
-use catsquad_shared::{LINK_WEB_INDEX, link_relative_settings};
+use catsquad_shared::{EmailCangeStage, LINK_WEB_INDEX, link_relative_settings};
 use leptos::prelude::*;
 use leptos_router::{NavigateOptions, hooks::use_navigate};
 use web_sys::HtmlInputElement;
 
 #[component]
-pub fn UsernameChange() -> impl IntoView {
-    let page = PageState::get();
+pub fn PasswordChange(
+        #[prop(optional, into)] password_change_stage_tracked: Option<Callback<(), EmailCangeStage>>,
+) -> impl IntoView {
+    // let page = PageState::get();
     let link_back = move || link_relative_settings();
-    let current_username = move || page.acc_username();
-    let spawner = Spawner::new();
-    let username_change = UsernameChangeState::new(create_client());
-    let input_username = NodeRef::new();
-    let input_password = NodeRef::new();
-    let navigate = use_navigate();
+    // let current_username = move || page.acc_username();
+    // let spawner = Spawner::new();
+    let password_change = PasswordChangeState::new(create_client());
+EmailCangeStage
+    // let input_username = NodeRef::new();
+    // let input_password = NodeRef::new();
+    // let navigate = use_navigate();
 
-    let on_confirm = move |_| {
-        let (Some(new_username), Some(current_password)) = (
-            input_username
-                .get_untracked()
-                .map(|v: HtmlInputElement| v.value()),
-            input_password
-                .get_untracked()
-                .map(|v: HtmlInputElement| v.value()),
-        ) else {
-            return;
-        };
-        let navigate = navigate.clone();
-        spawner.spawn(async move {
-            let Some(result) = username_change.change(new_username, current_password).await else {
-                return;
-            };
-            page.acc_username_set(result.username);
-            navigate(link_back(), NavigateOptions::default());
-        });
-    };
+    // let on_confirm = move |_| {
+    //     let (Some(new_username), Some(current_password)) = (
+    //         input_username
+    //             .get_untracked()
+    //             .map(|v: HtmlInputElement| v.value()),
+    //         input_password
+    //             .get_untracked()
+    //             .map(|v: HtmlInputElement| v.value()),
+    //     ) else {
+    //         return;
+    //     };
+    //     let navigate = navigate.clone();
+    //     spawner.spawn(async move {
+    //         let Some(result) = username_change.change(new_username, current_password).await else {
+    //             return;
+    //         };
+    //         page.acc_username_set(result.username);
+    //         navigate(link_back(), NavigateOptions::default());
+    //     });
+    // };
 
-    let general_errs = move || username_change.err_general.get();
-    let username_errs = move || username_change.err_username.get();
-    let is_loading = move || spawner.is_busy.get();
+    let general_errs = move || password_change.err_general.get();
+    // let username_errs = move || username_change.err_username.get();
+    // let is_loading = move || spawner.is_busy.get();
 
     view! {
         <div id="username_change_component" class=" bg-base01/80 absolute left-0 top-0 w-[100dvw] h-[100dvh] grid place-content-center">
             <a class="z-[1] absolute left-0 top-0 w-full h-full" href=link_back></a>
             <div class="z-[2] flex flex-col gap-6 shadow-lg bg-base00 rounded-lg px-6 py-4">
-                <p class="text-[1.5rem] text-base0A text-center">"Username Change"</p>
+                <p class="text-[1.5rem] text-base0A text-center">"Password Change"</p>
                 <ErrGeneral id=move||"username_change_general_error" error=general_errs/>
                 <div class="flex flex-col gap-2">
                     <label for="new_username">"New Username"</label>

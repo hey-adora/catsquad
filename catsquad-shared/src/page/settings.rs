@@ -16,6 +16,14 @@ pub fn link_relative_settings_username_change() -> String {
     )
 }
 
+pub fn link_relative_settings_password_change() -> String {
+    format!(
+        "/settings?{}={}",
+        SettingsPageParams::Stage,
+        SettingsPageStage::PasswordChange,
+    )
+}
+
 pub fn link_relative_settings_email_change_current_add() -> String {
     format!(
         "/settings?{}={}&{}={}",
@@ -202,6 +210,16 @@ pub enum EmailCangeStage {
 }
 
 #[derive(
+    Default, Debug, Clone, PartialEq, PartialOrd, strum::EnumString, strum::Display, strum::EnumIs,
+)]
+#[strum(serialize_all = "lowercase")]
+pub enum PasswordCangeStage {
+    #[default]
+    PasswordChangeAdd,
+    PasswordChangeConfirm,
+}
+
+#[derive(
     Debug, Default, Clone, PartialEq, PartialOrd, strum::EnumString, strum::Display, strum::EnumIs,
 )]
 #[strum(serialize_all = "lowercase")]
@@ -210,4 +228,5 @@ pub enum SettingsPageStage {
     None,
     UsernameChange,
     EmailChange,
+    PasswordChange,
 }
