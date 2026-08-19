@@ -1,11 +1,15 @@
+use std::fmt::Display;
+
 use axum::{Extension, Form, Json, extract::State, http::StatusCode, response::IntoResponse};
 use catsquad_db::{
     DbEmailSentReason, DbPasswordChange, DbPasswordChangeAddErr, DbUser, id_to_string,
 };
 use catsquad_log::prelude::*;
 use catsquad_shared::{
-    PasswordChangeAddErr, PasswordChangeAddReq, PasswordChangeRes, validate_email,
+    PasswordChangeAddErr, PasswordChangeAddReq, PasswordChangeRes,
+    link_absolute_settings_password_change_confirm, validate_email,
 };
+use url::Url;
 
 use crate::state::AppState;
 
@@ -24,10 +28,13 @@ fn status_code(result: &Result<PasswordChangeRes, PasswordChangeAddErr>) -> Stat
     }
 }
 
-fn send_email_password_change(address: impl AsRef<str>, token: impl AsRef<str>) -> String {
+fn send_email_password_change(address: Url, password_change_key: impl Display) -> String {
     // let link = link_absolute_reg_finish(address, token);
-    let link = "placeholder change".to_string();
-    debug!("EMAIL SENT {link}");
+    let link = link_absolute_settings_password_change_confirm(address, password_change_key)
+        .unwrap()
+        .to_string();
+    // let link = "placeholder change".to_string();
+    // debug!("EMAIL SENT {link}");
     link
 }
 
@@ -132,8 +139,26 @@ async fn test_password_change_add() {
         .user_add_full("hey", email, "a1234567890111GG11$")
         .await;
 
+    {
+        let result = server
+            .password_change_add("hey2@heyadora.com", "invalid")
+            .await;
+        assert!(matches!(result, Ok(_)));
+
+        let result = server
+            .password_change_add("hey2@heyadora.com", &token)
+            .await;
+        assert!(matches!(result, Ok(_)));
+
+        let result = server.password_change_add("invalid", &token).await;
+        assert!(matches!(result, Err(PasswordChangeAddErr::InvalidEmail(_))));
+
+        let result = server.password_change_add("invalid", "invalid").await;
+        assert!(matches!(result, Err(PasswordChangeAddErr::InvalidEmail(_))));
+    }
+
     // password change
-    let _result = server.password_change_add(email, token).await;
+    let _result = server.password_change_add(email, &token).await;
     let _password_change = server.state.db.password_change_get_all().await.unwrap()[0].clone();
 
     let emails = server

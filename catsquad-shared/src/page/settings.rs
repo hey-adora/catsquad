@@ -16,13 +16,57 @@ pub fn link_relative_settings_username_change() -> String {
     )
 }
 
-pub fn link_relative_settings_password_change() -> String {
+pub fn link_relative_settings_password_change_add() -> String {
     format!(
         "/settings?{}={}",
         SettingsPageParams::Stage,
         SettingsPageStage::PasswordChange,
     )
 }
+
+pub fn link_relative_settings_password_change_check_email() -> String {
+    format!(
+        "/settings?{}={}&{}={}",
+        SettingsPageParams::Stage,
+        SettingsPageStage::PasswordChange,
+        //
+        SettingsPageParams::PasswordChangeStage,
+        PasswordCangeStage::PasswordChangeCheckEmail,
+    )
+}
+
+pub fn link_relative_settings_password_change_confirm(password_change_key: impl Display) -> String {
+    format!(
+        "/settings?{}={}&{}={}&{}={}",
+        SettingsPageParams::Stage,
+        SettingsPageStage::PasswordChange,
+        //
+        SettingsPageParams::PasswordChangeStage,
+        PasswordCangeStage::PasswordChangeConfirm,
+        //
+        SettingsPageParams::Token,
+        password_change_key,
+    )
+}
+
+pub fn link_absolute_settings_password_change_confirm(
+    host: Url,
+    password_change_key: impl Display,
+) -> Result<Url, url::ParseError> {
+    let relative = link_relative_settings_password_change_confirm(password_change_key);
+    host.join(&relative)
+}
+
+// pub fn link_relative_settings_password_change_finished() -> String {
+//     format!(
+//         "/settings?{}={}&{}={}",
+//         SettingsPageParams::Stage,
+//         SettingsPageStage::PasswordChange,
+//         //
+//         SettingsPageParams::PasswordChangeStage,
+//         PasswordCangeStage::PasswordChangeFinished,
+//     )
+// }
 
 pub fn link_relative_settings_email_change_current_add() -> String {
     format!(
@@ -190,6 +234,7 @@ pub enum SettingsPageParams {
     NewEmail,
     EmailChangeKey,
     EmailChangeStage,
+    PasswordChangeStage,
 }
 
 #[derive(
@@ -216,7 +261,9 @@ pub enum EmailCangeStage {
 pub enum PasswordCangeStage {
     #[default]
     PasswordChangeAdd,
+    PasswordChangeCheckEmail,
     PasswordChangeConfirm,
+    // PasswordChangeFinished,
 }
 
 #[derive(

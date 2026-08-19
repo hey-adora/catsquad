@@ -1,6 +1,7 @@
 import { test, expect } from "@playwright/test";
 
 import { 
+    // wait_for_gallery,
     gallery_search,
     get_parsed_debug_state_fn,
     get_manual_data,
@@ -16,7 +17,7 @@ test("infinite_scroll", async ({ page }) => {
 
   let gallery = page.locator('[id="gallery"]');
 
-  let offset = 1;
+  let offset = 3;
   let scroll_iter_index = 0;
 
   let page_offset_id = await gallery.evaluate(
@@ -79,7 +80,7 @@ test("infinite_scroll", async ({ page }) => {
     // SCROLL 1
     await page.mouse.wheel(0, scroll_by);
 
-    await page.waitForTimeout(1000);
+    await page.waitForTimeout(1);
 
     let anchor_y_before = await get_elm_y(anchor_last);
     // await page.screenshot({ path: `${scroll_iter_index}_down_0.jpg` });
@@ -89,7 +90,7 @@ test("infinite_scroll", async ({ page }) => {
 
     await page.locator(`[id="${last_item_id}"] + a`).waitFor();
     // await page.screenshot({ path: `${scroll_iter_index}_down_1.jpg` });
-    await page.waitForTimeout(1000);
+    // await page.waitForTimeout(1000);
 
     let anchor_y_after = await get_elm_y(anchor_last);
 
@@ -123,15 +124,20 @@ test("infinite_scroll", async ({ page }) => {
 
     // SCROLL 1
     await page.mouse.wheel(0, scroll_by);
-    await page.locator(first_item_id_str).first().waitFor();
-    await page.waitForTimeout(1000);
+
+    // await page.locator(first_item_id_str).first().waitFor();
+
+    // await page.waitForTimeout(1000);
+    await page.waitForTimeout(1);
 
     let anchor_y_before = await get_elm_y(anchor);
     // await page.screenshot({ path: `${scroll_iter_index}_up_0.jpg` });
 
     // SCROLL 2
     await page.mouse.wheel(0, -offset);
-    await page.waitForTimeout(1000);
+    await page.locator(`a:has(+[id="${first_item_id}"])`).waitFor();
+
+    // await page.waitForTimeout(1000);
     // await page.locator(`[id="${first_item_id}"] - a`).waitFor();
     let anchor_y_after = await get_elm_y(anchor);
     // await page.screenshot({ path: `${scroll_iter_index}_up_1.jpg` });
@@ -158,18 +164,11 @@ test("infinite_scroll", async ({ page }) => {
 test("scroll_save_position", async ({ page }) => {
   await page.goto("http://localhost:3000");
 
-  let first_elm_id_before = await page
-    .locator('[id="gallery"] > a')
-    .first()
-    .evaluate((elm) => elm.id);
-  let page_offset_y = await page
-    .locator('[id="gallery"] > a')
-    .first()
-    .evaluate((elm) => elm.getBoundingClientRect().y);
+  let first_elm_id_before = await page.locator('[id="gallery"] > a').first().evaluate((elm) => elm.id);
+  let page_offset_y = await page.locator('[id="gallery"] > a').first().evaluate((elm) => elm.getBoundingClientRect().y);
   let gallery = page.locator('[id="gallery"]');
   let offset = 1;
   let scroll_iter_index = 0;
-
 
   let scroll_down_fn = async () => {
     let last_item_id = await gallery.evaluate((elm) => elm.lastElementChild.id);
@@ -187,28 +186,22 @@ test("scroll_save_position", async ({ page }) => {
 
     // SCROLL 1
     await page.mouse.wheel(0, scroll_by);
-    await page.locator(`[id="${last_item_id}"]`).waitFor();
 
-    await page.waitForTimeout(100);
-    // return;
+    await page.waitForTimeout(1);
 
     // SCROLL 2
     await page.mouse.wheel(0, offset);
     await page.locator(`[id="${last_item_id}"] + a`).waitFor();
 
-
     scroll_iter_index += 1;
   };
 
-  // let parsed_debug1 = await get_parsed_debug_state_fn(page);
-
   await scroll_down_fn();
-  // await page.waitForTimeout(100);
 
-  await page.waitForTimeout(1000);
+  await page.waitForTimeout(2000); // scroll possition gets saved every 1000ms
 
   let top_before = await gallery.evaluate((elm) => elm.scrollTop);
-  let params = await page.evaluate(() => {
+  let url_before = await page.evaluate(() => {
     let params = new URLSearchParams(document.location.search);
     let direction = params.get("direction");
     let time = params.get("time");
@@ -216,60 +209,28 @@ test("scroll_save_position", async ({ page }) => {
     return `direction=${direction}&time=${time}&scroll=${scroll}`;
   });
 
-  console.log(`look at url ${params}`);
+  console.log(`look at url ${url_before}`);
 
   await page.reload();
   await page.locator('[id="gallery"] > a').first().waitFor();
 
-  // let params2 = await page.evaluate(() => {
-  //   let params = new URLSearchParams(document.location.search);
-  //   let direction = params.get("direction");
-  //   let time = params.get("time");
-  //   let scroll = params.get("scroll");
-  //   return `direction=${direction}&time=${time}&scroll=${scroll}`;
-  // });
 
-  // console.log(`look at url2 ${params2}`);
-
-  let parsed_debug2 = await get_parsed_debug_state_fn(page);
-  let gallery_items = get_signal_data_latest(parsed_debug2.gallery_items);
-
+  let parsed_debug = await get_parsed_debug_state_fn(page);
+  let gallery_items = get_signal_data_latest(parsed_debug.gallery_items);
   let time = gallery_items[0].created_at;
-  let params3 = `direction=down&time=${time}&scroll=${top_before}`;
-  expect(params).toBe(
-    params3,
-  );
+  let url_after = `direction=down&time=${time}&scroll=${top_before}`;
 
-  console.log(`look at url3 ${params3}`);
+  console.log(`look at url3 ${url_after}`);
 
-  // return;
-
-
-  await page.reload();
-  let first_elm_id_after = await page
-    .locator('[id="gallery"] > a')
-    .first()
-    .evaluate((elm) => elm.id);
-
-  let top_after = await gallery.evaluate((elm) => elm.scrollTop);
-  // TODO compare items too perhaps, should be same ones
-  expect(top_before).toBe(top_after);
-
-  let parsed_debug3 = await get_parsed_debug_state_fn(page);
-  expect(parsed_debug3.count_scroll_correction_reset).toBe(0);
+  expect(url_before).toBe(url_after);
+  expect(parsed_debug.count_scroll_correction_reset).toBe(0);
 });
 
 test("reset_query", async ({ page }) => {
   await page.goto("http://localhost:3000");
 
-  let first_elm_id_before = await page
-    .locator('[id="gallery"] > a')
-    .first()
-    .evaluate((elm) => elm.id);
-  let page_offset_y = await page
-    .locator('[id="gallery"] > a')
-    .first()
-    .evaluate((elm) => elm.getBoundingClientRect().y);
+  let first_elm_id_before = await page.locator('[id="gallery"] > a').first().evaluate((elm) => elm.id);
+  let page_offset_y = await page.locator('[id="gallery"] > a').first().evaluate((elm) => elm.getBoundingClientRect().y);
   let gallery = page.locator('[id="gallery"]');
   let offset = 1;
   let scroll_iter_index = 0;
@@ -281,11 +242,11 @@ test("reset_query", async ({ page }) => {
 
   let banner = page.locator('[id="banner"]');
   await banner.click();
-  await page.waitForTimeout(1000);
-  let first_elm_id_after = await page
-    .locator('[id="gallery"] > a')
-    .first()
-    .evaluate((elm) => elm.id);
+
+  await page.locator(`[data-testid="gallery_mut_index_2"]`).waitFor();
+  // await page.waitForTimeout(1000);
+
+  let first_elm_id_after = await page.locator('[id="gallery"] > a').first().evaluate((elm) => elm.id);
 
   expect(first_elm_id_before).toBe(first_elm_id_after);
 
@@ -302,21 +263,15 @@ test("reset_query", async ({ page }) => {
   expect(parsed_debug2.count_reset).toBe(1);
 });
 
-test("gallery_search2", async ({ page }) => {
+test("gallery_search", async ({ page }) => {
   await page.goto("http://localhost:3000");
 
-  let first_elm_id_before = await page
-    .locator('[id="gallery"] > a')
-    .first()
-    .evaluate((elm) => elm.id);
+  await page.locator('[id="gallery"] > a').first().waitFor();
 
   let first_debug = await get_parsed_debug_state_fn(page);
-  // expect(param_limit).toBe(3);
 
   await gallery_search(page, first_debug, 1, 1, "dragon", "null");
-  // mutation index gets +0 because we run gallery.reset() BUT gallery was already empty
   await gallery_search(page, first_debug, 2, 2, "", "22");
-  // mutation index gets +1 because we run gallery.reset()
   await gallery_search(page, first_debug, 3, 4, "one", "3");
   await gallery_search(page, first_debug, 4, 6, "two", "2");
   await gallery_search(page, first_debug, 5, 8, "three", "1");

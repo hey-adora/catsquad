@@ -1,5 +1,5 @@
 use catsquad_log::prelude::*;
-use catsquad_shared::{SensitiveUserRes, UserGetBySessionKeyErr};
+use catsquad_shared::{SensitiveUserRes, SessionRemoveErr, UserGetBySessionKeyErr};
 use catsquad_web_utils::time::time_now_ns;
 use leptos::prelude::*;
 
@@ -103,5 +103,31 @@ impl PageState {
             }
         }
         page.acc_pending.set(false);
+    }
+
+    pub async fn logout(&self) {
+        if self.acc.with_untracked(|v| v.is_some()) {
+            let acc = self.acc;
+            let client = create_client();
+            let result = client.session_remove().send().await.into_json().await;
+            match result {
+                Ok(_) => {
+                    let r = acc.try_set(None);
+                    if r.is_some() {
+                        error!("global state acc was disposed somehow");
+                    }
+                }
+                Err(SessionRemoveErr::Unauthorized(_)) => {
+                    let r = acc.try_set(None);
+                    if r.is_some() {
+                        error!("global state acc was disposed somehow");
+                    }
+                }
+                Err(err) => error!("logout fail"),
+            }
+            // let api = ApiWebTmp::new();
+            // api.logout().send_web(move |result| async move {
+            // });
+        }
     }
 }

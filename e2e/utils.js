@@ -2,11 +2,11 @@ import { test, expect } from "@playwright/test";
 
 export const USER1_USERNAME = "prime1";
 export const USER1_EMAIL = "prime1@heyadora.com";
-export const USER1_PASSWORD = "A5%prime1@heyadora.com";
+export const USER1_PASSWORD = "A6%prime1@heyadora.com";
 
 export const USER99_USERNAME = "prime99";
 export const USER99_EMAIL = "prime99@heyadora.com";
-export const USER99_PASSWORD = "A5%prime1@heyadora.com";
+export const USER99_PASSWORD = "A6%prime1@heyadora.com";
 
 export let login = async (page, email, password)=>{
   await page.goto("http://localhost:3000/login");
@@ -15,8 +15,13 @@ export let login = async (page, email, password)=>{
   await page.locator('[id="password"]').fill(password);
   await page.locator('[id="login_btn"]').click();
 
+  // await page.locator('[id="gallery"] > a').first().waitFor();
   await page.locator('[id="gallery"] > a').first().waitFor();
 };
+
+// export let wait_for_gallery = async () => {
+//     await page.locator('[id="gallery"] > a').first().waitFor();
+// };
 
 export let gallery_search = async (
   page,
@@ -26,28 +31,25 @@ export let gallery_search = async (
   text,
   img_count,
 ) => {
+  // let response_promise = page.waitForResponse(resp => resp.url().includes('/api/posts') && resp.status() === 200);
   await page.locator('[id="search"]').fill(text);
   await page.locator('[id="search"]').focus();
+
+  // const elm = page.locator('[id="gallery"]');
+
   await page.keyboard.press("Enter");
+  // await page.getByTestId(`[id="gallery_mut_index_${index}"]`).waitFor();
+  await page.locator(`[data-testid="gallery_mut_index_${index}"]`).waitFor();
+
+
+  // await expect(elm).toBeHidden();
+  // await page.locator('[id="gallery_loading_bar"]').waitFor();
+  // let response = await response_promise;
+  // await page.locator('[id="gallery"]').waitFor();
   await page.waitForTimeout(1000);
 
-  let new_debug = await get_parsed_debug_state_fn(page);
 
-  expect(
-    `init_executed ${new_debug.count_init}
-reset_executed ${new_debug.count_reset}
-param_limit ${new_debug.count_gallery_param_limit}
-mutated ${new_debug.count_mutated}
-interval_top ${new_debug.count_interval_top}
-interval_down ${new_debug.count_interval_down}`,
-  ).toBe(
-    `init_executed ${first_parsed_debug.count_init}
-reset_executed ${first_parsed_debug.count_reset + index}
-param_limit ${first_parsed_debug.count_gallery_param_limit + index}
-mutated ${first_parsed_debug.count_mutated + mut_index}
-interval_top ${first_parsed_debug.count_interval_top}
-interval_down ${first_parsed_debug.count_interval_down}`,
-  );
+  let new_debug = await get_parsed_debug_state_fn(page);
 
   let params = await page.evaluate(() => {
     let params = new URLSearchParams(document.location.search);
@@ -62,6 +64,27 @@ interval_down ${first_parsed_debug.count_interval_down}`,
   expect(params).toBe(
     `direction=down&scroll=null&tags=${expected_tags}&img_count=${img_count}`,
   );
+
+
+  
+
+
+  expect(
+`init_executed ${new_debug.count_init}
+reset_executed ${new_debug.count_reset}
+param_limit ${new_debug.count_gallery_param_limit}
+mutated ${new_debug.count_mutated}
+interval_top ${new_debug.count_interval_top}
+interval_down ${new_debug.count_interval_down}`,
+  ).toBe(
+`init_executed ${first_parsed_debug.count_init}
+reset_executed ${first_parsed_debug.count_reset + index}
+param_limit ${first_parsed_debug.count_gallery_param_limit + index}
+mutated ${first_parsed_debug.count_mutated + mut_index}
+interval_top ${first_parsed_debug.count_interval_top}
+interval_down ${first_parsed_debug.count_interval_down}`,
+  );
+
 };
 
 export let get_parsed_debug_state_fn = async (page) => {

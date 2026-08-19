@@ -707,9 +707,9 @@ where
 
     pub fn session_remove(
         &self,
-    ) -> Builder<TSender, catsquad_shared::SessionDeleteRes, catsquad_shared::SessionDeleteErr>
+    ) -> Builder<TSender, catsquad_shared::SessionRemoveRes, catsquad_shared::SessionRemoveErr>
     {
-        self.post_form_empty(cs::LINK_API_SESSION_DELETE)
+        self.post_form_empty(cs::LINK_API_SESSION_REMOVE)
     }
 
     pub fn post_update_title(

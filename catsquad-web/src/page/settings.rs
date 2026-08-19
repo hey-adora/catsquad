@@ -2,8 +2,8 @@ use std::str::FromStr;
 
 use crate::{BtnPrimary, BtnSecondary, LinkSecondary, Nav, PageState};
 use catsquad_shared::{
-    EmailCangeStage, SettingsPageParams, SettingsPageStage,
-    link_relative_settings_email_change_current_add, link_relative_settings_password_change,
+    EmailCangeStage, PasswordCangeStage, SettingsPageParams, SettingsPageStage,
+    link_relative_settings_email_change_current_add, link_relative_settings_password_change_add,
     link_relative_settings_username_change,
 };
 use catsquad_web_utils::prelude::*;
@@ -17,6 +17,7 @@ mod username_change_component;
 mod username_change_state;
 
 use email_change_component::EmailChange;
+use password_change_component::PasswordChange;
 use username_change_component::UsernameChange;
 
 #[component]
@@ -33,6 +34,11 @@ pub fn Settings() -> impl IntoView {
     //         .and_then(|v| SettingsPageStage::from_str(&v).ok())
     //         .unwrap_or_default()
     // };
+    let password_stage =
+        RwQuery::<PasswordCangeStage>::new(SettingsPageParams::PasswordChangeStage.to_string());
+    let password_stage_tracked = move || password_stage.get_or_default();
+    let password_stage_untracked = move || password_stage.get_untracked().unwrap_or_default();
+
     let email_stage =
         RwQuery::<EmailCangeStage>::new(SettingsPageParams::EmailChangeStage.to_string());
     let email_stage_tracked = move || email_stage.get_or_default();
@@ -55,9 +61,10 @@ pub fn Settings() -> impl IntoView {
 
     let link_username_change = move || link_relative_settings_username_change();
     let link_email_change = move || link_relative_settings_email_change_current_add();
-    let link_password_change = move || link_relative_settings_password_change();
+    let link_password_change = move || link_relative_settings_password_change_add();
     let when_stage_username_change = move || stage() == SettingsPageStage::UsernameChange;
     let when_stage_email_change = move || stage() == SettingsPageStage::EmailChange;
+    let when_stage_password_change = move || stage() == SettingsPageStage::PasswordChange;
 
     view! {
         <main id="settings_page" class="relative font-hi text-base05 grid grid-rows-[auto_1fr] gap-4">
@@ -72,6 +79,13 @@ pub fn Settings() -> impl IntoView {
                     email_change_key_untracked
                     token_untracked
                     new_email_tracked
+                    />
+            </Show>
+            <Show when=when_stage_password_change>
+                <PasswordChange
+                        password_change_stage_tracked=password_stage_tracked
+                        password_change_stage_untracked=password_stage_untracked
+                        password_change_key=token_untracked
                     />
             </Show>
             <div class="px-[2rem] mx-auto max-w-[30rem] w-full">

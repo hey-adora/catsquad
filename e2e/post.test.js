@@ -15,6 +15,7 @@ const MAX_DESCRIPTION_LENGTH = 2000;
 
 test("post_edit_description", async ({ page }) => {
   await login(page, USER1_EMAIL, USER1_PASSWORD);
+  await page.locator('[id="gallery"] > a').first().click();
 
   let word = "hello";
   let iter_index = 0;

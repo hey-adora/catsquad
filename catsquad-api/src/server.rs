@@ -191,7 +191,7 @@ pub async fn app(state: AppState) -> Router {
             post(api::user_update_username),
         )
         .route(
-            catsquad_shared::LINK_API_SESSION_DELETE,
+            catsquad_shared::LINK_API_SESSION_REMOVE,
             post(api::session_remove),
         )
         .route(

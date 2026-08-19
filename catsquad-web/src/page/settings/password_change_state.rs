@@ -51,7 +51,7 @@ where
         }
     }
 
-    pub async fn change(&self, email: impl Into<String>) -> Option<PasswordChangeRes> {
+    pub async fn add(&self, email: impl Into<String>) -> Option<PasswordChangeRes> {
         self.err_general.update(|v| v.clear());
         self.err_password.update(|v| v.clear());
 
@@ -143,7 +143,13 @@ async fn test_passowrd_change_state() {
 
     let password_change = PasswordChangeState::new(server.client.clone());
 
-    let res = password_change.change("prime1@heyadora.com").await.unwrap();
+    {
+        let res = password_change.add("invalid").await.unwrap();
+        assert_eq!(password_change.err_general.get_untracked(), "");
+        assert_eq!(password_change.err_password.get_untracked(), "");
+    }
+
+    let res = password_change.add("prime1@heyadora.com").await.unwrap();
     assert_eq!(password_change.err_general.get_untracked(), "");
     assert_eq!(password_change.err_password.get_untracked(), "");
 

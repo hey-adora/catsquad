@@ -1,24 +1,24 @@
 use axum::{Extension, Form, Json, extract::State, http::StatusCode, response::IntoResponse};
 use catsquad_db::DbSessionRemoveErr;
 use catsquad_log::prelude::*;
-use catsquad_shared::{SessionDeleteErr, SessionDeleteRes};
+use catsquad_shared::{SessionRemoveErr, SessionRemoveRes};
 
 use crate::{
     auth::{SessionKey, create_auth_cookie, create_deleted_cookie, verify_password},
     state::AppState,
 };
 
-fn from_db_session_remove_err(value: DbSessionRemoveErr) -> SessionDeleteErr {
+fn from_db_session_remove_err(value: DbSessionRemoveErr) -> SessionRemoveErr {
     match value {
-        DbSessionRemoveErr::Db(_) => SessionDeleteErr::InternalServer,
+        DbSessionRemoveErr::Db(_) => SessionRemoveErr::InternalServer,
     }
 }
 
-fn status_code(result: &Result<SessionDeleteRes, SessionDeleteErr>) -> StatusCode {
+fn status_code(result: &Result<SessionRemoveRes, SessionRemoveErr>) -> StatusCode {
     match result {
         Ok(_) => StatusCode::OK,
-        Err(SessionDeleteErr::Unauthorized(_)) => StatusCode::UNAUTHORIZED,
-        Err(SessionDeleteErr::InternalServer) => StatusCode::INTERNAL_SERVER_ERROR,
+        Err(SessionRemoveErr::Unauthorized(_)) => StatusCode::UNAUTHORIZED,
+        Err(SessionRemoveErr::InternalServer) => StatusCode::INTERNAL_SERVER_ERROR,
     }
 }
 
@@ -26,13 +26,13 @@ pub async fn session_remove(
     State(app): State<AppState>,
     session_key: Extension<SessionKey>,
 ) -> impl IntoResponse {
-    let inner = async || -> Result<SessionDeleteRes, SessionDeleteErr> {
+    let inner = async || -> Result<SessionRemoveRes, SessionRemoveErr> {
         app.db
             .session_remove(session_key.to_string())
             .await
             .map_err(from_db_session_remove_err)?;
 
-        Ok(SessionDeleteRes {})
+        Ok(SessionRemoveRes {})
     };
     let result = inner().await;
     let status_code = status_code(&result);
@@ -51,7 +51,7 @@ mod test_utils {
         pub async fn session_remove(
             &self,
             session_key: impl AsRef<str>,
-        ) -> Result<cs::SessionDeleteRes, cs::SessionDeleteErr> {
+        ) -> Result<cs::SessionRemoveRes, cs::SessionRemoveErr> {
             self.client
                 .session_remove()
                 .header_add(header::COOKIE, create_auth_cookie_str(session_key))
