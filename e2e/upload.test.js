@@ -1,7 +1,6 @@
 
 import { test, expect } from "@playwright/test";
 import { 
-    gallery_search,
     get_parsed_debug_state_fn,
     get_manual_data,
     get_signal_data,

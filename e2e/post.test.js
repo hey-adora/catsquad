@@ -1,6 +1,5 @@
 import { test, expect } from "@playwright/test";
 import { 
-    gallery_search,
     get_parsed_debug_state_fn,
     get_manual_data,
     get_signal_data,
@@ -8,13 +7,13 @@ import {
     scroll_down_fn,
     login,
     USER1_EMAIL,
-    USER1_PASSWORD,
+    PASSWORD,
 } from "./utils";
 
 const MAX_DESCRIPTION_LENGTH = 2000;
 
 test("post_edit_description", async ({ page }) => {
-  await login(page, USER1_EMAIL, USER1_PASSWORD);
+  await login(page, USER1_EMAIL, PASSWORD);
   await page.locator('[id="gallery"] > a').first().click();
 
   let word = "hello";

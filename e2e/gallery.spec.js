@@ -1,8 +1,6 @@
 import { test, expect } from "@playwright/test";
 
 import { 
-    // wait_for_gallery,
-    gallery_search,
     get_parsed_debug_state_fn,
     get_manual_data,
     get_signal_data,
@@ -80,7 +78,7 @@ test("infinite_scroll", async ({ page }) => {
     // SCROLL 1
     await page.mouse.wheel(0, scroll_by);
 
-    await page.waitForTimeout(1);
+    await page.waitForTimeout(2000);
 
     let anchor_y_before = await get_elm_y(anchor_last);
     // await page.screenshot({ path: `${scroll_iter_index}_down_0.jpg` });
@@ -127,8 +125,8 @@ test("infinite_scroll", async ({ page }) => {
 
     // await page.locator(first_item_id_str).first().waitFor();
 
-    // await page.waitForTimeout(1000);
-    await page.waitForTimeout(1);
+    await page.waitForTimeout(1000);
+    // await page.waitForTimeout(1);
 
     let anchor_y_before = await get_elm_y(anchor);
     // await page.screenshot({ path: `${scroll_iter_index}_up_0.jpg` });
@@ -198,7 +196,7 @@ test("scroll_save_position", async ({ page }) => {
 
   await scroll_down_fn();
 
-  await page.waitForTimeout(2000); // scroll possition gets saved every 1000ms
+  await page.waitForTimeout(1000); // scroll possition gets saved every 1000ms
 
   let top_before = await gallery.evaluate((elm) => elm.scrollTop);
   let url_before = await page.evaluate(() => {
@@ -264,6 +262,58 @@ test("reset_query", async ({ page }) => {
 });
 
 test("gallery_search", async ({ page }) => {
+
+  let gallery_search = async (
+    page,
+    first_parsed_debug,
+    index,
+    mut_index,
+    text,
+    img_count,
+  ) => {
+    await page.locator('[id="search"]').fill(text);
+    await page.locator('[id="search"]').focus();
+
+    await page.keyboard.press("Enter");
+    await page.locator(`[data-testid="gallery_mut_index_${index}"]`).waitFor();
+
+    await page.waitForTimeout(2000);
+
+    let new_debug = await get_parsed_debug_state_fn(page);
+
+    let params = await page.evaluate(() => {
+      let params = new URLSearchParams(document.location.search);
+      let direction = params.get("direction");
+      let time = params.get("time");
+      let scroll = params.get("scroll");
+      let tags = params.get("tags");
+      let img_count = params.get("img_count");
+      return `direction=${direction}&scroll=${scroll}&tags=${tags}&img_count=${img_count}`;
+    });
+    let expected_tags = text == "" ? "null" : text;
+    expect(params).toBe(
+      `direction=down&scroll=null&tags=${expected_tags}&img_count=${img_count}`,
+    );  
+
+    expect(`
+            init_executed ${new_debug.count_init}
+            reset_executed ${new_debug.count_reset}
+            param_limit ${new_debug.count_gallery_param_limit}
+            mutated ${new_debug.count_mutated}
+            interval_top ${new_debug.count_interval_top}
+            interval_down ${new_debug.count_interval_down}`,
+    ).toBe(`
+            init_executed ${first_parsed_debug.count_init}
+            reset_executed ${first_parsed_debug.count_reset + index}
+            param_limit ${first_parsed_debug.count_gallery_param_limit + index}
+            mutated ${first_parsed_debug.count_mutated + mut_index}
+            interval_top ${first_parsed_debug.count_interval_top}
+            interval_down ${first_parsed_debug.count_interval_down}`,
+    );
+
+  };
+
+  
   await page.goto("http://localhost:3000");
 
   await page.locator('[id="gallery"] > a').first().waitFor();
