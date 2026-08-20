@@ -1,9 +1,12 @@
+use std::fmt::Display;
+
 pub const LINK_WEB_LOGIN: &str = "/login";
 
 #[derive(Debug, Clone, PartialEq, PartialOrd, strum::EnumString, strum::Display)]
 #[strum(serialize_all = "lowercase")]
 pub enum LoginPageParams {
-    Stage,
+    PageStage,
+    PssResetStage,
     Token,
     Email,
 }
@@ -13,21 +16,67 @@ pub enum LoginPageParams {
 pub enum LoginPageStage {
     #[default]
     None,
-    PssChangeSend,
-    PssChangeCheck,
-    PssChangeConfirm,
-    PssChangeFinish,
+    PssReset,
+    // PssChangeCheck,
+    // PssChangeConfirm,
+    // PssChangeFinish,
+}
+
+#[derive(Debug, Default, Clone, PartialEq, PartialOrd, strum::EnumString, strum::Display)]
+#[strum(serialize_all = "lowercase")]
+pub enum PasswordResetStage {
+    #[default]
+    Add,
+    Check,
+    Confirm,
+    Finished,
 }
 
 pub fn link_relative_login() -> &'static str {
     LINK_WEB_LOGIN
 }
 
-pub fn link_relative_login_password_change_send() -> String {
+pub fn link_relative_login_password_reset_send() -> String {
     format!(
         "{LINK_WEB_LOGIN}?{}={}",
-        LoginPageParams::Stage,
-        LoginPageStage::PssChangeSend
+        LoginPageParams::PageStage,
+        LoginPageStage::PssReset,
+    )
+}
+
+pub fn link_relative_login_password_reset_check(email: impl Display) -> String {
+    format!(
+        "{LINK_WEB_LOGIN}?{}={}&{}={}&{}={}",
+        LoginPageParams::PageStage,
+        LoginPageStage::PssReset,
+        LoginPageParams::PssResetStage,
+        PasswordResetStage::Check,
+        LoginPageParams::Email,
+        email,
+    )
+}
+
+pub fn link_relative_login_password_reset_confirm(pss_change_key: impl Display) -> String {
+    format!(
+        "{LINK_WEB_LOGIN}?{}={}&{}={}&{}={}",
+        LoginPageParams::PageStage,
+        LoginPageStage::PssReset,
+        LoginPageParams::PssResetStage,
+        PasswordResetStage::Confirm,
+        LoginPageParams::Token,
+        pss_change_key,
+    )
+}
+
+pub fn link_relative_login_password_reset_finished(email: impl Display) -> String {
+    format!(
+        "{LINK_WEB_LOGIN}?{}={}&{}={}&{}={}",
+        LoginPageParams::PageStage,
+        LoginPageStage::PssReset,
+        LoginPageParams::PssResetStage,
+        PasswordResetStage::Finished,
+        LoginPageParams::Email,
+        email,
     )
 }
 

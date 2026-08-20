@@ -70,17 +70,17 @@ pub fn PasswordChange(
     let view_msg = move || {
         match password_change_stage_tracked() {
             PasswordCangeStage::PasswordChangeAdd => view! {
-                <p>"Send confirmation to \""
+                <p id="pss_add_component">"Send confirmation to \""
                 <span class="text-base0E">{user_email}</span>
                 "\""</p>
             }.into_any(),
             PasswordCangeStage::PasswordChangeCheckEmail => view! {
-                <p>"Confirmation was sent to \""
+                <p id="pss_check_component">"Confirmation was sent to \""
                 <span class="text-base0E">{user_email}</span>
                 "\""</p>
             }.into_any(),
             PasswordCangeStage::PasswordChangeConfirm => view! {
-                <div id="password_change_confirm_component" class="flex flex-col gap-2 " >
+                <div id="pss_confirm_component" class="flex flex-col gap-2 " >
 
                     <div  class="flex flex-col gap-2 ">
                         <label for="new_password" class="">"New Password"</label>
@@ -147,17 +147,25 @@ pub fn PasswordChange(
     let general_errs = move || password_change.err_general.get();
     // let username_errs = move || username_change.err_username.get();
     let is_loading = move || spawner.is_busy.get();
+    let when_confirm_btn = move || match password_change_stage_tracked() {
+        PasswordCangeStage::PasswordChangeAdd => true,
+        PasswordCangeStage::PasswordChangeCheckEmail => false,
+        PasswordCangeStage::PasswordChangeConfirm => true,
+        // PasswordCangeStage::PasswordChangeFinished => "",
+    };
 
     view! {
-        <div id="username_change_component" class=" bg-base01/80 absolute left-0 top-0 w-[100dvw] h-[100dvh] grid place-content-center">
+        <div id="password_change_component" class=" bg-base01/80 absolute left-0 top-0 w-[100dvw] h-[100dvh] grid place-content-center">
             <a class="z-[1] absolute left-0 top-0 w-full h-full" href=link_back></a>
             <div class="z-[2] flex flex-col gap-6 shadow-lg bg-base00 rounded-lg px-6 py-4">
                 <p class="text-[1.5rem] text-base0A text-center">"Password Change"</p>
-                <ErrGeneral id=move||"username_change_general_error" error=general_errs/>
+                <ErrGeneral id=move||"passowrd_change_general_error" error=general_errs/>
                 {view_msg}
                 <div class="ml-auto flex gap-2 ">
-                    <BtnPrimary id=move||"confirm_btn" is_loading on_click=on_confirm.clone()>{view_text}</BtnPrimary>
-                    <LinkSecondary id=move||"cancel_btn" link=link_back>"Cancel"</LinkSecondary>
+                    <Show when=when_confirm_btn>
+                        <BtnPrimary id=move||"confirm_btn" is_loading on_click=on_confirm.clone()>{view_text}</BtnPrimary>
+                    </Show>
+                    <LinkSecondary id=move||"close_btn" link=link_back>"Cancel"</LinkSecondary>
                 </div>
             </div>
         </div>

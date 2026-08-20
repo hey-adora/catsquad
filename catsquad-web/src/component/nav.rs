@@ -12,13 +12,19 @@ pub fn Nav() -> impl IntoView {
     let search_input = NodeRef::<html::Div>::new();
     let navigate = use_navigate();
     let (get_query_tags, set_query_tags) = query_signal::<String>("tags");
+    let spawner = Spawner::new();
 
     // let on_login = move |_| {
     //     // let
 
     //     //
     // };
-    let on_logout = move |_| {
+    let on_logout = move |e: SubmitEvent| {
+        e.prevent_default();
+        //
+        spawner.spawn(async move {
+            page_state.logout().await;
+        });
 
         //
     };
@@ -59,6 +65,12 @@ pub fn Nav() -> impl IntoView {
         // let val = ;
     });
 
+    let is_loading = move || page_state.acc_pending() || spawner.is_busy.get();
+    let is_logged_in = move || page_state.is_logged_in().unwrap_or_default();
+
+    let when_guest = move || !is_logged_in() && !is_loading();
+    let when_user = move || is_logged_in() && !is_loading();
+
     view! {
         <nav class="text-gray-200 flex gap-2 px-4 h-[3rem] items-center justify-between">
             <a id="banner" href=LINK_WEB_INDEX class="font-lucky font-black text-[1.3rem]">
@@ -71,24 +83,24 @@ pub fn Nav() -> impl IntoView {
                  class={move || format!("w-full rounded text-[1rem] px-[0.8rem] py-[0.2rem] text-base05 bg-base01")}>
                  {move || get_query_tags.get()}
             </div>
-            <div class=move||format!("{}", if page_state.acc_pending() { "" } else { "hidden" })>
+            <Show when=is_loading>
                 <p>"loading..."</p>
-            </div>
-            <div class=move||format!("{}", if page_state.is_logged_in().unwrap_or_default() || page_state.acc_pending() { "hidden" } else { "" })>
-                <a href=LINK_WEB_LOGIN>"Login"</a>
-            </div>
-            <div class=move||format!("flex gap-2 {}", if page_state.is_logged_in().unwrap_or_default() { "" } else { "hidden" })>
-                // <UploadForm/>
-                <a href="/upload">"Upload"</a>
-                // <form method="POST" action="" on:submit=on_upload >
-                //     <input type="submit" value="Upload" class="transition-all duration-300 ease-in hover:font-bold"/>
-                // </form>
-                <a href=move|| "/user">{move || page_state.acc_username() }</a>
-                <a href=move|| "/settings">"Settings"</a>
-                <form method="POST" action="" on:submit=on_logout >
-                    <input type="submit" value="logout" class="transition-all duration-300 ease-in hover:font-bold"/>
-                </form>
-            </div>
+            </Show>
+            <Show when=when_guest>
+                <div class="flex gap-2">
+                    <a href=LINK_WEB_LOGIN>"Login"</a>
+                </div>
+            </Show>
+            <Show when=when_user>
+                <div class="flex gap-2">
+                    <a href="/upload">"Upload"</a>
+                    <a href=move|| "/user">{move || page_state.acc_username() }</a>
+                    <a href=move|| "/settings">"Settings"</a>
+                    <form method="POST" action="" on:submit=on_logout >
+                        <input type="submit" value="logout" class="transition-all duration-300 ease-in hover:font-bold"/>
+                    </form>
+                </div>
+            </Show>
         </nav>
     }
 }

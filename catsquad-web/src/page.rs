@@ -50,7 +50,8 @@ pub fn App() -> impl IntoView {
             page.time.set(time);
         },
         Duration::from_secs(1),
-    );
+    )
+    .unwrap();
 
     view! {
      <Router>
@@ -59,8 +60,8 @@ pub fn App() -> impl IntoView {
             <Route path=path!("/p/:post") view=PagePost />
             <ProtectedRoute path=path!("/login") condition=move||page.is_logged_in().map(|v|!v) redirect_path=move||"/" view=PageLogin />
             <ProtectedRoute path=path!("/register") condition=move||page.is_logged_in().map(|v|!v) redirect_path=move||"/" view=PageRegister />
-            <ProtectedRoute path=path!("/upload") condition=move||page.is_logged_in().map(|v|v) redirect_path=move||"/" view=PageUpload />
-            <ProtectedRoute path=path!("/settings") condition=move||page.is_logged_in().map(|v|v) redirect_path=move||"/" view=PageSettings />
+            <ProtectedRoute path=path!("/upload") condition=move||page.is_logged_in().map(|v|v) redirect_path=move||"/login" view=PageUpload />
+            <ProtectedRoute path=path!("/settings") condition=move||page.is_logged_in().map(|v|v) redirect_path=move||"/login" view=PageSettings />
         </Routes>
       </Router>
     }

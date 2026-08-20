@@ -76,7 +76,7 @@ pub async fn password_change_add(
             let _ = app
                 .db
                 .email_sent_add(
-                    0,
+                    time,
                     catsquad_db::DbEmailSentReason::UserPasswordChangeAdd,
                     email,
                     email_body,
@@ -88,7 +88,7 @@ pub async fn password_change_add(
             let _ = app
                 .db
                 .email_sent_add(
-                    0,
+                    time,
                     catsquad_db::DbEmailSentReason::UserPasswordResetAdd,
                     email,
                     email_body,

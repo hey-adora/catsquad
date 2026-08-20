@@ -83,9 +83,9 @@ pub async fn user_password_change_confirm(
                 let _ = app
                     .db
                     .email_sent_add(
-                        0,
+                        time,
                         catsquad_db::DbEmailSentReason::UserPasswordChangeConfirm,
-                        email,
+                        email.clone(),
                         email_body,
                     )
                     .await;
@@ -94,15 +94,15 @@ pub async fn user_password_change_confirm(
                 let _ = app
                     .db
                     .email_sent_add(
-                        0,
+                        time,
                         catsquad_db::DbEmailSentReason::UserPasswordResetConfirm,
-                        email,
+                        email.clone(),
                         email_body,
                     )
                     .await;
             };
 
-            Ok(PasswordChangeUpdateConfirmRes {})
+            Ok(PasswordChangeUpdateConfirmRes { email })
         };
 
     let result = inner().await;

@@ -2,7 +2,7 @@ pub const LINK_API_PASSWORD_CHANGE_UPDATE_CONFIRM: &str = "/api/password_change_
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
 pub struct PasswordChangeUpdateConfirmRes {
-    //
+    pub email: String,
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]

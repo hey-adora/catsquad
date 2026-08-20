@@ -18,6 +18,7 @@ mod username_change_state;
 
 use email_change_component::EmailChange;
 use password_change_component::PasswordChange;
+pub use password_change_state::PasswordChangeState;
 use username_change_component::UsernameChange;
 
 #[component]
