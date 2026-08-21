@@ -14,6 +14,7 @@ pub fn AutoTextArea(
     #[prop(optional, into)] track: Option<Callback<()>>,
     #[prop(optional, into)] on_input: Option<Callback<HtmlTextAreaElement>>,
     #[prop(optional, into)] on_focusout: Option<Callback<HtmlTextAreaElement>>,
+    #[prop(optional, into)] on_enter: Option<Callback<HtmlTextAreaElement>>,
     #[prop(default = 500.0)] min_height: f64,
     children: Children,
 ) -> impl IntoView {
@@ -103,6 +104,23 @@ pub fn AutoTextArea(
         }
     };
 
+    let on_enter = move |e: web_sys::KeyboardEvent| {
+        let key = e.key();
+        trace!("key pressed {key}");
+        if key.to_lowercase() != "enter" {
+            return;
+        }
+        e.prevent_default();
+
+        trace!("AutoTextArea focusout triggered");
+        let Some(input): Option<HtmlTextAreaElement> = input.get_untracked() else {
+            return;
+        };
+        if let Some(f) = on_enter {
+            f.run(input.clone());
+        }
+    };
+
     // TODO maybe convert px to rem
     view! {
         <textarea
@@ -111,6 +129,7 @@ pub fn AutoTextArea(
             id=id_fn
             on:input=move |_| fn_on_change()
             on:focusout=on_focusout
+            on:keydown=on_enter
             style:height=move|| format!("{}px", height.get())
             class=class_fn
             >{children()}</textarea>

@@ -10,16 +10,31 @@ pub fn SVGTrash(#[prop(optional, into)] class: String) -> impl IntoView {
 }
 
 #[component]
-pub fn SVGArrowDown(#[prop(optional, into)] class: String) -> impl IntoView {
+pub fn SVGArrowDown(#[prop(optional, into)] class: Option<Callback<(), String>>) -> impl IntoView {
+    let class_fn = move || class.map(|v| v.run(())).unwrap_or_default();
+
     view! {
-        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class=class>
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class=class_fn>
           <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
         </svg>
     }
 }
 
+// #[component]
+// pub fn SVGTriangleDown(
+//     #[prop(optional, into)] class: Option<Callback<(), String>>,
+// ) -> impl IntoView {
+//     let class_fn = move || class.map(|v| v.run(())).unwrap_or_default();
+
+//     view! {
+//         <svg width="13" height="11" viewBox="0 0 13 11" fill="none" xmlns="http://www.w3.org/2000/svg" class=class_fn>
+//             <path d="M6.62988 10.25C6.4374 10.5831 5.95713 10.5831 5.76465 10.25L0.56836 1.25C0.375933 0.916705 0.616155 0.500096 1.00098 0.499999L11.3936 0.5C11.7784 0.500098 12.0186 0.916705 11.8262 1.25L6.62988 10.25Z" fill="currentColor" stroke="currentColor"/>
+//         </svg>
+//     }
+// }
+
 #[component]
-pub fn SVGTriangle(#[prop(optional, into)] class: String) -> impl IntoView {
+pub fn SVGTriangle(#[prop(optional, into)] class: Signal<String>) -> impl IntoView {
     view! {
         <svg width="12" height="11" viewBox="0 0 12 11" fill="none" xmlns="http://www.w3.org/2000/svg" class=class>
             <path d="M6.63067 9.75C6.24577 10.4167 5.28352 10.4167 4.89862 9.75L0.135483 1.5C-0.249417 0.833333 0.231708 -2.83122e-07 1.00151 -2.83122e-07L10.5278 -2.83122e-07C11.2976 -2.83122e-07 11.7787 0.833333 11.3938 1.5L6.63067 9.75Z" fill="currentColor"/>
@@ -52,5 +67,27 @@ pub fn SVGSpinner(#[prop(optional, into)] class: Option<Callback<(), String>>) -
 
     view! {
         <svg class=class xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" style="--darkreader-inline-stroke: currentColor;" data-darkreader-inline-stroke=""></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+    }
+}
+
+#[component]
+pub fn SVGUpload(
+    #[prop(optional, into)] class: Option<Callback<(), String>>,
+    #[prop(optional, into)] stroke: Signal<String>,
+) -> impl IntoView {
+    let class_fn = move || class.map(|v| v.run(())).unwrap_or_default();
+    let stroke = move || {
+        let stroke = stroke.get();
+        if stroke.is_empty() {
+            "0".to_string()
+        } else {
+            stroke
+        }
+    };
+
+    view! {
+        <svg class=class_fn width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path stroke="currentColor" stroke-width=stroke d="M6.41667 11V3.52917L4.03333 5.9125L2.75 4.58333L7.33333 0L11.9167 4.58333L10.6333 5.9125L8.25 3.52917V11H6.41667ZM1.83333 14.6667C1.32917 14.6667 0.897722 14.4873 0.539 14.1286C0.180278 13.7699 0.000611111 13.3381 0 12.8333V10.0833H1.83333V12.8333H12.8333V10.0833H14.6667V12.8333C14.6667 13.3375 14.4873 13.7692 14.1286 14.1286C13.7699 14.4879 13.3381 14.6673 12.8333 14.6667H1.83333Z" fill="currentColor"/>
+        </svg>
     }
 }
