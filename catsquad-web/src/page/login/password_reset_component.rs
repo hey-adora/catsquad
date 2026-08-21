@@ -17,16 +17,20 @@ pub fn PasswordReset(
     #[prop(optional, into)] password_reset_stage_untracked: Option<
         Callback<(), PasswordResetStage>,
     >,
-    #[prop(optional, into)] email: Option<Callback<(), String>>,
-    #[prop(optional, into)] password_reset_key: Option<Callback<(), String>>,
+    #[prop(optional, into)] email_tracked: Option<Callback<(), String>>,
+    #[prop(optional, into)] password_reset_key_untracked: Option<Callback<(), String>>,
 ) -> impl IntoView {
     let link_back = move || link_relative_login();
 
     let spawner = Spawner::new();
-    let password_change = PasswordChangeState::new(create_client());
+    let password_reset = PasswordChangeState::new(create_client());
 
-    let email = move || email.map(|v| v.run(())).unwrap_or_default();
-    let password_reset_key = move || password_reset_key.map(|v| v.run(())).unwrap_or_default();
+    let email = move || email_tracked.map(|v| v.run(())).unwrap_or_default();
+    let password_reset_key = move || {
+        password_reset_key_untracked
+            .map(|v| v.run(()))
+            .unwrap_or_default()
+    };
     let password_reset_stage_tracked = move || {
         password_reset_stage_tracked
             .map(|v| v.run(()))
@@ -94,7 +98,7 @@ pub fn PasswordReset(
                     return;
                 };
                 spawner.spawn(async move {
-                    let Some(_result) = password_change.add(&user_email).await else {
+                    let Some(_result) = password_reset.add(&user_email).await else {
                         return;
                     };
                     let link = link_relative_login_password_reset_check(user_email);
@@ -115,7 +119,7 @@ pub fn PasswordReset(
                 };
                 let password_reset_key = password_reset_key();
                 spawner.spawn(async move {
-                    let Some(result) = password_change
+                    let Some(result) = password_reset
                         .confirm(password_reset_key, new_password, new_password_confirmation)
                         .await
                     else {
@@ -130,13 +134,13 @@ pub fn PasswordReset(
             }
         }
     };
-    let general_errs = move || password_change.err_general.get();
+    let general_errs = move || password_reset.err_general.get();
     let is_loading = move || spawner.is_busy.get();
     let when_confirm_btn = move || match password_reset_stage_tracked() {
         PasswordResetStage::Add => true,
         PasswordResetStage::Check => false,
         PasswordResetStage::Confirm => true,
-        PasswordResetStage::Finished => true,
+        PasswordResetStage::Finished => false,
     };
 
     view! {

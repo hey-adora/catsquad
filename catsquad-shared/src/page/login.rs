@@ -1,5 +1,7 @@
 use std::fmt::Display;
 
+use url::Url;
+
 pub const LINK_WEB_LOGIN: &str = "/login";
 
 #[derive(Debug, Clone, PartialEq, PartialOrd, strum::EnumString, strum::Display)]
@@ -66,6 +68,14 @@ pub fn link_relative_login_password_reset_confirm(pss_change_key: impl Display) 
         LoginPageParams::Token,
         pss_change_key,
     )
+}
+
+pub fn link_absolute_login_password_reset_confirm(
+    host: Url,
+    password_change_key: impl Display,
+) -> Result<Url, url::ParseError> {
+    let relative = link_relative_login_password_reset_confirm(password_change_key);
+    host.join(&relative)
 }
 
 pub fn link_relative_login_password_reset_finished(email: impl Display) -> String {

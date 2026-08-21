@@ -7,7 +7,8 @@ use catsquad_db::{
 use catsquad_log::prelude::*;
 use catsquad_shared::{
     PasswordChangeAddErr, PasswordChangeAddReq, PasswordChangeRes,
-    link_absolute_settings_password_change_confirm, validate_email,
+    link_absolute_login_password_reset_confirm, link_absolute_settings_password_change_confirm,
+    validate_email,
 };
 use url::Url;
 
@@ -38,11 +39,12 @@ fn send_email_password_change(address: Url, password_change_key: impl Display) -
     link
 }
 
-fn send_email_password_reset(address: impl AsRef<str>, token: impl AsRef<str>) -> String {
+fn send_email_password_reset(address: Url, token: impl Display) -> String {
+    let link = link_absolute_login_password_reset_confirm(address, token).unwrap();
     // let link = link_absolute_reg_finish(address, token);
-    let link = "placeholder reset".to_string();
-    debug!("EMAIL SENT {link}");
-    link
+    // let link = "placeholder reset".to_string();
+    // debug!("EMAIL SENT {link}");
+    link.to_string()
 }
 
 pub async fn password_change_add(

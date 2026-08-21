@@ -13,6 +13,8 @@ use web_sys::HtmlInputElement;
 mod login_state;
 mod password_reset_component;
 
+use password_reset_component::PasswordReset;
+
 // fn hello()  {
 //     let a = 10;
 //     let b = 10;
@@ -40,10 +42,12 @@ pub fn Login() -> impl IntoView {
     let password_stage_untracked = move || password_stage.get_untracked().unwrap_or_default();
 
     let email = RwQuery::<String>::new(LoginPageParams::Email.to_string());
+    let email_tracked = move || email.get().unwrap_or_default();
     let email_untracked = move || email.get_untracked().unwrap_or_default();
 
     let password_reset_key = RwQuery::<String>::new(LoginPageParams::Token.to_string());
-    let password_reset_key = move || password_reset_key.get_untracked().unwrap_or_default();
+    let password_reset_key_untracked =
+        move || password_reset_key.get_untracked().unwrap_or_default();
 
     let on_login = move |e: web_sys::SubmitEvent| {
         e.prevent_default();
@@ -83,10 +87,19 @@ pub fn Login() -> impl IntoView {
     };
 
     let link_password_reset = link_relative_login_password_reset_send();
+    let when_password_reset = move || page_stage() == LoginPageStage::PssReset;
 
     view! {
         <main id="login_page" class="grid grid-rows-[auto_1fr] h-screen">
             <Nav/>
+            <Show when=when_password_reset>
+                <PasswordReset
+                        password_reset_stage_tracked=password_stage_tracked
+                        password_reset_stage_untracked=password_stage_untracked
+                        password_reset_key_untracked=password_reset_key_untracked
+                        email_tracked
+                    />
+            </Show>
             <div class=move || format!("grid  text-base05 {}", if login_spawner.is_busy.get() {"items-center"} else {"justify-stretch"})>
                 <Show when=move||login_spawner.is_busy.get()>
                     <h1>"LOADING..."</h1>
@@ -104,7 +117,7 @@ pub fn Login() -> impl IntoView {
                                 <label for="password" class="text-[1.2rem] ">"Password"</label>
                                 <input id="password" node_ref=input_password type="password" class="border-b-2 border-base05" />
                             </div>
-                            <a href=link_password_reset class="underline">"forgot password?"</a>
+                            <a id="password_reset_link" href=link_password_reset class="underline">"forgot password?"</a>
                         </div>
                         <div class="flex flex-col gap-[1.3rem] mx-auto my-[4rem] text-center">
                             <input id="login_btn" type="submit" value="Login" class="border-2 border-base05 text-[1.3rem] font-bold px-4 py-1 hover:bg-base05 hover:text-gray-950"/>

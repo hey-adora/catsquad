@@ -88,7 +88,7 @@ pub fn Nav() -> impl IntoView {
             </Show>
             <Show when=when_guest>
                 <div class="flex gap-2">
-                    <a href=LINK_WEB_LOGIN>"Login"</a>
+                    <a id="login_link" href=LINK_WEB_LOGIN>"Login"</a>
                 </div>
             </Show>
             <Show when=when_user>
@@ -97,7 +97,7 @@ pub fn Nav() -> impl IntoView {
                     <a href=move|| "/user">{move || page_state.acc_username() }</a>
                     <a href=move|| "/settings">"Settings"</a>
                     <form method="POST" action="" on:submit=on_logout >
-                        <input type="submit" value="logout" class="transition-all duration-300 ease-in hover:font-bold"/>
+                        <input id="logout_btn" type="submit" value="logout" class="transition-all duration-300 ease-in hover:font-bold"/>
                     </form>
                 </div>
             </Show>

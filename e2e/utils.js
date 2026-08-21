@@ -2,7 +2,7 @@ import { test, expect } from "@playwright/test";
 
 export const USER1_USERNAME = "prime1";
 export const USER1_EMAIL = "prime1@heyadora.com";
-export const PASSWORD = "A6%prime1@heyadora.com";
+export const PASSWORD = "A5%prime1@heyadora.com";
 
 export const USER99_USERNAME = "prime99";
 export const USER99_EMAIL = "prime99@heyadora.com";
@@ -17,6 +17,21 @@ export let login = async (page, email, password)=>{
 
   // await page.locator('[id="gallery"] > a').first().waitFor();
   await page.locator('[id="gallery"] > a').first().waitFor();
+};
+
+export let logout = async (page)=>{
+  await page.goto("http://localhost:3000/");
+
+  // await page.locator('[id="email"]').fill(email);
+  // await page.locator('[id="password"]').fill(password);
+  await page.locator('[id="logout_btn"]').click();
+  await page.locator('[id="login_link"]').waitFor();
+
+  // await page.locator('[id="gallery"] > a').first().waitFor();
+  // await page.locator('[id="gallery"] > a').first().waitFor();
+
+
+  
 };
 
 // export let wait_for_gallery = async () => {
@@ -145,6 +160,18 @@ export let get_password_change_add = async (page, email) => {
   let emails = result["Ok"];
   console.log(`searching ${emails.length} emails by to_email=${email} && reason=user_password_change_add`);
   let link = emails.find((v)=>(v["to_email"] == email && v["reason"] == "user_password_change_add")).body;
+  console.log(`first result ${emails[0]}, result ${link}`);
+  return link;
+};
+
+export let get_password_reset_add = async (page, email) => {
+  const result = await page.evaluate(async () => {
+    let result = await fetch("http://localhost:3000/api/test_backdoor_email_sent_get_all");
+    return result.json();
+  });
+  let emails = result["Ok"];
+  console.log(`searching ${emails.length} emails by to_email=${email} && reason=user_password_reset_add`);
+  let link = emails.find((v)=>(v["to_email"] == email && v["reason"] == "user_password_reset_add")).body;
   console.log(`first result ${emails[0]}, result ${link}`);
   return link;
 };
