@@ -1,85 +1,123 @@
-use crate::{Db, DbUser, SurrealCheckUtils, SurrealErrUtils, SurrealSerializeUtils};
+use crate::{Db, Uuid, XTimestamp, XUuid};
 use catsquad_log::prelude::*;
-use std::fmt::Display;
-use surrealdb::types::{RecordId, RecordIdKey, SurrealValue};
 
-#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize, SurrealValue)]
+#[derive(Debug, Clone, PartialEq, sqlx::FromRow)]
 pub struct DbSession {
-    pub id: RecordId,
-    pub user: DbUser,
-    pub modified_at: u128,
-    pub created_at: u128,
+    #[sqlx(rename = "session_token")]
+    #[sqlx(try_from = "XUuid")]
+    pub token: Uuid,
+    #[sqlx(rename = "session_user_email")]
+    pub user_email: String,
+    #[sqlx(rename = "session_modified_at")]
+    #[sqlx(try_from = "XTimestamp")]
+    pub modified_at: u64,
+    #[sqlx(rename = "session_modified_at")]
+    #[sqlx(try_from = "XTimestamp")]
+    pub created_at: u64,
 }
 
-#[derive(Debug, thiserror::Error, PartialEq)]
+#[derive(Debug, thiserror::Error)]
 pub enum DbSessionAddErr {
     #[error("user {0} not found")]
     UserNotFound(String),
 
     #[error("db error {0}")]
-    Db(#[from] surrealdb::Error),
-}
-
-pub fn create_session_id(id: impl Into<RecordIdKey>) -> RecordId {
-    RecordId::new("session", id)
+    Db(#[from] sqlx::Error),
 }
 
 impl Db {
     pub async fn session_define(&self) {
-        let query = "
-                DEFINE TABLE session SCHEMAFULL;
-                DEFINE FIELD user ON TABLE session TYPE record<user>;
-                DEFINE FIELD modified_at ON TABLE session TYPE number;
-                DEFINE FIELD created_at ON TABLE session TYPE number;
-            ";
-        trace!("about to run {query}");
-        self.db.query(query).await.unwrap().check().unwrap();
+        // TODO maybe DELETE sessions when email changes
+        let pool = &self.db;
+        let _result = sqlx::raw_sql(
+            "
+            CREATE TABLE sessions (
+                session_token uuid PRIMARY KEY DEFAULT uuidv7(),
+                session_user_email varchar NOT NULL references users(user_email) ON UPDATE CASCADE ON DELETE CASCADE,
+                session_modified_at timestamp NOT NULL,
+                session_created_at timestamp NOT NULL
+            );
+            CREATE INDEX session_user_email_idx ON sessions (session_user_email);
+        ",
+        )
+        .execute(pool)
+        .await
+        .unwrap();
     }
 
     pub async fn session_add(
         &self,
-        time: u128,
+        time: u64,
         email: impl Into<String>,
     ) -> Result<DbSession, DbSessionAddErr> {
+        let pool = &self.db;
         let email = email.into();
-        let query = r#"
-                 BEGIN TRANSACTION;
-                 LET $user = SELECT id FROM ONLY user WHERE email = $email;
-                 CREATE session SET user = $user.id, modified_at = $time, created_at = $time RETURN *, user.*;
-                 COMMIT TRANSACTION;
-                "#;
-        trace!("about to run {query}");
 
-        self.db
-            .query(query)
-            .bind(("time", time))
-            .bind(("email", email.clone()))
-            .await
-            .check_better(|err| match err {
-                err if err.field_value_null("user") => DbSessionAddErr::UserNotFound(email),
-                err => {
-                    error!("unexpected db error {err}");
-                    err.into()
-                }
-            })
-            .and_then_take_expect(2)
+        let query = "
+            INSERT INTO sessions (
+                    session_user_email,
+                    session_modified_at,
+                    session_created_at
+                )
+                VALUES ( $2, $1, $1 )
+                RETURNING session_token
+        ";
+
+        debug!("about to run {query}");
+
+        let result = sqlx::query_as(query)
+            .bind(XTimestamp(time as i64))
+            .bind(&email)
+            .fetch_one(pool)
+            .await;
+
+        let result = match result {
+            Ok(v) => v,
+            Err(sqlx::Error::Database(err))
+                if err.is_foreign_key_violation()
+                    && err.constraint() == Some("sessions_session_user_email_fkey") =>
+            {
+                return Err(DbSessionAddErr::UserNotFound(email));
+            }
+            Err(err) => {
+                error!("unexpected db error {err}");
+                return Err(DbSessionAddErr::Db(err));
+            }
+        };
+
+        let (XUuid(session_token),): (XUuid,) = result;
+
+        let session = DbSession {
+            token: session_token,
+            user_email: email,
+            modified_at: time,
+            created_at: time,
+        };
+
+        debug!("query {query}\nresults {session:#?}");
+
+        Ok(session)
     }
 }
 
+#[cfg(test)]
 #[tokio::test]
 async fn test_session_add() {
     init_log();
 
-    let db = Db::mem(0).await;
+    let db = Db::test_db(0, "test_session_add").await;
 
     let invite = db.invite_add(0, "hey@hey.com", 1).await.unwrap();
-    let result = db
-        .user_add(0, "hey", "hey", invite.id.key, 10, 10)
+    let _result = db
+        .user_add(0, "hey", "hey", invite.token.clone(), 10, 10)
         .await
         .unwrap();
 
-    let session = db.session_add(0, "hey@hey.com").await.unwrap();
-    assert_eq!(session.user.username, "hey");
+    let session1 = db.session_add(0, "hey@hey.com").await.unwrap();
+    assert_eq!(session1.user_email, "hey@hey.com");
+
+    let session2 = db.session_add(0, "hey@hey.com").await.unwrap();
+    assert_eq!(session2.user_email, "hey@hey.com");
 
     let result = db.session_add(0, "hey2@hey.com").await;
     assert!(matches!(result, Err(DbSessionAddErr::UserNotFound(_))));

@@ -1,12 +1,10 @@
+use crate::Db;
 use catsquad_log::prelude::*;
-use surrealdb::types::{RecordId, RecordIdKey, SurrealValue};
 
-use crate::{Db, SurrealCheckUtils, SurrealErrUtils, SurrealSerializeUtils};
-
-#[derive(Debug, thiserror::Error, PartialEq)]
+#[derive(Debug, thiserror::Error)]
 pub enum DbUserGetPasswordErr {
     #[error("DB error {0}")]
-    DB(#[from] surrealdb::Error),
+    Db(#[from] sqlx::Error),
 
     #[error("user not found")]
     NotFound,
@@ -17,32 +15,42 @@ impl Db {
         &self,
         email: impl Into<String>,
     ) -> Result<String, DbUserGetPasswordErr> {
-        let query = "(SELECT password FROM user WHERE email = $email).password";
+        let pool = &self.db;
+        let email = email.into();
 
-        trace!("about to run {query}");
+        let query = "SELECT user_password FROM users WHERE user_email = $1";
 
-        self.db
-            .query(query)
-            .bind(("email", email.into()))
-            .await
-            .check_good(|err| match err {
-                err => {
-                    error!("unexpected db error {err}");
-                    DbUserGetPasswordErr::DB(err)
-                }
-            })
-            .and_then_take_or(0, DbUserGetPasswordErr::NotFound)
+        debug!("about to run {query}");
+
+        let result = sqlx::query_as(query).bind(email).fetch_one(pool).await;
+
+        let result = match result {
+            Ok(v) => v,
+            Err(sqlx::Error::RowNotFound) => {
+                return Err(DbUserGetPasswordErr::NotFound);
+            }
+            Err(err) => {
+                error!("unexpected db error {err}");
+                return Err(DbUserGetPasswordErr::Db(err));
+            }
+        };
+
+        debug!("query {query}\nresults {result:?}");
+        let (user_password,): (String,) = result;
+
+        Ok(user_password)
     }
 }
 
+#[cfg(test)]
 #[tokio::test]
 async fn test_user_get_password() {
     init_log();
 
-    let db = Db::mem(0).await;
+    let db = Db::test_db(0, "test_user_get_password").await;
 
     let invite = db.invite_add(0, "hey@hey.com", 10).await.unwrap();
-    db.user_add(0, "hey", "hey", invite.id.key.clone(), 10, 10)
+    db.user_add(0, "hey", "hey", invite.token.clone(), 10, 10)
         .await
         .unwrap();
     let password = db.user_get_password("hey@hey.com").await.unwrap();

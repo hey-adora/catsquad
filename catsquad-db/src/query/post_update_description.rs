@@ -1,114 +1,113 @@
-use catsquad_log::prelude::*;
-use surrealdb::types::{RecordId, RecordIdKey};
-
-use crate::{
-    Db, DbPost, SurrealCheckUtils, SurrealErrUtils, SurrealSerializeUtils, create_post_id,
-};
-
-#[derive(Debug, thiserror::Error, PartialEq)]
-pub enum DbPostUpdateDescriptionErr {
-    #[error("post not found")]
-    PostNotFound,
-
-    #[error("unauthorized")]
-    Unauthorized,
-
-    #[error("DB error {0}")]
-    Db(#[from] surrealdb::Error),
-}
+use crate::{Db, DbPostUpdateBuilderTextErr, DbPostUpdateBuilderTextField};
 
 impl Db {
     pub async fn post_update_description(
         &self,
-        time: u128,
-        user_id: RecordId,
-        post_key: impl Into<RecordIdKey>,
+        time: u64,
+        user_username: impl Into<String>,
+        post_id: i64,
         new_description: impl Into<String>,
-    ) -> Result<DbPost, DbPostUpdateDescriptionErr> {
-        let post_id = create_post_id(post_key);
-
-        let query = r#"
-                    BEGIN TRANSACTION;
-
-                    LET $post = SELECT user FROM ONLY $post_id;
-
-                    IF !$post {
-                        THROW "not found"
-                    };
-
-                    IF $post.user != $user_id {
-                        THROW "unauthorized"
-                    };
-
-                    UPDATE ONLY $post_id SET description = $new_description, modified_at = $time RETURN *, user.*;
-
-                    COMMIT TRANSACTION;
-                "#;
-
-        trace!("about to run {query}");
-
-        self.db
-            .query(query)
-            .bind(("time", time))
-            .bind(("user_id", user_id))
-            .bind(("post_id", post_id))
-            .bind(("new_description", new_description.into()))
-            .await
-            .check_better(|err| match err {
-                err if err.thrown("not found") => DbPostUpdateDescriptionErr::PostNotFound,
-                err if err.thrown("unauthorized") => DbPostUpdateDescriptionErr::Unauthorized,
-                err => {
-                    error!("unexpected db error {err}");
-                    DbPostUpdateDescriptionErr::Db(err)
-                }
-            })
-            .and_then_take_expect(4)
+    ) -> Result<(), DbPostUpdateBuilderTextErr> {
+        self.post_update_builder_text(
+            time,
+            user_username,
+            post_id,
+            DbPostUpdateBuilderTextField::Description,
+            new_description,
+        )
+        .await
     }
 }
 
+#[cfg(test)]
 #[tokio::test]
 async fn test_post_update_description() {
+    use catsquad_log::init_log;
+
     init_log();
 
-    let db = Db::mem(0).await;
+    let db = Db::test_db(0, "test_post_update_description").await;
 
-    let invite1 = db.invite_add(0, "hey@heyadora.com", 1).await.unwrap();
-    let user = db
-        .user_add(0, "hey", "hey", invite1.id.key.clone(), 10, 10)
-        .await
-        .unwrap();
+    let (user, user2) = {
+        let invite1 = db.invite_add(0, "hey@heyadora.com", 1).await.unwrap();
+        let user = db
+            .user_add(0, "hey", "hey", invite1.token, 10, 10)
+            .await
+            .unwrap();
 
-    let invite1 = db.invite_add(0, "hey2@heyadora.com", 1).await.unwrap();
-    let user2 = db
-        .user_add(0, "hey2", "hey", invite1.id.key.clone(), 10, 10)
-        .await
-        .unwrap();
+        let invite1 = db.invite_add(0, "hey2@heyadora.com", 1).await.unwrap();
+        let user2 = db
+            .user_add(0, "hey2", "hey", invite1.token, 10, 10)
+            .await
+            .unwrap();
 
-    let post1 = db
-        .post_add(0, user.id.clone(), "title1", "description1", "tags")
-        .await
-        .unwrap();
+        (user, user2)
+    };
+
+    let (post1, post2) = {
+        use catsquad_shared::PostState;
+
+        let post1 = db
+            .post_add(0, user.username.clone(), "title1", "description1", "tags")
+            .await
+            .unwrap();
+
+        db.post_update_state(0, user.username.clone(), post1.id, PostState::Active)
+            .await
+            .unwrap();
+
+        let post2 = db
+            .post_add(0, user.username.clone(), "title1", "description4", "tags")
+            .await
+            .unwrap();
+
+        db.post_update_state(0, user.username.clone(), post2.id, PostState::Active)
+            .await
+            .unwrap();
+
+        (post1, post2)
+    };
+
     assert_eq!(post1.description, "description1");
 
-    let post1 = db
-        .post_update_description(0, user.id.clone(), post1.id.key.clone(), "description2")
-        .await
-        .unwrap();
-    assert_eq!(post1.description, "description2");
+    // success assert
+    {
+        db.post_update_description(0, user.username.clone(), post1.id, "description2")
+            .await
+            .unwrap();
+        let post1 = db
+            .post_get_by_id(user.username.clone(), post1.id)
+            .await
+            .unwrap();
+        assert_eq!(post1.description, "description2");
 
-    let result = db
-        .post_update_description(0, user2.id.clone(), post1.id.key.clone(), "description2")
-        .await;
-    assert!(matches!(
-        result,
-        Err(DbPostUpdateDescriptionErr::Unauthorized)
-    ));
+        // make sure it only updated single row
+        let post2 = db
+            .post_get_by_id(user.username.clone(), post2.id)
+            .await
+            .unwrap();
+        assert_eq!(post2.description, "description4");
+    }
 
-    let result = db
-        .post_update_description(0, user.id.clone(), "invalid", "description2")
-        .await;
-    assert!(matches!(
-        result,
-        Err(DbPostUpdateDescriptionErr::PostNotFound)
-    ));
+    // error assert
+    {
+        let result = db
+            .post_update_description(0, user2.username.clone(), post1.id, "description2")
+            .await;
+        assert!(matches!(
+            result,
+            Err(DbPostUpdateBuilderTextErr::Unauthorized)
+        ));
+    }
+
+    // error assert
+    {
+        let result = db
+            .post_update_description(0, user.username.clone(), 0, "description2")
+            .await;
+        assert!(matches!(
+            result,
+            Err(DbPostUpdateBuilderTextErr::PostNotFound)
+        ));
+    }
 }

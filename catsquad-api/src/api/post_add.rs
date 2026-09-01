@@ -18,7 +18,7 @@ pub fn from_db_post(value: DbPost) -> PostRes {
         state: PostState::from(value.state),
         title: value.title,
         tags: value.tags,
-        favorites: value.favorites,
+        favorites: value.likes_count,
         description: value.description,
         file: value.file.into_iter().map(from_db_post_file).collect(),
         modified_at: value.modified_at,

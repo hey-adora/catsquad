@@ -1,21 +1,26 @@
+use crate::{Db, XTimestamp};
+use catsquad_log::prelude::*;
 use std::fmt::Display;
 
-use catsquad_log::prelude::*;
-use surrealdb::types::{RecordId, RecordIdKey, SurrealValue};
-
-use crate::{Db, SurrealCheckUtils, SurrealErrUtils, SurrealSerializeUtils};
-
-#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize, SurrealValue)]
+#[derive(Debug, Clone, PartialEq, sqlx::FromRow)]
 pub struct DbEmailSent {
-    pub id: RecordId,
+    #[sqlx(rename = "email_sent_id")]
+    pub id: i64,
+    #[sqlx(rename = "email_sent_body")]
     pub body: String,
+    #[sqlx(rename = "email_sent_to_email")]
     pub to_email: String,
+    #[sqlx(rename = "email_sent_reason")]
     pub reason: String,
-    pub modified_at: u128,
-    pub created_at: u128,
+    #[sqlx(rename = "email_sent_modified_at")]
+    #[sqlx(try_from = "XTimestamp")]
+    pub modified_at: u64,
+    #[sqlx(rename = "email_sent_created_at")]
+    #[sqlx(try_from = "XTimestamp")]
+    pub created_at: u64,
 }
 
-#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize, SurrealValue)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum DbEmailSentReason {
     InviteAdd,
     SessionAdd,
@@ -52,69 +57,136 @@ impl Display for DbEmailSentReason {
     }
 }
 
-#[derive(Debug, thiserror::Error, PartialEq)]
+// impl From<String>
+
+#[derive(Debug, thiserror::Error)]
 pub enum DbEmailSentAddErr {
     #[error("DB error {0}")]
-    Db(#[from] surrealdb::Error),
-}
-
-pub fn create_email_sent_id(id: impl Into<RecordIdKey>) -> RecordId {
-    RecordId::new("email_sent", id)
+    Db(#[from] sqlx::Error),
 }
 
 impl Db {
     pub async fn email_sent_define(&self) {
+        let pool = &self.db;
+        // pub id: i64,
+        // pub body: String,
+        // pub to_email: String,
+        // pub reason: String,
+        // pub modified_at: u64,
+        // pub created_at: u64,
         let query = "
-                DEFINE TABLE email_sent SCHEMAFULL;
-                DEFINE FIELD reason ON TABLE email_sent TYPE string;
-                DEFINE FIELD to_email ON TABLE email_sent TYPE string;
-                DEFINE FIELD body ON TABLE email_sent TYPE string;
-                DEFINE FIELD modified_at ON TABLE email_sent TYPE number;
-                DEFINE FIELD created_at ON TABLE email_sent TYPE number;
-            ";
+            CREATE TABLE emails_sent (
+                email_sent_id int8 PRIMARY KEY generated always as identity,
+                email_sent_body text NOT NULL,
+                email_sent_to_email varchar NOT NULL,
+                email_sent_reason varchar NOT NULL,
+                email_sent_modified_at timestamp NOT NULL,
+                email_sent_created_at timestamp NOT NULL
+            );
+        ";
         trace!("about to run {query}");
-        self.db.query(query).await.unwrap().check().unwrap();
+        let _result = sqlx::raw_sql(query).execute(pool).await.unwrap();
+        // let query = "
+        //         DEFINE TABLE email_sent SCHEMAFULL;
+        //         DEFINE FIELD reason ON TABLE email_sent TYPE string;
+        //         DEFINE FIELD to_email ON TABLE email_sent TYPE string;
+        //         DEFINE FIELD body ON TABLE email_sent TYPE string;
+        //         DEFINE FIELD modified_at ON TABLE email_sent TYPE number;
+        //         DEFINE FIELD created_at ON TABLE email_sent TYPE number;
+        //     ";
+        // trace!("about to run {query}");
+        // self.db.query(query).await.unwrap().check().unwrap();
     }
 
     pub async fn email_sent_add(
         &self,
-        time: u128,
+        time: u64,
         reason: DbEmailSentReason,
         to_email: impl Into<String>,
         body: impl Into<String>,
     ) -> Result<DbEmailSent, DbEmailSentAddErr> {
-        let query = r#"
-                 CREATE email_sent SET
-                    reason = $reason,
-                    to_email = $to_email,
-                    body = $body,
-                    modified_at = $time,
-                    created_at = $time;
-                "#;
-        trace!("about to run {query}");
+        let pool = &self.db;
+        let to_email = to_email.into();
+        let body = body.into();
+        let reason = reason.to_string();
 
-        self.db
-            .query(query)
-            .bind(("time", time))
-            .bind(("reason", reason.to_string()))
-            .bind(("to_email", to_email.into()))
-            .bind(("body", body.into()))
-            .await
-            .check_better(|err| match err {
-                err => {
-                    error!("unexpected db error {err}");
-                    DbEmailSentAddErr::Db(err)
-                }
-            })
-            .and_then_take_expect(0)
+        let query = "
+            INSERT INTO emails_sent (
+                    email_sent_body,
+                    email_sent_to_email,
+                    email_sent_reason,
+                    email_sent_modified_at,
+                    email_sent_created_at
+                )
+                VALUES ($1, $2, $3, $4, $4)
+                RETURNING email_sent_id
+        ";
+
+        let result = sqlx::query_as(query)
+            .bind(&body)
+            .bind(&to_email)
+            .bind(&reason) // TODO make it &'static str
+            .bind(XTimestamp(time as i64))
+            .fetch_one(pool)
+            .await;
+
+        debug!("query {query} result {result:?}");
+
+        let (emails_sent_id,): (i64,) = match result {
+            Ok(v) => v,
+            // Err(sqlx::Error::RowNotFound) => {
+            //     return Err(DbEmailSentAddErr::UserNotFound);
+            // }
+            Err(err) => {
+                error!("unexpected db error {err}");
+                return Err(DbEmailSentAddErr::Db(err));
+            }
+        };
+
+        let email_sent = DbEmailSent {
+            id: emails_sent_id,
+            body,
+            to_email,
+            reason,
+            modified_at: time,
+            created_at: time,
+        };
+
+        Ok(email_sent)
+
+        // let query = r#"
+        //          CREATE email_sent SET
+        //             reason = $reason,
+        //             to_email = $to_email,
+        //             body = $body,
+        //             modified_at = $time,
+        //             created_at = $time;
+        //         "#;
+        // trace!("about to run {query}");
+
+        // self.db
+        //     .query(query)
+        //     .bind(("time", time))
+        //     .bind(("reason", reason.to_string()))
+        //     .bind(("to_email", to_email.into()))
+        //     .bind(("body", body.into()))
+        //     .await
+        //     .check_better(|err| match err {
+        //         err => {
+        //             error!("unexpected db error {err}");
+        //             DbEmailSentAddErr::Db(err)
+        //         }
+        //     })
+        //     .and_then_take_expect(0)
     }
 }
 
+#[cfg(test)]
 #[tokio::test]
 async fn test_email_sent_add() {
     init_log();
 
-    let db = Db::mem(0).await;
+    let db = Db::test_db(0, "test_email_sent_add").await;
 
     let email = db
         .email_sent_add(0, DbEmailSentReason::InviteAdd, "prime@heyadora.com", "wtf")

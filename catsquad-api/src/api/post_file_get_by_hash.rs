@@ -53,7 +53,7 @@ pub async fn post_file_get_by_hash(
     let inner = async || -> Result<(Vec<u8>, String), PostFileGetByHashErr> {
         let post = app
             .db
-            .post_get_by_key(user_id, post_key)
+            .post_get_by_id(user_id, post_key)
             .await
             .map_err(from_post_get_by_key_err)?;
 

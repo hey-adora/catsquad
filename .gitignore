@@ -38,6 +38,8 @@ files
 log1.txt
 artbounty/logs
 font.ttf
+/data
+dump.rdb
 
 # Playwright
 /playwright-report/

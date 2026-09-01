@@ -17,7 +17,7 @@ pub enum DbCommentUpdateTextErr {
     Db(#[from] surrealdb::Error),
 }
 
-impl Db {
+impl<C: surrealdb::Connection> Db<C> {
     pub async fn comment_update_text(
         &self,
         time: u128,

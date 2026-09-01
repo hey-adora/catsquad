@@ -1,10 +1,10 @@
-use crate::{Db, DbMigration, SurrealCheckUtils, SurrealErrUtils, SurrealSerializeUtils};
+use crate::{Db, DbMigration, XTimestamp};
 use catsquad_log::prelude::*;
 
 #[derive(Debug, thiserror::Error)]
 pub enum DbMigrationGetLatestErr {
     #[error("DB error {0}")]
-    Db(#[from] surrealdb::Error),
+    Db(#[from] sqlx::Error),
 
     #[error("migration not found")]
     NotFound,
@@ -12,21 +12,49 @@ pub enum DbMigrationGetLatestErr {
 
 impl Db {
     pub async fn migration_get_latest(&self) -> Result<DbMigration, DbMigrationGetLatestErr> {
-        let query = "
-            SELECT * FROM ONLY migration ORDER BY created_at DESC
-        ";
+        let pool = &self.db;
+
+        let mut tx = pool.begin().await?;
+
+        let query = "SELECT * FROM migrations ORDER BY migration_created_at DESC LIMIT 1";
+
         trace!("about to run {query}");
-        //The table 'migration' does not exist
-        self.db
-            .query(query)
-            .await
-            .check_good(|err| match err {
-                err if err.table_not_found("migration") => DbMigrationGetLatestErr::NotFound,
-                err => {
-                    error!("unexpected db error {err}");
-                    DbMigrationGetLatestErr::from(err)
-                }
-            })
-            .and_then_take_or(0, DbMigrationGetLatestErr::NotFound)
+
+        let result = sqlx::query_as(query).fetch_one(&mut *tx).await;
+
+        let result = match result {
+            Ok(v) => v,
+            Err(sqlx::Error::RowNotFound) => {
+                return Err(DbMigrationGetLatestErr::NotFound);
+            }
+            Err(sqlx::Error::Database(err))
+                if err.kind() == sqlx::error::ErrorKind::Other
+                    && err.message() == "relation \"migrations\" does not exist" =>
+            {
+                return Err(DbMigrationGetLatestErr::NotFound);
+            }
+            Err(err) => {
+                error!("unexpected db error {err}");
+                return Err(DbMigrationGetLatestErr::Db(err));
+            }
+        };
+
+        let (version, XTimestamp(modified_at), XTimestamp(created_at)): (i32, XTimestamp, XTimestamp) =
+            result;
+
+        Ok(DbMigration {
+            version: version as u16,
+            modified_at: modified_at as u64,
+            created_at: created_at as u64,
+        })
     }
+}
+
+#[cfg(test)]
+#[tokio::test]
+async fn test_migration_get_latest() {
+    init_log();
+    let db = Db::test_db(0, "test_migration_get_latest").await;
+
+    let _result = db.migration_get_latest().await.unwrap();
 }

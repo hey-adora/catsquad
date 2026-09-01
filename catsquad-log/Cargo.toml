@@ -3,6 +3,11 @@ name = "catsquad-log"
 version = "0.1.0"
 edition = "2024"
 
+[features]
+release_max_level_info = [
+  "tracing/release_max_level_info"
+]
+
 [lib]
 crate-type = ["rlib"]
 

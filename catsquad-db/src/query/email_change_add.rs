@@ -1,132 +1,154 @@
+use crate::{Db, Uuid, XTimestamp, XUuid};
 use catsquad_log::prelude::*;
-use surrealdb::types::{RecordId, RecordIdKey, SurrealValue, ToSql};
 
-use crate::{
-    Db, DbUser, SurrealCheckUtils, SurrealErrUtils, SurrealSerializeUtils, create_user_id,
-};
-
-#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize, SurrealValue)]
+#[derive(Debug, Clone, PartialEq, sqlx::FromRow)]
 pub struct DbEmailChange {
-    pub id: RecordId,
-    pub user: DbUser,
-    pub current: DbEmailChangeToken,
-    pub new: Option<DbEmailChangeToken>,
+    #[sqlx(rename = "email_change_id")]
+    pub id: i64,
+    #[sqlx(rename = "email_change_user_username")]
+    pub user_username: String,
+    #[sqlx(rename = "email_change_current_email")]
+    pub current_email: String,
+    #[sqlx(rename = "email_change_current_token")]
+    #[sqlx(try_from = "XUuid")]
+    pub current_token: Uuid,
+    #[sqlx(rename = "email_change_current_used")]
+    pub current_used: bool,
+    #[sqlx(rename = "email_change_new_email")]
+    pub new_email: String,
+    #[sqlx(rename = "email_change_new_token")]
+    #[sqlx(try_from = "XUuid")]
+    pub new_token: Uuid,
+    #[sqlx(rename = "email_change_new_used")]
+    pub new_used: bool,
+    #[sqlx(rename = "email_change_completed")]
     pub completed: bool,
-    pub expires: u128,
-    pub modified_at: u128,
-    pub created_at: u128,
+    #[sqlx(rename = "email_change_expires_at")]
+    #[sqlx(try_from = "XTimestamp")]
+    pub expires_at: u64,
+    #[sqlx(rename = "email_change_modified_at")]
+    #[sqlx(try_from = "XTimestamp")]
+    pub modified_at: u64,
+    #[sqlx(rename = "email_change_created_at")]
+    #[sqlx(try_from = "XTimestamp")]
+    pub created_at: u64,
 }
 
-#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize, SurrealValue)]
-pub struct DbEmailChangeToken {
-    pub email: String,
-    pub token: String,
-    pub token_used: bool,
-}
-
-#[derive(Debug, thiserror::Error, PartialEq)]
+#[derive(Debug, thiserror::Error)]
 pub enum DbEmailChangeAddErr {
     #[error("user not found")]
     UserNotFound,
 
     #[error("DB error {0}")]
-    Db(#[from] surrealdb::Error),
-}
-
-pub fn create_email_change_id(key: impl Into<RecordIdKey>) -> RecordId {
-    RecordId::new("email_change", key)
+    Db(#[from] sqlx::Error),
 }
 
 impl Db {
     pub async fn email_change_define(&self) {
+        let pool = &self.db;
+        // add foreign key FILE
         let query = "
-                DEFINE TABLE email_change SCHEMAFULL;
-                DEFINE FIELD user ON TABLE email_change TYPE record<user>;
-
-                DEFINE FIELD current ON TABLE email_change TYPE object;
-                DEFINE FIELD current.email ON TABLE email_change TYPE string;
-                DEFINE FIELD current.token ON TABLE email_change TYPE string;
-                DEFINE FIELD current.token_used ON TABLE email_change TYPE bool;
-
-                DEFINE FIELD new ON TABLE email_change TYPE option<object>;
-                DEFINE FIELD new.email ON TABLE email_change TYPE string;
-                DEFINE FIELD new.token ON TABLE email_change TYPE string;
-                DEFINE FIELD new.token_used ON TABLE email_change TYPE bool;
-
-                DEFINE FIELD completed ON TABLE email_change TYPE bool;
-                DEFINE FIELD expires ON TABLE email_change TYPE number;
-                DEFINE FIELD modified_at ON TABLE email_change TYPE number;
-                DEFINE FIELD created_at ON TABLE email_change TYPE number;
-            ";
+            CREATE TABLE emails_changes (
+                email_change_id int8 PRIMARY KEY generated always as identity,
+                email_change_user_username varchar NOT NULL references users(user_username) ON UPDATE CASCADE ON DELETE CASCADE,
+                email_change_current_email varchar NOT NULL,
+                email_change_current_token uuid DEFAULT uuidv7(),
+                email_change_current_used bool DEFAULT FALSE,
+                email_change_new_email varchar DEFAULT '',
+                email_change_new_token uuid DEFAULT uuidv7(),
+                email_change_new_used bool DEFAULT FALSE,
+                email_change_completed bool DEFAULT FALSE,
+                email_change_expires_at timestamp NOT NULL,
+                email_change_modified_at timestamp NOT NULL,
+                email_change_created_at timestamp NOT NULL
+            );
+            CREATE INDEX email_change_user_username_idx ON emails_changes (email_change_user_username);
+        ";
         trace!("about to run {query}");
-        self.db.query(query).await.unwrap().check().unwrap();
+        let _result = sqlx::raw_sql(query).execute(pool).await.unwrap();
     }
 
     pub async fn email_change_add(
         &self,
-        time: u128,
-        user_id: RecordId,
-        expires: u128,
+        time: u64,
+        user_username: impl Into<String>,
+        expires: u64,
     ) -> Result<DbEmailChange, DbEmailChangeAddErr> {
-        let token_current = RecordIdKey::rand().to_sql();
+        let pool = &self.db;
+        let user_username = user_username.into();
 
-        let query = r#"
-                    BEGIN TRANSACTION;
+        let query = "
+            INSERT INTO emails_changes (
+                    email_change_user_username,
+                    email_change_current_email,
+                    email_change_expires_at,
+                    email_change_modified_at,
+                    email_change_created_at
+                )
+                SELECT $1, user_email, $2, $3, $3 FROM users WHERE user_username = $1
+                RETURNING email_change_id, email_change_current_token, email_change_new_token, email_change_current_email
+        ";
+        debug!("about to run {query}");
+        let result = sqlx::query_as(query)
+            .bind(&user_username)
+            .bind(XTimestamp(expires as i64))
+            .bind(XTimestamp(time as i64))
+            .fetch_one(pool)
+            .await;
 
-                    LET $user = SELECT id, email FROM ONLY $user_id;
+        let (
+            email_change_id,
+            XUuid(email_change_current_token),
+            XUuid(email_change_new_token),
+            email_change_current_email,
+        ): (i64, XUuid, XUuid, String) = match result {
+            Ok(v) => v,
+            Err(sqlx::Error::RowNotFound) => {
+                return Err(DbEmailChangeAddErr::UserNotFound);
+            }
+            Err(err) => {
+                error!("unexpected db error {err}");
+                return Err(DbEmailChangeAddErr::Db(err));
+            }
+        };
 
-                    if !$user {
-                        THROW "user not found"
-                    };
+        let email_change = DbEmailChange {
+            id: email_change_id,
+            user_username,
+            current_email: email_change_current_email,
+            current_token: email_change_current_token,
+            current_used: false,
+            new_email: String::new(),
+            new_token: email_change_new_token,
+            new_used: false,
+            completed: false,
+            expires_at: expires,
+            modified_at: time,
+            created_at: time,
+        };
 
-                    CREATE email_change SET
-                       user = $user.id,
-                       current.email = $user.email,
-                       current.token = $token_current,
-                       current.token_used = false,
-                       new = NONE,
-                       completed = false,
-                       expires = $expires,
-                       modified_at = $time,
-                       created_at = $time 
-                    RETURN *, user.*;
-
-                    COMMIT TRANSACTION;
-                "#;
-        trace!("about to run {query}");
-
-        self.db
-            .query(query)
-            .bind(("time", time))
-            .bind(("expires", expires))
-            .bind(("token_current", token_current))
-            .bind(("user_id", user_id))
-            .await
-            .check_better(|err| match err {
-                err if err.thrown("user not found") => DbEmailChangeAddErr::UserNotFound,
-                err => {
-                    error!("unexpected db error {err}");
-                    DbEmailChangeAddErr::Db(err)
-                }
-            })
-            .and_then_take_expect(3)
+        Ok(email_change)
     }
 }
 
+#[cfg(test)]
 #[tokio::test]
 async fn test_email_change_add() {
     init_log();
 
-    let db = Db::mem(0).await;
+    let db = Db::test_db(0, "test_email_change_add").await;
 
     let invite1 = db.invite_add(0, "hey@heyadora.com", 1).await.unwrap();
     let user = db
-        .user_add(0, "hey", "hey", invite1.id.key.clone(), 10, 10)
+        .user_add(0, "hey", "hey", invite1.token, 10, 10)
         .await
         .unwrap();
 
-    let _result = db.email_change_add(0, user.id.clone(), 10).await.unwrap();
+    let _result = db
+        .email_change_add(0, user.username.clone(), 10)
+        .await
+        .unwrap();
 
-    let result = db.email_change_add(0, create_user_id("invalid"), 10).await;
-    assert_eq!(result, Err(DbEmailChangeAddErr::UserNotFound));
+    let result = db.email_change_add(0, "invalid", 10).await;
+    assert!(matches!(result, Err(DbEmailChangeAddErr::UserNotFound)));
 }

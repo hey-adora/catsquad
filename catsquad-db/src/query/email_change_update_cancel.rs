@@ -1,12 +1,7 @@
+use crate::{Db, XTimestamp};
 use catsquad_log::prelude::*;
-use surrealdb::types::{RecordId, RecordIdKey};
 
-use crate::{
-    Db, SurrealCheckUtils, SurrealErrUtils, SurrealSerializeUtils,
-    query::email_change_add::{DbEmailChange, create_email_change_id},
-};
-
-#[derive(Debug, thiserror::Error, PartialEq)]
+#[derive(Debug, thiserror::Error)]
 pub enum DbEmailChangeUpdateCancelErr {
     #[error("email change not found")]
     NotFound,
@@ -21,105 +16,192 @@ pub enum DbEmailChangeUpdateCancelErr {
     Expired,
 
     #[error("DB error {0}")]
-    Db(#[from] surrealdb::Error),
+    Db(#[from] sqlx::Error),
 }
 
 impl Db {
     pub async fn email_change_update_cancel(
         &self,
-        time: u128,
-        user_id: RecordId,
-        email_change_key: impl Into<RecordIdKey>,
-    ) -> Result<DbEmailChange, DbEmailChangeUpdateCancelErr> {
-        // let user_id = create_user_id(user_key);
-        let email_change_id = create_email_change_id(email_change_key);
+        time: u64,
+        user_username: impl Into<String>,
+        email_change_id: i64,
+    ) -> Result<(), DbEmailChangeUpdateCancelErr> {
+        let pool = &self.db;
 
-        let query = r#"
-                    BEGIN TRANSACTION;
+        let user_username = user_username.into();
 
-                    LET $email_change = SELECT *, new.*, current.* FROM ONLY $email_change_id;
-
-                    # basic checks
-                    
-                    IF !$email_change {
-                        THROW "not found"
-                    };
-
-                    IF $email_change.user != $user_id {
-                        THROW "unauthorized"
-                    };
-
-                    IF $email_change.completed {
-                        THROW "already used"
-                    };
-
-                    IF $email_change.expires < $time {
-                        THROW "email change expired"
-                    };
-
-                    # 
-
-                    UPDATE ONLY $email_change_id SET
-                        completed = true,
-                        modified_at = $time
-                        RETURN *, new.*, current.*, user.*;
-
-                    COMMIT TRANSACTION;
-                "#;
-
-        trace!("about to run {query}");
-
-        self.db
-            .query(query)
-            .bind(("time", time))
-            .bind(("user_id", user_id))
-            .bind(("email_change_id", email_change_id))
+        let mut tx = pool
+            .begin()
             .await
-            .check_better(|err| match err {
-                err if err.thrown("not found") => DbEmailChangeUpdateCancelErr::NotFound,
-                err if err.thrown("unauthorized") => DbEmailChangeUpdateCancelErr::Unauthorized,
-                err if err.thrown("already used") => DbEmailChangeUpdateCancelErr::AlreadyUsed,
-                err if err.thrown("email change expired") => DbEmailChangeUpdateCancelErr::Expired,
-                err => {
-                    error!("unexpected db error {err}");
-                    DbEmailChangeUpdateCancelErr::Db(err)
+            .inspect_err(|err| error!("post_like_add {err}"))?;
+
+        // get email_change
+        {
+            let query = "SELECT
+                                email_change_user_username,
+                                email_change_completed,
+                                email_change_expires_at
+                                FROM emails_changes WHERE email_change_id = $1";
+
+            let result = sqlx::query_as(query)
+                .bind(email_change_id)
+                .fetch_one(&mut *tx)
+                .await;
+
+            debug!("query {query} result {result:#?}");
+
+            let (
+                email_change_user_username,
+                email_change_completed,
+                XTimestamp(email_change_expired_at),
+            ): (String, bool, XTimestamp) = match result {
+                Ok(v) => v,
+                Err(sqlx::Error::RowNotFound) => {
+                    return Err(DbEmailChangeUpdateCancelErr::NotFound);
                 }
-            })
-            .and_then_take_expect(6)
+                Err(err) => {
+                    error!("unexpected db error {err}");
+                    return Err(DbEmailChangeUpdateCancelErr::Db(err));
+                }
+            };
+            let email_change_expired_at = email_change_expired_at as u64;
+
+            if email_change_user_username != user_username {
+                return Err(DbEmailChangeUpdateCancelErr::Unauthorized);
+            }
+
+            if email_change_completed {
+                return Err(DbEmailChangeUpdateCancelErr::AlreadyUsed);
+            }
+
+            if email_change_expired_at < time {
+                return Err(DbEmailChangeUpdateCancelErr::Expired);
+            }
+        }
+
+        // update email change
+        {
+            let query = "UPDATE emails_changes SET
+                                email_change_completed = TRUE,
+                                email_change_modified_at = $1
+                                WHERE email_change_id = $2";
+
+            let result = sqlx::query(query)
+                .bind(XTimestamp(time as i64))
+                .bind(email_change_id)
+                .execute(&mut *tx)
+                .await;
+
+            debug!("query {query} result {result:#?}");
+
+            let result = match result {
+                Ok(v) => v,
+                Err(err) => {
+                    error!("unexpected db error {err}");
+                    return Err(DbEmailChangeUpdateCancelErr::Db(err));
+                }
+            };
+
+            assert_eq!(result.rows_affected(), 1);
+        }
+
+        tx.commit()
+            .await
+            .inspect_err(|err| error!("post_like_add {err}"))?;
+
+        Ok(())
+        // let user_id = create_user_id(user_key);
+
+        // let query = r#"
+        //             BEGIN TRANSACTION;
+
+        //             LET $email_change = SELECT *, new.*, current.* FROM ONLY $email_change_id;
+
+        //             # basic checks
+
+        //             IF !$email_change {
+        //                 THROW "not found"
+        //             };
+
+        //             IF $email_change.user != $user_id {
+        //                 THROW "unauthorized"
+        //             };
+
+        //             IF $email_change.completed {
+        //                 THROW "already used"
+        //             };
+
+        //             IF $email_change.expires < $time {
+        //                 THROW "email change expired"
+        //             };
+
+        //             #
+
+        //             UPDATE ONLY $email_change_id SET
+        //                 completed = true,
+        //                 modified_at = $time
+        //                 RETURN *, new.*, current.*, user.*;
+
+        //             COMMIT TRANSACTION;
+        //         "#;
+
+        // trace!("about to run {query}");
+
+        // self.db
+        //     .query(query)
+        //     .bind(("time", time))
+        //     .bind(("user_id", user_id))
+        //     .bind(("email_change_id", email_change_id))
+        //     .await
+        //     .check_better(|err| match err {
+        //         err if err.thrown("not found") => DbEmailChangeUpdateCancelErr::NotFound,
+        //         err if err.thrown("unauthorized") => DbEmailChangeUpdateCancelErr::Unauthorized,
+        //         err if err.thrown("already used") => DbEmailChangeUpdateCancelErr::AlreadyUsed,
+        //         err if err.thrown("email change expired") => DbEmailChangeUpdateCancelErr::Expired,
+        //         err => {
+        //             error!("unexpected db error {err}");
+        //             DbEmailChangeUpdateCancelErr::Db(err)
+        //         }
+        //     })
+        //     .and_then_take_expect(6)
     }
 }
 
+#[cfg(test)]
 #[tokio::test]
 async fn test_email_change_update_cancel() {
-    use crate::query::email_change_update_finish::DbEmailChangeUpdateFinishErr;
-
     init_log();
 
-    let db = Db::mem(0).await;
+    let db = Db::test_db(0, "test_email_change_update_cancel").await;
 
     let invite1 = db.invite_add(0, "hey@heyadora.com", 1).await.unwrap();
     let user = db
-        .user_add(0, "hey", "hey", invite1.id.key.clone(), 10, 10)
+        .user_add(0, "hey", "hey", invite1.token, 10, 10)
         .await
         .unwrap();
 
     let invite2 = db.invite_add(0, "hey2@heyadora.com", 1).await.unwrap();
     let user2 = db
-        .user_add(0, "hey2", "hey2", invite2.id.key.clone(), 10, 10)
+        .user_add(0, "hey2", "hey2", invite2.token, 10, 10)
         .await
         .unwrap();
 
     {
-        let result = db.email_change_update_cancel(0, user.id.clone(), "").await;
+        let result = db
+            .email_change_update_cancel(0, user.username.clone(), 0)
+            .await;
         assert!(matches!(
             result,
             Err(DbEmailChangeUpdateCancelErr::NotFound)
         ));
 
-        let email_change = db.email_change_add(0, user.id.clone(), 10).await.unwrap();
+        let email_change = db
+            .email_change_add(0, user.username.clone(), 10)
+            .await
+            .unwrap();
 
         let result = db
-            .email_change_update_cancel(0, user2.id.clone(), email_change.id.key.clone())
+            .email_change_update_cancel(0, user2.username.clone(), email_change.id)
             .await;
         assert!(matches!(
             result,
@@ -127,17 +209,16 @@ async fn test_email_change_update_cancel() {
         ));
 
         let result = db
-            .email_change_update_cancel(11, user.id.clone(), email_change.id.key.clone())
+            .email_change_update_cancel(11, user.username.clone(), email_change.id)
             .await;
         assert!(matches!(result, Err(DbEmailChangeUpdateCancelErr::Expired)));
 
-        let email_change = db
-            .email_change_update_cancel(0, user.id.clone(), email_change.id.key.clone())
+        db.email_change_update_cancel(0, user.username.clone(), email_change.id)
             .await
             .unwrap();
 
         let result = db
-            .email_change_update_cancel(0, user.id.clone(), email_change.id.key.clone())
+            .email_change_update_cancel(0, user.username.clone(), email_change.id)
             .await;
         assert!(matches!(
             result,
@@ -146,45 +227,46 @@ async fn test_email_change_update_cancel() {
     }
 
     {
-        let email_change = db.email_change_add(0, user.id.clone(), 10).await.unwrap();
+        use crate::query::email_change_update_finish::DbEmailChangeUpdateFinishErr;
 
         let email_change = db
-            .email_change_update_current_confirm(
-                0,
-                user.id.clone(),
-                email_change.id.key.clone(),
-                email_change.current.token.clone(),
-            )
+            .email_change_add(0, user.username.clone(), 10)
             .await
             .unwrap();
 
-        let email_change = db
-            .email_change_update_new_add(
-                0,
-                user.id.clone(),
-                email_change.id.key.clone(),
-                "hey3@heyadora.com",
-            )
-            .await
-            .unwrap();
+        db.email_change_update_current_confirm(
+            0,
+            user.username.clone(),
+            email_change.id,
+            email_change.current_token,
+        )
+        .await
+        .unwrap();
 
-        let email_change = db
-            .email_change_update_new_confirm(
-                0,
-                user.id.clone(),
-                email_change.id.key.clone(),
-                email_change.new.clone().unwrap().token,
-            )
-            .await
-            .unwrap();
+        db.email_change_update_new_add(
+            0,
+            user.username.clone(),
+            email_change.id,
+            "hey3@heyadora.com",
+        )
+        .await
+        .unwrap();
 
-        let email_change = db
-            .email_change_update_cancel(0, user.id.clone(), email_change.id.key.clone())
+        db.email_change_update_new_confirm(
+            0,
+            user.username.clone(),
+            email_change.id,
+            email_change.new_token,
+        )
+        .await
+        .unwrap();
+
+        db.email_change_update_cancel(0, user.username.clone(), email_change.id)
             .await
             .unwrap();
 
         let result = db
-            .email_change_update_finish(0, user.id.clone(), email_change.id.key.clone())
+            .email_change_update_finish(0, user.username.clone(), email_change.id)
             .await;
         assert!(matches!(
             result,

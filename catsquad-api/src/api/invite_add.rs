@@ -67,7 +67,7 @@ pub async fn invite_add(
     (status_code, Json(result))
 }
 
-#[cfg(test)]
+#[cfg(any(test, feature = "test_server"))]
 mod test_utils {
     use crate::TestServer;
     use catsquad_db::id_to_string;

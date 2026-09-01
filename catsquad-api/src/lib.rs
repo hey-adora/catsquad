@@ -41,5 +41,15 @@ pub fn get_file_hash_for_testing(file: &[u8]) -> String {
     let mut hasher = std::hash::DefaultHasher::default();
     // let mut hasher = GxHasher::with_seed(0);
     hasher.write(&file);
-    hasher.finish().to_string()
+    let hash = hasher.finish();
+    hash.to_string()
+}
+
+#[inline]
+pub fn fibonacci(n: u64) -> u64 {
+    match n {
+        0 => 1,
+        1 => 1,
+        n => fibonacci(n - 1) + fibonacci(n - 2),
+    }
 }

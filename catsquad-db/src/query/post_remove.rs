@@ -1,23 +1,17 @@
+use crate::Db;
 use catsquad_log::prelude::*;
 use catsquad_shared::PostState;
-use surrealdb::types::{RecordId, RecordIdKey, SurrealValue, ToSql};
 
-use crate::{
-    Db, DbComment, DbUser, SurrealCheckUtils, SurrealErrUtils, SurrealSerializeUtils,
-    create_comment_id, create_invite_id, create_post_id, create_user_id,
-};
-
-#[derive(Debug, thiserror::Error, PartialEq)]
+#[derive(Debug, thiserror::Error)]
 pub enum DbPostRemoveErr {
     #[error("DB error {0}")]
-    Db(#[from] surrealdb::Error),
+    Db(#[from] sqlx::Error),
 
     #[error("comment \"{0}\" was not found")]
-    NotFound(String),
+    NotFound(i64),
 
-    #[error("user \"{0}\" was not found")]
-    UserNotFound(String),
-
+    // #[error("user \"{0}\" was not found")]
+    // UserNotFound(String),
     #[error("unauthorized")]
     Unauthorized,
 }
@@ -25,169 +19,254 @@ pub enum DbPostRemoveErr {
 impl Db {
     pub async fn post_remove(
         &self,
-        user_id: RecordId,
-        post_key: impl Into<RecordIdKey>,
+        user_username: impl Into<String>,
+        post_id: i64,
     ) -> Result<(), DbPostRemoveErr> {
-        let post_key = post_key.into();
-        let post_id = create_post_id(post_key.clone());
+        let pool = &self.db;
+        let user_username = user_username.into();
 
-        let query = r#"
-                 BEGIN TRANSACTION;
-
-                 IF !$user_id.exists() {
-                     THROW "user not found";
-                 };
-
-                 LET $post = SELECT user FROM ONLY $post_id;
-
-                 IF !$post {
-                     THROW "post not found";
-                 };
-
-                 IF $post.user != $user_id {
-                     THROW "unauthorized"
-                 };
-
-                 DELETE $post_id;
-                 DELETE comment WHERE post == $post_id;
-                 DELETE post_like WHERE post = $post_id;
-
-                 COMMIT TRANSACTION;
-                "#;
-        trace!("about to run {query}");
-        self.db
-            .query(query)
-            .bind(("post_id", post_id))
-            .bind(("user_id", user_id.clone()))
+        let mut tx = pool
+            .begin()
             .await
-            .check_better(|err| match err {
-                err if err.thrown("post not found") => DbPostRemoveErr::NotFound(post_key.to_sql()),
-                err if err.thrown("user not found") => {
-                    DbPostRemoveErr::UserNotFound(user_id.key.to_sql())
+            .inspect_err(|err| error!("post_like_add {err}"))?;
+
+        // get post
+        {
+            let query = "SELECT post_user_username, post_state FROM posts WHERE post_id = $1";
+
+            let result = sqlx::query_as(query)
+                .bind(post_id)
+                .fetch_one(&mut *tx)
+                .await;
+
+            debug!("query: {query}\nresult: {result:#?}");
+
+            let (post_user_username, post_state): (String, String) = match result {
+                Ok(v) => v,
+                Err(sqlx::Error::RowNotFound) => {
+                    return Err(DbPostRemoveErr::NotFound(post_id));
                 }
-                err if err.thrown("unauthorized") => DbPostRemoveErr::Unauthorized,
-                err => {
+                Err(err) => {
                     error!("unexpected db error {err}");
-                    DbPostRemoveErr::Db(err)
+                    return Err(DbPostRemoveErr::Db(err));
                 }
-            })
-            .map(|_| ())
+            };
+
+            if post_user_username != user_username {
+                return Err(DbPostRemoveErr::Unauthorized);
+            }
+
+            let post_state = PostState::from(post_state);
+            match post_state {
+                PostState::Draft => return Err(DbPostRemoveErr::Unauthorized),
+                PostState::Hidden => (),
+                PostState::Active => (),
+            }
+        }
+
+        // delete post like
+        {
+            let query = "DELETE FROM posts WHERE post_id = $1";
+
+            let result = sqlx::query(query).bind(post_id).execute(&mut *tx).await;
+
+            debug!("query: {query}\nresult: {result:#?}");
+
+            let result = match result {
+                Ok(v) => v,
+                // Err(sqlx::Error::RowNotFound) => {
+                //     DOESNT GET TRIGGERED ON DELETE
+                // }
+                Err(err) => {
+                    error!("unexpected db error {err}");
+                    return Err(DbPostRemoveErr::Db(err));
+                }
+            };
+
+            let affected = result.rows_affected();
+
+            match affected {
+                0 => return Err(DbPostRemoveErr::NotFound(post_id)),
+                1 => (),
+                _ => panic!("query is wrong, it must only delete 1 row max"),
+            }
+        }
+
+        //
+
+        tx.commit()
+            .await
+            .inspect_err(|err| error!("post_like_add {err}"))?;
+
+        Ok(())
+
+        // let query = r#"
+        //          BEGIN TRANSACTION;
+
+        //          IF !$user_id.exists() {
+        //              THROW "user not found";
+        //          };
+
+        //          LET $post = SELECT user FROM ONLY $post_id;
+
+        //          IF !$post {
+        //              THROW "post not found";
+        //          };
+
+        //          IF $post.user != $user_id {
+        //              THROW "unauthorized"
+        //          };
+
+        //          DELETE $post_id;
+        //          DELETE comment WHERE post == $post_id;
+        //          DELETE post_like WHERE post = $post_id;
+
+        //          COMMIT TRANSACTION;
+        //         "#;
+        // trace!("about to run {query}");
+        // self.db
+        //     .query(query)
+        //     .bind(("post_id", post_id))
+        //     .bind(("user_id", user_id.clone()))
+        //     .await
+        //     .check_better(|err| match err {
+        //         err if err.thrown("post not found") => DbPostRemoveErr::NotFound(post_key.to_sql()),
+        //         err if err.thrown("user not found") => {
+        //             DbPostRemoveErr::UserNotFound(user_id.key.to_sql())
+        //         }
+        //         err if err.thrown("unauthorized") => DbPostRemoveErr::Unauthorized,
+        //         err => {
+        //             error!("unexpected db error {err}");
+        //             DbPostRemoveErr::Db(err)
+        //         }
+        //     })
+        //     .map(|_| ())
     }
 }
 
+#[cfg(test)]
 #[tokio::test]
 async fn test_post_remove() {
-    use crate::create_user_id;
+    // use crate::create_user_id;
 
     init_log();
-    let db = Db::mem(0).await;
+    let db = Db::test_db(0, "test_post_remove").await;
 
-    let invite1 = db.invite_add(0, "hey@heyadora.com", 1).await.unwrap();
-    let invite2 = db.invite_add(0, "hey2@heyadora.com", 1).await.unwrap();
-    let user = db
-        .user_add(0, "hey", "hey", invite1.id.key.clone(), 10, 10)
-        .await
-        .unwrap();
-    let user2 = db
-        .user_add(0, "hey2", "hey", invite2.id.key.clone(), 10, 10)
-        .await
-        .unwrap();
+    let (user, user2) = {
+        let invite1 = db.invite_add(0, "hey@heyadora.com", 1).await.unwrap();
+        let invite2 = db.invite_add(0, "hey2@heyadora.com", 1).await.unwrap();
+        let user = db
+            .user_add(0, "hey", "hey", invite1.token, 10, 10)
+            .await
+            .unwrap();
+        let user2 = db
+            .user_add(0, "hey2", "hey", invite2.token, 10, 10)
+            .await
+            .unwrap();
 
-    let result = db.post_remove(user.id.clone(), "invalid").await;
+        (user, user2)
+    };
+
+    let result = db.post_remove(user.username.clone(), 0).await;
     assert!(matches!(result, Err(DbPostRemoveErr::NotFound(_))));
 
     let post1_key = {
         let post1 = db
-            .post_add(0, user.id.clone(), "title", "description", "tags")
-            .await
-            .unwrap();
-        let post1 = db
-            .post_update_state(0, user.id.clone(), post1.id.key, PostState::Active)
+            .post_add(0, user.username.clone(), "title", "description", "tags")
             .await
             .unwrap();
 
-        db.post_like_add(0, user2.id.clone(), post1.id.key.clone())
+        db.post_update_state(0, user.username.clone(), post1.id, PostState::Active)
             .await
             .unwrap();
 
-        let comment1 = db
-            .comment_add(
-                0,
-                user2.id.clone(),
-                post1.id.key.clone(),
-                None::<RecordIdKey>,
-                "one",
-            )
+        db.post_like_add(0, user2.username.clone(), post1.id)
             .await
             .unwrap();
 
-        db.comment_add(
-            0,
-            user2.id.clone(),
-            post1.id.key.clone(),
-            Some(comment1.id.key.clone()),
-            "one1",
-        )
-        .await
-        .unwrap();
+        // let comment1 = db
+        //     .comment_add(
+        //         0,
+        //         user2.username.clone(),
+        //         post1.id,
+        //         None::<RecordIdKey>,
+        //         "one",
+        //     )
+        //     .await
+        //     .unwrap();
 
-        post1.id.key
+        // db.comment_add(
+        //     0,
+        //     user2.id.clone(),
+        //     post1.id.key.clone(),
+        //     Some(comment1.id.key.clone()),
+        //     "one1",
+        // )
+        // .await
+        // .unwrap();
+
+        post1.id
     };
 
     let post2_key = {
         let post2 = db
-            .post_add(0, user.id.clone(), "title2", "description", "tags")
+            .post_add(0, user.username.clone(), "title2", "description", "tags")
             .await
             .unwrap();
-        let post2 = db
-            .post_update_state(0, user.id.clone(), post2.id.key, PostState::Active)
-            .await
-            .unwrap();
-
-        db.post_like_add(0, user2.id.clone(), post2.id.key.clone())
+        db.post_update_state(0, user.username.clone(), post2.id, PostState::Active)
             .await
             .unwrap();
 
-        db.comment_add(
-            0,
-            user.id.clone(),
-            post2.id.key.clone(),
-            None::<RecordIdKey>,
-            "one2",
-        )
-        .await
-        .unwrap();
-        post2.id.key
+        db.post_like_add(0, user2.username.clone(), post2.id)
+            .await
+            .unwrap();
+
+        // db.comment_add(
+        //     0,
+        //     user.id.clone(),
+        //     post2.id.key.clone(),
+        //     None::<RecordIdKey>,
+        //     "one2",
+        // )
+        // .await
+        // .unwrap();
+        post2.id
     };
 
-    let result = db.post_remove(user2.id.clone(), post1_key.clone()).await;
-    assert!(matches!(result, Err(DbPostRemoveErr::Unauthorized)));
+    // assert errors
+    {
+        let result = db
+            .post_remove(user2.username.clone(), post1_key.clone())
+            .await;
+        assert!(matches!(result, Err(DbPostRemoveErr::Unauthorized)));
 
-    let result = db
-        .post_remove(create_user_id("invalid"), post1_key.clone())
-        .await;
-    assert!(matches!(result, Err(DbPostRemoveErr::UserNotFound(_))));
+        // let result = db.post_remove("invalid", post1_key.clone()).await;
+        // assert!(matches!(result, Err(DbPostRemoveErr::UserNotFound(_))));
 
-    let posts = db.post_get_all().await.unwrap();
-    let comments = db.comment_get_all().await.unwrap();
-    let likes = db.post_like_get_all().await.unwrap();
+        let posts = db.post_get_all().await.unwrap();
+        // let comments = db.comment_get_all().await.unwrap();
+        let likes = db.post_like_get_all().await.unwrap();
 
-    assert_eq!(posts.len(), 2);
-    assert_eq!(comments.len(), 3);
-    assert_eq!(likes.len(), 2);
+        assert_eq!(posts.len(), 2);
+        // assert_eq!(comments.len(), 3);
+        assert_eq!(likes.len(), 2);
+    }
 
-    db.post_remove(user.id.clone(), post1_key.clone())
-        .await
-        .unwrap();
+    // assert success
+    {
+        db.post_remove(user.username.clone(), post1_key.clone())
+            .await
+            .unwrap();
 
-    let posts = db.post_get_all().await.unwrap();
-    let comments = db.comment_get_all().await.unwrap();
-    let likes = db.post_like_get_all().await.unwrap();
+        let posts = db.post_get_all().await.unwrap();
+        // let comments = db.comment_get_all().await.unwrap();
+        let likes = db.post_like_get_all().await.unwrap();
 
-    assert_eq!(posts.len(), 1);
-    assert_eq!(comments.len(), 1);
-    assert_eq!(likes.len(), 1);
-    assert_eq!(posts[0].title, "title2");
-    assert_eq!(comments[0].text, "one2");
-    assert_eq!(likes[0].post.key, post2_key);
+        assert_eq!(posts.len(), 1);
+        // assert_eq!(comments.len(), 1);
+        assert_eq!(likes.len(), 1);
+        assert_eq!(posts[0].title, "title2");
+        // assert_eq!(comments[0].text, "one2");
+        assert_eq!(likes[0].post_id, post2_key);
+    }
 }

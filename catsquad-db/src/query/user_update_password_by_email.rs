@@ -1,12 +1,10 @@
+use crate::{Db, DbUser, XTimestamp};
 use catsquad_log::prelude::*;
-use surrealdb::types::{RecordId, RecordIdKey, SurrealValue};
 
-use crate::{Db, DbUser, SurrealCheckUtils, SurrealErrUtils, SurrealSerializeUtils};
-
-#[derive(Debug, thiserror::Error, PartialEq)]
+#[derive(Debug, thiserror::Error)]
 pub enum DbUserUpdatePasswordByEmailErr {
     #[error("DB error {0}")]
-    DB(#[from] surrealdb::Error),
+    Db(#[from] sqlx::Error),
 
     #[error("user not found")]
     NotFound,
@@ -15,46 +13,57 @@ pub enum DbUserUpdatePasswordByEmailErr {
 impl Db {
     pub async fn user_update_password_by_email(
         &self,
-        time: u128,
+        time: u64,
         email: impl Into<String>,
         new_password: impl Into<String>,
-    ) -> Result<DbUser, DbUserUpdatePasswordByEmailErr> {
+    ) -> Result<(), DbUserUpdatePasswordByEmailErr> {
+        let pool = &self.db;
+
         let query =
-            "UPDATE user SET modified_at = $time, password = $new_password WHERE email = $email;";
+            "UPDATE users SET user_password = $1, user_modified_at = $2 WHERE user_email = $3";
 
-        trace!("about to run {query}");
+        debug!("about to run {query}");
 
-        self.db
-            .query(query)
-            .bind(("time", time))
-            .bind(("email", email.into()))
-            .bind(("new_password", new_password.into()))
-            .await
-            .check_good(|err| match err {
-                err => {
-                    error!("unexpected db error {err}");
-                    DbUserUpdatePasswordByEmailErr::DB(err)
-                }
-            })
-            .and_then_take_or(0, DbUserUpdatePasswordByEmailErr::NotFound)
+        let result = sqlx::query(query)
+            .bind(new_password.into())
+            .bind(XTimestamp(time as i64))
+            .bind(email.into())
+            .execute(pool)
+            .await;
+
+        let result = match result {
+            Ok(v) => v,
+            Err(sqlx::Error::RowNotFound) => {
+                return Err(DbUserUpdatePasswordByEmailErr::NotFound);
+            }
+            Err(err) => {
+                error!("unexpected db error {err}");
+                return Err(DbUserUpdatePasswordByEmailErr::Db(err));
+            }
+        };
+
+        debug!("query {query}\nresults {result:?}");
+
+        Ok(())
     }
 }
 
+#[cfg(test)]
 #[tokio::test]
 async fn test_user_update_password_by_email() {
     init_log();
 
-    let db = Db::mem(0).await;
+    let db = Db::test_db(0, "test_user_update_password_by_email").await;
 
     let invite = db.invite_add(0, "hey@hey.com", 10).await.unwrap();
     let user = db
-        .user_add(0, "hey", "hey", invite.id.key.clone(), 10, 10)
+        .user_add(0, "hey", "hey", invite.token.clone(), 10, 10)
         .await
         .unwrap();
     assert_eq!(user.password, "hey");
-    let user = db
-        .user_update_password_by_email(0, "hey@hey.com", "hey2")
+    db.user_update_password_by_email(0, "hey@hey.com", "hey2")
         .await
         .unwrap();
+    let user = db.user_get_by_email("hey@hey.com").await.unwrap();
     assert_eq!(user.password, "hey2");
 }

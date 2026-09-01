@@ -71,6 +71,19 @@ pub enum TimeRange {
     MoreOrEqual,
 }
 
+impl From<u8> for TimeRange {
+    fn from(value: u8) -> Self {
+        match value {
+            0 => TimeRange::None,
+            1 => TimeRange::Less,
+            2 => TimeRange::LessOrEqual,
+            3 => TimeRange::More,
+            4 => TimeRange::MoreOrEqual,
+            v => panic!("invalid range {v}, valid: 0,1,2,3,4"),
+        }
+    }
+}
+
 #[derive(
     Debug,
     Default,
@@ -88,6 +101,15 @@ pub enum Order {
     #[default]
     OneTwoThree,
     ThreeTwoOne,
+}
+
+impl From<bool> for Order {
+    fn from(value: bool) -> Self {
+        match value {
+            false => Self::OneTwoThree,
+            true => Self::ThreeTwoOne,
+        }
+    }
 }
 
 // #[derive(Clone, Copy, Debug, serde::Serialize, serde::Deserialize, PartialEq)]

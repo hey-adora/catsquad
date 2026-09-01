@@ -53,7 +53,7 @@ pub async fn post_get_by_key(
 
         let post = app
             .db
-            .post_get_by_key(user_id, params.post_key)
+            .post_get_by_id(user_id, params.post_key)
             .await
             .map_err(from_db_post_get_by_key_err)?;
 

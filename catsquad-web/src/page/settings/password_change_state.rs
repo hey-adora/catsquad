@@ -144,7 +144,8 @@ async fn test_passowrd_change_state() {
     let password_change = PasswordChangeState::new(server.client.clone());
 
     {
-        let res = password_change.add("invalid").await.unwrap();
+        let res = password_change.add("invalid").await;
+        assert!(res.is_none());
         assert_eq!(password_change.err_general.get_untracked(), "");
         assert_eq!(password_change.err_password.get_untracked(), "");
     }

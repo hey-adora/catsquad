@@ -1,4 +1,4 @@
-use catsquad_db::Db;
+use catsquad_db::{Db, DbKindLocal};
 use rand::distr::SampleString;
 use std::{path::PathBuf, sync::Arc};
 use tokio::{fs, sync::RwLock};
@@ -8,7 +8,7 @@ use crate::{api_config::ApiConfig, assets::Assets, utils::get_time_ns};
 
 #[derive(Clone, Debug)]
 pub struct AppState {
-    pub db: Db,
+    pub db: Db<DbKindLocal>,
     pub assets: Arc<Assets>,
     conf: Arc<RwLock<ApiConfig>>,
     time: Option<Arc<RwLock<u128>>>,

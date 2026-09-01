@@ -37,6 +37,12 @@ url = { workspace = true }
 tower= { workspace = true, features = ["util"] }
 axum-test = { workspace = true } 
 catsquad-client = { workspace = true, features = ["axum_test"] }
+# divan = { workspace = true }
+
+[[bench]]
+name = "api"
+harness = false
+
 # tower = { workspace = true, optional = true }
 # 
 # features = ["timeout", "util"]

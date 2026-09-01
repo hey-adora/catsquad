@@ -6,7 +6,8 @@
     playwright.url = "github:pietdevries94/playwright-web-flake";
     playwright.inputs.nixpkgs.follows = "nixpkgs";
     crane.url = "github:ipetkov/crane";
-    crane.inputs.nixpkgs.follows = "nixpkgs";
+    process-compose-flake.url = "github:Platonic-Systems/process-compose-flake";
+    services-flake.url = "github:juspay/services-flake";
   };
 
   outputs =
@@ -17,11 +18,14 @@
       rust-overlay,
       playwright,
       crane,
+      services-flake,
+      process-compose-flake,
     }:
     utils.lib.eachDefaultSystem (
       system:
       let
         overlays = [
+          
           (import rust-overlay)
           (final: prev: {
             inherit (playwright.packages.${system}) playwright-test playwright-driver;
@@ -56,6 +60,84 @@
         };
 
         rust_toolchain = pkgs.rust-bin.fromRustupToolchainFile ./rust-toolchain.toml;
+
+        cat_scripts = pkgs.stdenv.mkDerivation {
+            pname = "cat_scripts";
+            version = "0.1.0";
+            src = pkgs.lib.fileset.toSource {
+              root = ./.;
+              fileset = pkgs.lib.fileset.unions [
+                ./scripts
+              ];
+            };
+            installPhase = ''
+              mkdir -p $out/lib
+              ls -lha .
+              ls -lha ./scripts/
+              cp ./scripts/postgres_init.sql $out/lib/postgres_init.sql
+            '';
+        };
+
+        # pgunit = pkgs.postgresqlPackages.callPackage ./scripts/pgunit.nix {};
+        # pgu128 = pkgs.postgresqlPackages.callPackage ./scripts/pgu128.nix {};
+        # pgdev = pkgs.callPackage "${nixpkgs}/pkgs/servers/sql/postgresql/buildPostgresqlExtension.nix";
+        # pgunit = pgdev.postgresqlBuildExtension (finalAttrs: {
+        #   pname = "pguint";
+        #   version = "1.20260630";
+
+        #   src = pkgs.fetchFromGitHub {
+        #     owner = "petere";
+        #     repo = "pguint";
+        #     tag = "v${finalAttrs.version}";
+        #     hash = "sha256-4PVr0dW6CL3ov1W5BPJU1CAphwOyXwqUoYgWCPXjto8=";
+        #   };
+
+        #   meta = {
+        #     description = "unsigned integer types extension for PostgreSQL";
+        #     homepage = "https://github.com/petere/pguint";
+        #     license = pkgs.licenses.postgresql;
+        #     platforms = pkgs.postgresql.meta.platforms;
+        #     maintainers = [ ];
+        #   };
+        # });
+
+        servicesMod = (import process-compose-flake.lib { inherit pkgs; }).evalModules {
+          modules = [
+            services-flake.processComposeModules.default
+            {
+              
+              services.postgres."pg1".package = pkgs.postgresql_18;
+              services.postgres."pg1".dataDir = "./target/tmp/data_db_pg1";
+              services.postgres."pg1".enable = true;
+              services.postgres."pg1".socketDir = "./target";
+              services.postgres."pg1".extensions = exts: [
+                exts.system_stats
+                # exts.pgvector
+                # exts.vectorchord
+                # (exts.callPackage ./scripts/pgu128.nix { })
+              ];
+              # services.postgres."pg1".settings.shared_preload_libraries = "vectors.so";
+              # services.postgres."pg1".settings.shared_preload_libraries = "${pkgs.postgresqlPackages.pgvector}/lib/vectors.so";
+              # services.postgres."pg1".settings.shared_preload_libraries = "vector.so, vchord.so";
+              # services.postgres."pg1".settings.shared_preload_libraries = "vector.so, vchord.so, uint128.so";
+              # services.postgres."pg1".settings.shared_preload_libraries = "vector.so, vchord.so, uint.so";
+              services.postgres."pg1".initialDatabases = [
+                {
+                  name = "catsquad";
+                  # schemas = ["${cat_scripts}/lib/postgres_init.sql"];
+                }
+              ];
+              # services.postgres."pg1".initialScript.before = ''
+              #   CREATE EXTENSION system_stats;
+              #   CREATE EXTENSION vchord CASCADE;
+              # '';
+                  # schemas = [ "${inputs.northwind}/northwind.sql" ];
+                # CREATE EXTENSION IF NOT EXISTS vchord CASCADE;
+              # services.redis."r1".port = 0;
+              # services.redis."r1".unixSocket = "./redis.sock";
+            }
+          ];
+        };
 
         src = ./.;
         catsquad_version = "0.1.0";
@@ -169,15 +251,22 @@
       {
         packages = {
           inherit catsquad-api-dev;
+          services = servicesMod.config.outputs.package;
+          cat_scripts = cat_scripts;
         };
 
         devShell =
           with pkgs;
           mkShell {
+            inputsFrom = [
+              servicesMod.config.services.outputs.devShell
+            ];
             packages = [
+              # parallel
+              # postgresql
               ffmpeg-full
               cargo-expand
-              surrealdb
+              # surrealdb
               rust_toolchain
               wild
               clang
@@ -203,6 +292,7 @@
             PLAYWRIGHT_BROWSERS_PATH = "${pkgs.playwright-driver.browsers}";
             shellHook = ''
               alias debug=./scripts/debug.sh
+              alias release=./scripts/release.sh
             '';
           };
       }

@@ -1,15 +1,10 @@
+use crate::{Db, DbPasswordChange, Uuid, XTimestamp, XUuid};
 use catsquad_log::prelude::*;
-use surrealdb::types::{RecordId, RecordIdKey, SurrealValue};
 
-use crate::{
-    Db, DbPasswordChange, SurrealCheckUtils, SurrealErrUtils, SurrealSerializeUtils,
-    create_password_change_id,
-};
-
-#[derive(Debug, thiserror::Error, PartialEq)]
+#[derive(Debug, thiserror::Error)]
 pub enum DbPasswordChangeUpdateConfirmErr {
     #[error("DB error {0}")]
-    Db(#[from] surrealdb::Error),
+    Db(#[from] sqlx::Error),
 
     #[error("expired")]
     Expired,
@@ -18,76 +13,181 @@ pub enum DbPasswordChangeUpdateConfirmErr {
     AlreadyUsed,
 
     #[error("password key not found")]
-    PasswordKeyNotFound,
+    TokenNotFound,
 }
 
 impl Db {
     pub async fn password_change_update_confirm(
         &self,
-        time: u128,
-        password_change_key: impl Into<RecordIdKey>,
+        time: u64,
+        password_change_token: Uuid,
         new_password: impl Into<String>,
-    ) -> Result<DbPasswordChange, DbPasswordChangeUpdateConfirmErr> {
-        let password_change_id = create_password_change_id(password_change_key);
-        let new_password = new_password.into();
+    ) -> Result<(), DbPasswordChangeUpdateConfirmErr> {
+        let pool = &self.db;
+        let token = password_change_token;
+        // let new_password = new_password.into();
 
-        let query = r#"
-                 BEGIN TRANSACTION;
-                 LET $password_change = SELECT used, expires, user FROM ONLY $password_change_id;
-                 if !$password_change {
-                     THROW "password change not found"
-                 };
-                 if $password_change.used {
-                     THROW "password change already used"
-                 };
-                 if $password_change.expires < $time {
-                     THROW "password change expired"
-                 };
-                 UPDATE $password_change.user SET password = $new_password;
-                 UPDATE $password_change_id SET used = true RETURN *, user.*;
-                 DELETE session WHERE user = $password_change.user;
-                 COMMIT TRANSACTION;
-                "#;
-        trace!("about to run {query}");
-
-        self.db
-            .query(query)
-            .bind(("time", time))
-            .bind(("password_change_id", password_change_id))
-            .bind(("new_password", new_password))
-            // .bind(("expires", expires))
+        let mut tx = pool
+            .begin()
             .await
-            .check_better(|err| match err {
-                err if err.thrown("password change not found") => {
-                    DbPasswordChangeUpdateConfirmErr::PasswordKeyNotFound
-                }
-                err if err.thrown("password change already used") => {
-                    DbPasswordChangeUpdateConfirmErr::AlreadyUsed
-                }
-                err if err.thrown("password change expired") => {
-                    DbPasswordChangeUpdateConfirmErr::Expired
-                }
-                err => {
+            .inspect_err(|err| error!("password_change_update_confirm {err}"))?;
+
+        // get password change
+        let user_email = {
+            let query = "SELECT
+                                  password_change_user_email,
+                                  password_change_used,
+                                  password_change_expires_at
+                               FROM passwords_changes WHERE password_change_token = $1";
+
+            let result = sqlx::query_as(query)
+                .bind(XUuid(token))
+                .fetch_one(&mut *tx)
+                .await;
+
+            debug!("query {query} result {result:#?}");
+
+            let (user_email, used, XTimestamp(expires_at)): (String, bool, XTimestamp) =
+                match result {
+                    Ok(v) => v,
+                    Err(sqlx::Error::RowNotFound) => {
+                        return Err(DbPasswordChangeUpdateConfirmErr::TokenNotFound);
+                    }
+                    Err(err) => {
+                        error!("unexpected db error {err}");
+                        return Err(DbPasswordChangeUpdateConfirmErr::Db(err));
+                    }
+                };
+
+            let expires_at = expires_at as u64;
+
+            if expires_at < time {
+                return Err(DbPasswordChangeUpdateConfirmErr::Expired);
+            }
+
+            if used {
+                return Err(DbPasswordChangeUpdateConfirmErr::AlreadyUsed);
+            }
+
+            user_email
+        };
+
+        // update user
+        {
+            let query = "UPDATE users SET
+                    user_password = $1,
+                    user_modified_at = $2
+                    WHERE user_email = $3";
+
+            let result = sqlx::query(query)
+                .bind(new_password.into())
+                .bind(XTimestamp(time as i64))
+                .bind(user_email)
+                .execute(&mut *tx)
+                .await;
+
+            debug!("query {query} result {result:#?}");
+
+            let v = match result {
+                Ok(v) => v,
+                Err(err) => {
                     error!("unexpected db error {err}");
-                    DbPasswordChangeUpdateConfirmErr::Db(err)
+                    return Err(DbPasswordChangeUpdateConfirmErr::Db(err));
                 }
-            })
-            .and_then_take_expect(6)
+            };
+
+            assert_eq!(v.rows_affected(), 1);
+        }
+
+        // update password change
+        {
+            let query = "UPDATE passwords_changes SET
+                    password_change_used = TRUE,
+                    password_change_modified_at = $1
+                    WHERE password_change_token = $2";
+
+            let result = sqlx::query(query)
+                .bind(XTimestamp(time as i64))
+                .bind(XUuid(token))
+                .execute(&mut *tx)
+                .await;
+
+            debug!("query {query} result {result:#?}");
+
+            let v = match result {
+                Ok(v) => v,
+                Err(err) => {
+                    error!("unexpected db error {err}");
+                    return Err(DbPasswordChangeUpdateConfirmErr::Db(err));
+                }
+            };
+
+            assert_eq!(v.rows_affected(), 1);
+        }
+
+        tx.commit()
+            .await
+            .inspect_err(|err| error!("password_change_update_confirm {err}"))?;
+
+        Ok(())
+        // let query = r#"
+        //          BEGIN TRANSACTION;
+        //          LET $password_change = SELECT used, expires, user FROM ONLY $password_change_id;
+        //          if !$password_change {
+        //              THROW "password change not found"
+        //          };
+        //          if $password_change.used {
+        //              THROW "password change already used"
+        //          };
+        //          if $password_change.expires < $time {
+        //              THROW "password change expired"
+        //          };
+        //          UPDATE $password_change.user SET password = $new_password;
+        //          UPDATE $password_change_id SET used = true RETURN *, user.*;
+        //          DELETE session WHERE user = $password_change.user;
+        //          COMMIT TRANSACTION;
+        //         "#;
+        // trace!("about to run {query}");
+
+        // self.db
+        //     .query(query)
+        //     .bind(("time", time))
+        //     .bind(("password_change_id", password_change_id))
+        //     .bind(("new_password", new_password))
+        //     // .bind(("expires", expires))
+        //     .await
+        //     .check_better(|err| match err {
+        //         err if err.thrown("password change not found") => {
+        //             DbPasswordChangeUpdateConfirmErr::PasswordKeyNotFound
+        //         }
+        //         err if err.thrown("password change already used") => {
+        //             DbPasswordChangeUpdateConfirmErr::AlreadyUsed
+        //         }
+        //         err if err.thrown("password change expired") => {
+        //             DbPasswordChangeUpdateConfirmErr::Expired
+        //         }
+        //         err => {
+        //             error!("unexpected db error {err}");
+        //             DbPasswordChangeUpdateConfirmErr::Db(err)
+        //         }
+        //     })
+        //     .and_then_take_expect(6)
     }
 }
 
+#[cfg(test)]
 #[tokio::test]
 async fn test_password_change_update_confirm() {
     init_log();
 
-    let db = Db::mem(0).await;
+    let db = Db::test_db(0, "test_password_change_update_confirm").await;
 
     let email = "hey@heyadora.com";
     let invite1 = db.invite_add(0, email, 1).await.unwrap();
     assert_eq!(invite1.email, email);
 
     let user = db
-        .user_add(0, "hey", "hey", invite1.id.key.clone(), 10, 10)
+        .user_add(0, "hey", "hey", invite1.token, 10, 10)
         .await
         .unwrap();
     assert_eq!(user.password, "hey");
@@ -95,26 +195,32 @@ async fn test_password_change_update_confirm() {
     let password_change = db.password_change_add(0, email, 10).await.unwrap();
 
     let result = db
-        .password_change_update_confirm(11, password_change.id.key.clone(), "hey2")
+        .password_change_update_confirm(11, password_change.token, "hey2")
         .await;
-    assert_eq!(result, Err(DbPasswordChangeUpdateConfirmErr::Expired));
+    assert!(matches!(
+        result,
+        Err(DbPasswordChangeUpdateConfirmErr::Expired)
+    ));
 
-    db.password_change_update_confirm(0, password_change.id.key.clone(), "hey2")
+    db.password_change_update_confirm(0, password_change.token, "hey2")
         .await
         .unwrap();
     let user = db.user_get_by_email(email).await.unwrap();
     assert_eq!(user.password, "hey2");
 
     let result = db
-        .password_change_update_confirm(0, password_change.id.key.clone(), "hey2")
+        .password_change_update_confirm(0, password_change.token, "hey2")
         .await;
-    assert_eq!(result, Err(DbPasswordChangeUpdateConfirmErr::AlreadyUsed));
+    assert!(matches!(
+        result,
+        Err(DbPasswordChangeUpdateConfirmErr::AlreadyUsed)
+    ));
 
     let result = db
-        .password_change_update_confirm(0, "invalid", "hey2")
+        .password_change_update_confirm(0, 0_u128.to_be_bytes(), "hey2")
         .await;
-    assert_eq!(
+    assert!(matches!(
         result,
-        Err(DbPasswordChangeUpdateConfirmErr::PasswordKeyNotFound)
-    );
+        Err(DbPasswordChangeUpdateConfirmErr::TokenNotFound)
+    ));
 }

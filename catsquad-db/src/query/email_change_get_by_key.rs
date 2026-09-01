@@ -1,12 +1,7 @@
+use crate::{Db, DbEmailChange};
 use catsquad_log::prelude::*;
-use surrealdb::types::{RecordId, RecordIdKey, SurrealValue, ToSql};
 
-use crate::{
-    Db, DbEmailChange, SurrealCheckUtils, SurrealErrUtils, SurrealSerializeUtils,
-    create_email_change_id, create_invite_id,
-};
-
-#[derive(Debug, thiserror::Error, PartialEq)]
+#[derive(Debug, thiserror::Error)]
 pub enum DbEmailChangeGetByKeyErr {
     #[error("email change not found")]
     EmailChangeNotFound,
@@ -21,80 +16,73 @@ pub enum DbEmailChangeGetByKeyErr {
     Expired,
 
     #[error("DB error {0}")]
-    Db(#[from] surrealdb::Error),
+    Db(#[from] sqlx::Error),
 }
 
 impl Db {
     pub async fn email_change_get_by_key(
         &self,
-        time: u128,
-        user_id: RecordId,
-        email_change_key: impl Into<RecordIdKey>,
+        time: u64,
+        user_username: impl Into<String>,
+        email_change_id: i64,
     ) -> Result<DbEmailChange, DbEmailChangeGetByKeyErr> {
-        let email_change_id = create_email_change_id(email_change_key);
-        let query = r#"
-                BEGIN TRANSACTION;
+        let pool = &self.db;
+        let user_username = user_username.into();
 
-                LET $email_change = SELECT *, user.* FROM ONLY $email_change_id;
-                
-                IF !$email_change {
-                    THROW "not found"
-                };
+        let query = "SELECT * FROM emails_changes WHERE email_change_id = $1";
 
-                IF $email_change.user.id != $user_id {
-                    THROW "unauthorized"
-                };
+        let result = sqlx::query_as(query)
+            .bind(email_change_id)
+            .fetch_one(pool)
+            .await;
 
-                IF $email_change.completed {
-                    THROW "already used"
-                };
+        debug!("query {query} result {result:#?}");
 
-                IF $email_change.expires < $time {
-                    THROW "email change expired"
-                };
+        let email_change: DbEmailChange = match result {
+            Ok(v) => v,
+            Err(sqlx::Error::RowNotFound) => {
+                return Err(DbEmailChangeGetByKeyErr::EmailChangeNotFound);
+            }
+            Err(err) => {
+                error!("unexpected db error {err}");
+                return Err(DbEmailChangeGetByKeyErr::Db(err));
+            }
+        };
 
-                RETURN $email_change;
+        if email_change.user_username != user_username {
+            return Err(DbEmailChangeGetByKeyErr::Unauthorized);
+        }
 
-                COMMIT TRANSACTION;
-            "#;
+        if email_change.completed {
+            return Err(DbEmailChangeGetByKeyErr::AlreadyUsed);
+        }
 
-        // SELECT *, user.* FROM ONLY $email_change_id;
-        trace!("about to run {query}");
+        if email_change.expires_at < time {
+            return Err(DbEmailChangeGetByKeyErr::Expired);
+        }
 
-        self.db
-            .query(query)
-            .bind(("time", time))
-            .bind(("user_id", user_id))
-            .bind(("email_change_id", email_change_id))
-            .await
-            .check_better(|err| match err {
-                err if err.thrown("not found") => DbEmailChangeGetByKeyErr::EmailChangeNotFound,
-                err if err.thrown("unauthorized") => DbEmailChangeGetByKeyErr::Unauthorized,
-                err if err.thrown("already used") => DbEmailChangeGetByKeyErr::AlreadyUsed,
-                err if err.thrown("email change expired") => DbEmailChangeGetByKeyErr::Expired,
-                err => {
-                    error!("unexpected db error {err}");
-                    DbEmailChangeGetByKeyErr::Db(err)
-                }
-            })
-            .and_then_take_expect(6)
+        Ok(email_change)
     }
 }
 
+#[cfg(test)]
 #[tokio::test]
 async fn test_email_change_get_by_key() {
     init_log();
 
-    let db = Db::mem(0).await;
+    let db = Db::test_db(0, "test_email_change_get_by_key").await;
 
     let invite = db.invite_add(0, "hey@hey.com", 10).await.unwrap();
     let user = db
-        .user_add(0, "hey", "r4$$ohnGergnn023n", invite.id.key.clone(), 10, 10)
+        .user_add(0, "hey", "r4$$ohnGergnn023n", invite.token, 10, 10)
         .await
         .unwrap();
-    let email_change = db.email_change_add(0, user.id.clone(), 10).await.unwrap();
+    let email_change = db
+        .email_change_add(0, user.username.clone(), 10)
+        .await
+        .unwrap();
     let _email_change = db
-        .email_change_get_by_key(0, user.id.clone(), email_change.id.key.clone())
+        .email_change_get_by_key(0, user.username.clone(), email_change.id)
         .await
         .unwrap();
 }

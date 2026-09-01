@@ -1,12 +1,8 @@
+use crate::{Db, XTimestamp};
 use catsquad_log::prelude::*;
 use catsquad_shared::PostState;
-use surrealdb::types::{RecordId, RecordIdKey};
 
-use crate::{
-    Db, DbPost, SurrealCheckUtils, SurrealErrUtils, SurrealSerializeUtils, create_post_id,
-};
-
-#[derive(Debug, thiserror::Error, PartialEq)]
+#[derive(Debug, thiserror::Error)]
 pub enum DbPostUpdateStateErr {
     #[error("same state")]
     SameState,
@@ -14,152 +10,222 @@ pub enum DbPostUpdateStateErr {
     #[error("cant set draft")]
     CantSetDraft,
 
-    #[error("not active")]
-    PostNotActive,
-
-    // #[error("already active")]
-    // PostAlreadyActive,
     #[error("post not found")]
     PostNotFound,
-
-    #[error("user not found")]
-    UserNotFound,
 
     #[error("unauthorized")]
     Unauthorized,
 
     #[error("DB error {0}")]
-    Db(#[from] surrealdb::Error),
+    Db(#[from] sqlx::Error),
 }
 
 impl Db {
     pub async fn post_update_state(
         &self,
-        time: u128,
-        user_id: RecordId,
-        post_key: impl Into<RecordIdKey>,
-        state: PostState,
-    ) -> Result<DbPost, DbPostUpdateStateErr> {
-        let post_id = create_post_id(post_key);
-        // TODO add auth check
+        time: u64,
+        user_username: String,
+        post_id: i64,
+        new_state: PostState,
+    ) -> Result<(), DbPostUpdateStateErr> {
+        if new_state == PostState::Draft {
+            return Err(DbPostUpdateStateErr::CantSetDraft);
+        }
 
-        let query = r#"
-                    BEGIN TRANSACTION;
+        let pool = &self.db;
 
-                    IF !$user_id.exists() {
-                        THROW "user not found"
-                    };
+        let mut tx = pool.begin().await?;
 
-                    LET $post = SELECT user, state FROM ONLY $post_id;
+        let query = "SELECT post_state, post_user_username FROM posts WHERE post_id = $1";
 
-                    IF $new_state == $draft_state {
-                        THROW "cant set draft"
-                    };
+        let result = sqlx::query_as(query)
+            .bind(post_id)
+            .fetch_one(&mut *tx)
+            .await;
 
-                    IF $new_state == $post.state {
-                        THROW "same stage"
-                    };
+        let result = match result {
+            Ok(v) => v,
+            Err(sqlx::Error::RowNotFound) => {
+                return Err(DbPostUpdateStateErr::PostNotFound);
+            }
+            Err(err) => {
+                error!("unexpected db error {err}");
+                return Err(DbPostUpdateStateErr::Db(err));
+            }
+        };
 
-                    IF $new_state != $active_state && $post.state == $draft_state {
-                        THROW "not active"
-                    };
+        debug!("query {query}\nresults {result:?}");
 
-                    IF !$post {
-                        THROW "not found"
-                    };
+        let (post_state, post_user_username): (String, String) = result;
 
-                    IF $post.user != $user_id {
-                        THROW "unauthorized"
-                    };
+        if new_state == post_state {
+            return Err(DbPostUpdateStateErr::SameState);
+        }
 
-                    UPDATE $post_id SET
-                        state = $new_state,
-                        modified_at = $time
-                    RETURN *, user.*;
+        if user_username != post_user_username {
+            return Err(DbPostUpdateStateErr::Unauthorized);
+        }
 
-                    COMMIT TRANSACTION;
-                "#;
+        let query = "UPDATE posts SET
+                            post_state = $1,
+                            post_modified_at = $2
+                            WHERE post_id = $3";
 
-        trace!("about to run {query}");
+        debug!("about to run {query}");
 
-        self.db
-            .query(query)
-            .bind(("time", time))
-            .bind(("draft_state", PostState::Draft.to_string()))
-            .bind(("active_state", PostState::Active.to_string()))
-            .bind(("hidden_state", PostState::Hidden.to_string()))
-            .bind(("post_id", post_id))
-            .bind(("user_id", user_id))
-            .bind(("new_state", state.to_string()))
-            .await
-            .check_better(|err| match err {
-                err if err.thrown("cant set draft") => DbPostUpdateStateErr::CantSetDraft,
-                err if err.thrown("same stage") => DbPostUpdateStateErr::SameState,
-                // err if err.thrown("already active") => DbPostUpdateStateErr::PostAlreadyActive,
-                err if err.thrown("not active") => DbPostUpdateStateErr::PostNotActive,
-                err if err.thrown("user not found") => DbPostUpdateStateErr::UserNotFound,
-                err if err.thrown("not found") => DbPostUpdateStateErr::PostNotFound,
-                err if err.thrown("unauthorized") => DbPostUpdateStateErr::Unauthorized,
-                err => {
-                    error!("unexpected db error {err}");
-                    DbPostUpdateStateErr::Db(err)
-                }
-            })
-            .and_then_take_expect(8)
+        let result = sqlx::query(query)
+            .bind(new_state.as_str())
+            .bind(XTimestamp(time as i64))
+            .bind(post_id)
+            .execute(&mut *tx)
+            .await;
+
+        let result = match result {
+            Ok(v) => v,
+            Err(err) => {
+                error!("unexpected db error {err}");
+                return Err(DbPostUpdateStateErr::Db(err));
+            }
+        };
+
+        debug!("query {query}\nresults {result:?}");
+
+        let affected = result.rows_affected();
+        if affected != 1 {
+            tx.rollback().await.unwrap();
+            panic!(
+                "something is wrong, updated wrong number of rows, expected 1, got {}, query {}, params {} {} {}",
+                affected, query, new_state, time, post_id
+            );
+        }
+
+        tx.commit().await?;
+
+        Ok(())
     }
 }
 
+#[cfg(test)]
 #[tokio::test]
 async fn test_post_update_state() {
     init_log();
 
-    let db = Db::mem(0).await;
+    let db = Db::test_db(0, "test_post_update_state").await;
 
-    let invite1 = db.invite_add(0, "hey@heyadora.com", 1).await.unwrap();
-    let user = db
-        .user_add(0, "hey", "hey", invite1.id.key.clone(), 10, 10)
+    let (user1, user2) = {
+        let invite1 = db.invite_add(0, "hey@heyadora.com", 1).await.unwrap();
+        let user1 = db
+            .user_add(0, "hey", "hey", invite1.token.clone(), 10, 10)
+            .await
+            .unwrap();
+
+        let invite1 = db.invite_add(0, "hey2@heyadora.com", 1).await.unwrap();
+        let user2 = db
+            .user_add(0, "hey2", "hey", invite1.token.clone(), 10, 10)
+            .await
+            .unwrap();
+
+        (user1, user2)
+    };
+
+    let post1 = db
+        .post_add(0, user1.username.clone(), "title", "description", "")
         .await
         .unwrap();
+    assert_eq!(post1.state, PostState::Draft.to_string());
 
-    let post = db
-        .post_add(0, user.id.clone(), "title", "description", "")
-        .await
-        .unwrap();
-    assert_eq!(post.state, PostState::Draft.to_string());
+    // error assert
+    {
+        let result = db
+            .post_update_state(0, user2.username.clone(), post1.id, PostState::Active)
+            .await;
+        assert!(matches!(result, Err(DbPostUpdateStateErr::Unauthorized)));
+    }
 
-    let result = db
-        .post_update_state(0, user.id.clone(), post.id.key.clone(), PostState::Draft)
-        .await;
-    assert_eq!(result, Err(DbPostUpdateStateErr::CantSetDraft));
+    // error assert
+    {
+        let result = db
+            .post_update_state(0, user1.username.clone(), post1.id, PostState::Draft)
+            .await;
+        assert!(matches!(result, Err(DbPostUpdateStateErr::CantSetDraft)));
+    }
 
-    let result = db
-        .post_update_state(0, user.id.clone(), post.id.key.clone(), PostState::Hidden)
-        .await;
-    assert_eq!(result, Err(DbPostUpdateStateErr::PostNotActive));
+    // success assert
+    {
+        let result = db
+            .post_update_state(0, user1.username.clone(), post1.id, PostState::Hidden)
+            .await;
+        assert!(matches!(result, Ok(_)));
+    }
 
-    let post = db
-        .post_update_state(0, user.id.clone(), post.id.key.clone(), PostState::Active)
-        .await
-        .unwrap();
-    assert_eq!(post.state, PostState::Active.to_string());
+    // success assert
+    let post1 = {
+        db.post_update_state(0, user1.username.clone(), post1.id, PostState::Active)
+            .await
+            .unwrap();
+        let post1 = db
+            .post_get_by_id(user1.username.clone(), post1.id)
+            .await
+            .unwrap();
+        assert_eq!(post1.state, PostState::Active.to_string());
 
-    let post = db
-        .post_update_state(0, user.id.clone(), post.id.key.clone(), PostState::Hidden)
-        .await
-        .unwrap();
+        post1
+    };
 
-    let result = db
-        .post_update_state(0, user.id.clone(), post.id.key.clone(), PostState::Draft)
-        .await;
-    assert_eq!(result, Err(DbPostUpdateStateErr::CantSetDraft));
+    let post2 = {
+        let post2 = db
+            .post_add(0, user1.username.clone(), "title2", "description2", "")
+            .await
+            .unwrap();
+        db.post_update_state(0, user1.username.clone(), post2.id, PostState::Active)
+            .await
+            .unwrap();
+        post2
+    };
 
-    let result = db
-        .post_update_state(0, user.id.clone(), post.id.key.clone(), PostState::Hidden)
-        .await;
-    assert_eq!(result, Err(DbPostUpdateStateErr::SameState));
+    // success assert
+    let post1 = {
+        db.post_update_state(0, user1.username.clone(), post1.id, PostState::Hidden)
+            .await
+            .unwrap();
+        let post1 = db
+            .post_get_by_id(user1.username.clone(), post1.id.clone())
+            .await
+            .unwrap();
 
-    let _post = db
-        .post_update_state(0, user.id.clone(), post.id.key.clone(), PostState::Active)
-        .await
-        .unwrap();
+        // make sure only 1 row was updated
+        {
+            let post2 = db
+                .post_get_by_id(user1.username.clone(), post2.id)
+                .await
+                .unwrap();
+
+            assert_eq!(post2.state, PostState::Active.to_string());
+        }
+
+        post1
+    };
+
+    // error assert
+    {
+        let result = db
+            .post_update_state(0, user1.username.clone(), post1.id, PostState::Draft)
+            .await;
+        assert!(matches!(result, Err(DbPostUpdateStateErr::CantSetDraft)));
+    }
+
+    // error assert
+    {
+        let result = db
+            .post_update_state(0, user1.username.clone(), post1.id, PostState::Hidden)
+            .await;
+        assert!(matches!(result, Err(DbPostUpdateStateErr::SameState)));
+    }
+
+    // success assert
+    {
+        db.post_update_state(0, user1.username.clone(), post1.id, PostState::Active)
+            .await
+            .unwrap();
+    }
 }

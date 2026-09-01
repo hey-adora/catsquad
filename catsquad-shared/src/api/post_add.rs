@@ -33,6 +33,32 @@ pub const POST_STATE_DRAFT: &'static str = "draft";
 pub const POST_STATE_ACTIVE: &'static str = "active";
 pub const POST_STATE_HIDDEN: &'static str = "hidden";
 
+impl PostState {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            PostState::Draft => POST_STATE_DRAFT,
+            PostState::Active => POST_STATE_ACTIVE,
+            PostState::Hidden => POST_STATE_HIDDEN,
+        }
+    }
+}
+
+impl PartialEq<&str> for PostState {
+    fn eq(&self, other: &&str) -> bool {
+        let other = *other;
+        let other = PostState::from(other);
+        *self == other
+    }
+}
+
+impl PartialEq<String> for PostState {
+    fn eq(&self, other: &String) -> bool {
+        let other = other.as_str();
+        let other = PostState::from(other);
+        *self == other
+    }
+}
+
 impl From<String> for PostState {
     fn from(value: String) -> Self {
         let value = value.as_str();

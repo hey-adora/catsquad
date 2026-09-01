@@ -1,40 +1,42 @@
 use catsquad_log::prelude::*;
-use surrealdb::types::{RecordId, RecordIdKey, SurrealValue};
 
-use crate::{Db, DbUser, SurrealCheckUtils, SurrealErrUtils, SurrealSerializeUtils};
+use crate::{Db, DbUser};
 
-#[derive(Debug, thiserror::Error, PartialEq)]
+#[derive(Debug, thiserror::Error)]
 pub enum DbUserGetAllErr {
     #[error("DB error {0}")]
-    DB(#[from] surrealdb::Error),
+    Db(#[from] sqlx::Error),
 }
 
 impl Db {
     pub async fn user_get_all(&self) -> Result<Vec<DbUser>, DbUserGetAllErr> {
-        let query = "SELECT * FROM user ORDER BY created_at DESC;";
+        let pool = &self.db;
+        let query = "SELECT * FROM users ORDER BY user_created_at DESC";
 
         trace!("about to run {query}");
 
-        self.db
-            .query(query)
-            .await
-            .check_good(|err| match err {
-                err => {
-                    error!("unexpected db error {err}");
-                    DbUserGetAllErr::DB(err)
-                }
-            })
-            .and_then_take_all(0)
+        let result = sqlx::query_as(query).fetch_all(pool).await;
+
+        let users = match result {
+            Ok(v) => v,
+            Err(err) => {
+                error!("unexpected db error {err}");
+                return Err(DbUserGetAllErr::Db(err));
+            }
+        };
+
+        Ok(users)
     }
 }
 
+#[cfg(test)]
 #[tokio::test]
 async fn test_user_get_all() {
     init_log();
 
-    let db = Db::mem(0).await;
+    let db = Db::test_db(0, "test_user_get_all").await;
     let invite = db.invite_add(0, "hey@hey.com", 10).await.unwrap();
-    db.user_add(0, "hey", "hey", invite.id.key.clone(), 10, 10)
+    db.user_add(0, "hey", "hey", invite.token.clone(), 10, 10)
         .await
         .unwrap();
     let users = db.user_get_all().await.unwrap();

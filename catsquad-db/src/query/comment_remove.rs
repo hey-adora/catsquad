@@ -21,7 +21,7 @@ pub enum DbCommentRemoveErr {
     Unauthorized,
 }
 
-impl Db {
+impl<C: surrealdb::Connection> Db<C> {
     pub async fn comment_remove(
         &self,
         time: u128,

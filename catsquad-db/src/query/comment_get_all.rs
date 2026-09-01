@@ -8,7 +8,7 @@ pub enum DbCommentGetAllErr {
     Db(#[from] surrealdb::Error),
 }
 
-impl Db {
+impl<C: surrealdb::Connection> Db<C> {
     pub async fn comment_get_all(&self) -> Result<Vec<DbComment>, DbCommentGetAllErr> {
         let query = "SELECT *, user.* FROM comment ORDER BY created_at DESC;";
 

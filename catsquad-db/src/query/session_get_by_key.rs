@@ -1,73 +1,65 @@
-use crate::{
-    Db, DbUser, SurrealCheckUtils, SurrealErrUtils, SurrealSerializeUtils,
-    query::session_add::{DbSession, create_session_id},
-};
+use crate::{Db, Uuid, XUuid, query::session_add::DbSession};
 use catsquad_log::prelude::*;
-use std::fmt::Display;
-use surrealdb::types::{RecordId, RecordIdKey, SurrealValue};
 
-#[derive(Debug, thiserror::Error, PartialEq)]
+#[derive(Debug, thiserror::Error)]
 pub enum DbSessionGetByKeyErr {
-    #[error("session {0:?} not found")]
-    NotFound(RecordIdKey),
+    #[error("session not found")]
+    NotFound,
 
     #[error("db error {0}")]
-    Db(#[from] surrealdb::Error),
+    Db(#[from] sqlx::Error),
 }
 
 impl Db {
-    // pub async fn get_session<S: Into<String>>(&self, token: S) -> Result<DBSession, DB404Err> {
-    //       let token = token.into();
-    //       let session_id = create_session_id(token.clone());
-    //       self.db
-    //           .query("SELECT *, user.* FROM $session_id;")
-    //           .bind(("session_id", session_id))
-    //           .await
-    //           .check_good(DB404Err::from)
-    //           .and_then_take_or(0, DB404Err::NotFound)
-    //   }
-
-    pub async fn session_get_by_key(
+    pub async fn session_get_by_token(
         &self,
-        session_key: impl Into<RecordIdKey>,
+        session_token: Uuid,
     ) -> Result<DbSession, DbSessionGetByKeyErr> {
-        let session_key = session_key.into();
-        let session_id = create_session_id(session_key.clone());
-        let query = r#"
-                    SELECT *, user.* FROM $session_id;
-                "#;
-        trace!("about to run {query}");
+        let pool = &self.db;
 
-        self.db
-            .query(query)
-            .bind(("session_id", session_id))
-            .await
-            .check_good(|err| match err {
-                err => {
-                    error!("unexpected db error {err}");
-                    DbSessionGetByKeyErr::Db(err)
-                }
-            })
-            .and_then_take_or(0, DbSessionGetByKeyErr::NotFound(session_key))
+        let query = "SELECT * FROM sessions WHERE session_token = $1";
+
+        debug!("about to run {query}");
+
+        let result = sqlx::query_as(query)
+            .bind(XUuid(session_token))
+            .fetch_one(pool)
+            .await;
+
+        let result = match result {
+            Ok(v) => v,
+            Err(sqlx::Error::RowNotFound) => {
+                return Err(DbSessionGetByKeyErr::NotFound);
+            }
+            Err(err) => {
+                error!("unexpected db error {err}");
+                return Err(DbSessionGetByKeyErr::Db(err));
+            }
+        };
+
+        debug!("query {query}\nresults {result:?}");
+
+        Ok(result)
     }
 }
 
+#[cfg(test)]
 #[tokio::test]
 async fn test_session_get_by_key() {
     init_log();
 
-    let db = Db::mem(0).await;
+    let db = Db::test_db(0, "test_session_get_by_key").await;
 
     let invite = db.invite_add(0, "hey@hey.com", 1).await.unwrap();
-    let result = db
-        .user_add(0, "hey", "hey", invite.id.key, 10, 10)
+    let _result = db
+        .user_add(0, "hey", "hey", invite.token, 10, 10)
         .await
         .unwrap();
 
     let session = db.session_add(0, "hey@hey.com").await.unwrap();
-    assert_eq!(session.user.username, "hey");
+    assert_eq!(session.user_email, "hey@hey.com");
 
-    let _result = db.session_get_by_key(session.id.key.clone()).await.unwrap();
-    let result = db.session_get_by_key("invalid").await;
-    assert!(matches!(result, Err(DbSessionGetByKeyErr::NotFound(_))));
+    let _result = db.session_get_by_token(session.token).await.unwrap();
+    let result = db.session_get_by_token(0_u128.to_be_bytes()).await;
+    assert!(matches!(result, Err(DbSessionGetByKeyErr::NotFound)));
 }

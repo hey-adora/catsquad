@@ -1,11 +1,7 @@
+use crate::{Db, XTimestamp};
 use catsquad_log::prelude::*;
-use surrealdb::types::{RecordId, RecordIdKey};
 
-use crate::{
-    Db, DbPost, SurrealCheckUtils, SurrealErrUtils, SurrealSerializeUtils, create_post_id,
-};
-
-#[derive(Debug, thiserror::Error, PartialEq)]
+#[derive(Debug, thiserror::Error)]
 pub enum DbPostUpdateOrderErr {
     #[error("post not found")]
     PostNotFound,
@@ -17,175 +13,235 @@ pub enum DbPostUpdateOrderErr {
     InvalidIndex,
 
     #[error("DB error {0}")]
-    Db(#[from] surrealdb::Error),
+    Db(#[from] sqlx::Error),
+
+    #[error("internal error {0}")]
+    InternalError(String),
 }
 
 impl Db {
     pub async fn post_update_order(
         &self,
-        time: u128,
-        user_id: RecordId,
-        post_key: impl Into<RecordIdKey>,
+        time: u64,
+        user_username: impl Into<String>,
+        post_id: i64,
         selected_pos: usize,
         new_pos: usize,
-    ) -> Result<DbPost, DbPostUpdateOrderErr> {
-        let post_id = create_post_id(post_key);
+    ) -> Result<(), DbPostUpdateOrderErr> {
+        let user_username = user_username.into();
 
-        let query = r#"
-                    BEGIN TRANSACTION;
+        let mut tx = self.db.begin().await?;
 
-                    LET $post = SELECT file, user FROM ONLY $post_id;
+        // get post
+        let post_images_hashes = {
+            let query =
+                "SELECT post_user_username, post_images_hashes FROM posts WHERE post_id = $1";
 
-                    IF $post.user AND $post.user != $user_id {
-                        THROW "unauthorized";
-                    };
+            let result = sqlx::query_as(query)
+                .bind(post_id)
+                .fetch_one(&mut *tx)
+                .await;
 
-                    IF !$post.file {
-                        THROW "not found";
-                    };
-                    
-                    LET $post_files_len = $post.file.len();
-                    IF $post_files_len <= $selected_pos OR $post_files_len <= $new_pos {
-                        THROW "out of range";
-                    };
+            debug!("query: {query}\nresult: {result:#?}");
 
-                    LET $file_selected = $post.file.at($selected_pos);
-                    LET $files_removed = $post.file.remove($selected_pos);
-                    LET $files_inserted = $files_removed.insert($file_selected, $new_pos);
-
-                    UPDATE ONLY $post_id SET 
-                       file = $files_inserted, 
-                       modified_at = $time 
-                    RETURN *, user.*;
-
-                    COMMIT TRANSACTION;
-                    
-                "#;
-
-        trace!("about to run {query}");
-
-        self.db
-            .query(query)
-            .bind(("time", time))
-            .bind(("selected_pos", selected_pos))
-            .bind(("new_pos", new_pos))
-            .bind(("user_id", user_id))
-            .bind(("post_id", post_id))
-            .await
-            .check_better(|err| match err {
-                err if err.thrown("not found") => DbPostUpdateOrderErr::PostNotFound,
-                err if err.thrown("unauthorized") => DbPostUpdateOrderErr::Unauthorized,
-                err if err.thrown("out of range") => DbPostUpdateOrderErr::InvalidIndex,
-                err => {
-                    error!("unexpected db error {err}");
-                    DbPostUpdateOrderErr::Db(err)
+            let result = match result {
+                Ok(v) => v,
+                Err(sqlx::Error::RowNotFound) => {
+                    return Err(DbPostUpdateOrderErr::PostNotFound);
                 }
-            })
-            .and_then_take_expect(9)
+                Err(err) => {
+                    error!("unexpected db error {err}");
+                    return Err(DbPostUpdateOrderErr::Db(err));
+                }
+            };
+
+            let (post_user_username, post_images_hashes): (String, Vec<i64>) = result;
+            let hashes_len = post_images_hashes.len();
+
+            if post_user_username != user_username {
+                return Err(DbPostUpdateOrderErr::Unauthorized);
+            }
+
+            if new_pos >= hashes_len || selected_pos >= hashes_len {
+                return Err(DbPostUpdateOrderErr::InvalidIndex);
+            }
+
+            post_images_hashes
+        };
+
+        // update post
+        {
+            let mut new_post_images_hashes = post_images_hashes;
+            let hash = new_post_images_hashes.remove(selected_pos);
+            new_post_images_hashes.insert(new_pos, hash);
+            // new_post_images_hashes.swap(selected_pos, new_pos);
+
+            let query = "UPDATE posts SET
+                            post_images_hashes = $1,
+                            post_modified_at = $2
+                            WHERE post_id = $3";
+
+            let result = sqlx::query(query)
+                .bind(&new_post_images_hashes)
+                .bind(XTimestamp(time as i64))
+                .bind(post_id)
+                .execute(&mut *tx)
+                .await;
+
+            debug!("query: {query}\nresult: {result:#?}");
+
+            let result = match result {
+                Ok(v) => v,
+                Err(err) => {
+                    error!("unexpected db error {err}");
+                    return Err(DbPostUpdateOrderErr::Db(err));
+                }
+            };
+
+            let affected = result.rows_affected();
+            if result.rows_affected() != 1 {
+                return Err(DbPostUpdateOrderErr::InternalError(format!(
+                    "post_update_order must updated 1 row max, updated {affected}"
+                )));
+            }
+        }
+
+        tx.commit().await?;
+
+        Ok(())
     }
 }
 
+#[cfg(test)]
 #[tokio::test]
 async fn test_post_update_order() {
     use crate::DbPost;
 
     init_log();
 
-    let db = Db::mem(0).await;
+    let db = Db::test_db(0, "test_post_update_order").await;
 
-    let invite1 = db.invite_add(0, "hey@heyadora.com", 1).await.unwrap();
-    let user = db
-        .user_add(0, "hey", "hey", invite1.id.key.clone(), 10, 10)
-        .await
-        .unwrap();
+    let (user, user2) = {
+        let invite1 = db.invite_add(0, "hey@heyadora.com", 1).await.unwrap();
+        let user = db
+            .user_add(0, "hey", "hey", invite1.token, 10, 10)
+            .await
+            .unwrap();
 
-    let invite1 = db.invite_add(0, "hey2@heyadora.com", 1).await.unwrap();
-    let user2 = db
-        .user_add(0, "hey2", "hey", invite1.id.key.clone(), 10, 10)
-        .await
-        .unwrap();
+        let invite1 = db.invite_add(0, "hey2@heyadora.com", 1).await.unwrap();
+        let user2 = db
+            .user_add(0, "hey2", "hey", invite1.token, 10, 10)
+            .await
+            .unwrap();
 
-    let post = db
-        .post_add(0, user.id.clone(), "title", "description", "")
-        .await
-        .unwrap();
-
-    let add_post_file_fn = async |post: &DbPost, hash: &str, size: u64| {
-        db.post_update_file_add(
-            0,
-            user.id.clone(),
-            post.id.key.clone(),
-            size,
-            hash,
-            "png",
-            50,
-            50,
-        )
-        .await
+        (user, user2)
     };
-    add_post_file_fn(&post, "0", 1).await.unwrap();
-    add_post_file_fn(&post, "1", 1).await.unwrap();
-    add_post_file_fn(&post, "2", 1).await.unwrap();
-    let post = add_post_file_fn(&post, "3", 1).await.unwrap();
-    assert_eq!(post.file.len(), 4);
-    assert_eq!(post.file[0].hash, "0");
-    assert_eq!(post.file[1].hash, "1");
-    assert_eq!(post.file[2].hash, "2");
-    assert_eq!(post.file[3].hash, "3");
 
-    let result = db
-        .post_update_order(0, user2.id.clone(), post.id.key.clone(), 2, 0)
-        .await;
-    assert!(matches!(result, Err(DbPostUpdateOrderErr::Unauthorized)));
+    let post = {
+        use catsquad_shared::PostState;
 
-    let post = db
-        .post_update_order(0, user.id.clone(), post.id.key.clone(), 2, 0)
-        .await
-        .unwrap();
-    assert_eq!(post.file.len(), 4);
-    assert_eq!(post.file[0].hash, "2");
-    assert_eq!(post.file[1].hash, "0");
-    assert_eq!(post.file[2].hash, "1");
-    assert_eq!(post.file[3].hash, "3");
+        let post = db
+            .post_add(0, user.username.clone(), "title", "description", "")
+            .await
+            .unwrap();
+        db.post_update_state(0, user.username.clone(), post.id, PostState::Active)
+            .await
+            .unwrap();
 
-    let post = db
-        .post_update_order(0, user.id.clone(), post.id.key.clone(), 0, 2)
-        .await
-        .unwrap();
-    assert_eq!(post.file.len(), 4);
-    assert_eq!(post.file[0].hash, "0");
-    assert_eq!(post.file[1].hash, "1");
-    assert_eq!(post.file[2].hash, "2");
-    assert_eq!(post.file[3].hash, "3");
+        post
+    };
 
-    let post = db
-        .post_update_order(0, user.id.clone(), post.id.key.clone(), 0, 3)
-        .await
-        .unwrap();
-    assert_eq!(post.file.len(), 4);
-    assert_eq!(post.file[0].hash, "1");
-    assert_eq!(post.file[1].hash, "2");
-    assert_eq!(post.file[2].hash, "3");
-    assert_eq!(post.file[3].hash, "0");
+    // add images
+    {
+        let add_post_file_fn = async |post: &DbPost, hash: i64, size: u32| {
+            db.post_update_file_add(0, user.username.clone(), post.id, size, hash, "png", 50, 50)
+                .await
+        };
 
-    let post_err = db
-        .post_update_order(0, user.id.clone(), post.id.key.clone(), 0, 4)
-        .await
-        .err()
-        .unwrap();
-    assert!(matches!(post_err, DbPostUpdateOrderErr::InvalidIndex));
+        add_post_file_fn(&post, 10, 1).await.unwrap();
+        add_post_file_fn(&post, 20, 1).await.unwrap();
+        add_post_file_fn(&post, 30, 1).await.unwrap();
+        add_post_file_fn(&post, 40, 1).await.unwrap();
+        let post = db
+            .post_get_by_id(user.username.clone(), post.id)
+            .await
+            .unwrap();
 
-    let post_err = db
-        .post_update_order(0, user.id.clone(), post.id.key.clone(), 4, 0)
-        .await
-        .err()
-        .unwrap();
-    assert!(matches!(post_err, DbPostUpdateOrderErr::InvalidIndex));
+        assert_eq!(post.images_hashes.len(), 4);
+        assert_eq!(post.images_hashes[0], 10);
+        assert_eq!(post.images_hashes[1], 20);
+        assert_eq!(post.images_hashes[2], 30);
+        assert_eq!(post.images_hashes[3], 40);
+    }
 
-    let post_err = db
-        .post_update_order(0, user.id.clone(), "invalid", 4, 0)
-        .await
-        .err()
-        .unwrap();
-    assert!(matches!(post_err, DbPostUpdateOrderErr::PostNotFound));
+    // assert success
+    {
+        db.post_update_order(0, user.username.clone(), post.id, 2, 0)
+            .await
+            .unwrap();
+        let post = db
+            .post_get_by_id(user.username.clone(), post.id)
+            .await
+            .unwrap();
+        assert_eq!(post.images_hashes.len(), 4);
+        assert_eq!(post.images_hashes[0], 30);
+        assert_eq!(post.images_hashes[1], 10);
+        assert_eq!(post.images_hashes[2], 20);
+        assert_eq!(post.images_hashes[3], 40);
+
+        db.post_update_order(0, user.username.clone(), post.id, 0, 2)
+            .await
+            .unwrap();
+        let post = db
+            .post_get_by_id(user.username.clone(), post.id)
+            .await
+            .unwrap();
+        assert_eq!(post.images_hashes.len(), 4);
+        assert_eq!(post.images_hashes[0], 10);
+        assert_eq!(post.images_hashes[1], 20);
+        assert_eq!(post.images_hashes[2], 30);
+        assert_eq!(post.images_hashes[3], 40);
+
+        db.post_update_order(0, user.username.clone(), post.id, 0, 3)
+            .await
+            .unwrap();
+        let post = db
+            .post_get_by_id(user.username.clone(), post.id)
+            .await
+            .unwrap();
+        assert_eq!(post.images_hashes.len(), 4);
+        assert_eq!(post.images_hashes[0], 20);
+        assert_eq!(post.images_hashes[1], 30);
+        assert_eq!(post.images_hashes[2], 40);
+        assert_eq!(post.images_hashes[3], 10);
+    }
+
+    // assert errors
+    {
+        let result = db
+            .post_update_order(0, user2.username.clone(), post.id, 2, 0)
+            .await;
+        assert!(matches!(result, Err(DbPostUpdateOrderErr::Unauthorized)));
+
+        let post_err = db
+            .post_update_order(0, user.username.clone(), post.id, 0, 4)
+            .await
+            .err()
+            .unwrap();
+        assert!(matches!(post_err, DbPostUpdateOrderErr::InvalidIndex));
+
+        let post_err = db
+            .post_update_order(0, user.username.clone(), post.id, 4, 0)
+            .await
+            .err()
+            .unwrap();
+        assert!(matches!(post_err, DbPostUpdateOrderErr::InvalidIndex));
+
+        let post_err = db
+            .post_update_order(0, user.username.clone(), 0, 4, 0)
+            .await
+            .err()
+            .unwrap();
+        assert!(matches!(post_err, DbPostUpdateOrderErr::PostNotFound));
+    }
 }

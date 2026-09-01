@@ -1,4 +1,7 @@
-use crate::{MAX_PASSWORD_LENGTH, MAX_USERNAME_LENGTH, MIN_PASSWORD_LENGTH, MIN_USERNAME_LENGTH};
+use crate::{
+    MAX_EMAIL_LENGTH, MAX_PASSWORD_LENGTH, MAX_USERNAME_LENGTH, MIN_EMAIL_LENGTH,
+    MIN_PASSWORD_LENGTH, MIN_USERNAME_LENGTH,
+};
 use catsquad_log::prelude::*;
 
 pub const LINK_API_USER_ADD: &str = "/api/register";
@@ -70,6 +73,12 @@ pub fn validate_email<S: AsRef<str>>(email: S) -> Result<(), String> {
         errors += "email must contain '@'\n";
     }
 
+    match email.len() {
+        len if len < MIN_EMAIL_LENGTH => errors += "min email length is 3 characters length\n",
+        len if len > MAX_EMAIL_LENGTH => errors += "max email length is 100 characters\n",
+        _ => {}
+    }
+
     if errors.is_empty() {
         Ok(())
     } else {
@@ -81,10 +90,16 @@ pub fn validate_email<S: AsRef<str>>(email: S) -> Result<(), String> {
 
 #[test]
 fn test_validate_email() {
+    use rand::distr::SampleString;
+    let long_email = rand::distr::Alphanumeric.sample_string(&mut rand::rng(), MAX_EMAIL_LENGTH);
+    let long_email = format!("{long_email}@heyadora.com");
+
+    assert!(validate_email(long_email).is_err());
     assert!(validate_email("").is_err());
     assert!(validate_email(" ").is_err());
     assert!(validate_email("a").is_err());
-    assert!(validate_email("a@").is_ok());
+    assert!(validate_email("a@").is_err());
+    assert!(validate_email("a@.").is_err());
 }
 
 pub fn validate_username(username: impl AsRef<str>) -> Result<(), String> {
@@ -119,6 +134,8 @@ pub fn validate_username(username: impl AsRef<str>) -> Result<(), String> {
 
 #[test]
 fn test_validate_username() {
+    use rand::distr::SampleString;
+
     assert!(validate_username("hey").is_ok());
     assert!(validate_username("hey%").is_err());
     assert!(validate_username("he").is_err());

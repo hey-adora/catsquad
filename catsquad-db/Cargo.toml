@@ -7,9 +7,19 @@ edition = "2024"
 crate-type = ["dylib"]
 
 [dependencies]
-catsquad-log = { workspace = true }
+catsquad-log = { workspace = true, features=["release_max_level_info"] }
 catsquad-shared = { workspace = true }
-surrealdb = { workspace = true }
-tokio = { workspace = true }
 thiserror = { workspace = true }
-serde = { workspace = true }
+sqlx = { workspace = true }
+# surrealdb = { workspace = true }
+# serde = { workspace = true }
+# chrono = { workspace = true }
+# uuid = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true, features=["macros", "rt-multi-thread"] }
+tokio-util = { workspace = true }
+
+[[bench]]
+name = "query"
+harness = false

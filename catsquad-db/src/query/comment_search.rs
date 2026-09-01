@@ -12,7 +12,7 @@ pub enum DbCommentSearchErr {
     Db(#[from] surrealdb::Error),
 }
 
-impl Db {
+impl<C: surrealdb::Connection> Db<C> {
     pub async fn comment_search(
         &self,
         // time: u128,
