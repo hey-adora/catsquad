@@ -402,6 +402,56 @@ impl Db {
     }
 }
 
+pub fn join_str<TInput, TInputItem, TCallbackOutput>(
+    input: TInput,
+    between: &str,
+    mut callback: impl FnMut(TInputItem) -> TCallbackOutput,
+) -> String
+where
+    TCallbackOutput: AsRef<str>,
+    TInput: IntoIterator<Item = TInputItem>,
+{
+    let mut output = String::new();
+
+    let mut iter = input.into_iter().peekable();
+
+    loop {
+        let Some(item) = iter.next() else {
+            break;
+        };
+        let result = callback(item);
+        let result = result.as_ref();
+
+        if result.is_empty() {
+            continue;
+        }
+
+        output.push_str(&result);
+
+        let next_is_empty = iter.peek();
+
+        if next_is_empty.is_none() {
+            break;
+        }
+
+        output.push_str(between);
+    }
+
+    output
+}
+
+pub fn if_empty(input: impl AsRef<str>, callback: impl FnOnce() -> String) -> String {
+    let input = input.as_ref();
+
+    let result = if !input.is_empty() {
+        callback()
+    } else {
+        "".to_string()
+    };
+
+    result
+}
+
 // #[derive(Clone, Debug)]
 // pub struct Db<C: Connection> {
 //     db: Surreal<C>,

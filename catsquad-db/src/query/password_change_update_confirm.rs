@@ -25,7 +25,6 @@ impl Db {
     ) -> Result<(), DbPasswordChangeUpdateConfirmErr> {
         let pool = &self.db;
         let token = password_change_token;
-        // let new_password = new_password.into();
 
         let mut tx = pool
             .begin()
@@ -130,48 +129,6 @@ impl Db {
             .inspect_err(|err| error!("password_change_update_confirm {err}"))?;
 
         Ok(())
-        // let query = r#"
-        //          BEGIN TRANSACTION;
-        //          LET $password_change = SELECT used, expires, user FROM ONLY $password_change_id;
-        //          if !$password_change {
-        //              THROW "password change not found"
-        //          };
-        //          if $password_change.used {
-        //              THROW "password change already used"
-        //          };
-        //          if $password_change.expires < $time {
-        //              THROW "password change expired"
-        //          };
-        //          UPDATE $password_change.user SET password = $new_password;
-        //          UPDATE $password_change_id SET used = true RETURN *, user.*;
-        //          DELETE session WHERE user = $password_change.user;
-        //          COMMIT TRANSACTION;
-        //         "#;
-        // trace!("about to run {query}");
-
-        // self.db
-        //     .query(query)
-        //     .bind(("time", time))
-        //     .bind(("password_change_id", password_change_id))
-        //     .bind(("new_password", new_password))
-        //     // .bind(("expires", expires))
-        //     .await
-        //     .check_better(|err| match err {
-        //         err if err.thrown("password change not found") => {
-        //             DbPasswordChangeUpdateConfirmErr::PasswordKeyNotFound
-        //         }
-        //         err if err.thrown("password change already used") => {
-        //             DbPasswordChangeUpdateConfirmErr::AlreadyUsed
-        //         }
-        //         err if err.thrown("password change expired") => {
-        //             DbPasswordChangeUpdateConfirmErr::Expired
-        //         }
-        //         err => {
-        //             error!("unexpected db error {err}");
-        //             DbPasswordChangeUpdateConfirmErr::Db(err)
-        //         }
-        //     })
-        //     .and_then_take_expect(6)
     }
 }
 

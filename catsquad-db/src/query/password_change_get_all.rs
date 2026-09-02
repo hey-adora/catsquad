@@ -27,20 +27,6 @@ impl Db {
         };
 
         Ok(result)
-        // let query = "SELECT *, user.* FROM password_change ORDER BY created_at DESC;";
-
-        // trace!("about to run {query}");
-
-        // self.db
-        //     .query(query)
-        //     .await
-        //     .check_good(|err| match err {
-        //         err => {
-        //             error!("unexpected db error {err}");
-        //             DbUserPasswordChangeGetAllErr::DB(err)
-        //         }
-        //     })
-        //     .and_then_take_all(0)
     }
 }
 

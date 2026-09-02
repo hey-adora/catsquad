@@ -33,7 +33,6 @@ pub enum DbPasswordChangeAddErr {
 impl Db {
     pub async fn password_change_define(&self) {
         let pool = &self.db;
-        // add foreign key FILE
         let query = "
             CREATE TABLE passwords_changes (
                 password_change_token uuid PRIMARY KEY DEFAULT uuidv7(),
@@ -44,20 +43,8 @@ impl Db {
                 password_change_created_at timestamp NOT NULL
             );
         ";
-        // CREATE INDEX post_user_username_idx ON posts (post_user_username);
-        // CREATE INDEX post_username_and_state_idx ON posts (post_user_username, post_state);
         trace!("about to run {query}");
         let _result = sqlx::raw_sql(query).execute(pool).await.unwrap();
-        // let query = "
-        //         DEFINE TABLE password_change SCHEMAFULL;
-        //         DEFINE FIELD user ON TABLE password_change TYPE record<user>;
-        //         DEFINE FIELD expires ON TABLE password_change TYPE number;
-        //         DEFINE FIELD used ON TABLE password_change TYPE bool;
-        //         DEFINE FIELD modified_at ON TABLE password_change TYPE number;
-        //         DEFINE FIELD created_at ON TABLE password_change TYPE number;
-        //     ";
-        // trace!("about to run {query}");
-        // self.db.query(query).await.unwrap().check().unwrap();
     }
 
     pub async fn password_change_add(
@@ -116,36 +103,6 @@ impl Db {
         };
 
         Ok(password_change)
-        // let email: String = email.into();
-
-        // let query = r#"
-        //          BEGIN TRANSACTION;
-        //          LET $user = SELECT id FROM ONLY user WHERE email = $email;
-        //          CREATE password_change SET
-        //                user = $user.id,
-        //                expires = $expires,
-        //                used = false,
-        //                modified_at = $time,
-        //                created_at = $time
-        //                RETURN *, user.*;
-        //         COMMIT TRANSACTION;
-        //         "#;
-        // trace!("about to run {query}");
-
-        // self.db
-        //     .query(query)
-        //     .bind(("time", time))
-        //     .bind(("email", email.clone()))
-        //     .bind(("expires", expires))
-        //     .await
-        //     .check_better(|err| match err {
-        //         err if err.field_value_null("user") => DbPasswordChangeAddErr::UserNotFound(email),
-        //         err => {
-        //             error!("unexpected db error {err}");
-        //             DbPasswordChangeAddErr::Db(err)
-        //         }
-        //     })
-        //     .and_then_take_expect(2)
     }
 }
 

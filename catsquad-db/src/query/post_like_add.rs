@@ -39,7 +39,6 @@ pub enum DbPostLikeAddErr {
 impl Db {
     pub async fn post_like_define(&self) {
         let pool = &self.db;
-        // add foreign key FILE
         let query = "
             CREATE TABLE posts_likes (
                 post_like_id int8 PRIMARY KEY generated always as identity,
@@ -53,16 +52,6 @@ impl Db {
         ";
         trace!("about to run {query}");
         let _result = sqlx::raw_sql(query).execute(pool).await.unwrap();
-        // let query = "
-        //         DEFINE TABLE post_like SCHEMAFULL;
-        //         DEFINE FIELD user ON TABLE post_like TYPE record<user>;
-        //         DEFINE FIELD post ON TABLE post_like TYPE record<post>;
-        //         DEFINE FIELD modified_at ON TABLE post_like TYPE number;
-        //         DEFINE FIELD created_at ON TABLE post_like TYPE number;
-        //         DEFINE INDEX idx_user_post ON TABLE post_like COLUMNS user, post UNIQUE;
-        //     ";
-        // trace!("about to run {query}");
-        // self.db.query(query).await.unwrap().check().unwrap();
     }
 
     pub async fn post_like_add(

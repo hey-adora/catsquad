@@ -26,20 +26,6 @@ impl Db {
         };
 
         Ok(img)
-        // let query = "SELECT *, user.* FROM post WHERE file.proccesed CONTAINS false ORDER BY created_at ASC;";
-
-        // trace!("about to run {query}");
-
-        // self.db
-        //     .query(query)
-        //     .await
-        //     .check_good(|err| match err {
-        //         err => {
-        //             error!("unexpected db error {err}");
-        //             DbPostGetUnproccesedErr::Db(err)
-        //         }
-        //     })
-        //     .and_then_take_all(0)
     }
 }
 

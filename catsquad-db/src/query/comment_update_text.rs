@@ -1,11 +1,8 @@
+use crate::{Db, DbComment, XTimestamp};
 use catsquad_log::prelude::*;
-use surrealdb::types::{RecordId, RecordIdKey};
+use catsquad_shared::PostState;
 
-use crate::{
-    Db, DbComment, SurrealCheckUtils, SurrealErrUtils, SurrealSerializeUtils, create_comment_id,
-};
-
-#[derive(Debug, thiserror::Error, PartialEq)]
+#[derive(Debug, thiserror::Error)]
 pub enum DbCommentUpdateTextErr {
     #[error("comment not found")]
     NotFound,
@@ -14,108 +11,163 @@ pub enum DbCommentUpdateTextErr {
     Unauthorized,
 
     #[error("DB error {0}")]
-    Db(#[from] surrealdb::Error),
+    Db(#[from] sqlx::Error),
 }
 
-impl<C: surrealdb::Connection> Db<C> {
+impl Db {
     pub async fn comment_update_text(
         &self,
-        time: u128,
-        user_id: RecordId,
-        comment_key: impl Into<RecordIdKey>,
+        time: u64,
+        user_username: impl Into<String>,
+        comment_id: i64,
         new_text: impl Into<String>,
-    ) -> Result<DbComment, DbCommentUpdateTextErr> {
-        let comment_id = create_comment_id(comment_key);
+    ) -> Result<(), DbCommentUpdateTextErr> {
+        let user_username = user_username.into();
+        let new_text = new_text.into();
+        let pool = &self.db;
 
-        let query = r#"
-                    BEGIN TRANSACTION;
-
-                    LET $comment = SELECT user FROM ONLY $comment_id;
-
-                    IF !$comment {
-                        THROW "not found"
-                    };
-
-                    IF $comment.user != $user_id {
-                        THROW "unauthorized"
-                    };
-
-                    UPDATE ONLY $comment_id SET text = $new_text, modified_at = $time RETURN *, user.*;
-
-                    COMMIT TRANSACTION;
-                "#;
-
-        trace!("about to run {query}");
-
-        self.db
-            .query(query)
-            .bind(("time", time))
-            .bind(("user_id", user_id))
-            .bind(("comment_id", comment_id))
-            .bind(("new_text", new_text.into()))
+        let mut tx = pool
+            .begin()
             .await
-            .check_better(|err| match err {
-                err if err.thrown("not found") => DbCommentUpdateTextErr::NotFound,
-                err if err.thrown("unauthorized") => DbCommentUpdateTextErr::Unauthorized,
-                err => {
+            .inspect_err(|err| error!("post_like_add {err}"))?;
+
+        // get post
+        {
+            let query = "SELECT
+                                comment_user_username,
+                                post_user_username,
+                                post_state
+                                FROM comments
+                                INNER JOIN posts ON comment_post_id = post_id
+                                WHERE comment_id = $1";
+
+            let result = sqlx::query_as(query)
+                .bind(comment_id)
+                .fetch_one(&mut *tx)
+                .await;
+
+            debug!("query: {query}\nresult: {result:#?}");
+
+            let (commet_user_username, post_user_username, post_state): (String, String, String) =
+                match result {
+                    Ok(v) => v,
+                    Err(sqlx::Error::RowNotFound) => {
+                        return Err(DbCommentUpdateTextErr::NotFound);
+                    }
+                    Err(err) => {
+                        error!("unexpected db error {err}");
+                        return Err(DbCommentUpdateTextErr::Db(err));
+                    }
+                };
+
+            let post_state = PostState::from(post_state);
+
+            if user_username != commet_user_username {
+                return Err(DbCommentUpdateTextErr::Unauthorized);
+            }
+
+            let post_state = PostState::from(post_state);
+            match post_state {
+                PostState::Hidden if post_user_username == user_username => (),
+                PostState::Active => (),
+                _ => return Err(DbCommentUpdateTextErr::Unauthorized),
+            }
+        }
+
+        // update comment
+        {
+            let query = "UPDATE comments SET
+                            comment_text = $3,
+                            comment_modified_at = $1
+                            WHERE comment_id = $2";
+
+            let result = sqlx::query(query)
+                .bind(XTimestamp(time as i64))
+                .bind(comment_id)
+                .bind(new_text)
+                .execute(&mut *tx)
+                .await;
+
+            debug!("query: {query}\nresult: {result:#?}");
+
+            let result = match result {
+                Ok(v) => v,
+                Err(err) => {
                     error!("unexpected db error {err}");
-                    DbCommentUpdateTextErr::Db(err)
+                    return Err(DbCommentUpdateTextErr::Db(err));
                 }
-            })
-            .and_then_take_expect(4)
+            };
+
+            assert_eq!(result.rows_affected(), 1);
+        }
+
+        tx.commit()
+            .await
+            .inspect_err(|err| error!("post_like_add {err}"))?;
+
+        Ok(())
     }
 }
 
+#[cfg(test)]
 #[tokio::test]
 async fn test_comment_update_text() {
     // use crate::create_user_id;
     init_log();
 
-    let db = Db::mem(0).await;
+    let db = Db::test_db(0, "test_comment_update_text").await;
 
     let invite1 = db.invite_add(0, "hey@heyadora.com", 1).await.unwrap();
     let user = db
-        .user_add(0, "hey", "hey", invite1.id.key.clone(), 10, 10)
+        .user_add(0, "hey", "hey", invite1.token, 10, 10)
         .await
         .unwrap();
 
     let invite1 = db.invite_add(0, "hey2@heyadora.com", 1).await.unwrap();
     let user2 = db
-        .user_add(0, "hey2", "hey", invite1.id.key.clone(), 10, 10)
+        .user_add(0, "hey2", "hey", invite1.token, 10, 10)
         .await
         .unwrap();
 
     let post1 = db
-        .post_add(0, user.id.clone(), "title", "description", "tags")
+        .post_add(0, user.username.clone(), "title", "description", "tags")
+        .await
+        .unwrap();
+    db.post_update_state(0, user.username.clone(), post1.id, PostState::Active)
         .await
         .unwrap();
 
     let comment1 = db
-        .comment_add(
-            0,
-            user.id.clone(),
-            post1.id.key.clone(),
-            None::<RecordIdKey>,
-            "one",
-        )
+        .comment_add(0, user.username.clone(), post1.id, None, "one")
         .await
         .unwrap();
 
-    assert_eq!(comment1.text, "one");
-
-    let comment1 = db
-        .comment_update_text(0, user.id.clone(), comment1.id.key.clone(), "one1")
+    let _comment2 = db
+        .comment_add(1, user.username.clone(), post1.id, None, "one2")
         .await
         .unwrap();
-    assert_eq!(comment1.text, "one1");
+
+    let comments = db.comment_get_all().await.unwrap();
+    assert_eq!(comments.len(), 2);
+    assert_eq!(comments[0].text, "one2");
+    assert_eq!(comments[1].text, "one");
+
+    db.comment_update_text(0, user.username.clone(), comment1.id, "one1")
+        .await
+        .unwrap();
+
+    let comments = db.comment_get_all().await.unwrap();
+    assert_eq!(comments.len(), 2);
+    assert_eq!(comments[0].text, "one2");
+    assert_eq!(comments[1].text, "one1");
 
     let result = db
-        .comment_update_text(0, user.id.clone(), "invalid", "one1")
+        .comment_update_text(0, user.username.clone(), 0, "one1")
         .await;
     assert!(matches!(result, Err(DbCommentUpdateTextErr::NotFound)));
 
     let result = db
-        .comment_update_text(0, user2.id.clone(), comment1.id.key.clone(), "one1")
+        .comment_update_text(0, user2.username.clone(), comment1.id, "one1")
         .await;
     assert!(matches!(result, Err(DbCommentUpdateTextErr::Unauthorized)));
 }

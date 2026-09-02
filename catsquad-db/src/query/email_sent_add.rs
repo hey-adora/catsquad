@@ -68,12 +68,6 @@ pub enum DbEmailSentAddErr {
 impl Db {
     pub async fn email_sent_define(&self) {
         let pool = &self.db;
-        // pub id: i64,
-        // pub body: String,
-        // pub to_email: String,
-        // pub reason: String,
-        // pub modified_at: u64,
-        // pub created_at: u64,
         let query = "
             CREATE TABLE emails_sent (
                 email_sent_id int8 PRIMARY KEY generated always as identity,
@@ -86,16 +80,6 @@ impl Db {
         ";
         trace!("about to run {query}");
         let _result = sqlx::raw_sql(query).execute(pool).await.unwrap();
-        // let query = "
-        //         DEFINE TABLE email_sent SCHEMAFULL;
-        //         DEFINE FIELD reason ON TABLE email_sent TYPE string;
-        //         DEFINE FIELD to_email ON TABLE email_sent TYPE string;
-        //         DEFINE FIELD body ON TABLE email_sent TYPE string;
-        //         DEFINE FIELD modified_at ON TABLE email_sent TYPE number;
-        //         DEFINE FIELD created_at ON TABLE email_sent TYPE number;
-        //     ";
-        // trace!("about to run {query}");
-        // self.db.query(query).await.unwrap().check().unwrap();
     }
 
     pub async fn email_sent_add(
@@ -154,30 +138,6 @@ impl Db {
 
         Ok(email_sent)
 
-        // let query = r#"
-        //          CREATE email_sent SET
-        //             reason = $reason,
-        //             to_email = $to_email,
-        //             body = $body,
-        //             modified_at = $time,
-        //             created_at = $time;
-        //         "#;
-        // trace!("about to run {query}");
-
-        // self.db
-        //     .query(query)
-        //     .bind(("time", time))
-        //     .bind(("reason", reason.to_string()))
-        //     .bind(("to_email", to_email.into()))
-        //     .bind(("body", body.into()))
-        //     .await
-        //     .check_better(|err| match err {
-        //         err => {
-        //             error!("unexpected db error {err}");
-        //             DbEmailSentAddErr::Db(err)
-        //         }
-        //     })
-        //     .and_then_take_expect(0)
     }
 }
 

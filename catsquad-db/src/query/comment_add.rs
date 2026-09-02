@@ -11,7 +11,8 @@ pub struct DbComment {
     #[sqlx(rename = "comment_post_id")]
     pub post_id: i64,
     #[sqlx(rename = "comment_replies_count")]
-    pub replies_count: usize,
+    #[sqlx(try_from = "i64")]
+    pub replies_count: u32,
     #[sqlx(rename = "comment_parents")]
     pub parents: Vec<i64>,
     #[sqlx(rename = "comment_text")]
@@ -49,7 +50,7 @@ impl Db {
             CREATE TABLE comments (
                 comment_id int8 PRIMARY KEY generated always as identity,
                 comment_user_username varchar NOT NULL references users(user_username) ON UPDATE CASCADE ON DELETE CASCADE,
-                comment_post_id int8 NOT NULL references posts(post_id),
+                comment_post_id int8 NOT NULL references posts(post_id) ON DELETE CASCADE,
                 comment_replies_count int8 DEFAULT 0,
                 comment_parents int8[] DEFAULT array[]::int8[],
                 comment_text text NOT NULL,
@@ -60,19 +61,6 @@ impl Db {
         ";
         trace!("about to run {query}");
         let _result = sqlx::raw_sql(query).execute(pool).await.unwrap();
-        // let query = "
-        //         DEFINE TABLE comment SCHEMAFULL;
-        //         DEFINE FIELD user ON TABLE comment TYPE record<user>;
-        //         DEFINE FIELD post ON TABLE comment TYPE record<post>;
-        //         DEFINE FIELD parent ON TABLE comment TYPE array<record<comment>>;
-        //         DEFINE FIELD replies_count ON TABLE comment TYPE number;
-        //         DEFINE FIELD text ON TABLE comment TYPE string;
-        //         DEFINE FIELD modified_at ON TABLE comment TYPE number;
-        //         DEFINE FIELD created_at ON TABLE comment TYPE number;
-        //         DEFINE INDEX idx_comment_parent ON TABLE comment COLUMNS parent;
-        //     ";
-        // trace!("about to run {query}");
-        // self.db.query(query).await.unwrap().check().unwrap();
     }
 
     pub async fn comment_add(
@@ -130,10 +118,6 @@ impl Db {
                                comment_modified_at = $2
                                WHERE comment_id=$1
                                RETURNING comment_parents";
-            // let query = "SELECT EXISTS(SELECT 1 FROM comments WHERE comment_id=$1)";
-
-            //comment_parents
-            // comment_replies_count
 
             let result = sqlx::query_as(query)
                 .bind(parent_id)
@@ -143,9 +127,8 @@ impl Db {
 
             debug!("query: {query}\nresult: {result:#?}");
 
-            let (parent_ids,): (Vec<i64>,) = match result {
+            let (mut parent_ids,): (Vec<i64>,) = match result {
                 Ok(v) => v,
-                // Ok((false,)) => return Err(DbCommentAddErr::ParentNotFound(parent_id)),
                 Err(sqlx::Error::RowNotFound) => {
                     return Err(DbCommentAddErr::ParentNotFound(parent_id));
                 }
@@ -154,6 +137,8 @@ impl Db {
                     return Err(DbCommentAddErr::Db(err));
                 }
             };
+
+            parent_ids.push(parent_id);
 
             parent_ids
         } else {
@@ -219,93 +204,12 @@ impl Db {
         };
 
         Ok(comment)
-        // TODO check if user exists in other queries too
-        // let post_key = post_key.into();
-        // let post_id = create_post_id(post_key.clone());
-        // let parent_id = comment_parent_key.map(|v| create_comment_id(v));
-
-        // IF $post.user != $user_id {
-        //     THROW "unauthorized"
-        // };
-
-        // let query = r#"
-        //          BEGIN TRANSACTION;
-
-        //          LET $post = SELECT NONE FROM ONLY $post_id;
-        //          LET $user = SELECT NONE FROM ONLY $user_id;
-
-        //          IF !$user {
-        //              THROW "user not found"
-        //          };
-
-        //          IF !$post {
-        //              THROW "not found"
-        //          };
-
-        //          LET $parent = IF $parent_id {
-        //                  SELECT id, parent, replies_count FROM ONLY $parent_id
-        //              } ELSE {
-        //                  NULL
-        //              };
-
-        //          IF $parent_id AND !$parent {
-        //              THROW "parent not found"
-        //          };
-
-        //          IF $parent {
-        //             UPDATE $parent.id SET replies_count = $parent.replies_count + 1;
-        //          };
-
-        //          LET $parent = if $parent {
-        //                 if $parent.parent { $parent.parent } else { [] } + [$parent.id]
-        //             } else {
-        //                 []
-        //             };
-
-        //          CREATE comment SET
-        //             user = $user_id,
-        //             post = $post_id,
-        //             parent = $parent,
-        //             replies_count = 0,
-        //             text = $comment_text,
-        //             modified_at = $time,
-        //             created_at = $time
-        //          RETURN *, user.*;
-
-        //          COMMIT TRANSACTION;
-        //         "#;
-        // trace!("about to run {query}");
-        // self.db
-        //     .query(query)
-        //     .bind(("time", time))
-        //     .bind(("user_id", user_id.clone()))
-        //     .bind(("post_id", post_id.clone()))
-        //     .bind(("comment_text", text.into()))
-        //     .bind(("parent_id", parent_id.clone()))
-        //     .await
-        //     .check_better(|err| match err {
-        //         err if err.thrown("not found") => DbCommentAddErr::PostNotFound(post_key.to_sql()),
-        //         err if err.thrown("user not found") => {
-        //             DbCommentAddErr::UserNotFound(user_id.key.to_sql())
-        //         }
-        //         err if err.thrown("parent not found") => DbCommentAddErr::ParentNotFound(
-        //             parent_id
-        //                 .map(|v| v.key.to_sql())
-        //                 .unwrap_or_else(|| "invalid".to_string()),
-        //         ),
-        //         err => {
-        //             error!("unexpected db error {err}");
-        //             DbCommentAddErr::Db(err)
-        //         }
-        //     })
-        //     .and_then_take_expect(9)
     }
 }
 
 #[cfg(test)]
 #[tokio::test]
 async fn test_comment_add() {
-    // use crate::create_user_id;
     // TODO check un-authorized errors
 
     init_log();
@@ -343,7 +247,7 @@ async fn test_comment_add() {
         .await;
     assert!(matches!(result, Err(DbCommentAddErr::ParentNotFound(_))));
 
-    let _comment2 = db
+    let comment2 = db
         .comment_add(
             1,
             user.username.clone(),
@@ -354,12 +258,27 @@ async fn test_comment_add() {
         .await
         .unwrap();
 
-    // let comments = db.comment_get_all().await.unwrap();
+    let _comment3 = db
+        .comment_add(
+            2,
+            user.username.clone(),
+            post1.id,
+            Some(comment2.id),
+            "one4",
+        )
+        .await
+        .unwrap();
 
-    // assert_eq!(comments.len(), 2);
-    // assert_eq!(comments[0].parent.len(), 1);
-    // assert_eq!(comments[0].parent[0], comment1.id.clone());
-    // assert_eq!(comments[0].text, "one3");
-    // assert_eq!(comments[1].parent.len(), 0);
-    // assert_eq!(comments[1].text, "one");
+    let comments = db.comment_get_all().await.unwrap();
+
+    assert_eq!(comments.len(), 3);
+    assert_eq!(comments[0].parents.len(), 2);
+    assert_eq!(comments[0].parents[0], comment1.id.clone());
+    assert_eq!(comments[0].parents[1], comment2.id.clone());
+    assert_eq!(comments[0].text, "one4");
+    assert_eq!(comments[1].parents.len(), 1);
+    assert_eq!(comments[1].parents[0], comment1.id.clone());
+    assert_eq!(comments[1].text, "one3");
+    assert_eq!(comments[2].parents.len(), 0);
+    assert_eq!(comments[2].text, "one");
 }

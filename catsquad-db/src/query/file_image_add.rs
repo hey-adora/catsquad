@@ -52,21 +52,6 @@ impl DbImageKind {
     }
 }
 
-// #[derive(Clone, Copy, Debug)]
-// pub enum DbImageState {
-//     Active,
-//     Hidden,
-// }
-
-// impl DbImageState {
-//     pub fn as_str(&self) -> &'static str {
-//         match self {
-//             DbImageState::Active => "active",
-//             DbImageState::Hidden => "hidden",
-//         }
-//     }
-// }
-
 impl Db {
     pub async fn file_image_define(&self) {
         let pool = &self.db;
@@ -84,9 +69,6 @@ impl Db {
                 image_created_at timestamp NOT NULL
             );
         ";
-        // image_post_id int8 NOT NULL references posts(post_id),
-        // image_user_username varchar(32) NOT NULL references users(user_username),
-        // image_state varchar(10) DEFAULT 'hidden',
         trace!("about to run {query}");
         let _result = sqlx::raw_sql(query).execute(pool).await.unwrap();
     }

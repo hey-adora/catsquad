@@ -110,60 +110,6 @@ impl Db {
             .inspect_err(|err| error!("post_like_add {err}"))?;
 
         Ok(())
-        // let user_id = create_user_id(user_key);
-
-        // let query = r#"
-        //             BEGIN TRANSACTION;
-
-        //             LET $email_change = SELECT *, new.*, current.* FROM ONLY $email_change_id;
-
-        //             # basic checks
-
-        //             IF !$email_change {
-        //                 THROW "not found"
-        //             };
-
-        //             IF $email_change.user != $user_id {
-        //                 THROW "unauthorized"
-        //             };
-
-        //             IF $email_change.completed {
-        //                 THROW "already used"
-        //             };
-
-        //             IF $email_change.expires < $time {
-        //                 THROW "email change expired"
-        //             };
-
-        //             #
-
-        //             UPDATE ONLY $email_change_id SET
-        //                 completed = true,
-        //                 modified_at = $time
-        //                 RETURN *, new.*, current.*, user.*;
-
-        //             COMMIT TRANSACTION;
-        //         "#;
-
-        // trace!("about to run {query}");
-
-        // self.db
-        //     .query(query)
-        //     .bind(("time", time))
-        //     .bind(("user_id", user_id))
-        //     .bind(("email_change_id", email_change_id))
-        //     .await
-        //     .check_better(|err| match err {
-        //         err if err.thrown("not found") => DbEmailChangeUpdateCancelErr::NotFound,
-        //         err if err.thrown("unauthorized") => DbEmailChangeUpdateCancelErr::Unauthorized,
-        //         err if err.thrown("already used") => DbEmailChangeUpdateCancelErr::AlreadyUsed,
-        //         err if err.thrown("email change expired") => DbEmailChangeUpdateCancelErr::Expired,
-        //         err => {
-        //             error!("unexpected db error {err}");
-        //             DbEmailChangeUpdateCancelErr::Db(err)
-        //         }
-        //     })
-        //     .and_then_take_expect(6)
     }
 }
 

@@ -132,78 +132,7 @@ impl Db {
 
         Ok(())
 
-        // let email_change_id = create_email_change_id(email_change_key);
-        // let token = token.into();
 
-        // let query = r#"
-        //             BEGIN TRANSACTION;
-
-        //             LET $email_change = SELECT *, new.*, current.* FROM ONLY $email_change_id;
-
-        //             # basic checks
-
-        //             IF !$email_change {
-        //                 THROW "not found"
-        //             };
-
-        //             IF $email_change.user != $user_id {
-        //                 THROW "unauthorized"
-        //             };
-
-        //             IF $email_change.new.token_used {
-        //                 THROW "already used"
-        //             };
-
-        //             IF $email_change.expires < $time {
-        //                 THROW "email change expired"
-        //             };
-
-        //             #
-
-        //             IF !$email_change.new OR !$email_change.new.email {
-        //                 THROW "new email not added"
-        //             };
-
-        //             #THROW [$email_change.new.token,  $token_new];
-        //             IF !$token_new OR $email_change.new.token != $token_new {
-        //                 THROW "invalid token"
-        //             };
-
-        //             UPDATE ONLY $email_change_id SET
-        //                 new.token_used = true,
-        //                 modified_at = $time
-        //                 RETURN *, new.*, current.*, user.*;
-
-        //             COMMIT TRANSACTION;
-        //         "#;
-        // trace!("about to run {query}");
-
-        // self.db
-        //     .query(query)
-        //     .bind(("time", time))
-        //     .bind(("token_new", token))
-        //     .bind(("user_id", user_id))
-        //     .bind(("email_change_id", email_change_id))
-        //     .await
-        //     .check_better(|err| match err {
-        //         err if err.thrown("not found") => DbEmailChangeUpdateNewConfirmErr::NotFound,
-        //         err if err.thrown("unauthorized") => DbEmailChangeUpdateNewConfirmErr::Unauthorized,
-        //         err if err.thrown("already used") => DbEmailChangeUpdateNewConfirmErr::AlreadyUsed,
-        //         err if err.thrown("email change expired") => {
-        //             DbEmailChangeUpdateNewConfirmErr::Expired
-        //         }
-        //         err if err.thrown("new email not added") => {
-        //             DbEmailChangeUpdateNewConfirmErr::NewEmailNotSet
-        //         }
-        //         err if err.thrown("invalid token") => {
-        //             DbEmailChangeUpdateNewConfirmErr::InvalidToken
-        //         }
-        //         err => {
-        //             error!("unexpected db error {err}");
-        //             DbEmailChangeUpdateNewConfirmErr::Db(err)
-        //         }
-        //     })
-        //     .and_then_take_expect(8)
     }
 }
 

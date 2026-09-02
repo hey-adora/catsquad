@@ -1,29 +1,30 @@
+use crate::{Db, DbComment};
 use catsquad_log::prelude::*;
 
-use crate::{Db, DbComment, SurrealCheckUtils, SurrealSerializeUtils};
-
-#[derive(Debug, thiserror::Error, PartialEq)]
+#[derive(Debug, thiserror::Error)]
 pub enum DbCommentGetAllErr {
     #[error("DB error {0}")]
-    Db(#[from] surrealdb::Error),
+    Db(#[from] sqlx::Error),
 }
 
-impl<C: surrealdb::Connection> Db<C> {
+impl Db {
     pub async fn comment_get_all(&self) -> Result<Vec<DbComment>, DbCommentGetAllErr> {
-        let query = "SELECT *, user.* FROM comment ORDER BY created_at DESC;";
+        let pool = &self.db;
+        let query = "SELECT * FROM comments ORDER BY comment_created_at DESC";
 
         trace!("about to run {query}");
 
-        self.db
-            .query(query)
-            .await
-            .check_good(|err| match err {
-                err => {
-                    error!("unexpected db error {err}");
-                    DbCommentGetAllErr::Db(err)
-                }
-            })
-            .and_then_take_all(0)
+        let result = sqlx::query_as(query).fetch_all(pool).await;
+
+        let posts = match result {
+            Ok(v) => v,
+            Err(err) => {
+                error!("unexpected db error {err}");
+                return Err(DbCommentGetAllErr::Db(err));
+            }
+        };
+
+        Ok(posts)
     }
 }
 

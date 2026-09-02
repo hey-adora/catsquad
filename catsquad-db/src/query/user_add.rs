@@ -26,18 +26,6 @@ pub struct DbUser {
     pub created_at: u64,
 }
 
-// #[derive(Debug, Clone, sqlx::FromRow)]
-// pub struct DbUserRaw {
-//     pub username: String,
-//     pub email: String,
-//     pub password: String,
-//     pub used_storage_bytes: i64,
-//     pub max_storage_per_file_bytes: i64,
-//     pub max_storage_bytes: i64,
-//     pub modified_at: TimeStamp,
-//     pub created_at: TimeStamp,
-// }
-
 #[derive(Debug, thiserror::Error)]
 pub enum DbUserAddErr {
     #[error("DB error {0}")]

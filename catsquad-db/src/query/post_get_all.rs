@@ -42,24 +42,15 @@ async fn test_post_get_all() {
         .await
         .unwrap();
 
-    let _post1 = db
+    let post1 = db
         .post_add(0, user.username.clone(), "title1", "description1", "tags")
         .await
         .unwrap();
 
-    // let _post1 = db
-    //     .post_update_file_add(
-    //         0,
-    //         user.id.clone(),
-    //         post1.id.key.clone(),
-    //         10,
-    //         "hash1",
-    //         "png",
-    //         10,
-    //         10,
-    //     )
-    //     .await
-    //     .unwrap();
+    let _file = db
+        .post_update_file_add(0, user.username.clone(), post1.id, 10, 333, "png", 10, 10)
+        .await
+        .unwrap();
 
     let posts = db.post_get_all().await.unwrap();
     assert_eq!(posts.len(), 1);

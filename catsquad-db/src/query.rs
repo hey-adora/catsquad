@@ -1,9 +1,10 @@
 // TODO CHECK IF UPDATE EMAIL AND USERNAME CASCADE
+// TODO ADD AUTH ERROR ON COMMENTS WHEN POST IS DRAFT/HIDDEN
 pub mod comment_add;
-// pub mod comment_get_all;
-// pub mod comment_remove;
-// pub mod comment_search;
-// pub mod comment_update_text;
+pub mod comment_get_all;
+pub mod comment_remove;
+pub mod comment_search;
+pub mod comment_update_text;
 pub mod email_change_add;
 pub mod email_change_get_by_key;
 pub mod email_change_update_cancel;

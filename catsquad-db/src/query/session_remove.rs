@@ -2,6 +2,8 @@ use crate::{Db, DbUser, Uuid, XUuid};
 use catsquad_log::prelude::*;
 use std::fmt::Display;
 
+// TODO maybe add not found again
+
 #[derive(Debug, thiserror::Error)]
 pub enum DbSessionRemoveErr {
     // #[error("not found")]
@@ -26,7 +28,7 @@ impl Db {
         let result = match result {
             Ok(v) => v,
             // Err(sqlx::Error::RowNotFound) => {
-            //     // DOESNT GET TRIGGERED ON DELETE
+            //     // DOESNT GET TRIGGERED ON EXECUTE
             // }
             Err(err) => {
                 error!("unexpected db error {err}");

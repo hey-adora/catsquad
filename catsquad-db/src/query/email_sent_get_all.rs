@@ -25,20 +25,6 @@ impl Db {
         };
 
         Ok(posts)
-        // let query = "SELECT * FROM email_sent ORDER BY created_at DESC;";
-
-        // trace!("about to run {query}");
-
-        // self.db
-        //     .query(query)
-        //     .await
-        //     .check_good(|err| match err {
-        //         err => {
-        //             error!("unexpected db error {err}");
-        //             DbEmailSentGetAllErr::Db(err)
-        //         }
-        //     })
-        //     .and_then_take_all(0)
     }
 }
 

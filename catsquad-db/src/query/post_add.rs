@@ -86,27 +86,6 @@ impl Db {
         ";
         trace!("about to run {query}");
         let _result = sqlx::raw_sql(query).execute(pool).await.unwrap();
-        // let query = "
-        //         DEFINE TABLE post SCHEMAFULL;
-        //         DEFINE FIELD user ON TABLE post TYPE record<user>;
-        //         DEFINE FIELD state ON TABLE post TYPE string;
-        //         DEFINE FIELD title ON TABLE post TYPE string;
-        //         DEFINE FIELD size_bytes ON TABLE post TYPE number;
-        //         DEFINE FIELD description ON TABLE post TYPE string;
-        //         DEFINE FIELD tags ON TABLE post TYPE string;
-        //         DEFINE FIELD favorites ON TABLE post TYPE number;
-        //         DEFINE FIELD file ON TABLE post TYPE array<object>;
-        //         DEFINE FIELD file.*.proccesed ON TABLE post TYPE bool;
-        //         DEFINE FIELD file.*.extension ON TABLE post TYPE string;
-        //         DEFINE FIELD file.*.hash ON TABLE post TYPE string;
-        //         DEFINE FIELD file.*.size_bytes ON TABLE post TYPE int;
-        //         DEFINE FIELD file.*.width ON TABLE post TYPE int;
-        //         DEFINE FIELD file.*.height ON TABLE post TYPE int;
-        //         DEFINE FIELD modified_at ON TABLE post TYPE number;
-        //         DEFINE FIELD created_at ON TABLE post TYPE number;
-        //     ";
-        // trace!("about to run {query}");
-        // self.db.query(query).await.unwrap().check().unwrap();
     }
 
     pub async fn post_add(

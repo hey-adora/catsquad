@@ -1,4 +1,4 @@
-use crate::{Db, DbPost, XTimestamp};
+use crate::{Db, DbPost, XTimestamp, if_empty, join_str};
 use catsquad_log::prelude::*;
 use catsquad_shared::{Order, PostState, TimeRange};
 use sqlx::AssertSqlSafe;
@@ -7,6 +7,22 @@ use sqlx::AssertSqlSafe;
 pub enum DbPostSearchErr {
     #[error("DB error {0}")]
     Db(#[from] sqlx::Error),
+}
+
+pub fn split_tags(tags: impl Into<String>) -> Vec<String> {
+    let tags = tags.into();
+    let tags = tags.to_lowercase();
+    let tags = tags.split_whitespace();
+    let tags = tags
+        .map(|v| {
+            let mut tag = String::new();
+            tag.push(' ');
+            tag.push_str(v);
+            tag.push(' ');
+            tag
+        })
+        .collect::<Vec<String>>();
+    tags
 }
 
 impl Db {
@@ -22,7 +38,7 @@ impl Db {
     ) -> Result<Vec<DbPost>, DbPostSearchErr> {
         let pool = &self.db;
         let user_username = user.into();
-        let mut bind_index = 4_usize;
+        let mut bind_index = 3_usize;
 
         let q_order = match order {
             Order::OneTwoThree => "ASC",
@@ -40,71 +56,20 @@ impl Db {
 
         let q_state = "post_state = $2".to_string();
 
-        let tags = tags.into();
-        let tags = tags.to_lowercase();
-        let tags = tags.split_whitespace();
-        let tags = tags
-            .map(|v| {
-                let mut tag = String::new();
-                tag.push(' ');
-                tag.push_str(v);
-                tag.push(' ');
-                tag
-            })
-            .collect::<Vec<String>>();
-        let tags_len = tags.len();
+        let tags = split_tags(tags);
 
-        // itertool
-        // position(' two ' in post_tags) > 0
-        let q_tags = if tags.len() > 0 {
-            let mut output = String::new();
+        let q_tags = join_str(0..tags.len(), " AND ", |_| {
+            bind_index += 1;
+            format!("position(${bind_index} in post_tags) > 0")
+        });
 
-            for i in 0..tags_len {
-                output += &format!("position(${bind_index} in post_tags) > 0");
-                if i != tags_len - 1 {
-                    output += " AND ";
-                }
-
-                bind_index += 1;
-            }
-
-            output
-            // "LIKE '%' || LOWER($4) || '%'"
-        } else {
-            "".to_string()
-        };
-
-        let q_user = if !user_username.is_empty() {
+        let q_user = if_empty(&user_username, || {
+            bind_index += 1;
             format!("user = ${bind_index}")
-        } else {
-            "".to_string()
-        };
+        });
 
         let filters = [q_tags, q_time_after, q_user, q_state];
-        // let filters = [q_time_after, q_state];
-        let mut q_where = String::new();
-        let mut iter = filters.into_iter().peekable();
-
-        loop {
-            let Some(q) = iter.next() else {
-                trace!("q break");
-                break;
-            };
-            trace!("reading q {q}");
-            if q.is_empty() {
-                trace!("q continue");
-                continue;
-            }
-            q_where.push_str(&q);
-
-            // let next_is_empty = iter.peek().map(|v| v.is_empty()).unwrap_or(true);
-            let next_is_empty = iter.peek();
-            if next_is_empty.is_none() {
-                trace!("q break2");
-                break;
-            }
-            q_where.push_str(" AND ");
-        }
+        let q_where = join_str(filters, " AND ", |v| v);
 
         let query_str = format!(
             "
