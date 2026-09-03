@@ -26,9 +26,10 @@ pub async fn session_remove(
     State(app): State<AppState>,
     session_key: Extension<SessionKey>,
 ) -> impl IntoResponse {
+    let session_key = session_key.0.0;
     let inner = async || -> Result<SessionRemoveRes, SessionRemoveErr> {
         app.db
-            .session_remove(session_key.to_string())
+            .session_remove(session_key)
             .await
             .map_err(from_db_session_remove_err)?;
 

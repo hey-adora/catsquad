@@ -37,7 +37,7 @@ pub async fn comment_update_text(
     State(app): State<AppState>,
     Form(req): Form<CommentUpdateTextReq>,
 ) -> impl IntoResponse {
-    let time = app.get_time().await;
+    let time = app.get_time_ns().await;
 
     let inner = async || -> Result<CommentRes, CommentUpdateTextErr> {
         let user_id = db_user.id.clone();
@@ -121,7 +121,7 @@ async fn test_comment_update_text() {
     assert_eq!(comment1.text, "text1");
 
     let comment1 = server
-        .comment_update_text(comment1.key.clone(), "text2", &session_key1)
+        .comment_update_text(comment1.id.clone(), "text2", &session_key1)
         .await
         .unwrap();
 
@@ -144,7 +144,7 @@ async fn test_comment_update_text() {
     assert!(matches!(result, Err(CommentUpdateTextErr::InvalidText(_))));
 
     let result = server
-        .comment_update_text(comment1.key.clone(), "text4", &session_key2)
+        .comment_update_text(comment1.id.clone(), "text4", &session_key2)
         .await;
     assert!(matches!(result, Err(CommentUpdateTextErr::Unauthorized(_))));
 }

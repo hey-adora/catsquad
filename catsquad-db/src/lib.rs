@@ -87,7 +87,7 @@ pub use query::user_update_username::*;
 
 pub type Uuid = [u8; 16];
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Db {
     db: Pool<Postgres>,
 }

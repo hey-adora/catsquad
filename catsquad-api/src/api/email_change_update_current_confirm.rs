@@ -53,7 +53,7 @@ pub async fn email_change_update_current_confirm(
     State(app): State<AppState>,
     Form(req): Form<EmailChangeUpdateCurrentConfirmReq>,
 ) -> impl IntoResponse {
-    let time = app.get_time().await;
+    let time = app.get_time_ns().await;
     let inner = async || -> Result<EmailChangeRes, EmailChangeUpdateCurrentConfirmErr> {
         let user_id = db_user.id.clone();
         let email_change_key = req.email_change_key.clone();

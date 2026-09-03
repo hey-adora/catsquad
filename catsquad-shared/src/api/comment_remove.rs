@@ -2,7 +2,7 @@ pub const LINK_API_COMMENT_REMOVE: &str = "/api/comment_remove";
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
 pub struct CommentRemoveReq {
-    pub comment_key: String,
+    pub comment_id: i64,
 }
 
 #[derive(

@@ -9,13 +9,10 @@ use crate::{auth::verify_password, state::AppState};
 
 fn from_db_user_update_username_err(value: DbUserUpdateUsernameErr) -> UserUpdateUsernameErr {
     match value {
+        DbUserUpdateUsernameErr::UserNotFound => UserUpdateUsernameErr::UserNotFound,
         DbUserUpdateUsernameErr::UsernameAlreadyUsed => UserUpdateUsernameErr::UsernameAlreadyUsed,
         DbUserUpdateUsernameErr::Db(_) => UserUpdateUsernameErr::InternalServer,
     }
-}
-
-fn from_db_user_update_username(value: String) -> UserUpdateUsernameRes {
-    UserUpdateUsernameRes { username: value }
 }
 
 fn status_code(result: &Result<UserUpdateUsernameRes, UserUpdateUsernameErr>) -> StatusCode {
@@ -24,6 +21,7 @@ fn status_code(result: &Result<UserUpdateUsernameRes, UserUpdateUsernameErr>) ->
         Err(UserUpdateUsernameErr::UsernameAlreadyUsed) => StatusCode::BAD_REQUEST,
         Err(UserUpdateUsernameErr::InvalidUsername(_)) => StatusCode::BAD_REQUEST,
         Err(UserUpdateUsernameErr::Unauthorized(_)) => StatusCode::UNAUTHORIZED,
+        Err(UserUpdateUsernameErr::UserNotFound) => StatusCode::BAD_REQUEST,
         Err(UserUpdateUsernameErr::BadRequest(_)) => StatusCode::BAD_REQUEST,
         Err(UserUpdateUsernameErr::InternalServer) => StatusCode::INTERNAL_SERVER_ERROR,
     }
@@ -44,11 +42,11 @@ pub async fn user_update_username(
     State(app): State<AppState>,
     Form(req): Form<UserUpdateUsernameReq>,
 ) -> impl IntoResponse {
-    let time = app.get_time().await;
+    let time = app.get_time_micro();
 
     let inner = async || -> Result<UserUpdateUsernameRes, UserUpdateUsernameErr> {
         // let email = req.email.trim().to_lowercase();
-        let user_id = db_user.id.clone();
+        let user_username = db_user.username.clone();
         let user_email = db_user.email.clone();
         let user_hash = db_user.password.clone();
 
@@ -63,7 +61,7 @@ pub async fn user_update_username(
 
         let result = app
             .db
-            .user_update_username(time, user_id, &new_username)
+            .user_update_username(time, user_username, &new_username)
             .await
             .map_err(from_db_user_update_username_err)?;
 
@@ -79,7 +77,7 @@ pub async fn user_update_username(
             )
             .await;
 
-        Ok(from_db_user_update_username(result))
+        Ok(UserUpdateUsernameRes {})
     };
 
     let result = inner().await;
@@ -146,9 +144,15 @@ async fn test_user_update_username() {
         Err(UserUpdateUsernameErr::UsernameAlreadyUsed)
     ));
 
-    let result = server
+    server
         .user_update_username(pss, "hey3", &token)
         .await
         .unwrap();
-    assert_eq!(result.username, "hey3");
+    let user = server
+        .state
+        .db
+        .user_get_by_email("hey@heyadora.com")
+        .await
+        .unwrap();
+    assert_eq!(user.username, "hey3");
 }

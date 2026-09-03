@@ -356,7 +356,7 @@ pub async fn post_update_file_add(
     params: axum::extract::RawPathParams,
     multipart: Multipart,
 ) -> impl IntoResponse {
-    let time = app.get_time().await;
+    let time = app.get_time_ns().await;
     let max_storage = db_user.max_storage_bytes;
     let max_storage_per_file = db_user.max_storage_per_file_bytes;
     let user_id = db_user.id.clone();

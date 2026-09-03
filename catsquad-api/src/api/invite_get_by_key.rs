@@ -8,7 +8,7 @@ use catsquad_db::{DbInvite, DbInviteGetByKeyErr};
 use catsquad_log::prelude::*;
 use catsquad_shared::{
     INVITE_GET_BY_KEY_REQ_FIELD_INVITE_KEY, InviteGetByKeyErr, InviteGetByKeyParams,
-    InviteGetByKeyRes,
+    InviteGetByKeyRes, str_to_uuid,
 };
 
 use crate::state::AppState;
@@ -16,7 +16,7 @@ use crate::state::AppState;
 fn from_db_invite(value: DbInvite) -> InviteGetByKeyRes {
     InviteGetByKeyRes {
         email: value.email,
-        expires: value.expires,
+        expires: value.expires_at,
     }
 }
 
@@ -56,13 +56,14 @@ pub async fn invite_get_by_key(
     State(app): State<AppState>,
     params: axum::extract::RawPathParams,
 ) -> impl IntoResponse {
-    let time = app.get_time().await;
+    let time = app.get_time_micro();
     let inner = async || -> Result<InviteGetByKeyRes, InviteGetByKeyErr> {
         let req = params_req(params)?;
+        let invite_key = str_to_uuid(&req.invite_key);
 
         let invite = app
             .db
-            .invite_get_by_key(time, req.invite_key)
+            .invite_get_by_key(time, invite_key)
             .await
             .map_err(from_db_invite_get_by_key_err)?;
 
@@ -77,14 +78,14 @@ pub async fn invite_get_by_key(
 
 #[cfg(test)]
 mod test_utils {
-    use catsquad_shared as cs;
+    use catsquad_shared::{self as cs, Uuid};
 
     use crate::TestServer;
 
     impl TestServer {
         pub async fn invite_get_by_key(
             &self,
-            invite_key: impl AsRef<str>,
+            invite_key: Uuid,
         ) -> Result<cs::InviteGetByKeyRes, cs::InviteGetByKeyErr> {
             self.client
                 .invite_get_by_key(invite_key)
@@ -98,22 +99,16 @@ mod test_utils {
 
 #[tokio::test]
 async fn test_invite_get_by_key() {
-    use catsquad_db::id_to_string;
-
     init_log();
     let server = crate::TestServer::new().await;
 
     server.invite_add("prime@heyadora.com").await.unwrap();
-    let invite_key = id_to_string(
-        server.state.db.invite_get_all().await.unwrap()[0]
-            .id
-            .clone(),
-    );
+    let invite_key = server.state.db.invite_get_all().await.unwrap()[0].token;
 
     let invite = server.invite_get_by_key(invite_key).await.unwrap();
     assert_eq!(invite.email, "prime@heyadora.com");
 
-    let result = server.invite_get_by_key("invalid").await;
+    let result = server.invite_get_by_key(0_u128.to_be_bytes()).await;
 
     assert_eq!(result, Err(InviteGetByKeyErr::InviteNotFound));
 }

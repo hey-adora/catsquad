@@ -34,14 +34,14 @@ pub async fn comment_remove(
     State(app): State<AppState>,
     Form(req): Form<CommentRemoveReq>,
 ) -> impl IntoResponse {
-    let time = app.get_time().await;
+    let time = app.get_time_ns().await;
 
     let inner = async || -> Result<(), CommentRemoveErr> {
         let user_id = db_user.id.clone();
-        let comment_key = req.comment_key;
+        let comment_id = req.comment_id;
 
         app.db
-            .comment_remove(time, user_id, comment_key)
+            .comment_remove(time, user_id, comment_id)
             .await
             .map_err(from_db_comment_remove)?;
 
@@ -124,7 +124,7 @@ async fn test_comment_remove() {
     let comment3 = server
         .comment_add(
             post1.key.clone(),
-            comment2.key.clone(),
+            comment2.id.clone(),
             "text3",
             session_key1.clone(),
         )
@@ -138,7 +138,7 @@ async fn test_comment_remove() {
     assert_eq!(comments[2].text, "text1");
 
     server
-        .comment_remove(comment1.key.clone(), &session_key1)
+        .comment_remove(comment1.id.clone(), &session_key1)
         .await
         .unwrap();
 
@@ -147,7 +147,7 @@ async fn test_comment_remove() {
     assert_eq!(comments[1].text, "text2");
 
     let result = server
-        .comment_remove(comment2.key.clone(), &session_key2)
+        .comment_remove(comment2.id.clone(), &session_key2)
         .await;
     assert!(matches!(result, Err(CommentRemoveErr::Unauthorized(_))));
 

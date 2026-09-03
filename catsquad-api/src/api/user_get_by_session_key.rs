@@ -45,7 +45,6 @@ mod test_utils {
 #[cfg(test)]
 #[tokio::test]
 async fn test_user_get_by_sessino_key() {
-    use catsquad_db::id_to_string;
     use catsquad_log::prelude::*;
     init_log();
     let server = crate::TestServer::new().await;
@@ -54,7 +53,7 @@ async fn test_user_get_by_sessino_key() {
         .user_add_full("hey", "prime@heyadora.com", "PAss$ord11111")
         .await;
     let user_get = server.user_get_by_session_key(session_key).await.unwrap();
-    assert_eq!(id_to_string(user_add.id), user_get.key);
+    assert_eq!(user_add.username, user_get.username);
 }
 
 #[cfg(test)]

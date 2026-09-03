@@ -5,20 +5,21 @@ pub const LINK_API_COMMENT_ADD: &str = "/api/comment_add";
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct CommentRes {
-    pub key: String,
-    pub user: RedactedUserRes,
-    pub post_key: String,
-    pub parent_key: Vec<String>,
+    pub id: i64,
+    pub user_username: String,
+    // pub user_username: RedactedUserRes,
+    pub post_id: i64,
+    pub parent_id: Vec<i64>,
     pub text: String,
-    pub replies_count: usize,
-    pub modified_at: u128,
-    pub created_at: u128,
+    pub replies_count: u32,
+    pub modified_at: u64,
+    pub created_at: u64,
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
 pub struct CommentAddReq {
-    pub post_key: String,
-    pub comment_key: String,
+    pub post_id: i64,
+    pub comment_id: i64,
     pub text: String,
 }
 
@@ -27,10 +28,10 @@ pub struct CommentAddReq {
 )]
 pub enum CommentAddErr {
     #[error("post \"{0}\" was not found")]
-    PostNotFound(String),
+    PostNotFound(i64),
 
     #[error("reply_comment \"{0}\" was not found")]
-    ReplyCommentNotFound(String),
+    ReplyCommentNotFound(i64),
 
     #[error("invalid text {0}")]
     InvalidText(String),

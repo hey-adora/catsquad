@@ -49,7 +49,8 @@ serde = { version = "1.0.229", features = ["serde_derive"] }
 serde_urlencoded = "0.7.1"
 serde_json = { version = "1.0.151" }
 thiserror = { version = "2.0.12" }
-rand = "0.9.1"
+rand = {version="0.9.1", features=[]}
+# rand = {version="0.9.1", features=["os_rng"]}
 # chrono = "0.4.45"
 sqlx = { version = "0.9.0", features=["macros","runtime-tokio", "postgres", "chrono", "uuid"] }
 
@@ -69,7 +70,7 @@ image = "0.25.6"
 config = "0.15.14"
 cfg-if = "1"
 gxhash = { version = "3.5.0", features = ["deterministic"] }
-argon2 = "0.5.3"
+argon2 = {version ="0.5.3", features=["rand"]}
 axum-server = { version = "0.8.0", features = ["tls-rustls"] }
 axum-test = { version = "19.0.0", features = ["reqwest", "typed-routing"] }
 rkyv = { version = "0.8.10", features = ["unaligned"] }

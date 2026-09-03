@@ -62,7 +62,7 @@ pub async fn post_add(
     State(app): State<AppState>,
     Form(req): Form<PostAddReq>,
 ) -> impl IntoResponse {
-    let time = app.get_time().await;
+    let time = app.get_time_ns().await;
     let inner = async || -> Result<PostRes, PostAddErr> {
         let title = req.title.trim();
         let description = req.description.trim();

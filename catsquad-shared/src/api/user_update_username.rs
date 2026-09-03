@@ -1,13 +1,10 @@
 pub const LINK_API_USER_UPDATE_USERNAME: &str = "/api/user_update_username";
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
-pub struct UserUpdateUsernameRes {
-    pub username: String,
-}
+pub struct UserUpdateUsernameRes {}
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
 pub struct UserUpdateUsernameReq {
-    // pub email: String,
     pub password: String,
     pub new_username: String,
 }
@@ -16,6 +13,9 @@ pub struct UserUpdateUsernameReq {
     Default, Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq, thiserror::Error,
 )]
 pub enum UserUpdateUsernameErr {
+    #[error("user not found")]
+    UserNotFound,
+
     #[error("username alreay used")]
     UsernameAlreadyUsed,
 

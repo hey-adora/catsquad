@@ -21,12 +21,15 @@ pub async fn post_like_get_by_post(
     State(app): State<AppState>,
     Path(req): Path<PostLikeGetByPostParams>,
 ) -> impl IntoResponse {
-    let time = app.get_time().await;
+    let time = app.get_time_ns().await;
     let inner = async || -> Result<bool, PostLikeGetByPostErr> {
         let post_key = req.post_key;
         let user_id = db_user.id.clone();
 
-        let post_like = app.db.post_like_exists_by_post(time, user_id, post_key).await;
+        let post_like = app
+            .db
+            .post_like_exists_by_post(time, user_id, post_key)
+            .await;
 
         let result = match post_like {
             Ok(_) => true,

@@ -65,7 +65,7 @@ pub async fn email_change_add(
     db_user: Extension<DbUser>,
     State(app): State<AppState>,
 ) -> impl IntoResponse {
-    let time = app.get_time().await;
+    let time = app.get_time_ns().await;
     let email_change_expiration = app.get_email_change_expiration().await;
     let inner = async || -> Result<EmailChangeRes, EmailChangeAddErr> {
         let expires = time + email_change_expiration;

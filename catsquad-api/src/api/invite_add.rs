@@ -1,5 +1,5 @@
 use axum::{Form, Json, extract::State, http::StatusCode, response::IntoResponse};
-use catsquad_db::{DbInvite, DbInviteAddErr, id_to_string};
+use catsquad_db::{DbInvite, DbInviteAddErr, Uuid};
 use catsquad_log::prelude::*;
 use catsquad_shared::{
     InviteAddErr, InviteAddReq, InviteRes, link_absolute_reg_finish, validate_email,
@@ -9,7 +9,7 @@ use crate::state::AppState;
 
 fn from_db_invite(value: DbInvite) -> InviteRes {
     InviteRes {
-        expires: value.expires,
+        expires: value.expires_at,
     }
 }
 
@@ -22,7 +22,8 @@ fn status_code(result: &Result<InviteRes, InviteAddErr>) -> StatusCode {
     }
 }
 
-fn send_email_invite(address: impl AsRef<str>, token: impl AsRef<str>) -> String {
+fn send_email_invite(address: impl AsRef<str>, token: Uuid) -> String {
+    let token = u128::from_be_bytes(token).to_string();
     let link = link_absolute_reg_finish(address, token);
     debug!("EMAIL SENT {link}");
     link
@@ -32,8 +33,8 @@ pub async fn invite_add(
     State(app): State<AppState>,
     Form(req): Form<InviteAddReq>,
 ) -> impl IntoResponse {
-    let time = app.get_time().await;
-    let invite_expiration = app.get_invite_expiration().await;
+    let time = app.get_time_micro();
+    let invite_expiration = app.get_invite_expiration_micro().await;
     let inner = async || -> Result<InviteRes, InviteAddErr> {
         let email = req.email.trim().to_lowercase();
         validate_email(&email).map_err(|err| InviteAddErr::InvalidEmail(err))?;
@@ -47,7 +48,7 @@ pub async fn invite_add(
         };
 
         let address = app.get_address().await;
-        let email_body = send_email_invite(address, &id_to_string(invite.id.clone()));
+        let email_body = send_email_invite(address, invite.token);
         let _ = app
             .db
             .email_sent_add(
@@ -70,7 +71,7 @@ pub async fn invite_add(
 #[cfg(any(test, feature = "test_server"))]
 mod test_utils {
     use crate::TestServer;
-    use catsquad_db::id_to_string;
+    use catsquad_db::Uuid;
     use catsquad_shared as cs;
 
     impl TestServer {
@@ -80,20 +81,17 @@ mod test_utils {
         ) -> Result<cs::InviteRes, cs::InviteAddErr> {
             self.client.invite_add(email).send().await.into_json().await
         }
-        pub async fn invite_get_key(&self, email: impl AsRef<str>) -> String {
+        pub async fn invite_get_key(&self, email: impl AsRef<str>) -> Uuid {
             let email = email.as_ref();
-            id_to_string(
-                self.state
-                    .db
-                    .invite_get_all()
-                    .await
-                    .unwrap()
-                    .into_iter()
-                    .find(|v| !v.used && v.email == *email)
-                    .unwrap()
-                    .id
-                    .clone(),
-            )
+            self.state
+                .db
+                .invite_get_all()
+                .await
+                .unwrap()
+                .into_iter()
+                .find(|v| !v.used && v.email == *email)
+                .unwrap()
+                .token
         }
     }
 }

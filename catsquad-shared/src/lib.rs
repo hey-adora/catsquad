@@ -1,9 +1,10 @@
 mod api;
 mod page;
+mod uuid;
 
 pub const DEFAULT_GLOBAL_MAX_UPLOAD_SIZE: usize = 1000000000; // 1GB i think
-pub const MAX_STORAGE_PER_FILE: u64 = 1024 * 1000 * 30; // 30MB
-pub const MAX_STORAGE: u64 = 1024 * 1000 * 1000 * 2; // 2GB
+pub const MAX_STORAGE_PER_FILE: u32 = 1024 * 1000 * 30; // 30MB
+pub const MAX_STORAGE: u32 = 1024 * 1000 * 1000 * 2; // 2GB
 pub const SUPPORTED_FILE_EXTENSIONS: &[&str] = &["ico", "svg", "jpg", "jpeg", "png", "webp"];
 pub const MAX_POST_DESCRIPTION_LENGTH: usize = 2000;
 pub const MAX_POST_COMMENT_LENGTH: usize = 2000;
@@ -62,6 +63,19 @@ pub use page::post::*;
 pub use page::register::*;
 pub use page::settings::*;
 pub use page::upload::*;
+
+pub use uuid::*;
+
+fn serde_from_uuid<S: serde::Serializer>(v: &Uuid, serializer: S) -> Result<S::Ok, S::Error> {
+    use serde::Serialize;
+    let v = uuid_to_str(*v);
+    v.serialize(serializer)
+}
+
+fn serde_to_uuid<'de, D: serde::Deserializer<'de>>(deserializer: D) -> Result<Uuid, D::Error> {
+    use serde::Deserialize;
+    String::deserialize(deserializer).map(|v| str_to_uuid(v))
+}
 
 fn serde_from_u128<S: serde::Serializer>(v: &u128, serializer: S) -> Result<S::Ok, S::Error> {
     use serde::Serialize;

@@ -4,7 +4,7 @@ use axum::{
     http::{HeaderMap, StatusCode},
     response::IntoResponse,
 };
-use catsquad_db::{DbSessionAddErr, DbUser, DbUserAddErr, id_to_string};
+use catsquad_db::{DbSessionAddErr, DbUser, DbUserAddErr};
 use catsquad_log::prelude::*;
 use catsquad_shared::{
     MAX_STORAGE, MAX_STORAGE_PER_FILE, RedactedUserRes, SensitiveUserRes, UserAddErr, UserAddReq,
@@ -18,7 +18,7 @@ use crate::{
 
 pub fn from_db_user_redacted(value: DbUser) -> RedactedUserRes {
     RedactedUserRes {
-        key: id_to_string(value.id),
+        // key: value.id,
         username: value.username,
         created_at: value.created_at,
     }
@@ -26,7 +26,7 @@ pub fn from_db_user_redacted(value: DbUser) -> RedactedUserRes {
 
 pub fn from_db_user_sensitive(value: DbUser) -> SensitiveUserRes {
     SensitiveUserRes {
-        key: id_to_string(value.id),
+        // key: id_to_string(value.id),
         username: value.username,
         email: value.email,
         created_at: value.created_at,
@@ -74,7 +74,7 @@ pub async fn user_add(
     State(app): State<AppState>,
     Form(req): Form<UserAddReq>,
 ) -> impl IntoResponse {
-    let time = app.get_time().await;
+    let time = app.get_time_micro();
     let inner = async || -> Result<SensitiveUserRes, UserAddErr> {
         let username = req.username.trim().to_lowercase();
         let password = req.password;
@@ -118,7 +118,7 @@ pub async fn user_add(
                 .map_err(from_db_session_add_err);
 
             let headers = match session_add_result {
-                Ok(session) => create_auth_cookie(id_to_string(session.id)),
+                Ok(session) => create_auth_cookie(session.token),
                 Err(_) => {
                     let headers = HeaderMap::new();
                     let status_code = StatusCode::INTERNAL_SERVER_ERROR;
@@ -147,8 +147,8 @@ mod test_utils {
         HeaderName,
         header::{self, SET_COOKIE},
     };
-    use catsquad_db::{DbUser, id_to_string};
-    use catsquad_shared as cs;
+    use catsquad_db::DbUser;
+    use catsquad_shared::{self as cs, Uuid, str_to_uuid};
 
     use crate::{
         TestServer,
@@ -160,7 +160,7 @@ mod test_utils {
         pub async fn user_add(
             &self,
             username: impl Into<String>,
-            invite_key: impl Into<String>,
+            invite_key: Uuid,
             password: impl Into<String>,
         ) -> Result<cs::SensitiveUserRes, cs::UserAddErr> {
             self.client
@@ -173,9 +173,9 @@ mod test_utils {
         pub async fn user_add_with_session(
             &self,
             username: impl Into<String>,
-            invite_key: impl Into<String>,
+            invite_key: Uuid,
             password: impl Into<String>,
-        ) -> (cs::SensitiveUserRes, String) {
+        ) -> (cs::SensitiveUserRes, Uuid) {
             let res = self
                 .client
                 .user_add(username, invite_key, password)
@@ -183,6 +183,7 @@ mod test_utils {
                 .await;
             let headers = res.get_headers().unwrap();
             let session_key = auth_token_get(&headers, header::SET_COOKIE).unwrap();
+            let session_key = str_to_uuid(session_key);
             let result = res.into_json().await.unwrap();
             (result, session_key)
         }
@@ -204,18 +205,17 @@ mod test_utils {
                 .await
                 .unwrap();
             // let invite = self.invite_add(email.clone()).await.unwrap();
-            let invite = id_to_string(
-                self.state
-                    .db
-                    .invite_get_all()
-                    .await
-                    .unwrap()
-                    .into_iter()
-                    .find(|v| !v.used && v.email == email)
-                    .unwrap()
-                    .id
-                    .clone(),
-            );
+            let invite = self
+                .state
+                .db
+                .invite_get_all()
+                .await
+                .unwrap()
+                .into_iter()
+                .find(|v| !v.used && v.email == email)
+                .unwrap()
+                .token
+                .clone();
             let res = self
                 .client
                 .user_add(username, invite, password)
@@ -264,12 +264,12 @@ async fn test_user_add() {
 
     // invalid input
     {
-        let result = server.user_add("hey", "hello", "").await;
+        let result = server.user_add("hey", 0_u128.to_be_bytes(), "").await;
         assert!(
             matches!(result, Err(UserAddErr::InvalidInput { username, password }) if username.is_none() && password.is_some())
         );
 
-        let result = server.user_add("he", "hello@P", "").await;
+        let result = server.user_add("he", 0_u128.to_be_bytes(), "").await;
         assert!(
             matches!(result, Err(UserAddErr::InvalidInput { username, password }) if username.is_some() && password.is_some())
         );
@@ -278,7 +278,7 @@ async fn test_user_add() {
     // invite not found
     {
         let result = server
-            .user_add("hey", "hello1111111@1P", "inesognf042n0NR)TN09nnfw9")
+            .user_add("hey", 10_u128.to_be_bytes(), "inesognf042n0NR)TN09nnfw9")
             .await;
         assert!(matches!(result, Err(UserAddErr::InviteNotFound)));
     }

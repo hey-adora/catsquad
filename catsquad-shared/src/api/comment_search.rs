@@ -12,21 +12,21 @@ pub fn link_relative_comment_search(options: CommentSearchParams) -> String {
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
 pub struct CommentSearchParams {
-    pub post_key: String,
-    pub comment_key: String,
-    #[serde(serialize_with = "serde_from_u128", deserialize_with = "serde_to_u128")]
-    pub time: u128,
+    pub post_id: i64,
+    pub comment_id: i64,
+    pub time: u64,
     pub limit: usize,
     pub range: TimeRange,
     pub order: Order,
     pub flatten: bool,
 }
 
+// #[serde(serialize_with = "serde_from_u128", deserialize_with = "serde_to_u128")]
 impl Default for CommentSearchParams {
     fn default() -> Self {
         Self {
-            post_key: "".to_string(),
-            comment_key: "".to_string(),
+            post_id: 0,
+            comment_id: 0,
             time: 0,
             limit: 50,
             range: TimeRange::MoreOrEqual,

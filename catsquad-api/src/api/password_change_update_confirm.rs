@@ -22,8 +22,8 @@ fn from_db_password_change_confirm_err(
         DbPasswordChangeUpdateConfirmErr::AlreadyUsed => {
             PasswordChangeUpdateConfirmErr::AlreadyUsed
         }
-        DbPasswordChangeUpdateConfirmErr::PasswordKeyNotFound => {
-            PasswordChangeUpdateConfirmErr::PasswordKeyNotFound
+        DbPasswordChangeUpdateConfirmErr::TokenNotFound => {
+            PasswordChangeUpdateConfirmErr::TokenNotFound
         }
         DbPasswordChangeUpdateConfirmErr::Db(_) => PasswordChangeUpdateConfirmErr::InternalServer,
     }
@@ -35,7 +35,7 @@ fn status_code(
     match result {
         Ok(_) => StatusCode::OK,
         Err(PasswordChangeUpdateConfirmErr::NewPasswordInvalid(_)) => StatusCode::BAD_REQUEST,
-        Err(PasswordChangeUpdateConfirmErr::PasswordKeyNotFound) => StatusCode::BAD_REQUEST,
+        Err(PasswordChangeUpdateConfirmErr::TokenNotFound) => StatusCode::BAD_REQUEST,
         Err(PasswordChangeUpdateConfirmErr::AlreadyUsed) => StatusCode::BAD_REQUEST,
         Err(PasswordChangeUpdateConfirmErr::Expired) => StatusCode::BAD_REQUEST,
         Err(PasswordChangeUpdateConfirmErr::BadRequest(_)) => StatusCode::BAD_REQUEST,
@@ -61,7 +61,7 @@ pub async fn user_password_change_confirm(
     State(app): State<AppState>,
     Form(req): Form<PasswordChangeUpdateConfirmReq>,
 ) -> impl IntoResponse {
-    let time = app.get_time().await;
+    let time = app.get_time_micro();
     let inner =
         async || -> Result<PasswordChangeUpdateConfirmRes, PasswordChangeUpdateConfirmErr> {
             validate_password(&req.new_password)
@@ -71,9 +71,10 @@ pub async fn user_password_change_confirm(
 
             let password_change = app
                 .db
-                .password_change_update_confirm(time, req.password_change_key, new_password)
+                .password_change_update_confirm(time, req.token, new_password)
                 .await
                 .map_err(from_db_password_change_confirm_err)?;
+
             let email = password_change.user.email;
 
             let address = app.get_address().await;

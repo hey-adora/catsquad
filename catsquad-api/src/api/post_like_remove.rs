@@ -30,7 +30,7 @@ pub async fn post_like_remove(
     State(app): State<AppState>,
     Form(req): Form<PostLikeRemoveReq>,
 ) -> impl IntoResponse {
-    let time = app.get_time().await;
+    let time = app.get_time_ns().await;
     let inner = async || -> Result<PostLikeRes, PostLikeRemoveErr> {
         let post_key = req.post_key;
         let user_id = db_user.id.clone();

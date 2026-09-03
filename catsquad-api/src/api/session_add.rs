@@ -4,7 +4,7 @@ use axum::{
     http::{HeaderMap, StatusCode},
     response::IntoResponse,
 };
-use catsquad_db::{DbSession, DbSessionAddErr, DbUserGetByEmailErr, id_to_string};
+use catsquad_db::{DbSession, DbSessionAddErr, DbUser, DbUserGetByEmailErr};
 use catsquad_log::prelude::*;
 use catsquad_shared::{SessionAddErr, SessionAddReq, SessionRes};
 
@@ -13,12 +13,12 @@ use crate::{
     state::AppState,
 };
 
-fn from_db_session(value: DbSession) -> SessionRes {
+fn from_db_session(value: DbUser) -> SessionRes {
     SessionRes {
-        key: id_to_string(value.user.id),
-        username: value.user.username,
-        email: value.user.email,
-        created_at: value.user.created_at,
+        // key: id_to_string(value.user.id),
+        username: value.username,
+        email: value.email,
+        created_at: value.created_at,
     }
 }
 
@@ -55,8 +55,8 @@ pub async fn session_add(
     State(app): State<AppState>,
     Form(req): Form<SessionAddReq>,
 ) -> impl IntoResponse {
-    let time = app.get_time().await;
-    let inner = async || -> Result<DbSession, SessionAddErr> {
+    let time = app.get_time_micro();
+    let inner = async || -> Result<(DbUser, DbSession), SessionAddErr> {
         let email = req.email.trim().to_lowercase();
         let password = req.password;
 
@@ -66,7 +66,7 @@ pub async fn session_add(
             .await
             .map_err(from_db_get_by_email_err)?;
 
-        verify_password(password, user.password).map_err(|_| SessionAddErr::InvalidCredentials)?;
+        verify_password(password, &user.password).map_err(|_| SessionAddErr::InvalidCredentials)?;
 
         let session = app
             .db
@@ -86,14 +86,14 @@ pub async fn session_add(
             )
             .await;
 
-        Ok(session)
+        Ok((user, session))
     };
 
     let result = inner().await;
     match result {
-        Ok(result) => {
-            let headers = create_auth_cookie(id_to_string(result.id.clone()));
-            let result = Ok(from_db_session(result));
+        Ok((user, session)) => {
+            let headers = create_auth_cookie(session.token);
+            let result = Ok(from_db_session(user));
             let status_code = status_code(&result);
             (status_code, headers, Json(result))
         }

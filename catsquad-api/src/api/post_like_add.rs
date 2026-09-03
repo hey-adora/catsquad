@@ -51,7 +51,7 @@ pub async fn post_like_add(
     State(app): State<AppState>,
     Form(req): Form<PostLikeAddReq>,
 ) -> impl IntoResponse {
-    let time = app.get_time().await;
+    let time = app.get_time_ns().await;
     let inner = async || -> Result<PostLikeRes, PostLikeAddErr> {
         let post_key = req.post_key;
         let user_id = db_user.id.clone();

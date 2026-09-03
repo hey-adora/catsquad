@@ -725,7 +725,7 @@ pub fn Post() -> impl IntoView {
                                 <div node_ref=comment_container_ref class=" flex flex-col gap-2 relative 0h-[20rem] 0overflow-y-scroll">
                                     <For
                                         each=move || comment_basic.items.get()
-                                        key=|state| state.key.clone()
+                                        key=|state| state.id.clone()
                                         let(data)
                                     >
                                         {
@@ -967,7 +967,7 @@ pub fn PostCommentElm(
     let replies_shown = RwSignal::new(false);
     // let edit_enabled = RwSignal::new(false);
     // let api = ApiWeb::new();
-    let comment_key = comment.key.clone();
+    let comment_key = comment.id.clone();
     let is_owned_fn = {
         let key = comment.user.key.clone();
         move || global_state.user_key() == key
@@ -1092,7 +1092,7 @@ pub fn PostCommentElm(
         if !kind.is_none() {
             break 'f false;
         }
-        let Some(last) = comment.parent_key.last() else {
+        let Some(last) = comment.parent_id.last() else {
             break 'f false;
         };
         *last != parent_key
@@ -1103,17 +1103,17 @@ pub fn PostCommentElm(
             break 'f None;
         }
         // let last = comment.parent_key.last().cloned();
-        let Some(last) = comment.parent_key.last() else {
+        let Some(last) = comment.parent_id.last() else {
             break 'f None;
         };
-        parent_items.with(|v| v.iter().find(|v| v.key == *last).cloned())
+        parent_items.with(|v| v.iter().find(|v| v.id == *last).cloned())
     };
 
     let on_bubble_click = {
         let bubble = bubble.clone();
         let comment_key = comment_key.clone();
         move || {
-            let Some(elm) = bubble.and_then(|v| document().get_element_by_id(&v.key)) else {
+            let Some(elm) = bubble.and_then(|v| document().get_element_by_id(&v.id)) else {
                 warn!("cant find element for bubble click {}", comment_key);
                 return;
             };
@@ -1175,7 +1175,7 @@ pub fn PostCommentElm(
 
     view! {
         <div class=" flex flex-col "  >
-            <div id=comment.key.clone() class=" rounded 0bg-base03 flex flex-col">
+            <div id=comment.id.clone() class=" rounded 0bg-base03 flex flex-col">
                 <Show when=move || is_bubble>
                     <button on:click=on_bubble_click_fn.clone() class="cursor-pointer flex gap-2 items-center">
                         <div class="flex place-items-end h-[1.5rem] w-[3.2rem] shrink-0">
@@ -1311,7 +1311,7 @@ pub fn PostCommentElm(
                                 view! {
                                     <For
                                         each=move || comments_manual.items.get()
-                                        key=|state| state.key.clone()
+                                        key=|state| state.id.clone()
                                         let(data)
                                     >
                                         {

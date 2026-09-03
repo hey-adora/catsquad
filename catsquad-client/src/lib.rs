@@ -1,6 +1,6 @@
 use catsquad_log::prelude::*;
 use catsquad_shared::{
-    self as cs, Order, PostFile, PostSearchParams, PostState, TimeRange, ToForm,
+    self as cs, Order, PostFile, PostSearchParams, PostState, TimeRange, ToForm, Uuid,
     link_relative_invite_get_by_key, link_relative_post_get_by_key, link_relative_post_remove,
     link_relative_post_search,
 };
@@ -509,7 +509,7 @@ where
 
     pub fn invite_get_by_key(
         &self,
-        invite_key: impl AsRef<str>,
+        invite_key: Uuid,
     ) -> Builder<TSender, catsquad_shared::InviteGetByKeyRes, catsquad_shared::InviteGetByKeyErr>
     {
         let link = link_relative_invite_get_by_key(invite_key);
@@ -526,13 +526,13 @@ where
     pub fn user_add(
         &self,
         username: impl Into<String>,
-        invite_key: impl Into<String>,
+        invite_key: Uuid,
         password: impl Into<String>,
     ) -> Builder<TSender, catsquad_shared::SensitiveUserRes, catsquad_shared::UserAddErr> {
         let req = catsquad_shared::UserAddReq {
             username: username.into(),
             password: password.into(),
-            invite_key: invite_key.into(),
+            invite_key: invite_key,
         }
         .to_form()
         .inspect_err(|err| error!("serializing failed {err}"))
@@ -953,14 +953,14 @@ where
 
     pub fn password_change_update_confirm(
         &self,
-        password_change_key: impl Into<String>,
+        token: Uuid,
         new_password: impl Into<String>,
     ) -> Builder<TSender, cs::PasswordChangeUpdateConfirmRes, cs::PasswordChangeUpdateConfirmErr>
     {
         self.post_form(
             cs::LINK_API_PASSWORD_CHANGE_UPDATE_CONFIRM,
             cs::PasswordChangeUpdateConfirmReq {
-                password_change_key: password_change_key.into(),
+                token,
                 new_password: new_password.into(),
             },
         )
@@ -968,15 +968,15 @@ where
 
     pub fn comment_add(
         &self,
-        post_key: impl Into<String>,
-        comment_parent_key: impl Into<String>,
+        post_id: i64,
+        comment_parent_id: i64,
         text: impl Into<String>,
     ) -> Builder<TSender, cs::CommentRes, cs::CommentAddErr> {
         self.post_form(
             cs::LINK_API_COMMENT_ADD,
             cs::CommentAddReq {
-                post_key: post_key.into(),
-                comment_key: comment_parent_key.into(),
+                post_id: post_id,
+                comment_id: comment_parent_id,
                 text: text.into(),
             },
         )
@@ -996,23 +996,20 @@ where
         )
     }
 
-    pub fn comment_remove(
-        &self,
-        comment_key: impl Into<String>,
-    ) -> Builder<TSender, (), cs::CommentRemoveErr> {
+    pub fn comment_remove(&self, comment_id: i64) -> Builder<TSender, (), cs::CommentRemoveErr> {
         self.post_form(
             cs::LINK_API_COMMENT_REMOVE,
             cs::CommentRemoveReq {
-                comment_key: comment_key.into(),
+                comment_id: comment_id,
             },
         )
     }
 
     pub fn comment_search(
         &self,
-        post_key: impl Into<String>,
-        comment_key: impl Into<String>,
-        time: u128,
+        post_id: i64,
+        comment_id: i64,
+        time: u64,
         limit: usize,
         range: TimeRange,
         order: Order,
@@ -1020,8 +1017,8 @@ where
     ) -> Builder<TSender, Vec<cs::CommentRes>, cs::CommentSearchErr> {
         self.get(cs::link_relative_comment_search(cs::CommentSearchParams {
             time,
-            post_key: post_key.into(),
-            comment_key: comment_key.into(),
+            post_id,
+            comment_id,
             limit,
             range,
             order,

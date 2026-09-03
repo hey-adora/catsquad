@@ -38,7 +38,7 @@ pub async fn post_update_file_remove(
     State(app): State<AppState>,
     Form(req): Form<PostUpdateFileRemoveReq>,
 ) -> impl IntoResponse {
-    let time = app.get_time().await;
+    let time = app.get_time_ns().await;
 
     let inner = async || -> Result<PostFile, PostUpdateFileRemoveErr> {
         let user_id = db_user.id.clone();

@@ -1,5 +1,5 @@
 use axum::{Extension, Form, Json, extract::State, http::StatusCode, response::IntoResponse};
-use catsquad_db::{DbComment, DbCommentAddErr, DbUser, id_to_string};
+use catsquad_db::{DbComment, DbCommentAddErr, DbUser};
 use catsquad_shared::{CommentAddErr, CommentAddReq, CommentRes, validate_comment_text};
 
 use crate::{
@@ -9,10 +9,10 @@ use crate::{
 
 pub fn from_db_comment(value: DbComment) -> CommentRes {
     CommentRes {
-        key: id_to_string(value.id),
-        user: from_db_user_redacted(value.user),
-        post_key: id_to_string(value.post),
-        parent_key: value.parent.into_iter().map(|v| id_to_string(v)).collect(),
+        id: value.id,
+        user_username: value.user_username,
+        post_id: value.post_id,
+        parent_id: value.p3arents,
         replies_count: value.replies_count,
         text: value.text,
         modified_at: value.modified_at,
@@ -25,6 +25,7 @@ fn from_db_comment_add_err(value: DbCommentAddErr) -> CommentAddErr {
         DbCommentAddErr::ParentNotFound(err) => CommentAddErr::ReplyCommentNotFound(err),
         DbCommentAddErr::PostNotFound(err) => CommentAddErr::PostNotFound(err),
         DbCommentAddErr::UserNotFound(_) => CommentAddErr::InternalServer,
+        DbCommentAddErr::Unauthorized => CommentAddErr::Unauthorized("unauthorized".to_string()),
         DbCommentAddErr::Db(_) => CommentAddErr::InternalServer,
     }
 }
@@ -45,22 +46,22 @@ pub async fn comment_add(
     State(app): State<AppState>,
     Form(req): Form<CommentAddReq>,
 ) -> impl IntoResponse {
-    let time = app.get_time().await;
+    let time = app.get_time_micro();
     let inner = async || -> Result<CommentRes, CommentAddErr> {
-        let post_key = req.post_key;
-        let comment_key = if req.comment_key.is_empty() {
+        let post_id = req.post_id;
+        let comment_id = if req.comment_id.is_empty() {
             None
         } else {
-            Some(req.comment_key)
+            Some(req.comment_id)
         };
         let text = req.text.trim();
-        let user_id = db_user.id.clone();
+        let user_username = db_user.username.clone();
 
         validate_comment_text(text).map_err(|err| CommentAddErr::InvalidText(err.to_string()))?;
 
         let comment = app
             .db
-            .comment_add(time, user_id, post_key, comment_key, text)
+            .comment_add(time, user_username, post_id, comment_id, text)
             .await
             .map_err(from_db_comment_add_err)?;
 

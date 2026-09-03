@@ -37,7 +37,7 @@ pub async fn post_update_state(
     State(app): State<AppState>,
     Form(req): Form<PostUpdateStateReq>,
 ) -> impl IntoResponse {
-    let time = app.get_time().await;
+    let time = app.get_time_ns().await;
 
     let inner = async || -> Result<PostRes, PostUpdateStateErr> {
         let user_id = db_user.id.clone();

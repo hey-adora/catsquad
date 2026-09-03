@@ -61,7 +61,7 @@ pub async fn email_change_update_new_add(
     State(app): State<AppState>,
     Form(req): Form<EmailChangeUpdateNewAddReq>,
 ) -> impl IntoResponse {
-    let time = app.get_time().await;
+    let time = app.get_time_ns().await;
     let inner = async || -> Result<EmailChangeRes, EmailChangeUpdateNewAddErr> {
         let user_id = db_user.id.clone();
         let user_email = db_user.email.clone();

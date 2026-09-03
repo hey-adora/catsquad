@@ -247,7 +247,7 @@ impl CommentsApi2 {
             }
             CommentKind2::Reply { comment, .. } => {
                 let comments = self
-                    .fetch_replies(time, client, comment.key.clone(), false)
+                    .fetch_replies(time, client, comment.id.clone(), false)
                     .await;
                 if comments.is_empty() {
                     return;
@@ -268,7 +268,7 @@ impl CommentsApi2 {
             }
             CommentKind2::Flat { comment, .. } => {
                 let comments = self
-                    .fetch_replies(time, client, comment.key.clone(), true)
+                    .fetch_replies(time, client, comment.id.clone(), true)
                     .await;
                 if comments.is_empty() {
                     return;
@@ -340,7 +340,7 @@ impl CommentsApi2 {
                 parent_items,
                 parent_replies_count,
                 comment,
-            } => comment.key,
+            } => comment.id,
         };
 
         let result = client
@@ -445,7 +445,7 @@ impl CommentsApi2 {
                 ..
             } => {
                 let result = client
-                    .comment_remove(comment.key.clone())
+                    .comment_remove(comment.id.clone())
                     .send()
                     .await
                     .into_json()
@@ -460,8 +460,8 @@ impl CommentsApi2 {
                                 .clone()
                                 .into_iter()
                                 .filter(|v| {
-                                    !(v.key == comment.key
-                                        || v.parent_key.iter().any(|v| *v == comment.key))
+                                    !(v.id == comment.id
+                                        || v.parent_id.iter().any(|v| *v == comment.id))
                                 })
                                 .collect::<Vec<CommentRes>>();
                             // let Some(pos) = v.iter().position(|v| v.key == comment.key) else {
@@ -524,7 +524,7 @@ impl CommentsApi2 {
                 comment,
                 ..
             } => {
-                let Some(comment) = self.post_reply(client, text, comment.key).await else {
+                let Some(comment) = self.post_reply(client, text, comment.id).await else {
                     error!("failed to post");
                     return;
                 };
@@ -540,7 +540,7 @@ impl CommentsApi2 {
                 parent_replies_count,
                 ..
             } => {
-                let Some(comment) = self.post_reply(client, text, comment.key).await else {
+                let Some(comment) = self.post_reply(client, text, comment.id).await else {
                     error!("failed to post");
                     return;
                 };
@@ -573,8 +573,8 @@ impl CommentsApi2 {
                 comment,
                 ..
             } => parent
-                .with(|v| v.last().map(|v| v.key.clone()))
-                .map(|v| v == comment.key)
+                .with(|v| v.last().map(|v| v.id.clone()))
+                .map(|v| v == comment.id)
                 .unwrap_or_default(),
         }
     }
@@ -730,7 +730,7 @@ pub mod tests {
         let hook_flat = CommentsApi2::new(
             2,
             CommentKind2::Flat {
-                parent_key: c0.key.clone(),
+                parent_key: c0.id.clone(),
                 parent_items: hook_reply.items,
                 parent_replies_count: hook_reply.replies_count,
                 comment: c0_r0x1.clone(),
@@ -759,7 +759,7 @@ pub mod tests {
         let hook_none = CommentsApi2::new(
             2,
             CommentKind2::None {
-                parent_key: c0_r0x1.key.clone(),
+                parent_key: c0_r0x1.id.clone(),
                 parent_items: hook_flat.items,
                 parent_replies_count: hook_flat.replies_count,
                 comment: c0_r0x2.clone(),
@@ -855,7 +855,7 @@ pub mod tests {
         let hook_flat = CommentsApi2::new(
             4,
             CommentKind2::Flat {
-                parent_key: c0.key.clone(),
+                parent_key: c0.id.clone(),
                 parent_items: hook_reply.items,
                 parent_replies_count: hook_reply.replies_count,
                 comment: c0_r0x1.clone(),
@@ -1019,7 +1019,7 @@ pub mod tests {
         let hook_flat = CommentsApi2::new(
             2,
             CommentKind2::Flat {
-                parent_key: c0.key.clone(),
+                parent_key: c0.id.clone(),
                 parent_items: hook_reply.items,
                 parent_replies_count: hook_reply.replies_count,
                 comment: c0_r0x1.clone(),
@@ -1043,7 +1043,7 @@ pub mod tests {
         let hook_none = CommentsApi2::new(
             2,
             CommentKind2::None {
-                parent_key: c0_r0x1.key.clone(),
+                parent_key: c0_r0x1.id.clone(),
                 parent_items: hook_flat.items,
                 parent_replies_count: hook_flat.replies_count,
                 comment: c0_r0x2,
@@ -1188,60 +1188,57 @@ pub mod tests {
         let comment0 = fn_comment_add(String::new(), "comment0").await;
         time += 1;
         app.state.set_time(time).await;
-        let comment0_reply0 = fn_comment_add(comment0.key.clone(), "comment0_reply0").await;
+        let comment0_reply0 = fn_comment_add(comment0.id.clone(), "comment0_reply0").await;
         time += 1;
         app.state.set_time(time).await;
         let comment0_reply0_reply0 =
-            fn_comment_add(comment0_reply0.key.clone(), "comment0_reply0_reply0").await;
+            fn_comment_add(comment0_reply0.id.clone(), "comment0_reply0_reply0").await;
         time += 1;
         app.state.set_time(time).await;
-        let comment0_reply0_times_3 = fn_comment_add(
-            comment0_reply0_reply0.key.clone(),
-            "comment0_reply0_times_3",
-        )
-        .await;
+        let comment0_reply0_times_3 =
+            fn_comment_add(comment0_reply0_reply0.id.clone(), "comment0_reply0_times_3").await;
         time += 1;
         app.state.set_time(time).await;
         let comment0_reply0_times_4 = fn_comment_add(
-            comment0_reply0_times_3.key.clone(),
+            comment0_reply0_times_3.id.clone(),
             "comment0_reply0_times_4",
         )
         .await;
         time += 1;
         app.state.set_time(time).await;
         let comment0_reply0_times_5 = fn_comment_add(
-            comment0_reply0_times_4.key.clone(),
+            comment0_reply0_times_4.id.clone(),
             "comment0_reply0_times_5",
         )
         .await;
         time += 1;
         app.state.set_time(time).await;
         let comment0_reply0_times_6 = fn_comment_add(
-            comment0_reply0_times_5.key.clone(),
+            comment0_reply0_times_5.id.clone(),
             "comment0_reply0_times_6",
         )
         .await;
         time += 1;
         app.state.set_time(time).await;
         let comment0_reply0_reply1 =
-            fn_comment_add(comment0_reply0.key.clone(), "comment0_reply0_reply1").await;
+            fn_comment_add(comment0_reply0.id.clone(), "comment0_reply0_reply1").await;
         time += 1;
         app.state.set_time(time).await;
         let comment0_reply0_reply2 =
-            fn_comment_add(comment0_reply0.key.clone(), "comment0_reply0_reply2").await;
+            fn_comment_add(comment0_reply0.id.clone(), "comment0_reply0_reply2").await;
         time += 1;
         app.state.set_time(time).await;
         let comment0_reply0_reply3 =
-            fn_comment_add(comment0_reply0.key.clone(), "comment0_reply0_reply3").await;
+            fn_comment_add(comment0_reply0.id.clone(), "comment0_reply0_reply3").await;
         time += 1;
         app.state.set_time(time).await;
-        let comment0_reply1 = fn_comment_add(comment0.key.clone(), "comment0_reply1").await;
+        let comment0_reply1 = fn_comment_add(comment0.id.clone(), "comment0_reply1").await;
         time += 1;
         app.state.set_time(time).await;
-        let comment0_reply2 = fn_comment_add(comment0.key.clone(), "comment0_reply2").await;
+        let comment0_reply2 = fn_comment_add(comment0.id.clone(), "comment0_reply2").await;
         time += 1;
         app.state.set_time(time).await;
-        let comment0_reply3 = fn_comment_add(comment0.key.clone(), "comment0_reply3").await;
+        let comment0_reply3 = fn_comment_add(comment0.id.clone(), "comment0_reply3").await;
         time += 1;
         app.state.set_time(time).await;
         let comment1 = fn_comment_add(String::new(), "comment1").await;
@@ -1272,7 +1269,7 @@ pub mod tests {
         assert_eq!(post_comments[0], comment3);
         assert_eq!(post_comments[1], comment2);
         assert_eq!(post_comments[2], comment1);
-        assert_eq!(post_comments[3].key, comment0.key);
+        assert_eq!(post_comments[3].id, comment0.id);
 
         let comment4 = fn_comment_add(String::new(), "comment4").await;
         // let comment4 = app
@@ -1293,7 +1290,7 @@ pub mod tests {
         assert_eq!(post_comments[0], comment3);
         assert_eq!(post_comments[1], comment2);
         assert_eq!(post_comments[2], comment1);
-        assert_eq!(post_comments[3].key, comment0.key);
+        assert_eq!(post_comments[3].id, comment0.id);
 
         let hook_comment = CommentsApi2::new(
             2,
@@ -1310,7 +1307,7 @@ pub mod tests {
         let comment0_replies = hook_comment.items.get_untracked();
 
         assert_eq!(comment0_replies.len(), 2);
-        assert_eq!(comment0_replies[0].key, comment0_reply0.key);
+        assert_eq!(comment0_replies[0].id, comment0_reply0.id);
         assert_eq!(comment0_replies[0].replies_count, 4);
         assert_eq!(comment0_replies[1], comment0_reply1);
 
@@ -1318,7 +1315,7 @@ pub mod tests {
         let comment0_replies = hook_comment.items.get_untracked();
 
         assert_eq!(comment0_replies.len(), 4);
-        assert_eq!(comment0_replies[0].key, comment0_reply0.key);
+        assert_eq!(comment0_replies[0].id, comment0_reply0.id);
         assert_eq!(comment0_replies[0].replies_count, 4);
         assert_eq!(comment0_replies[1], comment0_reply1);
         assert_eq!(comment0_replies[2], comment0_reply2);
@@ -1327,7 +1324,7 @@ pub mod tests {
         let hook_reply = CommentsApi2::new(
             2,
             CommentKind2::Reply {
-                parent_key: comment0.key.clone(),
+                parent_key: comment0.id.clone(),
                 parent_items: hook_comment.items,
                 parent_replies_count: hook_comment.replies_count,
                 comment: comment0_reply0.clone(),
@@ -1344,7 +1341,7 @@ pub mod tests {
         // });
 
         assert_eq!(comment0_reply0_replies.len(), 2);
-        assert_eq!(comment0_reply0_replies[0].key, comment0_reply0_reply0.key);
+        assert_eq!(comment0_reply0_replies[0].id, comment0_reply0_reply0.id);
         assert_eq!(comment0_reply0_replies[0].replies_count, 1);
         assert_eq!(comment0_reply0_replies[1], comment0_reply0_reply1);
 
@@ -1352,7 +1349,7 @@ pub mod tests {
         let comment0_reply0_replies = hook_reply.items.get_untracked();
 
         assert_eq!(comment0_reply0_replies.len(), 4);
-        assert_eq!(comment0_reply0_replies[0].key, comment0_reply0_reply0.key);
+        assert_eq!(comment0_reply0_replies[0].id, comment0_reply0_reply0.id);
         assert_eq!(comment0_reply0_replies[0].replies_count, 1);
         assert_eq!(comment0_reply0_replies[1], comment0_reply0_reply1);
         assert_eq!(comment0_reply0_replies[2], comment0_reply0_reply2);
@@ -1361,7 +1358,7 @@ pub mod tests {
         let hook_flat = CommentsApi2::new(
             2,
             CommentKind2::Flat {
-                parent_key: comment0_reply0.key.clone(),
+                parent_key: comment0_reply0.id.clone(),
                 parent_items: hook_reply.items,
                 parent_replies_count: hook_reply.replies_count,
                 comment: comment0_reply0_reply0.clone(),
@@ -1383,12 +1380,12 @@ pub mod tests {
         assert_eq!(replies_count, 2);
         assert_eq!(comment0_reply0_reply0_replies.len(), 2);
         assert_eq!(
-            comment0_reply0_reply0_replies[0].key,
-            comment0_reply0_times_3.key
+            comment0_reply0_reply0_replies[0].id,
+            comment0_reply0_times_3.id
         );
         assert_eq!(
-            comment0_reply0_reply0_replies[1].key,
-            comment0_reply0_times_4.key
+            comment0_reply0_reply0_replies[1].id,
+            comment0_reply0_times_4.id
         );
 
         hook_flat.fetch(time, &app.client).await;
@@ -1398,20 +1395,20 @@ pub mod tests {
         assert_eq!(replies_count, 4);
         assert_eq!(comment0_reply0_reply0_replies.len(), 4);
         assert_eq!(
-            comment0_reply0_reply0_replies[0].key,
-            comment0_reply0_times_3.key
+            comment0_reply0_reply0_replies[0].id,
+            comment0_reply0_times_3.id
         );
         assert_eq!(
-            comment0_reply0_reply0_replies[1].key,
-            comment0_reply0_times_4.key
+            comment0_reply0_reply0_replies[1].id,
+            comment0_reply0_times_4.id
         );
         assert_eq!(
-            comment0_reply0_reply0_replies[2].key,
-            comment0_reply0_times_5.key
+            comment0_reply0_reply0_replies[2].id,
+            comment0_reply0_times_5.id
         );
         assert_eq!(
-            comment0_reply0_reply0_replies[3].key,
-            comment0_reply0_times_6.key
+            comment0_reply0_reply0_replies[3].id,
+            comment0_reply0_times_6.id
         );
         assert_eq!(hook_flat.finished.get_untracked(), false);
 

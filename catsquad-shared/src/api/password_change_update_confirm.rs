@@ -7,7 +7,11 @@ pub struct PasswordChangeUpdateConfirmRes {
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
 pub struct PasswordChangeUpdateConfirmReq {
-    pub password_change_key: String,
+    #[serde(
+        serialize_with = "crate::serde_from_uuid",
+        deserialize_with = "crate::serde_to_uuid"
+    )]
+    pub token: crate::Uuid,
     pub new_password: String,
 }
 
@@ -22,7 +26,7 @@ pub enum PasswordChangeUpdateConfirmErr {
     AlreadyUsed,
 
     #[error("password key not found")]
-    PasswordKeyNotFound,
+    TokenNotFound,
 
     #[error("new password is invalid")]
     NewPasswordInvalid(String),

@@ -2,7 +2,7 @@ pub const LINK_API_INVITE_ADD: &str = "/api/invite";
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
 pub struct InviteRes {
-    pub expires: u128,
+    pub expires: u64,
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]

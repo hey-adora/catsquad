@@ -31,18 +31,18 @@ pub async fn comment_search(
     State(app): State<AppState>,
     Query(req): Query<CommentSearchParams>,
 ) -> impl IntoResponse {
-    let time = app.get_time().await;
+    let time = app.get_time_ns().await;
 
     let inner = async || -> Result<Vec<CommentRes>, CommentSearchErr> {
         let result = app
             .db
             .comment_search(
                 // time,
-                req.post_key,
-                if req.comment_key.is_empty() {
+                req.post_id,
+                if req.comment_id.is_empty() {
                     None
                 } else {
-                    Some(req.comment_key)
+                    Some(req.comment_id)
                 },
                 req.time,
                 req.limit,

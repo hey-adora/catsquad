@@ -1,13 +1,16 @@
+use crate::{Uuid, u128_to_str, uuid_to_str};
+
 pub const LINK_API_INVITE_GET_BY_KEY: &str = "/api/invite/{invite_key}";
 
-pub fn link_relative_invite_get_by_key(invite_key: impl AsRef<str>) -> String {
-    format!("/api/invite/{}", invite_key.as_ref())
+pub fn link_relative_invite_get_by_key(invite_key: Uuid) -> String {
+    let uuid_str = uuid_to_str(invite_key);
+    format!("/api/invite/{}", uuid_str)
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
 pub struct InviteGetByKeyRes {
     pub email: String,
-    pub expires: u128,
+    pub expires: u64,
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]

@@ -1,3 +1,4 @@
+use anyhow::anyhow;
 use axum::{
     Json,
     extract::State,
@@ -7,8 +8,9 @@ use axum::{
     },
     response::IntoResponse,
 };
-use catsquad_db::{DbSessionGetByKeyErr, DbUser};
+use catsquad_db::{DbSession, DbSessionGetByKeyErr, DbUser, Uuid};
 use catsquad_log::prelude::*;
+use catsquad_shared::{str_to_uuid, uuid_to_str};
 
 use crate::state::AppState;
 
@@ -22,11 +24,11 @@ const COOKIE_DELETED: &'static str =
     "authorization=Bearer DELETED; Secure; HttpOnly; expires=Thu, 01 Jan 1970 00:00:00 GMT";
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
-pub struct SessionKey(pub String);
+pub struct SessionKey(pub Uuid);
 
 impl ToString for SessionKey {
     fn to_string(&self) -> String {
-        self.0.clone()
+        uuid_to_str(self.0)
     }
 }
 
@@ -49,7 +51,7 @@ pub fn verify_password<T: AsRef<[u8]>, S2: AsRef<str>>(
     let hash = hash.as_ref();
     PasswordHash::new(hash)
         .and_then(|hash| Argon2::default().verify_password(password, &hash))
-        .map_err(|err| err.into())
+        .map_err(|err| anyhow!("{err}"))
 }
 
 pub fn hash_password<S: Into<String>>(password: S) -> Result<String, argon2::password_hash::Error> {
@@ -57,13 +59,14 @@ pub fn hash_password<S: Into<String>>(password: S) -> Result<String, argon2::pas
         Argon2, PasswordHasher,
         password_hash::{
             SaltString,
-            rand_core::{OsRng, RngCore},
+            // rand_core::{OsRng, RngCore},
         },
     };
 
-    let rng = &mut OsRng;
+    // TODO FIX THIS NONSENSE
+    // let rng = &mut OsRng;
     let mut bytes = [0u8; 10]; // 10 is salt length, bigger = slower = more secure
-    rng.fill_bytes(&mut bytes);
+    // rng.fill_bytes(&mut bytes);
     let salt = SaltString::encode_b64(&bytes)?;
     let argon2 = Argon2::default();
     let password = password.into();
@@ -80,7 +83,8 @@ pub fn create_deleted_cookie() -> HeaderMap {
     headers
 }
 
-pub fn create_auth_cookie(token: impl AsRef<str>) -> HeaderMap {
+pub fn create_auth_cookie(token: Uuid) -> HeaderMap {
+    let token = uuid_to_str(token);
     let cookie = create_auth_cookie_str(token);
     let mut headers = HeaderMap::new();
     headers.insert(SET_COOKIE, cookie.parse().unwrap());
@@ -145,23 +149,30 @@ pub async fn auth_middleware(
     }
 }
 
-pub async fn check_auth(app: &AppState, headers: &HeaderMap) -> Result<(String, DbUser), AuthErr> {
+pub async fn check_auth(app: &AppState, headers: &HeaderMap) -> Result<(Uuid, DbUser), AuthErr> {
     trace!("CHECKING AUTH");
 
     let token = auth_token_get(headers, header::COOKIE)
         .ok_or(AuthErr::Unauthorized(ERR_MSG_COOKIE.to_string()))?;
+    let token = str_to_uuid(&token);
 
     trace!("CHECKING AUTH SESSION");
-    let session = app
+    // TODO make this single db request, join user in session
+    let session: DbSession = app
         .db
-        .session_get_by_token(token.clone())
+        .session_get_by_token(token)
         .await
         .map_err(|err| match err {
-            DbSessionGetByKeyErr::NotFound(_) => AuthErr::Unauthorized(ERR_MSG_SESSION.to_string()),
+            DbSessionGetByKeyErr::NotFound => AuthErr::Unauthorized(ERR_MSG_SESSION.to_string()),
             _ => AuthErr::InternalServer,
         })?;
+    let user = app
+        .db
+        .user_get_by_email(session.user_email)
+        .await
+        .map_err(|err| AuthErr::InternalServer)?;
 
-    Ok((token, session.user))
+    Ok((token, user))
 }
 
 pub fn auth_token_get(headers: &HeaderMap, header_name: header::HeaderName) -> Option<String> {

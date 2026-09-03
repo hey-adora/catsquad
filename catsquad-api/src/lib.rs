@@ -13,7 +13,6 @@ pub mod utils;
 #[cfg(test)]
 use std::os::unix::fs::MetadataExt;
 
-pub use catsquad_db::id_to_string;
 pub use server::server;
 
 #[cfg(any(test, feature = "test_server"))]

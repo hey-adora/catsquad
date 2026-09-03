@@ -1,6 +1,6 @@
 use crate::{
     MAX_EMAIL_LENGTH, MAX_PASSWORD_LENGTH, MAX_USERNAME_LENGTH, MIN_EMAIL_LENGTH,
-    MIN_PASSWORD_LENGTH, MIN_USERNAME_LENGTH,
+    MIN_PASSWORD_LENGTH, MIN_USERNAME_LENGTH, Uuid,
 };
 use catsquad_log::prelude::*;
 
@@ -8,24 +8,24 @@ pub const LINK_API_USER_ADD: &str = "/api/register";
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
 pub struct RedactedUserRes {
-    pub key: String,
+    // pub key: i64,
     pub username: String,
-    pub created_at: u128,
+    pub created_at: u64,
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
 pub struct SensitiveUserRes {
-    pub key: String,
+    // pub key: i64,
     pub username: String,
     pub email: String,
-    pub created_at: u128,
+    pub created_at: u64,
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
 pub struct UserAddReq {
     pub username: String,
     pub password: String,
-    pub invite_key: String,
+    pub invite_key: Uuid,
 }
 
 #[derive(
