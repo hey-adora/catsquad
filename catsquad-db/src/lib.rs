@@ -25,10 +25,10 @@ mod migration;
 mod query;
 
 pub use query::comment_add::*;
-// pub use query::comment_get_all::*;
-// pub use query::comment_remove::*;
-// pub use query::comment_search::*;
-// pub use query::comment_update_text::*;
+pub use query::comment_get_all::*;
+pub use query::comment_remove::*;
+pub use query::comment_search::*;
+pub use query::comment_update_text::*;
 pub use query::email_change_add::*;
 pub use query::email_change_get_by_key::*;
 pub use query::email_change_update_cancel::*;

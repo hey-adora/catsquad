@@ -4,7 +4,7 @@ pub const LINK_API_POST_UPDATE_STATE: &str = "/api/post_update_state";
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
 pub struct PostUpdateStateReq {
-    pub post_key: String,
+    pub post_id: i64,
     pub new_state: PostState,
 }
 

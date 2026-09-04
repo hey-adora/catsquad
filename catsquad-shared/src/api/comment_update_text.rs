@@ -2,7 +2,7 @@ pub const LINK_API_COMMENT_UPDATE_TEXT: &str = "/api/comment_update_text";
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
 pub struct CommentUpdateTextReq {
-    pub comment_key: String,
+    pub comment_id: i64,
     pub text: String,
 }
 

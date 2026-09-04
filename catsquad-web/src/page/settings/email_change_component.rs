@@ -80,7 +80,7 @@ pub fn EmailChange(
                         let Some(result) = email_change.current_add().await else {
                             return;
                         };
-                        let key = result.key.clone();
+                        let key = result.id.clone();
                         let link = link_relative_settings_email_change_current_check_email(key);
                         navigate(&link, NavigateOptions::default());
                     }

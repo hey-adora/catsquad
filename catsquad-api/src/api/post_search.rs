@@ -1,6 +1,6 @@
 use axum::{
     Json,
-    extract::{Query, RawPathParams, State},
+    extract::{Query, State},
     http::{StatusCode, header},
     response::IntoResponse,
 };
@@ -44,17 +44,26 @@ pub async fn post_search(
 ) -> impl IntoResponse {
     let tags = req.tags.unwrap_or_default();
     let username = req.username.unwrap_or_default();
-    let time = req
-        .time
-        .map(|v| u128::from_str_radix(&v, 10).unwrap_or_default())
-        .unwrap_or_default();
+    let search_time = req.time.unwrap_or_default();
+    // let time = req
+    //     .time
+    //     .map(|v| u128::from_str_radix(&v, 10).unwrap_or_default())
+    //     .unwrap_or_default();
     let limit = req.limit.unwrap_or(50);
     let range = req.range.unwrap_or(TimeRange::MoreOrEqual);
     let order = req.order.unwrap_or(Order::ThreeTwoOne);
     let inner = async || -> Result<Vec<PostRes>, PostSearchErr> {
         let posts = app
             .db
-            .post_search(PostState::Active, tags, username, time, limit, range, order)
+            .post_search(
+                PostState::Active,
+                tags,
+                username,
+                search_time,
+                limit,
+                range,
+                order,
+            )
             .await
             .map_err(from_db_post_search_err)?;
 
@@ -77,7 +86,7 @@ mod test_utils {
             &self,
             tags: impl Into<String>,
             username: impl Into<String>,
-            time: u128,
+            time: u64,
             limit: usize,
             range: TimeRange,
             order: Order,
@@ -118,7 +127,7 @@ async fn test_post_search() {
     assert_eq!(posts.len(), 0);
 
     server
-        .post_update_state(post1.key.clone(), PostState::Active, session_key1.clone())
+        .post_update_state(post1.id, PostState::Active, session_key1.clone())
         .await
         .unwrap();
 

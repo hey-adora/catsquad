@@ -1,5 +1,5 @@
 use axum::{Extension, Form, Json, extract::State, http::StatusCode, response::IntoResponse};
-use catsquad_db::{DbPostLike, DbPostLikeAddErr, DbUser, id_to_string};
+use catsquad_db::{DbPostLike, DbPostLikeAddErr, DbUser};
 use catsquad_log::prelude::*;
 use catsquad_shared::{PostLikeAddErr, PostLikeAddReq, PostLikeRes};
 
@@ -9,9 +9,7 @@ use crate::{
 };
 
 pub fn from_db_post_like(value: DbPostLike) -> PostLikeRes {
-    PostLikeRes {
-        key: id_to_string(value.id),
-    }
+    PostLikeRes { id: value.id }
 }
 
 // pub fn from_db_post_file(value: DbPostFile) -> PostFile {
@@ -51,10 +49,10 @@ pub async fn post_like_add(
     State(app): State<AppState>,
     Form(req): Form<PostLikeAddReq>,
 ) -> impl IntoResponse {
-    let time = app.get_time_ns().await;
+    let time = app.get_time_micro();
     let inner = async || -> Result<PostLikeRes, PostLikeAddErr> {
-        let post_key = req.post_key;
-        let user_id = db_user.id.clone();
+        let post_key = req.post_id;
+        let user_id = db_user.username.clone();
 
         let post_like = app
             .db
@@ -73,19 +71,22 @@ pub async fn post_like_add(
 #[cfg(test)]
 mod test_utils {
     use axum::http::header;
-    use catsquad_shared as cs;
+    use catsquad_shared::{self as cs, Uuid, uuid_to_str};
 
     use crate::{TestServer, auth::create_auth_cookie_str};
 
     impl TestServer {
         pub async fn post_like_add(
             &self,
-            post_key: impl Into<String>,
-            session_key: impl Into<String>,
+            post_id: i64,
+            session_token: Uuid,
         ) -> Result<cs::PostLikeRes, cs::PostLikeAddErr> {
             self.client
-                .post_like_add(post_key.into())
-                .header_add(header::COOKIE, create_auth_cookie_str(session_key.into()))
+                .post_like_add(post_id.into())
+                .header_add(
+                    header::COOKIE,
+                    create_auth_cookie_str(uuid_to_str(session_token)),
+                )
                 .send()
                 .await
                 .into_json()
@@ -104,10 +105,10 @@ async fn test_post_like_add() {
     let (user, session_key) = server.user_add_full("hey", email, password).await;
 
     let post1 = server
-        .post_add("title1", "description1", "tags1", &session_key)
+        .post_add("title1", "description1", "tags1", session_key)
         .await
         .unwrap();
 
-    let result = server.post_like_add(post1.key.clone(), &session_key).await;
+    let result = server.post_like_add(post1.id, session_key).await;
     assert!(matches!(result, Err(PostLikeAddErr::CantLikeYourself)));
 }

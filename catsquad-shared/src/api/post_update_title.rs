@@ -2,7 +2,7 @@ pub const LINK_API_POST_UPDATE_TITLE: &str = "/api/post_update_title";
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
 pub struct PostUpdateTitleReq {
-    pub post_key: String,
+    pub post_id: i64,
     pub new_title: String,
 }
 

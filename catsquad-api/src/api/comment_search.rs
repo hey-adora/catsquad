@@ -31,7 +31,7 @@ pub async fn comment_search(
     State(app): State<AppState>,
     Query(req): Query<CommentSearchParams>,
 ) -> impl IntoResponse {
-    let time = app.get_time_ns().await;
+    let time = app.get_time_micro();
 
     let inner = async || -> Result<Vec<CommentRes>, CommentSearchErr> {
         let result = app
@@ -39,7 +39,7 @@ pub async fn comment_search(
             .comment_search(
                 // time,
                 req.post_id,
-                if req.comment_id.is_empty() {
+                if req.comment_id == 0 {
                     None
                 } else {
                     Some(req.comment_id)
@@ -72,16 +72,16 @@ mod test_utils {
     impl TestServer {
         pub async fn comment_search(
             &self,
-            post_key: impl Into<String>,
-            comment_key: impl Into<String>,
-            time: u128,
+            post_id: i64,
+            comment_id: i64,
+            time: u64,
             limit: usize,
             range: TimeRange,
             order: Order,
             flatten: bool,
         ) -> Result<Vec<cs::CommentRes>, cs::CommentSearchErr> {
             self.client
-                .comment_search(post_key, comment_key, time, limit, range, order, flatten)
+                .comment_search(post_id, comment_id, time, limit, range, order, flatten)
                 .send()
                 .await
                 .into_json()
@@ -128,19 +128,14 @@ async fn test_comment_search() {
     // assert_eq!(result, "");
 
     let comment1 = server
-        .comment_add(
-            post1.key.clone(),
-            String::new(),
-            "text1",
-            session_key1.clone(),
-        )
+        .comment_add(post1.id, 0, "text1", session_key1.clone())
         .await
         .unwrap();
 
     let comments = server
         .comment_search(
-            &post1.key,
-            "",
+            post1.id,
+            0,
             0,
             10,
             TimeRange::None,

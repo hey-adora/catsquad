@@ -1,12 +1,12 @@
 pub const LINK_API_POST_GET_BY_KEY: &str = "/api/post/{post_key}";
 
-pub fn link_relative_post_get_by_key(post_key: impl AsRef<str>) -> String {
-    format!("/api/post/{}", post_key.as_ref())
+pub fn link_relative_post_get_by_key(post_id: i64) -> String {
+    format!("/api/post/{}", post_id)
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
 pub struct PostGetByKeyParams {
-    pub post_key: String,
+    pub post_id: i64,
 }
 // pub const POST_GET_BY_KEY_REQ_FIELD_POST_KEY: &'static str = "post_key";
 

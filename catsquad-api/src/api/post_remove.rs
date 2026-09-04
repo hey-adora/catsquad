@@ -1,19 +1,18 @@
-use crate::{api::post_add::from_db_post, state::AppState};
+use crate::state::AppState;
 use axum::{
-    Extension, Form, Json,
+    Extension, Json,
     extract::{Path, State},
     http::StatusCode,
     response::IntoResponse,
 };
 use catsquad_db::{DbPostRemoveErr, DbUser};
-use catsquad_log::prelude::*;
-use catsquad_shared::{PostGetByKeyErr, PostRemoveErr, PostRemoveParams, PostState};
+use catsquad_shared::{PostRemoveErr, PostRemoveParams};
 
 fn from_db_post_remove_err(value: DbPostRemoveErr) -> PostRemoveErr {
     match value {
         DbPostRemoveErr::NotFound(_) => PostRemoveErr::PostNotFound,
         DbPostRemoveErr::Unauthorized => PostRemoveErr::Unauthorized("unauthorized".to_string()),
-        DbPostRemoveErr::UserNotFound(_) => PostRemoveErr::Unauthorized("unauthorized".to_string()),
+        // DbPostRemoveErr::UserNotFound(_) => PostRemoveErr::Unauthorized("unauthorized".to_string()),
         DbPostRemoveErr::Db(_) => PostRemoveErr::InternalServer,
     }
 }
@@ -32,14 +31,12 @@ pub async fn post_remove(
     State(app): State<AppState>,
     Path(req): Path<PostRemoveParams>,
 ) -> impl IntoResponse {
-    let time = app.get_time_ns().await;
-
     let inner = async || -> Result<(), PostRemoveErr> {
-        let user_id = db_user.id.clone();
-        let post_key = req.post_key;
+        let user_username = db_user.username.clone();
+        let post_id = req.post_id;
 
         app.db
-            .post_remove(user_id, post_key)
+            .post_remove(user_username, post_id)
             .await
             .map_err(from_db_post_remove_err)?;
 
@@ -55,19 +52,22 @@ pub async fn post_remove(
 #[cfg(test)]
 mod test_utils {
     use axum::http::header;
-    use catsquad_shared as cs;
+    use catsquad_shared::{self as cs, Uuid, uuid_to_str};
 
     use crate::{TestServer, auth::create_auth_cookie_str};
 
     impl TestServer {
         pub async fn post_remove(
             &self,
-            post_key: impl Into<String>,
-            session_key: impl Into<String>,
+            post_id: i64,
+            session_token: Uuid,
         ) -> Result<(), cs::PostRemoveErr> {
             self.client
-                .post_remove(post_key.into())
-                .header_add(header::COOKIE, create_auth_cookie_str(session_key.into()))
+                .post_remove(post_id)
+                .header_add(
+                    header::COOKIE,
+                    create_auth_cookie_str(uuid_to_str(session_token)),
+                )
                 .send()
                 .await
                 .into_json()
@@ -76,10 +76,13 @@ mod test_utils {
     }
 }
 
+#[cfg(test)]
 #[tokio::test]
 async fn test_post_remove() {
     use crate::auth::create_auth_cookie_str;
     use axum::http::header;
+    use catsquad_log::prelude::*;
+    use catsquad_shared::{PostGetByKeyErr, PostState};
 
     init_log();
 
@@ -94,50 +97,40 @@ async fn test_post_remove() {
         .await;
 
     let post1 = server
-        .client
-        .post_add("title", "description1", "tags1")
-        .header_add(header::COOKIE, create_auth_cookie_str(session_key1.clone()))
-        .send()
-        .await
-        .into_json()
+        .post_add("title", "description1", "tags1", session_key1)
         .await
         .unwrap();
 
     server
-        .post_update_state(&post1.key, PostState::Active, &session_key1)
+        .post_update_state(post1.id, PostState::Active, session_key1)
         .await
         .unwrap();
 
     let _result = server
-        .post_get_by_key(&post1.key, &session_key1)
+        .post_get_by_key(post1.id, session_key1)
         .await
         .unwrap();
 
-    let result = server.post_remove(&post1.key, &session_key2).await;
+    let result = server.post_remove(post1.id, session_key2).await;
     assert!(matches!(result, Err(PostRemoveErr::Unauthorized(_))));
 
     let _result = server
-        .post_get_by_key(&post1.key, &session_key1)
+        .post_get_by_key(post1.id, session_key1)
         .await
         .unwrap();
 
-    let result = server.post_remove(&post1.key, &session_key1).await;
+    let result = server.post_remove(post1.id, session_key1).await;
     assert!(matches!(result, Ok(_)));
 
-    let result = server.post_get_by_key(&post1.key, &session_key1).await;
+    let result = server.post_get_by_key(post1.id, session_key1).await;
 
     assert!(matches!(result, Err(PostGetByKeyErr::PostNotFound)));
 
     let post2 = server
-        .client
-        .post_add("title", "description1", "tags1")
-        .header_add(header::COOKIE, create_auth_cookie_str(session_key1.clone()))
-        .send()
-        .await
-        .into_json()
+        .post_add("title", "description1", "tags1", session_key1)
         .await
         .unwrap();
 
-    let result = server.post_remove(&post2.key, &session_key1).await;
+    let result = server.post_remove(post2.id, session_key1).await;
     assert!(matches!(result, Ok(_)));
 }

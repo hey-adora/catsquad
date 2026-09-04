@@ -2,7 +2,7 @@ use catsquad_log::prelude::*;
 use catsquad_shared::{
     self as cs, Order, PostFile, PostSearchParams, PostState, TimeRange, ToForm, Uuid,
     link_relative_invite_get_by_key, link_relative_post_get_by_key, link_relative_post_remove,
-    link_relative_post_search,
+    link_relative_post_search, uuid_to_str,
 };
 use http::{HeaderMap, HeaderName, StatusCode, header};
 use std::{
@@ -389,10 +389,15 @@ where
         self
     }
 
+    // .header_add()
     pub fn header_add(mut self, name: header::HeaderName, value: impl Into<String>) -> Self {
         self.params.headers.push((name, value.into()));
         self
     }
+
+    // pub fn auth_add(mut self, token: Uuid) -> Self {
+    //     self.header_add(header::COOKIE, create_auth_cookie_str(uuid_to_str(token)))
+    // }
 
     pub fn header_remove(mut self, name: header::HeaderName) -> Self {
         let pos = self.params.headers.iter().position(|v| v.0 == name);
@@ -587,45 +592,38 @@ where
 
     pub fn post_remove(
         &self,
-        post_key: impl AsRef<str>,
+        post_id: i64,
     ) -> Builder<TSender, (), catsquad_shared::PostRemoveErr> {
-        self.delete(link_relative_post_remove(post_key))
+        self.delete(link_relative_post_remove(post_id))
     }
 
     pub fn post_like_add(
         &self,
-        post_key: impl Into<String>,
+        post_id: i64,
     ) -> Builder<TSender, catsquad_shared::PostLikeRes, catsquad_shared::PostLikeAddErr> {
-        self.post_form(
-            cs::LINK_API_POST_LIKE_ADD,
-            cs::PostLikeAddReq {
-                post_key: post_key.into(),
-            },
-        )
+        self.post_form(cs::LINK_API_POST_LIKE_ADD, cs::PostLikeAddReq { post_id })
     }
 
     pub fn post_like_remove(
         &self,
-        post_key: impl Into<String>,
+        post_id: i64,
     ) -> Builder<TSender, catsquad_shared::PostLikeRes, catsquad_shared::PostLikeRemoveErr> {
         self.post_form(
             cs::LINK_API_POST_LIKE_REMOVE,
-            cs::PostLikeRemoveReq {
-                post_key: post_key.into(),
-            },
+            cs::PostLikeRemoveReq { post_id },
         )
     }
 
     pub fn post_like_get_by_post(
         &self,
-        post_key: impl AsRef<str>,
+        post_id: i64,
     ) -> Builder<TSender, bool, catsquad_shared::PostLikeRemoveErr> {
-        self.get(cs::link_relative_post_like_get_by_post(post_key))
+        self.get(cs::link_relative_post_like_get_by_post(post_id))
     }
 
     pub fn post_update_file_add<F: Into<SchrodingersFile>>(
         &self,
-        post_key: impl AsRef<str>,
+        post_id: i64,
         files: Vec<F>,
     ) -> Builder<TSender, Vec<PostFile>, catsquad_shared::PostUpdateFileAddErr> {
         let body = files
@@ -635,7 +633,7 @@ where
             .collect::<Vec<(String, BodyField)>>();
 
         let params = SenderParams {
-            path: catsquad_shared::link_relative_post_update_file_add(post_key),
+            path: catsquad_shared::link_relative_post_update_file_add(post_id),
             method: Method::Post,
             body: Body::MultipartForm(body),
             ..Default::default()
@@ -646,13 +644,10 @@ where
 
     pub fn post_update_file_remove(
         &self,
-        post_key: impl Into<String>,
-        hash: impl Into<String>,
-    ) -> Builder<TSender, PostFile, catsquad_shared::PostUpdateFileRemoveErr> {
-        let req = catsquad_shared::PostUpdateFileRemoveReq {
-            post_key: post_key.into(),
-            hash: hash.into(),
-        };
+        post_id: i64,
+        hash: i64,
+    ) -> Builder<TSender, (), catsquad_shared::PostUpdateFileRemoveErr> {
+        let req = catsquad_shared::PostUpdateFileRemoveReq { post_id, hash };
         trace!("input req {req:?}");
         let req = req
             .to_form()
@@ -714,11 +709,11 @@ where
 
     pub fn post_update_title(
         &self,
-        post_key: impl Into<String>,
+        post_id: i64,
         new_title: impl Into<String>,
-    ) -> Builder<TSender, catsquad_shared::PostRes, catsquad_shared::PostUpdateTitleErr> {
+    ) -> Builder<TSender, (), catsquad_shared::PostUpdateTitleErr> {
         let req = catsquad_shared::PostUpdateTitleReq {
-            post_key: post_key.into(),
+            post_id,
             new_title: new_title.into(),
         }
         .to_form()
@@ -736,11 +731,11 @@ where
 
     pub fn post_update_description(
         &self,
-        post_key: impl Into<String>,
+        post_id: i64,
         new_description: impl Into<String>,
-    ) -> Builder<TSender, catsquad_shared::PostRes, catsquad_shared::PostUpdateDescriptionErr> {
+    ) -> Builder<TSender, (), catsquad_shared::PostUpdateDescriptionErr> {
         let req = catsquad_shared::PostUpdateDescriptionReq {
-            post_key: post_key.into(),
+            post_id,
             new_description: new_description.into(),
         }
         .to_form()
@@ -758,11 +753,11 @@ where
 
     pub fn post_update_tags(
         &self,
-        post_key: impl Into<String>,
+        post_id: i64,
         new_tags: impl Into<String>,
-    ) -> Builder<TSender, catsquad_shared::PostRes, catsquad_shared::PostUpdateTagsErr> {
+    ) -> Builder<TSender, (), catsquad_shared::PostUpdateTagsErr> {
         let req = catsquad_shared::PostUpdateTagsReq {
-            post_key: post_key.into(),
+            post_id,
             new_tags: new_tags.into(),
         }
         .to_form()
@@ -780,11 +775,11 @@ where
 
     pub fn post_update_state(
         &self,
-        post_key: impl Into<String>,
+        post_id: i64,
         new_state: PostState,
-    ) -> Builder<TSender, catsquad_shared::PostRes, catsquad_shared::PostUpdateStateErr> {
+    ) -> Builder<TSender, (), catsquad_shared::PostUpdateStateErr> {
         let req = catsquad_shared::PostUpdateStateReq {
-            post_key: post_key.into(),
+            post_id,
             new_state: new_state.into(),
         }
         .to_form()
@@ -802,9 +797,9 @@ where
 
     pub fn post_get_by_key(
         &self,
-        post_key: impl AsRef<str>,
+        post_id: i64,
     ) -> Builder<TSender, catsquad_shared::PostRes, catsquad_shared::PostGetByKeyErr> {
-        let link = link_relative_post_get_by_key(post_key);
+        let link = link_relative_post_get_by_key(post_id);
         let params = SenderParams {
             path: link,
             method: Method::Get,
@@ -817,23 +812,23 @@ where
 
     pub fn post_file_get_by_hash(
         &self,
-        post_key: impl AsRef<str>,
-        file_hash: impl AsRef<str>,
+        post_id: i64,
+        file_hash: i64,
     ) -> Builder<TSender, Vec<u8>, cs::PostFileGetByHashErr> {
-        self.get(cs::link_relative_img(post_key, file_hash))
+        self.get(cs::link_relative_img(post_id, file_hash))
     }
 
     pub fn post_search(
         &self,
         tags: impl Into<String>,
         username: impl Into<String>,
-        time: u128,
+        time: u64,
         limit: usize,
         range: TimeRange,
         order: Order,
     ) -> Builder<TSender, Vec<cs::PostRes>, cs::PostSearchErr> {
         self.get(link_relative_post_search(cs::PostSearchParams {
-            time: Some(time.to_string()),
+            time: Some(time),
             range: Some(range),
             order: Some(order),
             limit: Some(limit),
@@ -850,21 +845,21 @@ where
 
     pub fn email_change_resend(
         &self,
-        email_change_key: impl Into<String>,
+        email_change_id: i64,
     ) -> Builder<TSender, catsquad_shared::EmailChangeRes, catsquad_shared::EmailChangeResendErr>
     {
         self.post_form(
             cs::LINK_API_EMAIL_CHANGE_RESEND,
             catsquad_shared::EmailChangeResendReq {
-                email_change_key: email_change_key.into(),
+                email_change_id: email_change_id.into(),
             },
         )
     }
 
     pub fn email_change_update_current_confirm(
         &self,
-        email_change_key: impl Into<String>,
-        token: impl Into<String>,
+        email_change_id: i64,
+        token: Uuid,
     ) -> Builder<
         TSender,
         catsquad_shared::EmailChangeRes,
@@ -873,7 +868,7 @@ where
         self.post_form(
             cs::LINK_API_EMAIL_CHANGE_UPDATE_CURRENT_CONFIRM,
             catsquad_shared::EmailChangeUpdateCurrentConfirmReq {
-                email_change_key: email_change_key.into(),
+                email_change_id: email_change_id.into(),
                 token: token.into(),
             },
         )
@@ -881,7 +876,7 @@ where
 
     pub fn email_change_update_new_add(
         &self,
-        email_change_key: impl Into<String>,
+        email_change_id: i64,
         new_email: impl Into<String>,
     ) -> Builder<
         TSender,
@@ -891,7 +886,7 @@ where
         self.post_form(
             cs::LINK_API_EMAIL_CHANGE_UPDATE_NEW_ADD,
             catsquad_shared::EmailChangeUpdateNewAddReq {
-                email_change_key: email_change_key.into(),
+                email_change_id,
                 new_email: new_email.into(),
             },
         )
@@ -899,17 +894,13 @@ where
 
     pub fn email_change_update_new_confirm(
         &self,
-        email_change_key: impl Into<String>,
-        token: impl Into<String>,
-    ) -> Builder<
-        TSender,
-        catsquad_shared::EmailChangeRes,
-        catsquad_shared::EmailChangeUpdateNewConfirmErr,
-    > {
+        email_change_id: i64,
+        token: Uuid,
+    ) -> Builder<TSender, (), catsquad_shared::EmailChangeUpdateNewConfirmErr> {
         self.post_form(
             cs::LINK_API_EMAIL_CHANGE_UPDATE_NEW_CONFIRM,
             catsquad_shared::EmailChangeUpdateNewConfirmReq {
-                email_change_key: email_change_key.into(),
+                email_change_id,
                 token: token.into(),
             },
         )
@@ -984,13 +975,13 @@ where
 
     pub fn comment_update_text(
         &self,
-        comment_key: impl Into<String>,
+        comment_id: i64,
         text: impl Into<String>,
     ) -> Builder<TSender, cs::CommentRes, cs::CommentUpdateTextErr> {
         self.post_form(
             cs::LINK_API_COMMENT_UPDATE_TEXT,
             cs::CommentUpdateTextReq {
-                comment_key: comment_key.into(),
+                comment_id,
                 text: text.into(),
             },
         )

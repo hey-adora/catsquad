@@ -3,8 +3,8 @@
 // pub const LINK_API_POST_UPDATE_FILE_ADD: &str = "/api/post_update_file_add";
 pub const LINK_API_POST_UPDATE_FILE_ADD: &str = "/api/post/{post_key}";
 
-pub fn link_relative_post_update_file_add(post_key: impl AsRef<str>) -> String {
-    format!("/api/post/{}", post_key.as_ref())
+pub fn link_relative_post_update_file_add(post_id: i64) -> String {
+    format!("/api/post/{}", post_id)
 }
 
 #[derive(
@@ -77,8 +77,8 @@ pub enum PostUpdateFileAddErr {
     #[error("file {file_name} is too big, max file size {max}, stopped upload at: {got}")]
     FileTooBig {
         file_name: String,
-        max: u64,
-        got: u64,
+        max: u32,
+        got: u32,
     },
 
     #[error("post not found")]
@@ -102,9 +102,9 @@ pub struct PostUpdateFileAddReq {}
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
 pub struct PostUpdateFileAddParams {
-    pub post_key: String,
+    pub post_id: i64,
 }
-pub const POST_UPDATE_FILE_ADD_PARAMS_FIELD_POST_KEY: &'static str = "post_key";
+pub const POST_UPDATE_FILE_ADD_PARAMS_FIELD_POST_ID: &'static str = "post_id";
 
 // #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
 // pub struct PostUpdateFileAddReq {

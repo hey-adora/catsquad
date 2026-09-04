@@ -4,7 +4,7 @@ use axum::{
     http::StatusCode,
     response::IntoResponse,
 };
-use catsquad_db::{DbPostLikeGetByPostErr, DbUser};
+use catsquad_db::{DbPostLikeExistsByPostErr, DbUser};
 use catsquad_shared::{PostLikeGetByPostErr, PostLikeGetByPostParams};
 
 use crate::{api::post_like_add::from_db_post_like, state::AppState};
@@ -21,20 +21,22 @@ pub async fn post_like_get_by_post(
     State(app): State<AppState>,
     Path(req): Path<PostLikeGetByPostParams>,
 ) -> impl IntoResponse {
-    let time = app.get_time_ns().await;
+    let time = app.get_time_micro();
     let inner = async || -> Result<bool, PostLikeGetByPostErr> {
-        let post_key = req.post_key;
-        let user_id = db_user.id.clone();
+        let post_id = req.post_id;
+        let user_username = db_user.username.clone();
 
         let post_like = app
             .db
-            .post_like_exists_by_post(time, user_id, post_key)
+            .post_like_exists_by_post(user_username, post_id)
             .await;
 
         let result = match post_like {
             Ok(_) => true,
-            Err(DbPostLikeGetByPostErr::NotFound) => false,
-            Err(DbPostLikeGetByPostErr::Db(_)) => return Err(PostLikeGetByPostErr::InternalServer),
+            Err(DbPostLikeExistsByPostErr::NotFound) => false,
+            Err(DbPostLikeExistsByPostErr::Db(_)) => {
+                return Err(PostLikeGetByPostErr::InternalServer);
+            }
         };
 
         Ok(result)
@@ -48,19 +50,22 @@ pub async fn post_like_get_by_post(
 #[cfg(test)]
 mod test_utils {
     use axum::http::header;
-    use catsquad_shared as cs;
+    use catsquad_shared::{self as cs, Uuid, uuid_to_str};
 
     use crate::{TestServer, auth::create_auth_cookie_str};
 
     impl TestServer {
         pub async fn post_like_get_by_post(
             &self,
-            post_key: impl Into<String>,
-            session_key: impl Into<String>,
+            post_id: i64,
+            session_token: Uuid,
         ) -> Result<bool, cs::PostLikeRemoveErr> {
             self.client
-                .post_like_get_by_post(post_key.into())
-                .header_add(header::COOKIE, create_auth_cookie_str(session_key.into()))
+                .post_like_get_by_post(post_id)
+                .header_add(
+                    header::COOKIE,
+                    create_auth_cookie_str(uuid_to_str(session_token)),
+                )
                 .send()
                 .await
                 .into_json()
@@ -84,36 +89,33 @@ async fn test_post_like_get_by_post() {
         .await;
 
     let post1 = server
-        .post_add("title1", "description1", "tags1", &session_key1)
+        .post_add("title1", "description1", "tags1", session_key1)
         .await
         .unwrap();
 
     let liked = server
-        .post_like_get_by_post(post1.key.clone(), session_key1.clone())
+        .post_like_get_by_post(post1.id, session_key1.clone())
         .await
         .unwrap();
 
     assert!(!liked);
 
     server
-        .post_update_state(&post1.key, cs::PostState::Active, &session_key1)
+        .post_update_state(post1.id, cs::PostState::Active, session_key1)
         .await
         .unwrap();
 
     let liked = server
-        .post_like_get_by_post(post1.key.clone(), session_key1.clone())
+        .post_like_get_by_post(post1.id, session_key1.clone())
         .await
         .unwrap();
 
     assert!(!liked);
 
-    server
-        .post_like_add(&post1.key, &session_key2)
-        .await
-        .unwrap();
+    server.post_like_add(post1.id, session_key2).await.unwrap();
 
     let liked = server
-        .post_like_get_by_post(&post1.key, &session_key2)
+        .post_like_get_by_post(post1.id, session_key2)
         .await
         .unwrap();
 

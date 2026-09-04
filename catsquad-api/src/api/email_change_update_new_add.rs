@@ -1,12 +1,11 @@
-use std::fmt::Display;
-
 use axum::{Extension, Form, Json, extract::State, http::StatusCode, response::IntoResponse};
-use catsquad_db::{DbEmailChangeUpdateNewAddErr, DbEmailSentReason, DbUser, id_to_string};
+use catsquad_db::{DbEmailChangeUpdateNewAddErr, DbEmailSentReason, DbUser};
 use catsquad_log::prelude::*;
 use catsquad_shared::{
-    EmailChangeRes, EmailChangeUpdateNewAddErr, EmailChangeUpdateNewAddReq,
-    link_absolute_settings_email_change_new_confirm, validate_email,
+    EmailChangeRes, EmailChangeUpdateNewAddErr, EmailChangeUpdateNewAddReq, Uuid,
+    link_absolute_settings_email_change_new_confirm, uuid_to_str, validate_email,
 };
+use std::fmt::Display;
 use url::Url;
 
 use crate::{api::email_change_add::from_db_email_change, state::AppState};
@@ -46,11 +45,13 @@ fn status_code(result: &Result<EmailChangeRes, EmailChangeUpdateNewAddErr>) -> S
 pub fn send_email_email_change_update_new_add(
     address: Url,
     email_change_key: impl Display,
-    token: impl Display,
+    token: Uuid,
 ) -> String {
-    let link = link_absolute_settings_email_change_new_confirm(address, email_change_key, token)
-        .unwrap()
-        .to_string();
+    let token_str = uuid_to_str(token);
+    let link =
+        link_absolute_settings_email_change_new_confirm(address, email_change_key, token_str)
+            .unwrap()
+            .to_string();
     // let link = "placeholder change".to_string();
     // debug!("EMAIL SENT {link}");
     link
@@ -61,26 +62,34 @@ pub async fn email_change_update_new_add(
     State(app): State<AppState>,
     Form(req): Form<EmailChangeUpdateNewAddReq>,
 ) -> impl IntoResponse {
-    let time = app.get_time_ns().await;
+    let time = app.get_time_micro();
     let inner = async || -> Result<EmailChangeRes, EmailChangeUpdateNewAddErr> {
-        let user_id = db_user.id.clone();
+        let user_username = db_user.username.clone();
         let user_email = db_user.email.clone();
-        let email_change_key = req.email_change_key;
+        let email_change_id = req.email_change_id;
 
         let new_email = req.new_email.trim().to_lowercase();
         validate_email(&new_email)
             .map_err(|err| EmailChangeUpdateNewAddErr::EmailIsInvalid(err))?;
 
-        let email_change = app
-            .db
-            .email_change_update_new_add(time, user_id, email_change_key, new_email)
+        app.db
+            .email_change_update_new_add(time, user_username.clone(), email_change_id, new_email)
             .await
             .map_err(from_db_email_change_update_new_add_err)?;
-        let token = email_change.new.as_ref().map(|v| v.token.clone()).unwrap();
-        let key = id_to_string(email_change.id.clone());
+
+        // TODO add better error and maybe combine queries
+        let email_change = app
+            .db
+            .email_change_get_by_key(time, user_username, email_change_id)
+            .await
+            .map_err(|_| EmailChangeUpdateNewAddErr::InternalServer)?;
+        let new_token = email_change.new_token;
+        // let email_change
+        // let key = id_to_string(email_change.id.clone());
 
         let address = app.get_address().await;
-        let email_body = send_email_email_change_update_new_add(address, key, token);
+        let email_body =
+            send_email_email_change_update_new_add(address, email_change.id, new_token);
         let _ = app
             .db
             .email_sent_add(
@@ -104,18 +113,21 @@ pub async fn email_change_update_new_add(
 mod test_utils {
     use crate::{TestServer, auth::create_auth_cookie_str};
     use axum::http::header;
-    use catsquad_shared as cs;
+    use catsquad_shared::{self as cs, Uuid, uuid_to_str};
 
     impl TestServer {
         pub async fn email_change_update_new_add(
             &self,
-            email_change_key: impl Into<String>,
+            email_change_id: i64,
             new_email: impl Into<String>,
-            session_key: impl Into<String>,
+            session_token: Uuid,
         ) -> Result<cs::EmailChangeRes, cs::EmailChangeUpdateNewAddErr> {
             self.client
-                .email_change_update_new_add(email_change_key, new_email)
-                .header_add(header::COOKIE, create_auth_cookie_str(session_key.into()))
+                .email_change_update_new_add(email_change_id, new_email)
+                .header_add(
+                    header::COOKIE,
+                    create_auth_cookie_str(uuid_to_str(session_token)),
+                )
                 .send()
                 .await
                 .into_json()
@@ -142,37 +154,19 @@ async fn test_email_change_update_new_add() {
         .await;
     server.state.set_email_change_expiration(10).await;
 
-    let email_change = server
-        .client
-        .email_change_add()
-        .header_add(header::COOKIE, create_auth_cookie_str(session_key.clone()))
-        .send()
-        .await
-        .into_json()
-        .await
-        .unwrap();
+    let email_change = server.email_change_add(session_key).await.unwrap();
 
     let current_token = server
-        .email_change_get_current_token(0, &user1, email_change.key.clone())
+        .email_change_get_current_token(0, &user1, email_change.id)
         .await;
 
-    let add_new = async |key: String, email: &str, session: String| {
+    let add_new = async |key: i64, email: &str, session: Uuid| {
         server
-            .client
-            .email_change_update_new_add(key, email)
-            .header_add(header::COOKIE, create_auth_cookie_str(session))
-            .send()
-            .await
-            .into_json()
+            .email_change_update_new_add(key, email, session)
             .await
     };
 
-    let result = add_new(
-        email_change.key.to_string(),
-        "hey2@heyadora.com",
-        session_key.clone(),
-    )
-    .await;
+    let result = add_new(email_change.id, "hey2@heyadora.com", session_key).await;
 
     assert!(matches!(
         result,
@@ -180,75 +174,41 @@ async fn test_email_change_update_new_add() {
     ));
 
     let email_change = server
-        .client
-        .email_change_update_current_confirm(email_change.key.clone(), current_token.clone())
-        .header_add(header::COOKIE, create_auth_cookie_str(session_key.clone()))
-        .send()
-        .await
-        .into_json()
+        .email_change_update_current_confirm(email_change.id, current_token, session_key)
         .await
         .unwrap();
 
-    let result = add_new(
-        "invalid".to_string(),
-        "hey2@heyadora.com",
-        session_key.clone(),
-    )
-    .await;
+    let result = add_new(0, "hey2@heyadora.com", session_key).await;
     assert!(matches!(result, Err(EmailChangeUpdateNewAddErr::NotFound)));
 
-    let result = add_new(
-        "invalid".to_string(),
-        "hey2@heyadora.com",
-        "invalid".to_string(),
-    )
-    .await;
+    let result = add_new(0, "hey2@heyadora.com", 0_u128.to_be_bytes()).await;
     assert!(matches!(
         result,
         Err(EmailChangeUpdateNewAddErr::Unauthorized(_))
     ));
 
-    server.state.set_time(11).await;
-    let result = add_new(
-        email_change.key.clone(),
-        "hey2@heyadora.com",
-        session_key.clone(),
-    )
-    .await;
+    server.state.set_time(11);
+    let result = add_new(email_change.id, "hey2@heyadora.com", session_key.clone()).await;
     assert!(matches!(result, Err(EmailChangeUpdateNewAddErr::Expired)));
-    server.state.set_time(0).await;
+    server.state.set_time(0);
 
-    let result = add_new(
-        email_change.key.clone(),
-        "hey5@heyadora.com",
-        session_key.clone(),
-    )
-    .await;
+    let result = add_new(email_change.id, "hey5@heyadora.com", session_key.clone()).await;
     assert!(matches!(
         result,
         Err(EmailChangeUpdateNewAddErr::EmailIsTaken(_))
     ));
 
-    let result = add_new(email_change.key.clone(), "hey2", session_key.clone()).await;
+    let result = add_new(email_change.id, "hey2", session_key.clone()).await;
     assert!(matches!(
         result,
         Err(EmailChangeUpdateNewAddErr::EmailIsInvalid(_))
     ));
 
-    let result = add_new(
-        email_change.key.clone(),
-        "hey2@heyadora.com",
-        session_key.clone(),
-    )
-    .await
-    .unwrap();
+    let result = add_new(email_change.id, "hey2@heyadora.com", session_key.clone())
+        .await
+        .unwrap();
 
-    let result = add_new(
-        email_change.key.clone(),
-        "hey2@heyadora.com",
-        session_key.clone(),
-    )
-    .await;
+    let result = add_new(email_change.id, "hey2@heyadora.com", session_key.clone()).await;
 
     assert!(matches!(
         result,

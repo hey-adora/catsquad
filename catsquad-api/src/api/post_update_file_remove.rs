@@ -1,13 +1,9 @@
+use crate::{api::post_add::from_db_post, state::AppState};
 use axum::{Extension, Form, Json, extract::State, http::StatusCode, response::IntoResponse};
 use catsquad_db::{DbPostUpdateFileRemoveErr, DbUser};
 use catsquad_log::prelude::*;
 use catsquad_shared::{
     PostFile, PostRes, PostState, PostUpdateFileRemoveErr, PostUpdateFileRemoveReq,
-};
-
-use crate::{
-    api::post_add::{from_db_post, from_db_post_file},
-    state::AppState,
 };
 
 fn from_db_post_update_file_remove_err(
@@ -20,10 +16,11 @@ fn from_db_post_update_file_remove_err(
         }
         DbPostUpdateFileRemoveErr::FileNotFound => PostUpdateFileRemoveErr::FileNotFound,
         DbPostUpdateFileRemoveErr::Db(_) => PostUpdateFileRemoveErr::InternalServer,
+        DbPostUpdateFileRemoveErr::InternalError(_) => PostUpdateFileRemoveErr::InternalServer,
     }
 }
 
-fn status_code(result: &Result<PostFile, PostUpdateFileRemoveErr>) -> StatusCode {
+fn status_code(result: &Result<(), PostUpdateFileRemoveErr>) -> StatusCode {
     match result {
         Ok(_) => StatusCode::OK,
         Err(PostUpdateFileRemoveErr::PostNotFound) => StatusCode::NOT_FOUND,
@@ -38,18 +35,20 @@ pub async fn post_update_file_remove(
     State(app): State<AppState>,
     Form(req): Form<PostUpdateFileRemoveReq>,
 ) -> impl IntoResponse {
-    let time = app.get_time_ns().await;
+    let time = app.get_time_micro();
 
-    let inner = async || -> Result<PostFile, PostUpdateFileRemoveErr> {
-        let user_id = db_user.id.clone();
-        let post_key = req.post_key;
+    let inner = async || -> Result<(), PostUpdateFileRemoveErr> {
+        let user_username = db_user.username.clone();
+        let post_id = req.post_id;
         let hash = req.hash;
 
-        let post_file = app
+        let img_used_count = app
             .db
-            .post_update_file_remove(time, user_id.clone(), post_key.clone(), hash)
+            .post_update_file_remove(time, user_username, post_id, hash)
             .await
             .map_err(from_db_post_update_file_remove_err)?;
+
+        // TODO remove file on used count zero // do it in commit somehow
 
         // let mut post = None;
         // for file_hash in hashes {
@@ -62,7 +61,7 @@ pub async fn post_update_file_remove(
         // }
         // let post = post.ok_or_else(|| PostUpdateFileRemoveErr::InternalServer)?;
 
-        Ok(from_db_post_file(post_file))
+        Ok(())
         // Ok(from_db_post(post))
     };
 
@@ -70,6 +69,43 @@ pub async fn post_update_file_remove(
     let status_code = status_code(&result);
 
     (status_code, Json(result))
+}
+
+#[cfg(test)]
+mod test_utils {
+    use crate::{TestServer, auth::create_auth_cookie_str};
+    use axum::http::header;
+    use catsquad_shared::{self as cs, PostFile, PostState, Uuid, uuid_to_str};
+
+    impl TestServer {
+        pub async fn post_update_file_remove(
+            &self,
+            post_id: i64,
+            file_hash: i64,
+            session_token: Uuid,
+        ) -> Result<(), cs::PostUpdateFileRemoveErr> {
+            self.client
+                .post_update_file_remove(post_id, file_hash)
+                .header_add(
+                    header::COOKIE,
+                    create_auth_cookie_str(uuid_to_str(session_token)),
+                )
+                .send()
+                .await
+                .into_json()
+                .await
+            // self.client
+            //     .post_update_tags(post_id, new_tags)
+            //     .header_add(
+            //         header::COOKIE,
+            //         create_auth_cookie_str(uuid_to_str(session_token)),
+            //     )
+            //     .send()
+            //     .await
+            //     .into_json()
+            //     .await
+        }
+    }
 }
 
 #[cfg(test)]
@@ -91,50 +127,35 @@ async fn test_post_update_file_remove() {
         .await;
 
     let post1 = server
-        .client
-        .post_add("title", "description1", "tags1")
-        .header_add(header::COOKIE, create_auth_cookie_str(session_key1.clone()))
-        .send()
-        .await
-        .into_json()
+        .post_add("title", "description1", "tags1", session_key1)
         .await
         .unwrap();
 
     let _result = server
-        .client
-        .post_update_file_add(post1.key.clone(), vec!["../assets/favicon.ico".to_string()])
-        .header_add(header::COOKIE, create_auth_cookie_str(session_key1.clone()))
-        .send()
-        .await
-        .into_json()
+        .post_update_file_add(post1.id, &["../assets/favicon.ico"], session_key1)
         .await
         .unwrap();
 
     server
-        .post_update_state(post1.key.clone(), PostState::Active, &session_key1)
+        .post_update_state(post1.id, PostState::Active, session_key1)
         .await
         .unwrap();
 
     let result = server
-        .post_get_by_key(post1.key.clone(), &session_key1)
+        .post_get_by_key(post1.id, session_key1)
         .await
         .unwrap();
 
     assert_eq!(result.file.len(), 1);
-    let file1_hash = result.file[0].hash.clone();
+    let file1_hash = result.file[0];
 
-    let _result = server
-        .client
-        .post_update_file_remove(post1.key.clone(), file1_hash)
-        .header_add(header::COOKIE, create_auth_cookie_str(session_key1.clone()))
-        .send()
-        .await
-        .into_json()
+    server
+        .post_update_file_remove(post1.id, file1_hash, session_key1)
         .await
         .unwrap();
 
     let result = server
-        .post_get_by_key(post1.key.clone(), &session_key1)
+        .post_get_by_key(post1.id, session_key1)
         .await
         .unwrap();
 

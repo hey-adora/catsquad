@@ -4,7 +4,7 @@ pub const LINK_API_POST_LIKE_REMOVE: &str = "/api/post_like_remove";
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
 pub struct PostLikeRemoveReq {
-    pub post_key: String,
+    pub post_id: i64,
 }
 
 #[derive(

@@ -12,7 +12,7 @@ pub fn from_db_comment(value: DbComment) -> CommentRes {
         id: value.id,
         user_username: value.user_username,
         post_id: value.post_id,
-        parent_id: value.p3arents,
+        parent_id: value.parents,
         replies_count: value.replies_count,
         text: value.text,
         modified_at: value.modified_at,
@@ -49,7 +49,7 @@ pub async fn comment_add(
     let time = app.get_time_micro();
     let inner = async || -> Result<CommentRes, CommentAddErr> {
         let post_id = req.post_id;
-        let comment_id = if req.comment_id.is_empty() {
+        let comment_id = if req.comment_id == 0 {
             None
         } else {
             Some(req.comment_id)
@@ -76,21 +76,24 @@ pub async fn comment_add(
 #[cfg(test)]
 mod test_utils {
     use axum::http::header;
-    use catsquad_shared as cs;
+    use catsquad_shared::{self as cs, Uuid, uuid_to_str};
 
     use crate::{TestServer, auth::create_auth_cookie_str};
 
     impl TestServer {
         pub async fn comment_add(
             &self,
-            post_key: impl Into<String>,
-            comment_parent_key: impl Into<String>,
+            post_id: i64,
+            comment_parent_id: i64,
             text: impl Into<String>,
-            session_key: impl Into<String>,
+            session_token: Uuid,
         ) -> Result<cs::CommentRes, cs::CommentAddErr> {
             self.client
-                .comment_add(post_key, comment_parent_key, text)
-                .header_add(header::COOKIE, create_auth_cookie_str(session_key.into()))
+                .comment_add(post_id, comment_parent_id, text)
+                .header_add(
+                    header::COOKIE,
+                    create_auth_cookie_str(uuid_to_str(session_token)),
+                )
                 .send()
                 .await
                 .into_json()
@@ -115,23 +118,21 @@ async fn test_comment_add() {
         .await;
 
     let post1 = server
-        .post_add("title1", "description1", "tags1", &session_key)
+        .post_add("title1", "description1", "tags1", session_key)
         .await
         .unwrap();
 
     let comment1 = server
-        .comment_add(post1.key.clone(), String::new(), "text", &session_key)
+        .comment_add(post1.id, 0, "text", session_key)
         .await
         .unwrap();
 
-    let result = server
-        .comment_add(post1.key.clone(), String::new(), "", &session_key)
-        .await;
+    let result = server.comment_add(post1.id, 0, "", session_key).await;
     assert!(matches!(result, Err(CommentAddErr::InvalidText(_))));
 
     let text_invalid = rng_str(MAX_POST_COMMENT_LENGTH + 1);
     let result = server
-        .comment_add(post1.key.clone(), String::new(), text_invalid, &session_key)
+        .comment_add(post1.id, 0, text_invalid, session_key)
         .await;
     assert!(matches!(result, Err(CommentAddErr::InvalidText(_))));
 }

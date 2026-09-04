@@ -9,16 +9,18 @@ pub const LINK_API_POST_ADD: &str = "/api/post";
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
 pub struct PostRes {
-    pub key: String,
-    pub user: RedactedUserRes,
+    pub id: i64,
+    // pub user: RedactedUserRes,
+    pub user_username: String,
     pub state: PostState,
     pub title: String,
     pub description: String,
     pub tags: String,
-    pub favorites: u64,
-    pub file: Vec<PostFile>,
-    pub modified_at: u128,
-    pub created_at: u128,
+    pub favorites: u32,
+    // pub file: Vec<PostFile>,
+    pub file: Vec<i64>,
+    pub modified_at: u64,
+    pub created_at: u64,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -91,9 +93,9 @@ impl Display for PostState {
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
 pub struct PostFile {
     pub extension: String,
-    pub hash: String,
+    pub hash: i64,
     pub proccesed: bool,
-    pub size_bytes: u64,
+    pub size_bytes: u32,
     pub width: u32,
     pub height: u32,
 }

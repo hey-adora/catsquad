@@ -192,7 +192,7 @@ mod test_utils {
             user: impl Into<String>,
             email: impl Into<String>,
             password: impl Into<String>,
-        ) -> (DbUser, String) {
+        ) -> (DbUser, Uuid) {
             let username = user.into();
             let email = email.into();
             let password = password.into();
@@ -222,13 +222,14 @@ mod test_utils {
                 .send()
                 .await;
             let headers = res.get_headers().unwrap();
-            let session_key = auth_token_get(&headers, header::SET_COOKIE).unwrap();
+            let session_token = auth_token_get(&headers, header::SET_COOKIE).unwrap();
+            let session_token = str_to_uuid(session_token);
             let _res = res.into_json().await.unwrap();
 
             // let session_key = res.get_auth_token().unwrap();
             // let res = res.into_res().await;
             let user = self.state.db.user_get_by_email(email).await.unwrap();
-            (user, session_key)
+            (user, session_token)
         }
     }
 }

@@ -1,5 +1,5 @@
 use axum::{Extension, Form, Json, extract::State, http::StatusCode, response::IntoResponse};
-use catsquad_db::{DbPost, DbPostAddErr, DbPostFile, DbUser, id_to_string};
+use catsquad_db::{DbPost, DbPostAddErr, DbUser};
 use catsquad_log::prelude::*;
 use catsquad_shared::{
     PostAddErr, PostAddReq, PostFile, PostRes, PostState, validate_post_description,
@@ -13,29 +13,29 @@ use crate::{
 
 pub fn from_db_post(value: DbPost) -> PostRes {
     PostRes {
-        key: id_to_string(value.id),
-        user: from_db_user_redacted(value.user),
+        id: value.id,
+        user_username: value.user_username,
         state: PostState::from(value.state),
         title: value.title,
         tags: value.tags,
         favorites: value.likes_count,
         description: value.description,
-        file: value.file.into_iter().map(from_db_post_file).collect(),
+        file: value.images_hashes,
         modified_at: value.modified_at,
         created_at: value.created_at,
     }
 }
 
-pub fn from_db_post_file(value: DbPostFile) -> PostFile {
-    PostFile {
-        extension: value.extension,
-        hash: value.hash,
-        proccesed: value.proccesed,
-        size_bytes: value.size_bytes,
-        width: value.width,
-        height: value.height,
-    }
-}
+// pub fn from_db_post_file(value: DbPostFile) -> PostFile {
+//     PostFile {
+//         extension: value.extension,
+//         hash: value.hash,
+//         proccesed: value.proccesed,
+//         size_bytes: value.size_bytes,
+//         width: value.width,
+//         height: value.height,
+//     }
+// }
 
 fn from_db_post_add_err(value: DbPostAddErr) -> PostAddErr {
     match value {
@@ -62,12 +62,12 @@ pub async fn post_add(
     State(app): State<AppState>,
     Form(req): Form<PostAddReq>,
 ) -> impl IntoResponse {
-    let time = app.get_time_ns().await;
+    let time = app.get_time_micro();
     let inner = async || -> Result<PostRes, PostAddErr> {
         let title = req.title.trim();
         let description = req.description.trim();
         let tags = req.tags.trim();
-        let user_id = db_user.id.clone();
+        let user_username = db_user.username.clone();
 
         validate_post_title(title).map_err(|err| PostAddErr::InvalidTitle(err))?;
         validate_post_tags(tags).map_err(|err| PostAddErr::InvalidTags(err))?;
@@ -76,7 +76,7 @@ pub async fn post_add(
 
         let post = app
             .db
-            .post_add(time, user_id, title, description, tags)
+            .post_add(time, user_username, title, description, tags)
             .await
             .map_err(from_db_post_add_err)?;
 
@@ -91,7 +91,7 @@ pub async fn post_add(
 #[cfg(test)]
 mod test_utils {
     use axum::http::header;
-    use catsquad_shared as cs;
+    use catsquad_shared::{self as cs, Uuid, uuid_to_str};
 
     use crate::{TestServer, auth::create_auth_cookie_str};
 
@@ -101,11 +101,14 @@ mod test_utils {
             title: impl Into<String>,
             description: impl Into<String>,
             tags: impl Into<String>,
-            session_key: impl Into<String>,
+            session_token: Uuid,
         ) -> Result<cs::PostRes, cs::PostAddErr> {
             self.client
                 .post_add(title, description, tags)
-                .header_add(header::COOKIE, create_auth_cookie_str(session_key.into()))
+                .header_add(
+                    header::COOKIE,
+                    create_auth_cookie_str(uuid_to_str(session_token)),
+                )
                 .send()
                 .await
                 .into_json()
@@ -123,33 +126,33 @@ async fn test_post_add() {
     let password = "1nnerogGeron@@$";
     let (user, session_key) = server.user_add_full("hey", email, password).await;
 
-    server.state.set_time(1).await;
+    server.state.set_time(1);
 
     let post1 = server
-        .post_add("title1", "description1", "tags1", &session_key)
+        .post_add("title1", "description1", "tags1", session_key)
         .await
         .unwrap();
 
     assert_eq!(post1.created_at, 1);
 
     let post1 = server
-        .post_update_state(post1.key.clone(), PostState::Active, &session_key)
+        .post_update_state(post1.id, PostState::Active, session_key)
         .await
         .unwrap();
 
     assert_eq!(post1.created_at, 1);
 
-    server.state.set_time(2).await;
+    server.state.set_time(2);
 
     let post2 = server
-        .post_add("title2", "description2", "tags2", &session_key)
+        .post_add("title2", "description2", "tags2", session_key)
         .await
         .unwrap();
 
     assert_eq!(post2.created_at, 2);
 
     let post2 = server
-        .post_update_state(post2.key.clone(), PostState::Active, &session_key)
+        .post_update_state(post2.id, PostState::Active, session_key)
         .await
         .unwrap();
 

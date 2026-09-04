@@ -201,27 +201,27 @@ async fn test_email_change_state() {
 
     let email_change_res = email_change.current_add().await.unwrap();
     let current_token = server
-        .email_change_get_current_token(0, &user1, email_change_res.key.clone())
+        .email_change_get_current_token(0, &user1, email_change_res.id.clone())
         .await;
     assert!(email_change.err_general.get_untracked().is_empty());
 
     {
         let result = email_change
-            .current_confirm(email_change_res.key.clone(), "invalid")
+            .current_confirm(email_change_res.id.clone(), "invalid")
             .await;
         assert!(!email_change.err_general.get_untracked().is_empty());
         assert!(result.is_none());
     }
 
     let email_change_res = email_change
-        .current_confirm(email_change_res.key.clone(), current_token.clone())
+        .current_confirm(email_change_res.id.clone(), current_token.clone())
         .await
         .unwrap();
     assert!(email_change.err_general.get_untracked().is_empty());
 
     {
         let result = email_change
-            .current_confirm(email_change_res.key.clone(), current_token)
+            .current_confirm(email_change_res.id.clone(), current_token)
             .await;
         assert!(!email_change.err_general.get_untracked().is_empty());
         assert!(result.is_none());
@@ -229,24 +229,24 @@ async fn test_email_change_state() {
 
     {
         let result = email_change
-            .new_add(email_change_res.key.clone(), "prime2")
+            .new_add(email_change_res.id.clone(), "prime2")
             .await;
         assert!(!email_change.err_general.get_untracked().is_empty());
         assert!(result.is_none());
     }
 
     let email_change_res = email_change
-        .new_add(email_change_res.key.clone(), "prime2@heyadora.com")
+        .new_add(email_change_res.id.clone(), "prime2@heyadora.com")
         .await
         .unwrap();
 
     let new_token = server
-        .email_change_get_new_token(0, &user1, email_change_res.key.clone())
+        .email_change_get_new_token(0, &user1, email_change_res.id.clone())
         .await;
 
     {
         let result = email_change
-            .new_confirm(email_change_res.key.clone(), "invalid")
+            .new_confirm(email_change_res.id.clone(), "invalid")
             .await;
 
         assert!(!email_change.err_general.get_untracked().is_empty());
@@ -254,12 +254,12 @@ async fn test_email_change_state() {
     }
 
     let result = email_change
-        .new_confirm(email_change_res.key.clone(), new_token)
+        .new_confirm(email_change_res.id.clone(), new_token)
         .await
         .unwrap();
 
     let email_change_res = email_change
-        .finish(email_change_res.key.clone())
+        .finish(email_change_res.id.clone())
         .await
         .unwrap();
 

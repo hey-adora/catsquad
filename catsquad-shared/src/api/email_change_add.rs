@@ -2,13 +2,13 @@ pub const LINK_API_EMAIL_CHANGE_ADD: &str = "/api/email_change_update_current_ad
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct EmailChangeRes {
-    pub key: String,
+    pub id: i64,
     pub current: EmailChangeToken,
     pub new: Option<EmailChangeToken>,
     pub completed: bool,
-    pub expires: u128,
-    pub modified_at: u128,
-    pub created_at: u128,
+    pub expires: u64,
+    pub modified_at: u64,
+    pub created_at: u64,
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]

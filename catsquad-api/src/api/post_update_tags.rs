@@ -1,22 +1,21 @@
 use axum::{Extension, Form, Json, extract::State, http::StatusCode, response::IntoResponse};
-use catsquad_db::{DbPostUpdateTagsErr, DbUser};
+use catsquad_db::{DbPostUpdateBuilderTextErr, DbUser};
 use catsquad_log::prelude::*;
 use catsquad_shared::{PostRes, PostUpdateTagsErr, PostUpdateTagsReq, validate_post_tags};
 
 use crate::{api::post_add::from_db_post, state::AppState};
 
-fn from_db_post_update_tags_err(value: DbPostUpdateTagsErr) -> PostUpdateTagsErr {
+fn from_db_post_update_tags_err(value: DbPostUpdateBuilderTextErr) -> PostUpdateTagsErr {
     match value {
-        DbPostUpdateTagsErr::PostNotFound => PostUpdateTagsErr::PostNotFound,
-        DbPostUpdateTagsErr::Unauthorized => {
+        DbPostUpdateBuilderTextErr::PostNotFound => PostUpdateTagsErr::PostNotFound,
+        DbPostUpdateBuilderTextErr::Unauthorized => {
             PostUpdateTagsErr::Unauthorized("unauthorized".to_string())
         }
-        DbPostUpdateTagsErr::UserNotFound => PostUpdateTagsErr::InternalServer,
-        DbPostUpdateTagsErr::Db(_) => PostUpdateTagsErr::InternalServer,
+        DbPostUpdateBuilderTextErr::Db(_) => PostUpdateTagsErr::InternalServer,
     }
 }
 
-fn status_code(result: &Result<PostRes, PostUpdateTagsErr>) -> StatusCode {
+fn status_code(result: &Result<(), PostUpdateTagsErr>) -> StatusCode {
     match result {
         Ok(_) => StatusCode::OK,
         Err(PostUpdateTagsErr::PostNotFound) => StatusCode::NOT_FOUND,
@@ -31,28 +30,54 @@ pub async fn post_update_tags(
     State(app): State<AppState>,
     Form(req): Form<PostUpdateTagsReq>,
 ) -> impl IntoResponse {
-    let time = app.get_time_ns().await;
+    let time = app.get_time_micro();
 
-    let inner = async || -> Result<PostRes, PostUpdateTagsErr> {
-        let user_id = db_user.id.clone();
-        let post_key = req.post_key;
+    let inner = async || -> Result<(), PostUpdateTagsErr> {
+        let user_username = db_user.username.clone();
+        let post_id = req.post_id;
         let new_tags = req.new_tags;
 
         validate_post_tags(&new_tags).map_err(|err| PostUpdateTagsErr::InvalidTags(err))?;
 
-        let result = app
-            .db
-            .post_update_tags(time, user_id, post_key, &new_tags)
+        app.db
+            .post_update_tags(time, user_username, post_id, &new_tags)
             .await
             .map_err(from_db_post_update_tags_err)?;
 
-        Ok(from_db_post(result))
+        Ok(())
     };
 
     let result = inner().await;
     let status_code = status_code(&result);
 
     (status_code, Json(result))
+}
+
+#[cfg(test)]
+mod test_utils {
+    use crate::{TestServer, auth::create_auth_cookie_str};
+    use axum::http::header;
+    use catsquad_shared::{self as cs, PostState, Uuid, uuid_to_str};
+
+    impl TestServer {
+        pub async fn post_update_tags(
+            &self,
+            post_id: i64,
+            new_tags: impl Into<String>,
+            session_token: Uuid,
+        ) -> Result<(), cs::PostUpdateTagsErr> {
+            self.client
+                .post_update_tags(post_id, new_tags)
+                .header_add(
+                    header::COOKIE,
+                    create_auth_cookie_str(uuid_to_str(session_token)),
+                )
+                .send()
+                .await
+                .into_json()
+                .await
+        }
+    }
 }
 
 #[tokio::test]
@@ -73,54 +98,28 @@ async fn test_post_update_tags() {
         .await;
 
     let post1 = server
-        .client
-        .post_add("title", "description1", "tags1")
-        .header_add(header::COOKIE, create_auth_cookie_str(session_key1.clone()))
-        .send()
-        .await
-        .into_json()
+        .post_add("title", "description1", "tags1", session_key1)
         .await
         .unwrap();
 
+    server
+        .post_update_tags(post1.id, "     tagS2", session_key1)
+        .await
+        .unwrap();
     let post1 = server
-        .client
-        .post_update_tags(post1.key.clone(), "     tagS2")
-        .header_add(header::COOKIE, create_auth_cookie_str(session_key1.clone()))
-        .send()
-        .await
-        .into_json()
+        .post_get_by_key(post1.id, session_key1)
         .await
         .unwrap();
-
     assert_eq!(post1.tags, " tags2 ");
 
     let result = server
-        .client
-        .post_update_tags(post1.key.clone(), "tags3")
-        .header_add(header::COOKIE, create_auth_cookie_str(session_key2.clone()))
-        .send()
-        .await
-        .into_json()
+        .post_update_tags(post1.id, "tags3", session_key2)
         .await;
     assert!(matches!(result, Err(PostUpdateTagsErr::Unauthorized(_))));
 
-    let result = server
-        .client
-        .post_update_tags("invalid", "tags3")
-        .header_add(header::COOKIE, create_auth_cookie_str(session_key1.clone()))
-        .send()
-        .await
-        .into_json()
-        .await;
+    let result = server.post_update_tags(0, "tags3", session_key1).await;
     assert!(matches!(result, Err(PostUpdateTagsErr::PostNotFound)));
 
-    let result = server
-        .client
-        .post_update_tags("invalid", "tags3")
-        .header_add(header::COOKIE, create_auth_cookie_str(session_key1.clone()))
-        .send()
-        .await
-        .into_json()
-        .await;
+    let result = server.post_update_tags(0, "tags3", session_key1).await;
     assert!(matches!(result, Err(PostUpdateTagsErr::PostNotFound)));
 }

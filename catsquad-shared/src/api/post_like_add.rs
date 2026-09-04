@@ -4,12 +4,12 @@ pub const LINK_API_POST_LIKE_ADD: &str = "/api/post_like_add";
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
 pub struct PostLikeRes {
-    pub key: String,
+    pub id: i64,
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
 pub struct PostLikeAddReq {
-    pub post_key: String,
+    pub post_id: i64,
 }
 
 #[derive(

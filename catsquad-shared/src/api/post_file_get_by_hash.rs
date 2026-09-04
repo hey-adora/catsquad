@@ -4,16 +4,12 @@ pub const LINK_API_POST_FILE_GET_BY_HASH: &str = "/api/post/{post_key}/file/{fil
 
 #[derive(Clone, serde::Deserialize, serde::Serialize)]
 pub struct StorageParams {
-    pub post_key: String,
-    pub file_hash: String,
+    pub post_id: i64,
+    pub file_hash: i64,
 }
 
-pub fn link_relative_img(post_key: impl AsRef<str>, file_hash: impl AsRef<str>) -> String {
-    format!(
-        "/api/post/{}/file/{}",
-        post_key.as_ref(),
-        file_hash.as_ref()
-    )
+pub fn link_relative_img(post_id: i64, file_hash: i64) -> String {
+    format!("/api/post/{}/file/{}", post_id, file_hash)
 }
 
 // pub fn validate_storage_path(storage_path: impl AsRef<str>) -> Result<(), String> {

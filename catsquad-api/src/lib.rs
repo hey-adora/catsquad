@@ -21,19 +21,19 @@ mod test_server;
 pub use test_server::TestServer;
 
 #[cfg(test)]
-pub async fn get_file_size(file_path: impl AsRef<std::path::Path>) -> u64 {
+pub async fn get_file_size(file_path: impl AsRef<std::path::Path>) -> u32 {
     let file = tokio::fs::metadata(file_path).await.unwrap();
-    file.size()
+    file.size() as u32
 }
 
 #[cfg(test)]
-pub async fn get_file_hash_for_testing_by_path(file_path: impl AsRef<str>) -> String {
+pub async fn get_file_hash_for_testing_by_path(file_path: impl AsRef<str>) -> i64 {
     let file = tokio::fs::read(file_path.as_ref()).await.unwrap();
     get_file_hash_for_testing(&file)
 }
 
 #[cfg(test)]
-pub fn get_file_hash_for_testing(file: &[u8]) -> String {
+pub fn get_file_hash_for_testing(file: &[u8]) -> i64 {
     use std::hash::Hasher;
     // let file = tokio::fs::read(file_path.as_ref()).await.unwrap();
     // let mut hasher = GxBuildHasher::default();
@@ -41,7 +41,8 @@ pub fn get_file_hash_for_testing(file: &[u8]) -> String {
     // let mut hasher = GxHasher::with_seed(0);
     hasher.write(&file);
     let hash = hasher.finish();
-    hash.to_string()
+    hash as i64
+    // hash.to_string()
 }
 
 #[inline]

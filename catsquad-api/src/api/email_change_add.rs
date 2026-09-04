@@ -1,13 +1,11 @@
 use std::fmt::Display;
 
 use axum::{Extension, Form, Json, extract::State, http::StatusCode, response::IntoResponse};
-use catsquad_db::{
-    DbEmailChange, DbEmailChangeAddErr, DbEmailChangeToken, DbEmailSentReason, DbUser, id_to_string,
-};
+use catsquad_db::{DbEmailChange, DbEmailChangeAddErr, DbEmailSentReason, DbUser};
 use catsquad_log::prelude::*;
 use catsquad_shared::{
-    EmailChangeAddErr, EmailChangeRes, EmailChangeToken,
-    link_absolute_settings_email_change_current_confirm,
+    EmailChangeAddErr, EmailChangeRes, EmailChangeToken, Uuid,
+    link_absolute_settings_email_change_current_confirm, uuid_to_str,
 };
 use url::Url;
 
@@ -22,22 +20,33 @@ fn from_db_email_change_add_err(value: DbEmailChangeAddErr) -> EmailChangeAddErr
 
 pub fn from_db_email_change(value: DbEmailChange) -> EmailChangeRes {
     EmailChangeRes {
-        key: id_to_string(value.id),
-        current: from_db_email_change_token(value.current),
-        new: value.new.map(from_db_email_change_token),
+        id: value.id,
+        current: EmailChangeToken {
+            email: value.current_email,
+            token_used: value.current_used,
+        },
+        new: if !value.new_email.is_empty() {
+            Some(EmailChangeToken {
+                email: value.new_email,
+                token_used: value.new_used,
+            })
+        } else {
+            None
+        },
+        // new: value.new.map(from_db_email_change_token),
         completed: value.completed,
-        expires: value.expires,
+        expires: value.expires_at,
         modified_at: value.modified_at,
         created_at: value.created_at,
     }
 }
 
-fn from_db_email_change_token(value: DbEmailChangeToken) -> EmailChangeToken {
-    EmailChangeToken {
-        email: value.email,
-        token_used: value.token_used,
-    }
-}
+// fn from_db_email_change_token(value: DbEmailChangeToken) -> EmailChangeToken {
+//     EmailChangeToken {
+//         email: value.email,
+//         token_used: value.token_used,
+//     }
+// }
 
 pub fn status_code(result: &Result<EmailChangeRes, EmailChangeAddErr>) -> StatusCode {
     match result {
@@ -50,12 +59,13 @@ pub fn status_code(result: &Result<EmailChangeRes, EmailChangeAddErr>) -> Status
 pub fn send_email_email_change_add(
     address: Url,
     email_change_key: impl Display,
-    token: impl Display,
+    token: Uuid,
 ) -> String {
     // let link = link_absolute_reg_finish(address, token);
     // let link = "placeholder change".to_string();
+    let token_str = uuid_to_str(token);
     let link =
-        link_absolute_settings_email_change_current_confirm(address, email_change_key, token)
+        link_absolute_settings_email_change_current_confirm(address, email_change_key, token_str)
             .unwrap();
     // debug!("EMAIL SENT {link}");
     link.to_string()
@@ -65,23 +75,23 @@ pub async fn email_change_add(
     db_user: Extension<DbUser>,
     State(app): State<AppState>,
 ) -> impl IntoResponse {
-    let time = app.get_time_ns().await;
-    let email_change_expiration = app.get_email_change_expiration().await;
+    let time = app.get_time_micro();
+    let email_change_expiration = app.get_email_change_expiration_micro().await;
     let inner = async || -> Result<EmailChangeRes, EmailChangeAddErr> {
         let expires = time + email_change_expiration;
-        let user_id = db_user.id.clone();
+        let user_username = db_user.username.clone();
         let user_email = db_user.email.clone();
 
         let email_change = app
             .db
-            .email_change_add(time, user_id, expires)
+            .email_change_add(time, user_username, expires)
             .await
             .map_err(from_db_email_change_add_err)?;
-        let token = email_change.current.token.clone();
-        let key = id_to_string(email_change.id.clone());
+        let token = email_change.current_token.clone();
+        let change_id = email_change.id.clone();
 
         let address = app.get_address().await;
-        let email_body = send_email_email_change_add(address, key, token);
+        let email_body = send_email_email_change_add(address, change_id, token);
         let _ = app
             .db
             .email_sent_add(
@@ -106,16 +116,19 @@ mod test_utils {
     use crate::{TestServer, auth::create_auth_cookie_str};
     use axum::http::header;
     use catsquad_db::DbUser;
-    use catsquad_shared as cs;
+    use catsquad_shared::{self as cs, Uuid, uuid_to_str};
 
     impl TestServer {
         pub async fn email_change_add(
             &self,
-            session_key: impl Into<String>,
+            session_token: Uuid,
         ) -> Result<cs::EmailChangeRes, cs::EmailChangeAddErr> {
             self.client
                 .email_change_add()
-                .header_add(header::COOKIE, create_auth_cookie_str(session_key.into()))
+                .header_add(
+                    header::COOKIE,
+                    create_auth_cookie_str(uuid_to_str(session_token)),
+                )
                 .send()
                 .await
                 .into_json()
@@ -124,33 +137,30 @@ mod test_utils {
 
         pub async fn email_change_get_current_token(
             &self,
-            time: u128,
+            time: u64,
             user: &DbUser,
-            email_change_key: impl Into<String>,
-        ) -> String {
+            email_change_id: i64,
+        ) -> Uuid {
             self.state
                 .db
-                .email_change_get_by_key(time, user.id.clone(), email_change_key.into())
+                .email_change_get_by_key(time, user.username.clone(), email_change_id)
                 .await
                 .unwrap()
-                .current
-                .token
+                .current_token
         }
 
         pub async fn email_change_get_new_token(
             &self,
-            time: u128,
+            time: u64,
             user: &DbUser,
-            email_change_key: impl Into<String>,
-        ) -> String {
+            email_change_id: i64,
+        ) -> Uuid {
             self.state
                 .db
-                .email_change_get_by_key(time, user.id.clone(), email_change_key.into())
+                .email_change_get_by_key(time, user.username.clone(), email_change_id)
                 .await
                 .unwrap()
-                .new
-                .unwrap()
-                .token
+                .new_token
         }
     }
 }
@@ -167,7 +177,7 @@ async fn test_email_change_add() {
         .user_add_full("hey", "hey@heyadora.com", "1g234567890111GG11$")
         .await;
 
-    let result = server.email_change_add("invalid").await;
+    let result = server.email_change_add(0_u128.to_be_bytes()).await;
     assert!(matches!(result, Err(EmailChangeAddErr::Unauthorized(_))));
 
     let _email_change = server.email_change_add(session_key).await.unwrap();

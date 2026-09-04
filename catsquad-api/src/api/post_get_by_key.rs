@@ -49,11 +49,14 @@ pub async fn post_get_by_key(
 ) -> impl IntoResponse {
     let inner = async || -> Result<PostRes, PostGetByKeyErr> {
         // let req = params_req(params)?;
-        let user_id = db_user.as_ref().map(|v| v.id.clone());
+        let user_userame = db_user
+            .as_ref()
+            .map(|v| v.username.clone())
+            .unwrap_or_default();
 
         let post = app
             .db
-            .post_get_by_id(user_id, params.post_key)
+            .post_get_by_id(user_userame, params.post_id)
             .await
             .map_err(from_db_post_get_by_key_err)?;
 
@@ -70,17 +73,20 @@ pub async fn post_get_by_key(
 mod test_utils {
     use crate::{TestServer, auth::create_auth_cookie_str};
     use axum::http::header;
-    use catsquad_shared as cs;
+    use catsquad_shared::{self as cs, Uuid, uuid_to_str};
 
     impl TestServer {
         pub async fn post_get_by_key(
             &self,
-            post_key: impl AsRef<str>,
-            session_key: impl AsRef<str>,
+            post_id: i64,
+            session_token: Uuid,
         ) -> Result<cs::PostRes, cs::PostGetByKeyErr> {
             self.client
-                .post_get_by_key(post_key)
-                .header_add(header::COOKIE, create_auth_cookie_str(session_key.as_ref()))
+                .post_get_by_key(post_id)
+                .header_add(
+                    header::COOKIE,
+                    create_auth_cookie_str(uuid_to_str(session_token)),
+                )
                 .send()
                 .await
                 .into_json()
@@ -108,55 +114,46 @@ async fn test_post_get_by_key() {
         .unwrap();
 
     {
-        let result = server.post_get_by_key("invalid", "").await;
+        let result = server.post_get_by_key(0, 0_u128.to_be_bytes()).await;
         assert_eq!(result, Err(PostGetByKeyErr::PostNotFound));
 
-        let result = server.post_get_by_key(post1.key.clone(), "").await;
+        let result = server.post_get_by_key(post1.id, 0_u128.to_be_bytes()).await;
         assert!(matches!(result, Err(PostGetByKeyErr::PostNotFound)));
 
-        let result = server
-            .post_get_by_key(post1.key.clone(), &session_key1)
-            .await;
+        let result = server.post_get_by_key(post1.id, session_key1).await;
         assert!(matches!(result, Err(PostGetByKeyErr::PostNotFound)));
 
-        let result = server
-            .post_get_by_key(post1.key.clone(), &session_key2)
-            .await;
+        let result = server.post_get_by_key(post1.id, session_key2).await;
         assert!(matches!(result, Err(PostGetByKeyErr::PostNotFound)));
     }
 
     server
-        .post_update_state(
-            post1.key.clone(),
-            catsquad_shared::PostState::Active,
-            &session_key1,
-        )
+        .post_update_state(post1.id, catsquad_shared::PostState::Active, session_key1)
         .await
         .unwrap();
 
     {
-        let result = server.post_get_by_key(post1.key.clone(), "").await.unwrap();
-        assert_eq!(result.key, post1.key);
+        let result = server
+            .post_get_by_key(post1.id, 0_u128.to_be_bytes())
+            .await
+            .unwrap();
+        assert_eq!(result.id, post1.id);
     }
 
     server
         .post_update_state(
-            post1.key.clone(),
+            post1.id.clone(),
             catsquad_shared::PostState::Hidden,
-            &session_key1,
+            session_key1,
         )
         .await
         .unwrap();
 
     {
-        let result = server
-            .post_get_by_key(post1.key.clone(), &session_key1)
-            .await;
+        let result = server.post_get_by_key(post1.id.clone(), session_key1).await;
         assert!(matches!(result, Ok(_)));
 
-        let result = server
-            .post_get_by_key(post1.key.clone(), &session_key2)
-            .await;
+        let result = server.post_get_by_key(post1.id, session_key2).await;
         assert!(matches!(result, Err(PostGetByKeyErr::Unauthorized(_))));
     }
 }

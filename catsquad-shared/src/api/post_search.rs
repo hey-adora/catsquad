@@ -21,7 +21,7 @@ pub struct PostSearchParams {
     //     serialize_with = "serde_from_option_u128",
     //     deserialize_with = "serde_to_option_u128"
     // )]
-    pub time: Option<String>,
+    pub time: Option<u64>,
     pub range: Option<TimeRange>,
     pub order: Option<Order>,
     pub limit: Option<usize>,
@@ -30,7 +30,7 @@ pub struct PostSearchParams {
 impl Default for PostSearchParams {
     fn default() -> Self {
         Self {
-            time: Some(0.to_string()),
+            time: Some(0),
             range: Some(TimeRange::MoreOrEqual),
             order: Some(Order::ThreeTwoOne),
             limit: Some(50),

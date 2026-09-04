@@ -7,7 +7,7 @@ use axum::{
     },
     response::IntoResponse,
 };
-use catsquad_db::{DbPostFile, DbPostGetByKeyErr, DbUser};
+use catsquad_db::{DbPostGetByKeyErr, DbUser};
 use catsquad_log::prelude::*;
 use catsquad_shared::{PostFileGetByHashErr, StorageParams};
 use tokio::fs;
@@ -46,28 +46,34 @@ pub async fn post_file_get_by_hash(
     //TODO optimize this nonsense, simplify db query
     //the string manipulation at the end is -100000% performance
 
-    let user_id = db_user.as_ref().map(|v| v.id.clone());
-    let post_key = params.post_key;
+    let user_usename = db_user
+        .as_ref()
+        .map(|v| v.username.clone())
+        .unwrap_or_default();
+    let post_key = params.post_id;
     let file_hash = params.file_hash;
 
     let inner = async || -> Result<(Vec<u8>, String), PostFileGetByHashErr> {
         let post = app
             .db
-            .post_get_by_id(user_id, post_key)
+            .post_get_by_id(user_usename, post_key)
             .await
             .map_err(from_post_get_by_key_err)?;
 
-        let file = post
-            .file
+        let file_hash = post
+            .images_hashes
             .into_iter()
-            .find(|v| v.hash == file_hash)
+            .find(|v| *v == file_hash)
             .ok_or(PostFileGetByHashErr::FileNotFound)?;
+        let file_hash_str = (file_hash as u64).to_string();
 
-        let file_hash = file.hash;
-        let file_extension = file.extension;
+        // TODO GET FROM FILES_IMAGES TABLE
+
+        // let file_extension = file.extension;
+        let file_extension = "png".to_string();
         let path = app.get_storage_path().await;
         let path = std::path::Path::new(&path);
-        let path = path.join(file_hash).with_extension(file_extension.clone());
+        let path = path.join(file_hash_str).with_extension(&file_extension);
 
         let bytes = fs::read(&path)
             .await
@@ -119,18 +125,21 @@ pub async fn post_file_get_by_hash(
 mod test_utils {
     use crate::{TestServer, auth::create_auth_cookie_str};
     use axum::http::header;
-    use catsquad_shared as cs;
+    use catsquad_shared::{self as cs, Uuid, uuid_to_str};
 
     impl TestServer {
         pub async fn post_file_get_by_hash(
             &self,
-            post_key: impl AsRef<str>,
-            file_hash: impl AsRef<str>,
-            session_key: impl AsRef<str>,
+            post_id: i64,
+            file_hash: i64,
+            session_token: Uuid,
         ) -> Result<Vec<u8>, cs::PostFileGetByHashErr> {
             self.client
-                .post_file_get_by_hash(post_key, file_hash)
-                .header_add(header::COOKIE, create_auth_cookie_str(session_key.as_ref()))
+                .post_file_get_by_hash(post_id, file_hash)
+                .header_add(
+                    header::COOKIE,
+                    create_auth_cookie_str(uuid_to_str(session_token)),
+                )
                 .send()
                 .await
                 .into_bytes()
@@ -161,17 +170,17 @@ async fn test_post_file_by_hash() {
     let file_hash = get_file_hash_for_testing_by_path("../assets/favicon.ico").await;
 
     let result = server
-        .post_file_get_by_hash(&post1.key, &file_hash, &session_key1)
+        .post_file_get_by_hash(post1.id, file_hash, session_key1)
         .await;
     assert!(matches!(result, Err(PostFileGetByHashErr::PostNotFound)));
 
-    let result = server
-        .post_update_state(post1.key.clone(), PostState::Active, &session_key1)
+    server
+        .post_update_state(post1.id, PostState::Active, session_key1)
         .await
         .unwrap();
 
     let result = server
-        .post_file_get_by_hash(&post1.key, &file_hash, &session_key1)
+        .post_file_get_by_hash(post1.id, file_hash, session_key1)
         .await;
     assert!(matches!(result, Err(PostFileGetByHashErr::FileNotFound)));
 

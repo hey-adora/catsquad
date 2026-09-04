@@ -1,25 +1,25 @@
 use axum::{Extension, Form, Json, extract::State, http::StatusCode, response::IntoResponse};
 use catsquad_db::{DbPostUpdateStateErr, DbUser};
 use catsquad_log::prelude::*;
-use catsquad_shared::{PostRes, PostState, PostUpdateStateErr, PostUpdateStateReq};
+use catsquad_shared::{PostUpdateStateErr, PostUpdateStateReq};
 
 use crate::{api::post_add::from_db_post, state::AppState};
 
 fn from_db_post_update_state_err(value: DbPostUpdateStateErr) -> PostUpdateStateErr {
     match value {
         DbPostUpdateStateErr::SameState => PostUpdateStateErr::SameState,
-        DbPostUpdateStateErr::PostNotActive => PostUpdateStateErr::PostNotActive,
+        // DbPostUpdateStateErr::PostNotActive => PostUpdateStateErr::PostNotActive,
         DbPostUpdateStateErr::CantSetDraft => PostUpdateStateErr::CantSetDraft,
         DbPostUpdateStateErr::PostNotFound => PostUpdateStateErr::PostNotFound,
         DbPostUpdateStateErr::Unauthorized => {
             PostUpdateStateErr::Unauthorized("unauthorized".to_string())
         }
-        DbPostUpdateStateErr::UserNotFound => PostUpdateStateErr::InternalServer,
+        // DbPostUpdateStateErr::UserNotFound => PostUpdateStateErr::InternalServer,
         DbPostUpdateStateErr::Db(_) => PostUpdateStateErr::InternalServer,
     }
 }
 
-fn status_code(result: &Result<PostRes, PostUpdateStateErr>) -> StatusCode {
+fn status_code(result: &Result<(), PostUpdateStateErr>) -> StatusCode {
     match result {
         Ok(_) => StatusCode::OK,
         Err(PostUpdateStateErr::SameState) => StatusCode::BAD_REQUEST,
@@ -37,20 +37,19 @@ pub async fn post_update_state(
     State(app): State<AppState>,
     Form(req): Form<PostUpdateStateReq>,
 ) -> impl IntoResponse {
-    let time = app.get_time_ns().await;
+    let time = app.get_time_micro();
 
-    let inner = async || -> Result<PostRes, PostUpdateStateErr> {
-        let user_id = db_user.id.clone();
-        let post_key = req.post_key;
+    let inner = async || -> Result<(), PostUpdateStateErr> {
+        let user_username = db_user.username.clone();
+        let post_id = req.post_id;
         let new_state = req.new_state;
 
-        let result = app
-            .db
-            .post_update_state(time, user_id, post_key, new_state)
+        app.db
+            .post_update_state(time, user_username, post_id, new_state)
             .await
             .map_err(from_db_post_update_state_err)?;
 
-        Ok(from_db_post(result))
+        Ok(())
     };
 
     let result = inner().await;
@@ -63,18 +62,21 @@ pub async fn post_update_state(
 mod test_utils {
     use crate::{TestServer, auth::create_auth_cookie_str};
     use axum::http::header;
-    use catsquad_shared::{self as cs, PostState};
+    use catsquad_shared::{self as cs, PostState, Uuid, uuid_to_str};
 
     impl TestServer {
         pub async fn post_update_state(
             &self,
-            post_key: impl Into<String>,
+            post_id: i64,
             new_state: PostState,
-            session_key: impl AsRef<str>,
-        ) -> Result<cs::PostRes, cs::PostUpdateStateErr> {
+            session_token: Uuid,
+        ) -> Result<(), cs::PostUpdateStateErr> {
             self.client
-                .post_update_state(post_key, new_state)
-                .header_add(header::COOKIE, create_auth_cookie_str(session_key.as_ref()))
+                .post_update_state(post_id, new_state)
+                .header_add(
+                    header::COOKIE,
+                    create_auth_cookie_str(uuid_to_str(session_token)),
+                )
                 .send()
                 .await
                 .into_json()
@@ -83,11 +85,13 @@ mod test_utils {
     }
 }
 
+#[cfg(test)]
 #[tokio::test]
 async fn test_post_update_state() {
     // TODO test all errors
     use crate::auth::create_auth_cookie_str;
     use axum::http::header;
+    use catsquad_shared::PostState;
 
     init_log();
 
@@ -106,8 +110,12 @@ async fn test_post_update_state() {
         .await
         .unwrap();
 
+    server
+        .post_update_state(post1.id, PostState::Active, session_key1.clone())
+        .await
+        .unwrap();
     let post1 = server
-        .post_update_state(post1.key.clone(), PostState::Active, session_key1.clone())
+        .post_get_by_key(post1.id, session_key1)
         .await
         .unwrap();
 

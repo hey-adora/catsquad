@@ -32,9 +32,7 @@ fn from_db_email_change_confirm_current_err(
     }
 }
 
-pub fn status_code(
-    result: &Result<EmailChangeRes, EmailChangeUpdateCurrentConfirmErr>,
-) -> StatusCode {
+pub fn status_code(result: &Result<(), EmailChangeUpdateCurrentConfirmErr>) -> StatusCode {
     match result {
         Ok(_) => StatusCode::OK,
         Err(EmailChangeUpdateCurrentConfirmErr::NotFound) => StatusCode::BAD_REQUEST,
@@ -53,24 +51,23 @@ pub async fn email_change_update_current_confirm(
     State(app): State<AppState>,
     Form(req): Form<EmailChangeUpdateCurrentConfirmReq>,
 ) -> impl IntoResponse {
-    let time = app.get_time_ns().await;
-    let inner = async || -> Result<EmailChangeRes, EmailChangeUpdateCurrentConfirmErr> {
-        let user_id = db_user.id.clone();
-        let email_change_key = req.email_change_key.clone();
+    let time = app.get_time_micro();
+    let inner = async || -> Result<(), EmailChangeUpdateCurrentConfirmErr> {
+        let user_username = db_user.username.clone();
+        let email_change_key = req.email_change_id.clone();
         let email_change_token = req.token.clone();
 
-        let email_change = app
-            .db
+        app.db
             .email_change_update_current_confirm(
                 time,
-                user_id,
+                user_username,
                 email_change_key,
                 email_change_token,
             )
             .await
             .map_err(from_db_email_change_confirm_current_err)?;
 
-        Ok(from_db_email_change(email_change))
+        Ok(())
     };
 
     let result = inner().await;
@@ -83,18 +80,21 @@ pub async fn email_change_update_current_confirm(
 mod test_utils {
     use crate::{TestServer, auth::create_auth_cookie_str};
     use axum::http::header;
-    use catsquad_shared as cs;
+    use catsquad_shared::{self as cs, Uuid, uuid_to_str};
 
     impl TestServer {
         pub async fn email_change_update_current_confirm(
             &self,
-            email_change_key: impl Into<String>,
-            token: impl Into<String>,
-            session_key: impl Into<String>,
+            email_change_id: i64,
+            token: Uuid,
+            session_token: Uuid,
         ) -> Result<cs::EmailChangeRes, cs::EmailChangeUpdateCurrentConfirmErr> {
             self.client
-                .email_change_update_current_confirm(email_change_key, token)
-                .header_add(header::COOKIE, create_auth_cookie_str(session_key.into()))
+                .email_change_update_current_confirm(email_change_id, token)
+                .header_add(
+                    header::COOKIE,
+                    create_auth_cookie_str(uuid_to_str(session_token)),
+                )
                 .send()
                 .await
                 .into_json()
@@ -123,27 +123,14 @@ async fn test_email_change_update_current_confirm() {
         server.state.set_email_change_expiration(10).await;
 
         // let email_change = server.email_change_add(&session_key).await.unwrap();
-        let email_change = server
-            .client
-            .email_change_add()
-            .header_add(header::COOKIE, create_auth_cookie_str(session_key.clone()))
-            .send()
-            .await
-            .into_json()
-            .await
-            .unwrap();
+        let email_change = server.email_change_add(session_key).await.unwrap();
 
         let current_token = server
-            .email_change_get_current_token(0, &user1, email_change.key.clone())
+            .email_change_get_current_token(0, &user1, email_change.id)
             .await;
 
         let result = server
-            .client
-            .email_change_update_current_confirm("invalid", "")
-            .header_add(header::COOKIE, create_auth_cookie_str(session_key.clone()))
-            .send()
-            .await
-            .into_json()
+            .email_change_update_current_confirm(0, 0_u128.to_be_bytes(), session_key)
             .await;
 
         assert!(matches!(
@@ -152,12 +139,7 @@ async fn test_email_change_update_current_confirm() {
         ));
 
         let result = server
-            .client
-            .email_change_update_current_confirm(email_change.key.clone(), "")
-            .header_add(header::COOKIE, create_auth_cookie_str(session_key.clone()))
-            .send()
-            .await
-            .into_json()
+            .email_change_update_current_confirm(email_change.id, 0_u128.to_be_bytes(), session_key)
             .await;
 
         assert!(matches!(
@@ -166,12 +148,11 @@ async fn test_email_change_update_current_confirm() {
         ));
 
         let result = server
-            .client
-            .email_change_update_current_confirm(email_change.key.clone(), "")
-            .header_add(header::COOKIE, create_auth_cookie_str(session_key2.clone()))
-            .send()
-            .await
-            .into_json()
+            .email_change_update_current_confirm(
+                email_change.id,
+                0_u128.to_be_bytes(),
+                session_key2.clone(),
+            )
             .await;
 
         assert!(matches!(
@@ -179,40 +160,33 @@ async fn test_email_change_update_current_confirm() {
             Err(EmailChangeUpdateCurrentConfirmErr::Unauthorized(_))
         ));
 
-        server.state.set_time(11).await;
+        server.state.set_time(11);
 
         let result = server
-            .client
-            .email_change_update_current_confirm(email_change.key.clone(), current_token.clone())
-            .header_add(header::COOKIE, create_auth_cookie_str(session_key.clone()))
-            .send()
-            .await
-            .into_json()
+            .email_change_update_current_confirm(
+                email_change.id,
+                current_token.clone(),
+                session_key,
+            )
             .await;
 
         assert!(matches!(
             result,
             Err(EmailChangeUpdateCurrentConfirmErr::Expired)
         ));
-        server.state.set_time(0).await;
+        server.state.set_time(0);
 
         let email_change = server
-            .client
-            .email_change_update_current_confirm(email_change.key.clone(), current_token.clone())
-            .header_add(header::COOKIE, create_auth_cookie_str(session_key.clone()))
-            .send()
-            .await
-            .into_json()
+            .email_change_update_current_confirm(email_change.id, current_token, session_key)
             .await
             .unwrap();
 
         let result = server
-            .client
-            .email_change_update_current_confirm(email_change.key.clone(), current_token.clone())
-            .header_add(header::COOKIE, create_auth_cookie_str(session_key.clone()))
-            .send()
-            .await
-            .into_json()
+            .email_change_update_current_confirm(
+                email_change.id.clone(),
+                current_token.clone(),
+                session_key,
+            )
             .await;
 
         assert!(matches!(

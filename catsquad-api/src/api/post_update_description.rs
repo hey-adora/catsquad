@@ -1,6 +1,5 @@
 use axum::{Extension, Form, Json, extract::State, http::StatusCode, response::IntoResponse};
-use catsquad_db::{DbPostUpdateDescriptionErr, DbUser};
-use catsquad_log::prelude::*;
+use catsquad_db::{DbPostUpdateBuilderTextErr, DbUser};
 use catsquad_shared::{
     PostRes, PostUpdateDescriptionErr, PostUpdateDescriptionReq, validate_post_description,
 };
@@ -8,19 +7,19 @@ use catsquad_shared::{
 use crate::{api::post_add::from_db_post, state::AppState};
 
 fn from_db_post_update_description_err(
-    value: DbPostUpdateDescriptionErr,
+    value: DbPostUpdateBuilderTextErr,
 ) -> PostUpdateDescriptionErr {
     match value {
-        DbPostUpdateDescriptionErr::PostNotFound => PostUpdateDescriptionErr::PostNotFound,
-        DbPostUpdateDescriptionErr::Unauthorized => {
+        DbPostUpdateBuilderTextErr::PostNotFound => PostUpdateDescriptionErr::PostNotFound,
+        DbPostUpdateBuilderTextErr::Unauthorized => {
             PostUpdateDescriptionErr::Unauthorized("unauthorized".to_string())
         }
         // DbPostUpdateDescriptionErr::UserNotFound => PostUpdateDescriptionErr::InternalServer,
-        DbPostUpdateDescriptionErr::Db(_) => PostUpdateDescriptionErr::InternalServer,
+        DbPostUpdateBuilderTextErr::Db(_) => PostUpdateDescriptionErr::InternalServer,
     }
 }
 
-fn status_code(result: &Result<PostRes, PostUpdateDescriptionErr>) -> StatusCode {
+fn status_code(result: &Result<(), PostUpdateDescriptionErr>) -> StatusCode {
     match result {
         Ok(_) => StatusCode::OK,
         Err(PostUpdateDescriptionErr::PostNotFound) => StatusCode::NOT_FOUND,
@@ -35,23 +34,22 @@ pub async fn post_update_description(
     State(app): State<AppState>,
     Form(req): Form<PostUpdateDescriptionReq>,
 ) -> impl IntoResponse {
-    let time = app.get_time_ns().await;
+    let time = app.get_time_micro();
 
-    let inner = async || -> Result<PostRes, PostUpdateDescriptionErr> {
-        let user_id = db_user.id.clone();
-        let post_key = req.post_key;
+    let inner = async || -> Result<(), PostUpdateDescriptionErr> {
+        let user_username = db_user.username.clone();
+        let post_id = req.post_id;
         let new_description = req.new_description;
 
         validate_post_description(&new_description)
             .map_err(|err| PostUpdateDescriptionErr::InvalidDescription(err))?;
 
-        let result = app
-            .db
-            .post_update_description(time, user_id, post_key, &new_description)
+        app.db
+            .post_update_description(time, user_username, post_id, &new_description)
             .await
             .map_err(from_db_post_update_description_err)?;
 
-        Ok(from_db_post(result))
+        Ok(())
     };
 
     let result = inner().await;
@@ -60,10 +58,39 @@ pub async fn post_update_description(
     (status_code, Json(result))
 }
 
+#[cfg(test)]
+mod test_utils {
+    use crate::{TestServer, auth::create_auth_cookie_str};
+    use axum::http::header;
+    use catsquad_shared::{self as cs, PostState, Uuid, uuid_to_str};
+
+    impl TestServer {
+        pub async fn post_update_description(
+            &self,
+            post_id: i64,
+            new_description: impl Into<String>,
+            session_token: Uuid,
+        ) -> Result<(), cs::PostUpdateDescriptionErr> {
+            self.client
+                .post_update_description(post_id, new_description)
+                .header_add(
+                    header::COOKIE,
+                    create_auth_cookie_str(uuid_to_str(session_token)),
+                )
+                .send()
+                .await
+                .into_json()
+                .await
+        }
+    }
+}
+
+#[cfg(test)]
 #[tokio::test]
 async fn test_post_update_description() {
     use crate::auth::create_auth_cookie_str;
     use axum::http::header;
+    use catsquad_log::prelude::*;
 
     init_log();
 
@@ -78,34 +105,23 @@ async fn test_post_update_description() {
         .await;
 
     let post1 = server
-        .client
-        .post_add("title", "description1", "tags1")
-        .header_add(header::COOKIE, create_auth_cookie_str(session_key1.clone()))
-        .send()
-        .await
-        .into_json()
+        .post_add("title", "description1", "tags1", session_key1)
         .await
         .unwrap();
 
-    let post1 = server
-        .client
-        .post_update_description(post1.key.clone(), "description2")
-        .header_add(header::COOKIE, create_auth_cookie_str(session_key1.clone()))
-        .send()
+    server
+        .post_update_description(post1.id, "description2", session_key1)
         .await
-        .into_json()
+        .unwrap();
+    let post1 = server
+        .post_get_by_key(post1.id, session_key1)
         .await
         .unwrap();
 
     assert_eq!(post1.description, "description2");
 
     let result = server
-        .client
-        .post_update_description(post1.key.clone(), "description3")
-        .header_add(header::COOKIE, create_auth_cookie_str(session_key2.clone()))
-        .send()
-        .await
-        .into_json()
+        .post_update_description(post1.id, "description3", session_key2)
         .await;
     assert!(matches!(
         result,
@@ -113,12 +129,7 @@ async fn test_post_update_description() {
     ));
 
     let result = server
-        .client
-        .post_update_description("invalid", "title3")
-        .header_add(header::COOKIE, create_auth_cookie_str(session_key1.clone()))
-        .send()
-        .await
-        .into_json()
+        .post_update_description(0, "title3", session_key1)
         .await;
     assert!(matches!(
         result,
@@ -126,12 +137,7 @@ async fn test_post_update_description() {
     ));
 
     let result = server
-        .client
-        .post_update_description("invalid", "title3")
-        .header_add(header::COOKIE, create_auth_cookie_str(session_key1.clone()))
-        .send()
-        .await
-        .into_json()
+        .post_update_description(0, "title3", session_key1)
         .await;
     assert!(matches!(
         result,

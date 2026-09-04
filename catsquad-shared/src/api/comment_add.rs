@@ -19,7 +19,7 @@ pub struct CommentRes {
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
 pub struct CommentAddReq {
     pub post_id: i64,
-    pub comment_id: i64,
+    pub comment_id: i64, // 0 means None
     pub text: String,
 }
 

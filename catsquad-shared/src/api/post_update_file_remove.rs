@@ -24,6 +24,6 @@ pub enum PostUpdateFileRemoveErr {
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
 pub struct PostUpdateFileRemoveReq {
-    pub post_key: String,
-    pub hash: String,
+    pub post_id: i64,
+    pub hash: i64,
 }

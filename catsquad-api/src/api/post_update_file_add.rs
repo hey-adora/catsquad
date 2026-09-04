@@ -12,11 +12,11 @@ use axum::{
     response::IntoResponse,
 };
 use bytes::Bytes;
-use catsquad_db::{DbPostFile, DbPostUpdateFileAddErr, DbUser, id_to_string};
+use catsquad_db::{DbPostUpdateFileAddErr, DbUser};
 use catsquad_log::prelude::*;
 use catsquad_shared::{
-    POST_UPDATE_FILE_ADD_PARAMS_FIELD_POST_KEY, PostFile, PostUpdateFileAddErr,
-    PostUpdateFileAddParams, SUPPORTED_FILE_EXTENSIONS,
+    POST_UPDATE_FILE_ADD_PARAMS_FIELD_POST_ID, PostFile, PostUpdateFileAddErr,
+    PostUpdateFileAddParams, SUPPORTED_FILE_EXTENSIONS, uuid_to_str,
 };
 use futures::{Stream, TryStreamExt};
 use futures_util::StreamExt;
@@ -26,10 +26,7 @@ use tokio::{
     io::{AsyncWriteExt, BufWriter},
 };
 
-use crate::{
-    api::{email_change_add::from_db_email_change, post_add::from_db_post},
-    state::AppState,
-};
+use crate::{api::post_add::from_db_post, state::AppState};
 
 fn from_db_post_update_file_add(value: DbPostUpdateFileAddErr) -> PostUpdateFileAddErr {
     match value {
@@ -49,6 +46,7 @@ fn from_db_post_update_file_add(value: DbPostUpdateFileAddErr) -> PostUpdateFile
             PostUpdateFileAddErr::Unauthorized("unauthorized".to_string())
         }
         DbPostUpdateFileAddErr::Db(_) => PostUpdateFileAddErr::InternalServer,
+        DbPostUpdateFileAddErr::InternalError(_) => PostUpdateFileAddErr::InternalServer,
     }
 }
 
@@ -74,10 +72,10 @@ fn status_code(result: &Result<Vec<PostFile>, PostUpdateFileAddErr>) -> StatusCo
 fn params_req(value: RawPathParams) -> Result<PostUpdateFileAddParams, PostUpdateFileAddErr> {
     value
         .iter()
-        .find(|(name, _)| *name == POST_UPDATE_FILE_ADD_PARAMS_FIELD_POST_KEY)
+        .find(|(name, _)| *name == POST_UPDATE_FILE_ADD_PARAMS_FIELD_POST_ID)
         .ok_or(PostUpdateFileAddErr::ParamNotFoundPostId)
         .map(|(_, value)| PostUpdateFileAddParams {
-            post_key: value.to_string(),
+            post_id: i64::from_str_radix(value, 10).unwrap_or_default(),
         })
 }
 
@@ -94,9 +92,9 @@ pub async fn parse_multipart(
     mut multipart: Multipart,
     storage_path: impl AsRef<Path>,
     tmp_path: impl AsRef<Path>,
-    max_storage: u64,
-    max_storage_per_file: u64,
-    mut used_storage: u64,
+    max_storage: u32,
+    max_storage_per_file: u32,
+    mut used_storage: u32,
 ) -> Result<Vec<File>, PostUpdateFileAddErr> {
     let mut files = Vec::new();
     let storage_path = storage_path.as_ref();
@@ -198,15 +196,15 @@ pub async fn parse_multipart(
 }
 
 pub struct SavedFile {
-    pub hash: String,
+    pub hash: i64,
     pub saved_path: PathBuf,
-    pub size_bytes: u64,
+    pub size_bytes: u32,
 }
 
 #[derive(thiserror::Error, Debug)]
 pub enum SaveFileErr {
     #[error("max file size {max_bytes} bytes, upload stopped at {got_bytes} bytes")]
-    FileTooBig { max_bytes: u64, got_bytes: u64 },
+    FileTooBig { max_bytes: u32, got_bytes: u32 },
 
     #[error("io err {0}")]
     IoErr(#[from] std::io::Error),
@@ -219,7 +217,7 @@ pub async fn handle_file_saving<S, StreamErr>(
     mut stream: S,
     extension: impl AsRef<str>,
     save_path: impl AsRef<Path>,
-    max_storage_per_file: u64,
+    max_storage_per_file: u32,
     tmp_path: impl AsRef<Path>,
     // used_storage: usize,
     // max_storage: usize,
@@ -244,11 +242,11 @@ where
 
     let mut hasher = DefaultHasher::default();
     // let mut hasher = GxHasher::with_seed(0);
-    let mut size = 0_u64;
+    let mut size = 0_u32;
 
     while let Some(value) = stream.next().await {
         let bytes = value?;
-        size += bytes.len() as u64;
+        size += bytes.len() as u32;
         if size > max_storage_per_file {
             file.flush().await?;
             drop(file);
@@ -263,11 +261,14 @@ where
     }
 
     file.flush().await?;
-    let hash = hasher.finish().to_string();
+    let hash = hasher.finish();
+    let hash_str = hash.to_string();
     trace!("hashing in prod {file_path_tmp:?} = {hash}");
 
+    // uuid_to_str(uuid)
+
     let file_path = {
-        let file_path = save_path.join(&hash).with_extension(extension);
+        let file_path = save_path.join(&hash_str).with_extension(extension);
         if file_path.exists() {
             trace!("file removed");
             tokio::fs::remove_file(file_path_tmp).await?;
@@ -288,7 +289,7 @@ where
     };
 
     Ok(SavedFile {
-        hash,
+        hash: hash as i64,
         size_bytes: size,
         saved_path: file_path,
     })
@@ -356,10 +357,10 @@ pub async fn post_update_file_add(
     params: axum::extract::RawPathParams,
     multipart: Multipart,
 ) -> impl IntoResponse {
-    let time = app.get_time_ns().await;
+    let time = app.get_time_micro();
     let max_storage = db_user.max_storage_bytes;
     let max_storage_per_file = db_user.max_storage_per_file_bytes;
-    let user_id = db_user.id.clone();
+    let user_username = db_user.username.clone();
     let used_storage = db_user.used_storage_bytes;
     let storage_path = app.get_storage_path().await;
     let tmp_path = app.get_tmp_path().await;
@@ -367,7 +368,7 @@ pub async fn post_update_file_add(
     let inner = async || -> Result<Vec<PostFile>, PostUpdateFileAddErr> {
         let req = params_req(params)?;
 
-        let post_key = req.post_key;
+        let post_id = req.post_id;
 
         let files = parse_multipart(
             multipart,
@@ -386,8 +387,8 @@ pub async fn post_update_file_add(
                 .db
                 .post_update_file_add(
                     time,
-                    user_id.clone(),
-                    post_key.clone(),
+                    user_username.clone(),
+                    post_id,
                     file.saved_file.size_bytes,
                     file.saved_file.hash.clone(),
                     file.extension.clone(),
@@ -424,6 +425,45 @@ pub async fn post_update_file_add(
     (status_code, Json(result))
 }
 
+#[cfg(test)]
+mod test_utils {
+    use crate::{TestServer, auth::create_auth_cookie_str};
+    use axum::http::header;
+    use catsquad_shared::{self as cs, PostFile, PostState, Uuid, uuid_to_str};
+
+    impl TestServer {
+        pub async fn post_update_file_add(
+            &self,
+            // post_id: i64,
+            // new_tags: impl Into<String>,
+            post_id: i64,
+            files: &[&str],
+            session_token: Uuid,
+        ) -> Result<Vec<PostFile>, cs::PostUpdateFileAddErr> {
+            self.client
+                .post_update_file_add(post_id, files.into_iter().map(|v| v.to_string()).collect())
+                .header_add(
+                    header::COOKIE,
+                    create_auth_cookie_str(uuid_to_str(session_token)),
+                )
+                .send()
+                .await
+                .into_json()
+                .await
+            // self.client
+            //     .post_update_tags(post_id, new_tags)
+            //     .header_add(
+            //         header::COOKIE,
+            //         create_auth_cookie_str(uuid_to_str(session_token)),
+            //     )
+            //     .send()
+            //     .await
+            //     .into_json()
+            //     .await
+        }
+    }
+}
+
 #[tokio::test]
 async fn test_post_update_file_add() {
     use crate::auth::create_auth_cookie_str;
@@ -445,7 +485,8 @@ async fn test_post_update_file_add() {
         let file_path = Path::new(file_path_str);
         let file_extension = file_path.extension().unwrap();
         let hash = get_file_hash_for_testing_by_path(file_path_str).await;
-        let storage_path = storage_path.join(&hash).with_extension(file_extension);
+        let hash_str = (hash as u64).to_string();
+        let storage_path = storage_path.join(&hash_str).with_extension(file_extension);
         let file_path = storage_path.to_str().unwrap().to_string();
         (hash, PathBuf::from(file_path))
     };
@@ -461,32 +502,34 @@ async fn test_post_update_file_add() {
 
     // /tmp/test.txt
     let post1 = server
-        .client
-        .post_add("title", "description1", "tags1")
-        .header_add(header::COOKIE, create_auth_cookie_str(session_key1.clone()))
-        .send()
-        .await
-        .into_json()
+        .post_add("title", "description1", "tags1", session_key1)
         .await
         .unwrap();
 
-    let add_file = async |post_key: &str, files: &[&str]| {
-        server
-            .client
-            .post_update_file_add(post_key, files.into_iter().map(|v| v.to_string()).collect())
-            .header_add(header::COOKIE, create_auth_cookie_str(session_key1.clone()))
-            .send()
-            .await
-            .into_json()
-            .await
-    };
-    let result = add_file(&post1.key, &[txt_file]).await;
+    // let add_file = async |post_id: i64, files: &[&str]| {
+    //     server
+    //         .client
+    //         .post_update_file_add(post_id, files.into_iter().map(|v| v.to_string()).collect())
+    //         .header_add(
+    //             header::COOKIE,
+    //             create_auth_cookie_str(uuid_to_str(session_key1)),
+    //         )
+    //         .send()
+    //         .await
+    //         .into_json()
+    //         .await
+    // };
+    let result = server
+        .post_update_file_add(post1.id, &[txt_file], session_key1)
+        .await;
     assert!(matches!(
         result,
         Err(PostUpdateFileAddErr::UnsupportedExtension(_))
     ));
 
-    let result = add_file(&post1.key, &[favicon_path, txt_file]).await;
+    let result = server
+        .post_update_file_add(post1.id, &[favicon_path, txt_file], session_key1)
+        .await;
 
     let (favicon_hash, favicon_storage_path) = get_storage_path(favicon_path).await;
 
@@ -506,11 +549,13 @@ async fn test_post_update_file_add() {
         let result = server
             .state
             .db
-            .user_update_storage(0, user1.id.clone(), max, max_per_file)
+            .user_update_storage(0, user1.username.clone(), max, max_per_file)
             .await
             .unwrap();
 
-        let result = add_file(&post1.key, &[favicon_path, txt_file]).await;
+        let result = server
+            .post_update_file_add(post1.id, &[favicon_path, txt_file], session_key1)
+            .await;
         assert!(matches!(
             result,
             Err(PostUpdateFileAddErr::FileTooBig { .. })
@@ -523,11 +568,14 @@ async fn test_post_update_file_add() {
     let result = server
         .state
         .db
-        .user_update_storage(0, user1.id.clone(), favicon_size, favicon_size)
+        .user_update_storage(0, user1.username.clone(), favicon_size, favicon_size)
         .await
         .unwrap();
 
-    let files = add_file(&post1.key, &[favicon_path]).await.unwrap();
+    let files = server
+        .post_update_file_add(post1.id, &[favicon_path], session_key1)
+        .await
+        .unwrap();
     assert_eq!(files.len(), 1);
     assert_eq!(files[0].extension, "ico");
     assert_eq!(files[0].size_bytes, favicon_size);

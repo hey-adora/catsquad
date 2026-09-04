@@ -22,7 +22,7 @@ fn from_db_comment_update_text_err(value: DbCommentUpdateTextErr) -> CommentUpda
     }
 }
 
-fn status_code(result: &Result<CommentRes, CommentUpdateTextErr>) -> StatusCode {
+fn status_code(result: &Result<(), CommentUpdateTextErr>) -> StatusCode {
     match result {
         Ok(_) => StatusCode::OK,
         Err(CommentUpdateTextErr::PostNotFound) => StatusCode::NOT_FOUND,
@@ -37,22 +37,22 @@ pub async fn comment_update_text(
     State(app): State<AppState>,
     Form(req): Form<CommentUpdateTextReq>,
 ) -> impl IntoResponse {
-    let time = app.get_time_ns().await;
+    let time = app.get_time_micro();
 
-    let inner = async || -> Result<CommentRes, CommentUpdateTextErr> {
-        let user_id = db_user.id.clone();
-        let comment_key = req.comment_key;
+    let inner = async || -> Result<(), CommentUpdateTextErr> {
+        let user_username = db_user.username.clone();
+        let comment_id = req.comment_id;
         let text = req.text.trim();
 
         validate_comment_text(text).map_err(|err| CommentUpdateTextErr::InvalidText(err))?;
 
         let result = app
             .db
-            .comment_update_text(time, user_id, comment_key, text)
+            .comment_update_text(time, user_username, comment_id, text)
             .await
             .map_err(from_db_comment_update_text_err)?;
 
-        Ok(from_db_comment(result))
+        Ok(())
     };
 
     let result = inner().await;
@@ -64,20 +64,23 @@ pub async fn comment_update_text(
 #[cfg(test)]
 mod test_utils {
     use axum::http::header;
-    use catsquad_shared as cs;
+    use catsquad_shared::{self as cs, Uuid, uuid_to_str};
 
     use crate::{TestServer, auth::create_auth_cookie_str};
 
     impl TestServer {
         pub async fn comment_update_text(
             &self,
-            comment_key: impl Into<String>,
+            comment_id: i64,
             text: impl Into<String>,
-            session_key: impl Into<String>,
+            session_token: Uuid,
         ) -> Result<cs::CommentRes, cs::CommentUpdateTextErr> {
             self.client
-                .comment_update_text(comment_key, text)
-                .header_add(header::COOKIE, create_auth_cookie_str(session_key.into()))
+                .comment_update_text(comment_id, text)
+                .header_add(
+                    header::COOKIE,
+                    create_auth_cookie_str(uuid_to_str(session_token)),
+                )
                 .send()
                 .await
                 .into_json()
@@ -109,42 +112,33 @@ async fn test_comment_update_text() {
         .unwrap();
 
     let comment1 = server
-        .comment_add(
-            post1.key.clone(),
-            String::new(),
-            "text1",
-            session_key1.clone(),
-        )
+        .comment_add(post1.id, 9, "text1", session_key1.clone())
         .await
         .unwrap();
 
     assert_eq!(comment1.text, "text1");
 
     let comment1 = server
-        .comment_update_text(comment1.id.clone(), "text2", &session_key1)
+        .comment_update_text(comment1.id.clone(), "text2", session_key1)
         .await
         .unwrap();
 
     assert_eq!(comment1.text, "text2");
 
-    let result = server
-        .comment_update_text("invalid", "text3", &session_key1)
-        .await;
+    let result = server.comment_update_text(0, "text3", session_key1).await;
     assert_eq!(result, Err(CommentUpdateTextErr::PostNotFound));
 
     let text_invalid = rng_str(MAX_POST_COMMENT_LENGTH + 1);
     let result = server
-        .comment_update_text("invalid", text_invalid, &session_key1)
+        .comment_update_text(0, text_invalid, session_key1)
         .await;
     assert!(matches!(result, Err(CommentUpdateTextErr::InvalidText(_))));
 
-    let result = server
-        .comment_update_text("invalid", "", &session_key1)
-        .await;
+    let result = server.comment_update_text(0, "", session_key1).await;
     assert!(matches!(result, Err(CommentUpdateTextErr::InvalidText(_))));
 
     let result = server
-        .comment_update_text(comment1.id.clone(), "text4", &session_key2)
+        .comment_update_text(comment1.id.clone(), "text4", session_key2)
         .await;
     assert!(matches!(result, Err(CommentUpdateTextErr::Unauthorized(_))));
 }

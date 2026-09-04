@@ -1,13 +1,10 @@
 use axum::{Extension, Form, Json, extract::State, http::StatusCode, response::IntoResponse};
-use catsquad_db::{DbEmailChangeGetByKeyErr, DbUser, id_to_string};
+use catsquad_db::{DbEmailChangeGetByKeyErr, DbUser};
 use catsquad_log::prelude::*;
 use catsquad_shared::{EmailChangeRes, EmailChangeResendErr, EmailChangeResendReq};
 
 use crate::{
-    api::{
-        email_change_add::{from_db_email_change, send_email_email_change_add},
-        email_change_update_new_add::send_email_email_change_update_new_add,
-    },
+    api::email_change_add::{from_db_email_change, send_email_email_change_add},
     state::AppState,
 };
 
@@ -40,26 +37,25 @@ pub async fn email_change_resend(
     State(app): State<AppState>,
     Form(req): Form<EmailChangeResendReq>,
 ) -> impl IntoResponse {
-    let time = app.get_time_ns().await;
+    let time = app.get_time_micro();
     let inner = async || -> Result<EmailChangeRes, EmailChangeResendErr> {
-        let user_id = db_user.id.clone();
+        let user_username = db_user.username.clone();
         let user_email = db_user.email.clone();
-        let email_change_key = req.email_change_key.clone();
+        let email_change_id = req.email_change_id.clone();
 
         let email_change = app
             .db
-            .email_change_get_by_key(time, user_id, email_change_key)
+            .email_change_get_by_key(time, user_username, email_change_id)
             .await
             .map_err(from_db_email_change_get_by_key_err)?;
-        let key = id_to_string(email_change.id.clone());
+        let email_change_id = email_change.id;
         let address = app.get_address().await;
 
-        if let Some(email_change_new) = email_change.new.as_ref().map(|v| v.clone())
-            && !email_change_new.token_used
-        {
-            let token = email_change_new.token;
-            let new_email = email_change_new.email;
-            let email_body_new = send_email_email_change_update_new_add(address, key, token);
+        if !email_change.new_email.is_empty() && !email_change.new_used {
+            let token = email_change.new_token;
+            let new_email = email_change.new_email;
+            let email_body_new =
+                send_email_email_change_update_new_add(address, email_change_id, token);
             let _ = app
                 .db
                 .email_sent_add(
@@ -72,7 +68,7 @@ pub async fn email_change_resend(
             //
         } else if !email_change.current.token_used {
             let token = email_change.current.token.clone();
-            let email_body_current = send_email_email_change_add(address, key, token);
+            let email_body_current = send_email_email_change_add(address, email_change_id, token);
             let _ = app
                 .db
                 .email_sent_add(

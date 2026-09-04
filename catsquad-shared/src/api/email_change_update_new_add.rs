@@ -2,7 +2,7 @@ pub const LINK_API_EMAIL_CHANGE_UPDATE_NEW_ADD: &str = "/api/email_change_update
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
 pub struct EmailChangeUpdateNewAddReq {
-    pub email_change_key: String,
+    pub email_change_id: i64,
     pub new_email: String,
 }
 

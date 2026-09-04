@@ -13,7 +13,7 @@ pub struct EmailSentRes {
     pub body: String,
     pub to_email: String,
     pub reason: String,
-    pub created_at: u128,
+    pub created_at: u64,
 }
 
 // #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]

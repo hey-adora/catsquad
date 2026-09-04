@@ -13,9 +13,9 @@ pub struct ApiConfig {
     pub address: Url,
     pub bind: String,
     pub secret: String,
-    pub invite_expiration_ns: u128,
-    pub password_change_expiration_ns: u128,
-    pub email_change_expiration_ns: u128,
+    pub invite_expiration_micros: u64,
+    pub password_change_expiration_micros: u64,
+    pub email_change_expiration_micros: u64,
     pub database_path: PathBuf,
     pub storage_path: PathBuf,
     pub assets_path: PathBuf,
@@ -25,9 +25,9 @@ pub struct ApiConfig {
 pub const FIELD_ADDRESS: &'static str = "address";
 pub const FIELD_BIND: &'static str = "bind";
 pub const FIELD_SECRET: &'static str = "secret";
-pub const FIELD_INVITE_EXPIRATION: &'static str = "invite_expiration_ns";
-pub const FIELD_PASSWORD_CHANGE_EXPIRATION: &'static str = "password_change_expiration_ns";
-pub const FIELD_EMAIL_CHANGE_EXPIRATION: &'static str = "email_change_expiration_ns";
+pub const FIELD_INVITE_EXPIRATION: &'static str = "invite_expiration_micros";
+pub const FIELD_PASSWORD_CHANGE_EXPIRATION: &'static str = "password_change_expiration_micros";
+pub const FIELD_EMAIL_CHANGE_EXPIRATION: &'static str = "email_change_expiration_micros";
 pub const FIELD_DATABASE_PATH: &'static str = "database_path";
 pub const FIELD_STORAGE_PATH: &'static str = "storage_path";
 pub const FIELD_ASSETS_PATH: &'static str = "assets_path";
@@ -176,9 +176,9 @@ impl Default for ApiConfig {
             address: Url::parse("http://localhost:3000").unwrap(),
             bind: "localhost:3000".to_string(),
             secret: "test".to_string(),
-            invite_expiration_ns: 1800000000000,
-            password_change_expiration_ns: 1800000000000,
-            email_change_expiration_ns: 1800000000000,
+            invite_expiration_micros: 1800000000,
+            password_change_expiration_micros: 1800000000,
+            email_change_expiration_micros: 1800000000,
             database_path: PathBuf::from("target/db"),
             storage_path: PathBuf::from("target/storage"),
             assets_path: PathBuf::from("target/dist"),
@@ -203,23 +203,23 @@ impl<T: AsRef<str>> From<T> for ApiConfig {
                 FIELD_BIND => conf.bind = value.to_string(),
                 FIELD_SECRET => conf.secret = value.to_string(),
                 FIELD_INVITE_EXPIRATION => {
-                    conf.invite_expiration_ns = if let Ok(v) = u128::from_str_radix(value, 10) {
+                    conf.invite_expiration_micros = if let Ok(v) = u64::from_str_radix(value, 10) {
                         v
                     } else {
                         continue;
                     }
                 }
                 FIELD_PASSWORD_CHANGE_EXPIRATION => {
-                    conf.password_change_expiration_ns =
-                        if let Ok(v) = u128::from_str_radix(value, 10) {
+                    conf.password_change_expiration_micros =
+                        if let Ok(v) = u64::from_str_radix(value, 10) {
                             v
                         } else {
                             continue;
                         }
                 }
                 FIELD_EMAIL_CHANGE_EXPIRATION => {
-                    conf.password_change_expiration_ns =
-                        if let Ok(v) = u128::from_str_radix(value, 10) {
+                    conf.password_change_expiration_micros =
+                        if let Ok(v) = u64::from_str_radix(value, 10) {
                             v
                         } else {
                             continue;
@@ -256,19 +256,19 @@ impl From<&ApiConfig> for String {
         push(
             &mut output,
             FIELD_INVITE_EXPIRATION,
-            &value.invite_expiration_ns.to_string(),
+            &value.invite_expiration_micros.to_string(),
         );
         output.push('\n');
         push(
             &mut output,
             FIELD_PASSWORD_CHANGE_EXPIRATION,
-            &value.password_change_expiration_ns.to_string(),
+            &value.password_change_expiration_micros.to_string(),
         );
         output.push('\n');
         push(
             &mut output,
             FIELD_EMAIL_CHANGE_EXPIRATION,
-            &value.password_change_expiration_ns.to_string(),
+            &value.password_change_expiration_micros.to_string(),
         );
         output.push('\n');
         push(
