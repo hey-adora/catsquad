@@ -86,7 +86,7 @@ async fn test_post_remove() {
 
     init_log();
 
-    let server = crate::TestServer::new().await;
+    let server = crate::TestServer::new(0, "test_post_remove").await;
 
     let (user1, session_key1) = server
         .user_add_full("prime", "prime@heyadora.com", "1234567890111GGd11$")
@@ -128,6 +128,14 @@ async fn test_post_remove() {
 
     let post2 = server
         .post_add("title", "description1", "tags1", session_key1)
+        .await
+        .unwrap();
+
+    let result = server.post_remove(post2.id, session_key1).await;
+    assert!(matches!(result, Err(PostRemoveErr::Unauthorized(_))));
+
+    server
+        .post_update_state(post2.id, PostState::Active, session_key1)
         .await
         .unwrap();
 

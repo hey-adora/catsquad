@@ -183,8 +183,8 @@ pub struct TestServer {
 // }
 
 impl TestServer {
-    pub async fn new() -> Self {
-        let state = AppState::mem().await;
+    pub async fn new(time: u64, test_db: &str) -> Self {
+        let state = AppState::mem(time, test_db).await;
         let router = app(state.clone()).await;
         // let config = axum_test::TestServerConfig {
         //     transport: Some(Transport::HttpRandomPort),

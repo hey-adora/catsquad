@@ -1,19 +1,18 @@
 // use catsquad_log::prelude::*;
 
 // pub const LINK_API_POST_UPDATE_FILE_ADD: &str = "/api/post_update_file_add";
-pub const LINK_API_POST_UPDATE_FILE_ADD: &str = "/api/post/{post_key}";
+pub const LINK_API_POST_UPDATE_FILE_ADD: &str = "/api/post/{post_id}/image";
 
 pub fn link_relative_post_update_file_add(post_id: i64) -> String {
-    format!("/api/post/{}", post_id)
+    format!("/api/post/{}/image", post_id)
 }
 
 #[derive(
     Default, Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq, thiserror::Error,
 )]
 pub enum PostFileGetByHashErr {
-    #[error("post not found")]
-    PostNotFound,
-
+    // #[error("post not found")]
+    // PostNotFound,
     #[error("post file not found")]
     FileNotFound,
 

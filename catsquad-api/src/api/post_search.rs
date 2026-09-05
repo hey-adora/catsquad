@@ -103,12 +103,12 @@ mod test_utils {
 
 #[cfg(test)]
 #[tokio::test]
-async fn test_post_search() {
+async fn test_api_post_search() {
     use catsquad_log::prelude::*;
     use catsquad_shared::{Order, TimeRange};
 
     init_log();
-    let server = crate::TestServer::new().await;
+    let server = crate::TestServer::new(0, "test_api_post_search").await;
 
     let (_user1, session_key1) = server
         .user_add_full("prime", "prime@heyadora.com", "a1234567890111GGd11$")

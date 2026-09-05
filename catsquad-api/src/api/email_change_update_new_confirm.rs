@@ -101,7 +101,7 @@ mod test_utils {
 
 #[cfg(test)]
 #[tokio::test]
-async fn test_email_change_update_new_confirm() {
+async fn test_api_email_change_update_new_confirm() {
     use axum::http::header;
     use catsquad_log::prelude::*;
     use catsquad_shared::Uuid;
@@ -109,7 +109,7 @@ async fn test_email_change_update_new_confirm() {
     use crate::auth::create_auth_cookie_str;
 
     init_log();
-    let server = crate::TestServer::new().await;
+    let server = crate::TestServer::new(0, "test_api_email_change_update_new_confirm").await;
 
     let (user1, session_key) = server
         .user_add_full("hey", "hey@heyadora.com", "w1234567890111GG11$")
@@ -128,7 +128,7 @@ async fn test_email_change_update_new_confirm() {
         .email_change_get_current_token(0, &user1, email_change.id)
         .await;
 
-    let email_change = server
+    server
         .email_change_update_current_confirm(email_change.id, current_token.clone(), session_key)
         .await
         .unwrap();

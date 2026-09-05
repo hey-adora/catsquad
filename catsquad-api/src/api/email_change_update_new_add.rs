@@ -138,13 +138,13 @@ mod test_utils {
 
 #[cfg(test)]
 #[tokio::test]
-async fn test_email_change_update_new_add() {
+async fn test_api_email_change_update_new_add() {
     use axum::http::header;
 
     use crate::auth::create_auth_cookie_str;
 
     init_log();
-    let server = crate::TestServer::new().await;
+    let server = crate::TestServer::new(0, "test_api_email_change_update_new_add").await;
 
     let (user1, session_key) = server
         .user_add_full("hey", "hey@heyadora.com", "12a34567890111GG11$")
@@ -173,7 +173,7 @@ async fn test_email_change_update_new_add() {
         Err(EmailChangeUpdateNewAddErr::NotConfirmed)
     ));
 
-    let email_change = server
+    server
         .email_change_update_current_confirm(email_change.id, current_token, session_key)
         .await
         .unwrap();

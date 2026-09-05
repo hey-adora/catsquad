@@ -110,10 +110,10 @@ pub async fn user_add(
     };
     let user_add_result = inner().await;
     match user_add_result {
-        Ok(result) => {
+        Ok(user) => {
             let session_add_result = app
                 .db
-                .session_add(time, &result.email)
+                .session_add(time, &user.email)
                 .await
                 .map_err(from_db_session_add_err);
 
@@ -127,7 +127,7 @@ pub async fn user_add(
                 }
             };
 
-            let result = Ok(result);
+            let result = Ok(user);
             let status_code = status_code(&result);
             (status_code, headers, Json(result))
         }
@@ -259,9 +259,9 @@ mod test_utils {
 
 #[cfg(test)]
 #[tokio::test]
-async fn test_user_add() {
+async fn test_api_user_add() {
     init_log();
-    let server = crate::TestServer::new().await;
+    let server = crate::TestServer::new(0, "test_api_user_add").await;
 
     // invalid input
     {

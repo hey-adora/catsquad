@@ -89,7 +89,7 @@ pub async fn user_update_username(
 #[cfg(test)]
 mod test_utils {
     use axum::http::header;
-    use catsquad_shared as cs;
+    use catsquad_shared::{self as cs, Uuid, uuid_to_str};
 
     use crate::{TestServer, auth::create_auth_cookie_str};
 
@@ -98,11 +98,14 @@ mod test_utils {
             &self,
             password: impl Into<String>,
             new_username: impl Into<String>,
-            session_key: impl Into<String>,
+            session_token: Uuid,
         ) -> Result<cs::UserUpdateUsernameRes, cs::UserUpdateUsernameErr> {
             self.client
                 .user_update_username(password, new_username)
-                .header_add(header::COOKIE, create_auth_cookie_str(session_key.into()))
+                .header_add(
+                    header::COOKIE,
+                    create_auth_cookie_str(uuid_to_str(session_token)),
+                )
                 .send()
                 .await
                 .into_json()
@@ -112,40 +115,40 @@ mod test_utils {
 }
 
 #[tokio::test]
-async fn test_user_update_username() {
+async fn test_api_user_update_username() {
     init_log();
-    let server = crate::TestServer::new().await;
+    let server = crate::TestServer::new(0, "test_api_user_update_username").await;
 
     let pss = "a1234567890111GG11$";
     let (_user1, token) = server.user_add_full("hey", "hey@heyadora.com", pss).await;
     let _ = server.user_add_full("hey2", "hey2@heyadora.com", pss).await;
 
-    let result = server.user_update_username("", "one", &token).await;
+    let result = server.user_update_username("", "one", token).await;
     assert!(matches!(
         result,
         Err(UserUpdateUsernameErr::Unauthorized(_))
     ));
 
-    let result = server.user_update_username("hey2", "one", &token).await;
+    let result = server.user_update_username("hey2", "one", token).await;
     assert!(matches!(
         result,
         Err(UserUpdateUsernameErr::Unauthorized(_))
     ));
 
-    let result = server.user_update_username(pss, "he", &token).await;
+    let result = server.user_update_username(pss, "he", token).await;
     assert!(matches!(
         result,
         Err(UserUpdateUsernameErr::InvalidUsername(_))
     ));
 
-    let result = server.user_update_username(pss, "hey2", &token).await;
+    let result = server.user_update_username(pss, "hey2", token).await;
     assert!(matches!(
         result,
         Err(UserUpdateUsernameErr::UsernameAlreadyUsed)
     ));
 
     server
-        .user_update_username(pss, "hey3", &token)
+        .user_update_username(pss, "hey3", token)
         .await
         .unwrap();
     let user = server

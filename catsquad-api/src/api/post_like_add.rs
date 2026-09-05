@@ -96,9 +96,9 @@ mod test_utils {
 }
 
 #[tokio::test]
-async fn test_post_like_add() {
+async fn test_api_post_like_add() {
     init_log();
-    let server = crate::TestServer::new().await;
+    let server = crate::TestServer::new(0, "test_api_post_like_add").await;
 
     let email = "hey@heyadora.com";
     let password = "1nnerogGeron@@$";

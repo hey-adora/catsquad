@@ -46,16 +46,19 @@ pub async fn session_remove(
 mod test_utils {
     use crate::{TestServer, auth::create_auth_cookie_str};
     use axum::http::header;
-    use catsquad_shared as cs;
+    use catsquad_shared::{self as cs, Uuid, uuid_to_str};
 
     impl TestServer {
         pub async fn session_remove(
             &self,
-            session_key: impl AsRef<str>,
+            session_token: Uuid,
         ) -> Result<cs::SessionRemoveRes, cs::SessionRemoveErr> {
             self.client
                 .session_remove()
-                .header_add(header::COOKIE, create_auth_cookie_str(session_key))
+                .header_add(
+                    header::COOKIE,
+                    create_auth_cookie_str(uuid_to_str(session_token)),
+                )
                 .send()
                 .await
                 .into_json()
@@ -64,20 +67,20 @@ mod test_utils {
     }
 }
 #[tokio::test]
-async fn test_session_remove() {
+async fn test_api_session_remove() {
     init_log();
-    let server = crate::TestServer::new().await;
+    let server = crate::TestServer::new(0, "test_api_session_remove").await;
 
     let email = "hey@heyadora.com";
     let password = "1nnerogGeron@@$";
 
     let (user, session_key) = server.user_add_full("hey", email, password).await;
 
-    let result = server.user_get_by_session_key(&session_key).await;
+    let result = server.user_get_by_session_key(session_key).await;
     assert!(result.is_ok());
 
-    let _result = server.session_remove(&session_key).await.unwrap();
+    let _result = server.session_remove(session_key).await.unwrap();
 
-    let result = server.user_get_by_session_key(&session_key).await;
+    let result = server.user_get_by_session_key(session_key).await;
     assert!(result.is_err());
 }

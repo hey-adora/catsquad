@@ -25,6 +25,10 @@ pub struct SensitiveUserRes {
 pub struct UserAddReq {
     pub username: String,
     pub password: String,
+    #[serde(
+        serialize_with = "crate::serde_from_uuid",
+        deserialize_with = "crate::serde_to_uuid"
+    )]
     pub invite_key: Uuid,
 }
 

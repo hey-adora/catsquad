@@ -110,13 +110,13 @@ mod test_utils {
 
 #[cfg(test)]
 #[tokio::test]
-async fn test_post_update_file_remove() {
+async fn test_api_post_update_file_remove() {
     use crate::auth::create_auth_cookie_str;
     use axum::http::header;
 
     init_log();
 
-    let server = crate::TestServer::new().await;
+    let server = crate::TestServer::new(0, "test_api_post_update_file_remove").await;
 
     let (_user1, session_key1) = server
         .user_add_full("prime", "prime@heyadora.com", "1234567890111GGd11$")

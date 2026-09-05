@@ -2,7 +2,7 @@ pub const LINK_API_EMAIL_CHANGE_UPDATE_CANCEL: &str = "/api/email_change_update_
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
 pub struct EmailChangeUpdateCancelReq {
-    pub email_change_key: String,
+    pub email_change_id: i64,
 }
 
 #[derive(

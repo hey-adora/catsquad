@@ -78,7 +78,7 @@ impl Db {
             let result = match result {
                 Ok(v) => v,
                 // Err(sqlx::Error::RowNotFound) => {
-                //     DOESNT GET TRIGGERED ON DELETE
+                //     DOESNT GET TRIGGERED ON EXECUTE
                 // }
                 Err(err) => {
                     error!("unexpected db error {err}");

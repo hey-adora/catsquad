@@ -69,13 +69,11 @@ pub async fn user_password_change_confirm(
             let new_password = hash_password(&req.new_password)
                 .map_err(|_err| PasswordChangeUpdateConfirmErr::InternalServer)?;
 
-            let password_change = app
+            let user_email = app
                 .db
                 .password_change_update_confirm(time, req.token, new_password)
                 .await
                 .map_err(from_db_password_change_confirm_err)?;
-
-            let email = password_change.user.email;
 
             let address = app.get_address().await;
 
@@ -86,7 +84,7 @@ pub async fn user_password_change_confirm(
                     .email_sent_add(
                         time,
                         catsquad_db::DbEmailSentReason::UserPasswordChangeConfirm,
-                        email.clone(),
+                        user_email.clone(),
                         email_body,
                     )
                     .await;
@@ -97,13 +95,13 @@ pub async fn user_password_change_confirm(
                     .email_sent_add(
                         time,
                         catsquad_db::DbEmailSentReason::UserPasswordResetConfirm,
-                        email.clone(),
+                        user_email.clone(),
                         email_body,
                     )
                     .await;
             };
 
-            Ok(PasswordChangeUpdateConfirmRes { email })
+            Ok(PasswordChangeUpdateConfirmRes {})
         };
 
     let result = inner().await;
@@ -115,44 +113,41 @@ pub async fn user_password_change_confirm(
 #[cfg(any(test, feature = "test_server"))]
 mod test_utils {
     use axum::http::header;
-    use catsquad_db::id_to_string;
-    use catsquad_shared as cs;
+    use catsquad_shared::{self as cs, Uuid, uuid_to_str};
 
     use crate::{TestServer, auth::create_auth_cookie_str};
 
     impl TestServer {
         pub async fn password_change_confirm(
             &self,
-            password_change_key: impl Into<String>,
+            password_change_token: Uuid,
             new_password: impl Into<String>,
-            session_key: impl Into<String>,
+            session_token: Uuid,
         ) -> Result<cs::PasswordChangeUpdateConfirmRes, cs::PasswordChangeUpdateConfirmErr>
         {
             self.client
-                .password_change_update_confirm(password_change_key, new_password)
-                .header_add(header::COOKIE, create_auth_cookie_str(session_key.into()))
+                .password_change_update_confirm(password_change_token, new_password)
+                .header_add(
+                    header::COOKIE,
+                    create_auth_cookie_str(uuid_to_str(session_token)),
+                )
                 .send()
                 .await
                 .into_json()
                 .await
         }
 
-        pub async fn password_change_get_latest_key(&self) -> String {
-            id_to_string(
-                self.state.db.password_change_get_all().await.unwrap()[0]
-                    .id
-                    .clone(),
-            )
+        pub async fn password_change_get_latest_key(&self) -> Uuid {
+            self.state.db.password_change_get_all().await.unwrap()[0].token
         }
     }
 }
 
 #[cfg(test)]
 #[tokio::test]
-async fn test_user_password_change_confirm() {
-    use catsquad_db::id_to_string;
+async fn test_api_user_password_change_confirm() {
     init_log();
-    let server = crate::TestServer::new().await;
+    let server = crate::TestServer::new(0, "test_api_user_password_change_confirm").await;
 
     let (user, session_key) = server
         .user_add_full("hey", "hey@heyadora.com", "hello1111111@1P")
@@ -166,15 +161,11 @@ async fn test_user_password_change_confirm() {
 
     // password change
     let result = server
-        .password_change_add("hey@heyadora.com", session_key.clone())
+        .password_change_add("hey@heyadora.com", session_key)
         .await
         .unwrap();
 
-    let pss_key = id_to_string(
-        server.state.db.password_change_get_all().await.unwrap()[0]
-            .id
-            .clone(),
-    );
+    let pss_key = server.password_change_get_latest_key().await;
 
     let result = server
         .password_change_confirm(pss_key.clone(), "invalid", session_key.clone())
@@ -202,23 +193,20 @@ async fn test_user_password_change_confirm() {
         DbEmailSentReason::UserPasswordChangeConfirm.to_string()
     );
 
+    // password change should invalidate old sessions
     let result = server.user_get_by_session_key(session_key.clone()).await;
     assert!(result.is_err());
 
     // password reset
 
-    server.state.set_time(1).await;
+    server.state.set_time(1);
 
     let result = server
-        .password_change_add("hey@heyadora.com", "invalid")
+        .password_change_add("hey@heyadora.com", 0_u128.to_be_bytes())
         .await
         .unwrap();
 
-    let pss_key = id_to_string(
-        server.state.db.password_change_get_all().await.unwrap()[0]
-            .id
-            .clone(),
-    );
+    let pss_key = server.password_change_get_latest_key().await;
 
     let result = server
         .password_change_confirm(pss_key, "hello1111111@3P", session_key.clone())

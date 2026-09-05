@@ -2,8 +2,8 @@ use crate::{Uuid, u128_to_str, uuid_to_str};
 
 pub const LINK_API_INVITE_GET_BY_KEY: &str = "/api/invite/{invite_key}";
 
-pub fn link_relative_invite_get_by_key(invite_key: Uuid) -> String {
-    let uuid_str = uuid_to_str(invite_key);
+pub fn link_relative_invite_get_by_key(invite_token: Uuid) -> String {
+    let uuid_str = uuid_to_str(invite_token);
     format!("/api/invite/{}", uuid_str)
 }
 

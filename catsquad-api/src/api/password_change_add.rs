@@ -108,7 +108,7 @@ pub async fn password_change_add(
 #[cfg(test)]
 mod test_utils {
     use axum::http::header;
-    use catsquad_shared as cs;
+    use catsquad_shared::{self as cs, Uuid, uuid_to_str};
 
     use crate::{TestServer, auth::create_auth_cookie_str};
 
@@ -116,11 +116,14 @@ mod test_utils {
         pub async fn password_change_add(
             &self,
             email: impl Into<String>,
-            session_key: impl Into<String>,
+            session_token: Uuid,
         ) -> Result<cs::PasswordChangeRes, cs::PasswordChangeAddErr> {
             self.client
                 .password_change_add(email.into())
-                .header_add(header::COOKIE, create_auth_cookie_str(session_key.into()))
+                .header_add(
+                    header::COOKIE,
+                    create_auth_cookie_str(uuid_to_str(session_token)),
+                )
                 .send()
                 .await
                 .into_json()
@@ -130,9 +133,9 @@ mod test_utils {
 }
 
 #[tokio::test]
-async fn test_password_change_add() {
+async fn test_api_password_change_add() {
     init_log();
-    let server = crate::TestServer::new().await;
+    let server = crate::TestServer::new(0, "test_api_password_change_add").await;
 
     let email = "hey@heyadora.com";
     let (_user1, token) = server
@@ -141,24 +144,24 @@ async fn test_password_change_add() {
 
     {
         let result = server
-            .password_change_add("hey2@heyadora.com", "invalid")
+            .password_change_add("hey2@heyadora.com", 0_u128.to_be_bytes())
             .await;
         assert!(matches!(result, Ok(_)));
 
-        let result = server
-            .password_change_add("hey2@heyadora.com", &token)
-            .await;
+        let result = server.password_change_add("hey2@heyadora.com", token).await;
         assert!(matches!(result, Ok(_)));
 
-        let result = server.password_change_add("invalid", &token).await;
+        let result = server.password_change_add("invalid", token).await;
         assert!(matches!(result, Err(PasswordChangeAddErr::InvalidEmail(_))));
 
-        let result = server.password_change_add("invalid", "invalid").await;
+        let result = server
+            .password_change_add("invalid", 0_u128.to_be_bytes())
+            .await;
         assert!(matches!(result, Err(PasswordChangeAddErr::InvalidEmail(_))));
     }
 
     // password change
-    let _result = server.password_change_add(email, &token).await;
+    let _result = server.password_change_add(email, token).await;
     let _password_change = server.state.db.password_change_get_all().await.unwrap()[0].clone();
 
     let emails = server
@@ -171,7 +174,9 @@ async fn test_password_change_add() {
     );
 
     // password reset
-    let _result = server.password_change_add(email, "invalid").await;
+    let _result = server
+        .password_change_add(email, 0_u128.to_be_bytes())
+        .await;
     let password_change = server.state.db.password_change_get_all().await.unwrap();
     assert_eq!(password_change.len(), 2);
 

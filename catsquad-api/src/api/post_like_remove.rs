@@ -60,7 +60,7 @@ mod test_utils {
             &self,
             post_id: i64,
             session_token: Uuid,
-        ) -> Result<cs::PostLikeRes, cs::PostLikeRemoveErr> {
+        ) -> Result<(), cs::PostLikeRemoveErr> {
             self.client
                 .post_like_remove(post_id)
                 .header_add(
@@ -80,7 +80,7 @@ async fn test_post_like_remove() {
     use catsquad_log::prelude::*;
     use catsquad_shared as cs;
     init_log();
-    let server = crate::TestServer::new().await;
+    let server = crate::TestServer::new(0, "test_post_like_remove").await;
 
     let (user1, session_key1) = server
         .user_add_full("hey", "hey@heyadora.com", "1nnerogGeron@@$")

@@ -1,4 +1,4 @@
-pub const LINK_API_POST_REMOVE: &str = "/api/post/{post_key}";
+pub const LINK_API_POST_REMOVE: &str = "/api/post/{post_id}";
 
 pub fn link_relative_post_remove(post_id: i64) -> String {
     format!("/api/post/{}", post_id)

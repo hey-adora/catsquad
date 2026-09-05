@@ -1,6 +1,6 @@
 use crate::{Db, DbComment, XTimestamp, join_str};
 use catsquad_log::prelude::*;
-use catsquad_shared::{Order, TimeRange};
+use catsquad_shared::{Order, PostState, TimeRange};
 use sqlx::AssertSqlSafe;
 
 #[derive(Debug, thiserror::Error)]
@@ -12,6 +12,7 @@ pub enum DbCommentSearchErr {
 impl Db {
     pub async fn comment_search(
         &self,
+        user_username: String,
         post_id: i64,
         parent_id: Option<i64>,
         search_time: u64,
@@ -22,63 +23,95 @@ impl Db {
     ) -> Result<Vec<DbComment>, DbCommentSearchErr> {
         let pool = &self.db;
 
-        let q_order = match order {
-            Order::OneTwoThree => "ASC",
-            Order::ThreeTwoOne => "DESC",
-        };
+        // get post
+        {
+            let query = "SELECT post_user_username, post_state FROM posts WHERE post_id = $1";
 
-        let q_time_after = match range {
-            TimeRange::None => "",
-            TimeRange::Less => "AND comment_created_at < $1",
-            TimeRange::LessOrEqual => "AND comment_created_at <= $1",
-            TimeRange::More => "AND comment_created_at > $1",
-            TimeRange::MoreOrEqual => "AND comment_created_at >= $1",
-        };
-        // .to_string();
+            let result = sqlx::query_as(query).bind(post_id).fetch_one(pool).await;
 
-        let q_parent = match (&parent_id, flatten) {
-            (Some(_), true) => "AND $2 = ANY(comment_parents)",
-            (Some(_), false) => "AND comment_parents[array_length(comment_parents, 1)] = $2",
-            (None, true) => "",
-            (None, false) => "AND array_length(comment_parents, 1) IS NULL",
-        };
+            debug!("query: {query}\nresult: {result:#?}");
 
-        let query_str = format!(
-            "
+            let result = match result {
+                Ok(v) => v,
+                Err(sqlx::Error::RowNotFound) => {
+                    return Ok(Vec::new());
+                }
+                Err(err) => {
+                    error!("unexpected db error {err}");
+                    return Err(DbCommentSearchErr::Db(err));
+                }
+            };
+
+            let (post_user_username, post_state): (String, String) = result;
+
+            let post_state = PostState::from(post_state);
+            match post_state {
+                PostState::Active => (),
+                PostState::Hidden if user_username == post_user_username => (),
+                _ => return Ok(Vec::new()),
+            }
+        }
+
+        // search
+        {
+            let q_order = match order {
+                Order::OneTwoThree => "ASC",
+                Order::ThreeTwoOne => "DESC",
+            };
+
+            let q_time_after = match range {
+                TimeRange::None => "",
+                TimeRange::Less => "AND comment_created_at < $1",
+                TimeRange::LessOrEqual => "AND comment_created_at <= $1",
+                TimeRange::More => "AND comment_created_at > $1",
+                TimeRange::MoreOrEqual => "AND comment_created_at >= $1",
+            };
+            // .to_string();
+
+            let q_parent = match (&parent_id, flatten) {
+                (Some(_), true) => "AND $2 = ANY(comment_parents)",
+                (Some(_), false) => "AND comment_parents[array_length(comment_parents, 1)] = $2",
+                (None, true) => "",
+                (None, false) => "AND array_length(comment_parents, 1) IS NULL",
+            };
+
+            let query_str = format!(
+                "
             SELECT * FROM comments
                 WHERE comment_post_id = $4 {q_time_after} {q_parent}
                 ORDER BY comment_created_at {q_order}
                 LIMIT $3
         "
-        );
+            );
 
-        let query = AssertSqlSafe(query_str.clone());
+            let query = AssertSqlSafe(query_str.clone());
 
-        let result = sqlx::query_as(query)
-            .bind(XTimestamp(search_time as i64))
-            .bind(parent_id.unwrap_or_default())
-            .bind(limit as i64)
-            .bind(post_id)
-            .fetch_all(pool)
-            .await;
+            let result = sqlx::query_as(query)
+                .bind(XTimestamp(search_time as i64))
+                .bind(parent_id.unwrap_or_default())
+                .bind(limit as i64)
+                .bind(post_id)
+                .fetch_all(pool)
+                .await;
 
-        debug!(
-            "query: {query_str}\n $1={}, $2={}, $3={}, $4={}\nresult: {result:#?}",
-            search_time as i64,
-            parent_id.unwrap_or_default(),
-            limit as i64,
-            post_id
-        );
+            debug!(
+                "query: {query_str}\n $1={}, $2={}, $3={}, $4={}\nresult: {result:#?}",
+                search_time as i64,
+                parent_id.unwrap_or_default(),
+                limit as i64,
+                post_id
+            );
 
-        let result = match result {
-            Ok(v) => v,
-            Err(err) => {
-                error!("unexpected db error {err}");
-                return Err(DbCommentSearchErr::Db(err));
-            }
-        };
+            let result = match result {
+                Ok(v) => v,
+                Err(err) => {
+                    error!("unexpected db error {err}");
+                    return Err(DbCommentSearchErr::Db(err));
+                }
+            };
 
-        Ok(result)
+            Ok(result)
+        }
     }
 }
 
@@ -97,6 +130,12 @@ async fn test_comment_search() {
         .await
         .unwrap();
 
+    let invite2 = db.invite_add(0, "hey2@heyadora.com", 1).await.unwrap();
+    let user2 = db
+        .user_add(0, "hey2", "hey2", invite2.token, 10, 10)
+        .await
+        .unwrap();
+
     let post0 = db
         .post_add(
             1,
@@ -107,13 +146,14 @@ async fn test_comment_search() {
         )
         .await
         .unwrap();
+
     db.post_update_state(0, user.username.clone(), post0.id, PostState::Active)
         .await
         .unwrap();
 
     let comments = db
         .comment_search(
-            // 0,
+            user.username.clone(),
             post0.id,
             None,
             0,
@@ -130,6 +170,62 @@ async fn test_comment_search() {
         .comment_add(0, user.username.clone(), post0.id, None, "one0")
         .await
         .unwrap();
+
+    // post state permisions
+    {
+        let comments = db
+            .comment_search(
+                user.username.clone(),
+                post0.id,
+                None,
+                0,
+                10,
+                TimeRange::MoreOrEqual,
+                Order::ThreeTwoOne,
+                false,
+            )
+            .await
+            .unwrap();
+        assert_eq!(comments.len(), 1);
+
+        db.post_update_state(0, user.username.clone(), post0.id, PostState::Hidden)
+            .await
+            .unwrap();
+
+        let comments = db
+            .comment_search(
+                user.username.clone(),
+                post0.id,
+                None,
+                0,
+                10,
+                TimeRange::MoreOrEqual,
+                Order::ThreeTwoOne,
+                false,
+            )
+            .await
+            .unwrap();
+        assert_eq!(comments.len(), 1);
+
+        let comments = db
+            .comment_search(
+                user2.username.clone(),
+                post0.id,
+                None,
+                0,
+                10,
+                TimeRange::MoreOrEqual,
+                Order::ThreeTwoOne,
+                false,
+            )
+            .await
+            .unwrap();
+        assert_eq!(comments.len(), 0);
+
+        db.post_update_state(0, user.username.clone(), post0.id, PostState::Active)
+            .await
+            .unwrap();
+    }
 
     let comment0_r0 = db
         .comment_add(
@@ -187,7 +283,7 @@ async fn test_comment_search() {
 
     let comments = db
         .comment_search(
-            // 0,
+            user.username.clone(),
             post0.id,
             None,
             0,
@@ -205,7 +301,7 @@ async fn test_comment_search() {
 
     let comments = db
         .comment_search(
-            // 0,
+            user.username.clone(),
             post0.id,
             None,
             0,
@@ -223,7 +319,7 @@ async fn test_comment_search() {
 
     let comments = db
         .comment_search(
-            // 0,
+            user.username.clone(),
             post0.id,
             Some(comment0.id),
             0,
@@ -239,7 +335,7 @@ async fn test_comment_search() {
 
     let comments = db
         .comment_search(
-            // 0,
+            user.username.clone(),
             post0.id,
             Some(comment0_r0.id),
             0,
@@ -255,7 +351,7 @@ async fn test_comment_search() {
 
     let comments = db
         .comment_search(
-            // 0,
+            user.username.clone(),
             post0.id,
             Some(comment0_r1.id),
             0,
@@ -271,7 +367,7 @@ async fn test_comment_search() {
 
     let comments = db
         .comment_search(
-            // 0,
+            user.username.clone(),
             post0.id,
             Some(comment0_r2.id),
             0,
@@ -286,7 +382,7 @@ async fn test_comment_search() {
 
     let comments = db
         .comment_search(
-            // 0,
+            user.username.clone(),
             post0.id,
             Some(comment0.id),
             0,
@@ -304,7 +400,7 @@ async fn test_comment_search() {
 
     let comments = db
         .comment_search(
-            // 0,
+            user.username.clone(),
             post0.id,
             Some(comment0.id),
             0,
@@ -322,7 +418,7 @@ async fn test_comment_search() {
 
     let comments = db
         .comment_search(
-            // 0,
+            user.username.clone(),
             post0.id,
             Some(comment0.id),
             2,
@@ -339,7 +435,7 @@ async fn test_comment_search() {
 
     let comments = db
         .comment_search(
-            // 0,
+            user.username.clone(),
             post0.id,
             Some(comment0.id),
             2,
@@ -355,7 +451,7 @@ async fn test_comment_search() {
 
     let comments = db
         .comment_search(
-            // 0,
+            user.username.clone(),
             post0.id,
             Some(comment0.id),
             2,
@@ -372,7 +468,7 @@ async fn test_comment_search() {
 
     let comments = db
         .comment_search(
-            // 0,
+            user.username.clone(),
             post0.id,
             Some(comment0.id),
             2,

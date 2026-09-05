@@ -1,31 +1,29 @@
-use crate::{Db, DbComment};
+use crate::{Db, DbSession};
 use catsquad_log::prelude::*;
 
 #[derive(Debug, thiserror::Error)]
-pub enum DbCommentGetAllErr {
+pub enum DbSessionGetAllErr {
     #[error("DB error {0}")]
     Db(#[from] sqlx::Error),
 }
 
 impl Db {
-    pub async fn comment_get_all(&self) -> Result<Vec<DbComment>, DbCommentGetAllErr> {
+    pub async fn sessoin_get_all(&self) -> Result<Vec<DbSession>, DbSessionGetAllErr> {
         let pool = &self.db;
-        let query = "SELECT * FROM comments ORDER BY comment_created_at DESC";
+        let query = "SELECT * FROM sessions ORDER BY session_created_at DESC";
 
         trace!("about to run {query}");
 
         let result = sqlx::query_as(query).fetch_all(pool).await;
 
-        let comments = match result {
+        let sessions = match result {
             Ok(v) => v,
             Err(err) => {
                 error!("unexpected db error {err}");
-                return Err(DbCommentGetAllErr::Db(err));
+                return Err(DbSessionGetAllErr::Db(err));
             }
         };
 
-        Ok(comments)
+        Ok(sessions)
     }
 }
-
-// test is in /query/post_comment_add.rs

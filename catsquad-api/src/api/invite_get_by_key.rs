@@ -98,9 +98,9 @@ mod test_utils {
 }
 
 #[tokio::test]
-async fn test_invite_get_by_key() {
+async fn test_api_invite_get_by_key() {
     init_log();
-    let server = crate::TestServer::new().await;
+    let server = crate::TestServer::new(0, "test_api_invite_get_by_key").await;
 
     server.invite_add("prime@heyadora.com").await.unwrap();
     let invite_key = server.state.db.invite_get_all().await.unwrap()[0].token;

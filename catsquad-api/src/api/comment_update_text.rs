@@ -2,7 +2,7 @@ use axum::{Extension, Form, Json, extract::State, http::StatusCode, response::In
 use catsquad_db::{DbCommentUpdateTextErr, DbUser};
 use catsquad_log::prelude::*;
 use catsquad_shared::{
-    CommentRes, CommentUpdateTextErr, CommentUpdateTextReq, MAX_POST_COMMENT_LENGTH,
+    CommentRes, CommentUpdateTextErr, CommentUpdateTextReq, MAX_POST_COMMENT_LENGTH, PostState,
     PostUpdateTagsErr, validate_comment_text,
 };
 
@@ -74,7 +74,7 @@ mod test_utils {
             comment_id: i64,
             text: impl Into<String>,
             session_token: Uuid,
-        ) -> Result<cs::CommentRes, cs::CommentUpdateTextErr> {
+        ) -> Result<(), cs::CommentUpdateTextErr> {
             self.client
                 .comment_update_text(comment_id, text)
                 .header_add(
@@ -90,13 +90,13 @@ mod test_utils {
 }
 
 #[tokio::test]
-async fn test_comment_update_text() {
+async fn test_api_comment_update_text() {
     use crate::auth::create_auth_cookie_str;
     use axum::http::header;
 
     init_log();
 
-    let server = crate::TestServer::new().await;
+    let server = crate::TestServer::new(0, "test_api_comment_update_text").await;
 
     let (user1, session_key1) = server
         .user_add_full("prime", "prime@heyadora.com", "1234567890111GGd11$")
@@ -111,15 +111,26 @@ async fn test_comment_update_text() {
         .await
         .unwrap();
 
+    server
+        .post_update_state(post1.id, PostState::Active, session_key1)
+        .await
+        .unwrap();
+
     let comment1 = server
-        .comment_add(post1.id, 9, "text1", session_key1.clone())
+        .comment_add(post1.id, 0, "text1", session_key1.clone())
         .await
         .unwrap();
 
     assert_eq!(comment1.text, "text1");
 
-    let comment1 = server
+    server
         .comment_update_text(comment1.id.clone(), "text2", session_key1)
+        .await
+        .unwrap();
+    let comment1 = server
+        .state
+        .db
+        .comment_get_by_id(comment1.id)
         .await
         .unwrap();
 

@@ -465,14 +465,14 @@ mod test_utils {
 }
 
 #[tokio::test]
-async fn test_post_update_file_add() {
+async fn test_api_post_update_file_add() {
     use crate::auth::create_auth_cookie_str;
     use crate::{get_file_hash_for_testing_by_path, get_file_size};
     use axum::http::header;
 
     init_log();
 
-    let server = crate::TestServer::new().await;
+    let server = crate::TestServer::new(0, "test_api_post_update_file_add").await;
 
     let (user1, session_key1) = server
         .user_add_full("prime", "prime@heyadora.com", "1234567890111GGd11$")
@@ -491,7 +491,8 @@ async fn test_post_update_file_add() {
         (hash, PathBuf::from(file_path))
     };
 
-    let txt_file = "/tmp/test.txt";
+    // let txt_file = "/tmp/test.txt";
+    let txt_file = "../flake.nix";
     let favicon_path = "../assets/favicon.ico";
     let favicon_size = get_file_size(favicon_path).await;
     // let tmp_path = Path::new(&tmp_path);

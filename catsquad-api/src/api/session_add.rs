@@ -109,7 +109,7 @@ pub async fn session_add(
 #[cfg(any(test, feature = "test_server"))]
 mod test_utils {
     use axum::http::header;
-    use catsquad_shared as cs;
+    use catsquad_shared::{self as cs, Uuid, str_to_uuid};
 
     use crate::{TestServer, auth::auth_token_get};
 
@@ -130,12 +130,13 @@ mod test_utils {
             &self,
             email: impl Into<String>,
             password: impl Into<String>,
-        ) -> (cs::SensitiveUserRes, String) {
+        ) -> (cs::SensitiveUserRes, Uuid) {
             let res = self.client.session_add(email, password).send().await;
             let headers = res.get_headers().unwrap();
-            let session_key = auth_token_get(&headers, header::SET_COOKIE).unwrap();
+            let session_token = auth_token_get(&headers, header::SET_COOKIE).unwrap();
+            let session_token = str_to_uuid(session_token);
             let res = res.into_json().await.unwrap();
-            (res, session_key)
+            (res, session_token)
         }
     }
 }
@@ -164,9 +165,9 @@ mod test_utils {
 // }
 
 #[tokio::test]
-async fn test_session_add() {
+async fn test_api_session_add() {
     init_log();
-    let server = crate::TestServer::new().await;
+    let server = crate::TestServer::new(0, "test_api_session_add").await;
 
     let email = "hey@heyadora.com";
     let password = "1nnerogGeron@@$";

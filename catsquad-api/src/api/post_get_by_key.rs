@@ -42,7 +42,7 @@ pub fn status_code(result: &Result<PostRes, PostGetByKeyErr>) -> StatusCode {
     }
 }
 
-pub async fn post_get_by_key(
+pub async fn post_get_by_id(
     db_user: Extension<Option<DbUser>>,
     State(app): State<AppState>,
     Path(params): Path<PostGetByKeyParams>,
@@ -96,9 +96,9 @@ mod test_utils {
 }
 
 #[tokio::test]
-async fn test_post_get_by_key() {
+async fn test_api_post_get_by_key() {
     init_log();
-    let server = crate::TestServer::new().await;
+    let server = crate::TestServer::new(0, "test_api_post_get_by_key").await;
 
     let (_user1, session_key1) = server
         .user_add_full("prime", "prime@heyadora.com", "1234567890111GGd11$")

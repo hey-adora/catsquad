@@ -186,33 +186,73 @@ pub fn auth_token_get(headers: &HeaderMap, header_name: header::HeaderName) -> O
 fn extract_auth_token_plain(input: impl AsRef<str>) -> Option<String> {
     let input = input.as_ref();
     let input_len = input.len();
+    let mut i = input.chars();
 
     let mut start = 0;
-    let mut end = 0_usize;
-    let mut stage = 0_usize;
-    for (i, c) in input.chars().map(|v| v).enumerate() {
-        if (c >= '0' && c <= '9') || (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') {
-            if stage == 0 {
-                stage = 1;
-                start = i;
-            }
-            end = i;
-            trace!("0 {c} cursor {start} end {end}");
-            continue;
+    let mut end;
+    // let mut stage = 0_usize;
+
+    while let Some(c) = i.next() {
+        start += 1;
+        if c == ' ' {
+            break;
         }
-
-        if stage == 1 && end.saturating_sub(start) == 19 && end < input_len {
-            return Some(input[start..=end].to_string());
-        }
-
-        stage = 0;
-
-        trace!("3 {c} cursor {start} end {end}");
     }
 
-    if end.saturating_sub(start) == 19 && end < input_len {
-        Some(input[start..=end].to_string())
-    } else {
-        None
+    end = start;
+
+    while let Some(c) = i.next() {
+        let valid_char = (c >= '0' && c <= '9') || (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z');
+        if !valid_char {
+            break;
+        }
+        end += 1;
     }
+
+    let is_not_out_of_index = end <= input_len && start < end;
+    if !is_not_out_of_index {
+        return None;
+    }
+
+    Some(input[start..end].to_string())
+
+    // for
+
+    // for (i, c) in input.chars().map(|v| v).enumerate() {
+    //     if (c >= '0' && c <= '9') || (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') {
+    //         if stage == 0 {
+    //             stage = 1;
+    //             start = i;
+    //         }
+    //         end = i;
+    //         trace!("0 {c} cursor {start} end {end}");
+    //         continue;
+    //     }
+
+    //     if stage == 1 && end.saturating_sub(start) == 19 && end < input_len {
+    //         return Some(input[start..=end].to_string());
+    //     }
+
+    //     stage = 0;
+
+    //     trace!("3 {c} cursor {start} end {end}");
+    // }
+
+    // if end.saturating_sub(start) == 19 && end < input_len {
+    //     Some(input[start..=end].to_string())
+    // } else {
+    //     None
+    // }
+}
+
+#[cfg(test)]
+#[test]
+fn test_extract_auth_token_plain() {
+    init_log();
+
+    let token =
+        extract_auth_token_plain("authorization=Bearer 34JSuIfanzy1UDwwCLh3c; HttpOnly; Secure")
+            .unwrap();
+    assert_eq!(token, "34JSuIfanzy1UDwwCLh3c");
+    //extract_auth_token_plain
 }

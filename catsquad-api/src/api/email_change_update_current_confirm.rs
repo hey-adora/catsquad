@@ -88,7 +88,7 @@ mod test_utils {
             email_change_id: i64,
             token: Uuid,
             session_token: Uuid,
-        ) -> Result<cs::EmailChangeRes, cs::EmailChangeUpdateCurrentConfirmErr> {
+        ) -> Result<(), cs::EmailChangeUpdateCurrentConfirmErr> {
             self.client
                 .email_change_update_current_confirm(email_change_id, token)
                 .header_add(
@@ -105,11 +105,11 @@ mod test_utils {
 
 #[cfg(test)]
 #[tokio::test]
-async fn test_email_change_update_current_confirm() {
+async fn test_api_email_change_update_current_confirm() {
     use crate::auth::create_auth_cookie_str;
     use axum::http::header;
     init_log();
-    let server = crate::TestServer::new().await;
+    let server = crate::TestServer::new(0, "test_api_email_change_update_current_confirm").await;
 
     let (user1, session_key) = server
         .user_add_full("hey", "hey@heyadora.com", "1234567890111GG2f11$")
@@ -176,14 +176,14 @@ async fn test_email_change_update_current_confirm() {
         ));
         server.state.set_time(0);
 
-        let email_change = server
+        server
             .email_change_update_current_confirm(email_change.id, current_token, session_key)
             .await
             .unwrap();
 
         let result = server
             .email_change_update_current_confirm(
-                email_change.id.clone(),
+                email_change.id,
                 current_token.clone(),
                 session_key,
             )

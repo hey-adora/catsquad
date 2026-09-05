@@ -97,9 +97,9 @@ mod test_utils {
 }
 
 #[tokio::test]
-async fn test_invite_add() {
+async fn test_api_invite_add() {
     init_log();
-    let server = crate::TestServer::new().await;
+    let server = crate::TestServer::new(0, "test_api_invite_add").await;
 
     let result = server.invite_add("hello").await;
     // let result = server.invite_add("hello").await;

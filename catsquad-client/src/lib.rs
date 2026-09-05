@@ -456,13 +456,13 @@ where
         req: TReq,
     ) -> Builder<TSender, TResult, TError>
     where
-        TReq: serde::Serialize,
+        TReq: serde::Serialize + Debug,
         TResult: for<'a> serde::Deserialize<'a> + Debug,
         TError: for<'a> serde::Deserialize<'a> + Debug + Default,
     {
         let req = req
             .to_form()
-            .inspect_err(|err| error!("serializing failed {err}"))
+            .inspect_err(|err| error!("serializing of\n{req:#?}\nfailed {err}"))
             .unwrap_or_default();
         let params = SenderParams {
             path: link.into(),
@@ -534,22 +534,26 @@ where
         invite_key: Uuid,
         password: impl Into<String>,
     ) -> Builder<TSender, catsquad_shared::SensitiveUserRes, catsquad_shared::UserAddErr> {
-        let req = catsquad_shared::UserAddReq {
-            username: username.into(),
-            password: password.into(),
-            invite_key: invite_key,
-        }
-        .to_form()
-        .inspect_err(|err| error!("serializing failed {err}"))
-        .unwrap_or_default();
-        let params = SenderParams {
-            path: cs::LINK_API_USER_ADD.to_string(),
-            method: Method::Post,
-            body: Body::Form(req),
-            ..Default::default()
-        };
-        let sender = self.sender.clone();
-        Builder::new(sender, params)
+        self.post_form(
+            cs::LINK_API_USER_ADD,
+            cs::UserAddReq {
+                username: username.into(),
+                password: password.into(),
+                invite_key: invite_key,
+            },
+        )
+        // let req =
+        // .to_form()
+        // .inspect_err(|err| error!("serializing failed {err}"))
+        // .unwrap_or_default();
+        // let params = SenderParams {
+        //     path: cs::LINK_API_USER_ADD.to_string(),
+        //     method: Method::Post,
+        //     body: Body::Form(req),
+        //     ..Default::default()
+        // };
+        // let sender = self.sender.clone();
+        // Builder::new(sender, params)
     }
 
     pub fn user_update_username(
@@ -607,7 +611,7 @@ where
     pub fn post_like_remove(
         &self,
         post_id: i64,
-    ) -> Builder<TSender, catsquad_shared::PostLikeRes, catsquad_shared::PostLikeRemoveErr> {
+    ) -> Builder<TSender, (), catsquad_shared::PostLikeRemoveErr> {
         self.post_form(
             cs::LINK_API_POST_LIKE_REMOVE,
             cs::PostLikeRemoveReq { post_id },
@@ -860,11 +864,7 @@ where
         &self,
         email_change_id: i64,
         token: Uuid,
-    ) -> Builder<
-        TSender,
-        catsquad_shared::EmailChangeRes,
-        catsquad_shared::EmailChangeUpdateCurrentConfirmErr,
-    > {
+    ) -> Builder<TSender, (), catsquad_shared::EmailChangeUpdateCurrentConfirmErr> {
         self.post_form(
             cs::LINK_API_EMAIL_CHANGE_UPDATE_CURRENT_CONFIRM,
             catsquad_shared::EmailChangeUpdateCurrentConfirmReq {
@@ -908,25 +908,21 @@ where
 
     pub fn email_change_update_finish(
         &self,
-        email_change_key: impl Into<String>,
-    ) -> Builder<TSender, cs::EmailChangeRes, cs::EmailChangeUpdateFinishErr> {
+        email_change_id: i64,
+    ) -> Builder<TSender, (), cs::EmailChangeUpdateFinishErr> {
         self.post_form(
             cs::LINK_API_EMAIL_CHANGE_UPDATE_FINISH,
-            cs::EmailChangeUpdateFinishReq {
-                email_change_key: email_change_key.into(),
-            },
+            cs::EmailChangeUpdateFinishReq { email_change_id },
         )
     }
 
     pub fn email_change_update_cancel(
         &self,
-        email_change_key: impl Into<String>,
-    ) -> Builder<TSender, cs::EmailChangeRes, cs::EmailChangeUpdateCancelErr> {
+        email_change_id: i64,
+    ) -> Builder<TSender, (), cs::EmailChangeUpdateCancelErr> {
         self.post_form(
             cs::LINK_API_EMAIL_CHANGE_UPDATE_CANCEL,
-            cs::EmailChangeUpdateCancelReq {
-                email_change_key: email_change_key.into(),
-            },
+            cs::EmailChangeUpdateCancelReq { email_change_id },
         )
     }
 
@@ -977,7 +973,7 @@ where
         &self,
         comment_id: i64,
         text: impl Into<String>,
-    ) -> Builder<TSender, cs::CommentRes, cs::CommentUpdateTextErr> {
+    ) -> Builder<TSender, (), cs::CommentUpdateTextErr> {
         self.post_form(
             cs::LINK_API_COMMENT_UPDATE_TEXT,
             cs::CommentUpdateTextReq {

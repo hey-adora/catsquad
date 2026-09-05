@@ -104,35 +104,72 @@ mod test_utils {
 
 #[cfg(test)]
 #[tokio::test]
-async fn test_comment_add() {
+async fn test_api_comment_add() {
     use catsquad_log::prelude::*;
-    use catsquad_shared::MAX_POST_COMMENT_LENGTH;
+    use catsquad_shared::{MAX_POST_COMMENT_LENGTH, PostState};
 
     use crate::utils::rng_str;
     init_log();
 
-    let server = crate::TestServer::new().await;
+    let server = crate::TestServer::new(0, "test_api_comment_add").await;
 
-    let (user, session_key) = server
+    let (user, session_token) = server
         .user_add_full("hey", "hey@heyadora.com", "1nnerogGeron@@$")
         .await;
 
+    let (user2, session_token2) = server
+        .user_add_full("hey2", "hey2@heyadora.com", "1nnerogGeron@@$")
+        .await;
+
     let post1 = server
-        .post_add("title1", "description1", "tags1", session_key)
+        .post_add("title1", "description1", "tags1", session_token)
         .await
         .unwrap();
 
-    let comment1 = server
-        .comment_add(post1.id, 0, "text", session_key)
+    let result = server.comment_add(post1.id, 0, "text", session_token).await;
+    assert!(matches!(result, Err(CommentAddErr::Unauthorized(_))));
+
+    let result = server
+        .comment_add(post1.id, 0, "text", session_token2)
+        .await;
+    assert!(matches!(result, Err(CommentAddErr::Unauthorized(_))));
+
+    server
+        .post_update_state(post1.id, PostState::Active, session_token)
         .await
         .unwrap();
 
-    let result = server.comment_add(post1.id, 0, "", session_key).await;
+    server
+        .comment_add(post1.id, 0, "text", session_token)
+        .await
+        .unwrap();
+
+    server
+        .comment_add(post1.id, 0, "text1", session_token2)
+        .await
+        .unwrap();
+
+    server
+        .post_update_state(post1.id, PostState::Hidden, session_token)
+        .await
+        .unwrap();
+
+    server
+        .comment_add(post1.id, 0, "text2", session_token)
+        .await
+        .unwrap();
+
+    let result = server
+        .comment_add(post1.id, 0, "text3", session_token2)
+        .await;
+    assert!(matches!(result, Err(CommentAddErr::Unauthorized(_))));
+
+    let result = server.comment_add(post1.id, 0, "", session_token).await;
     assert!(matches!(result, Err(CommentAddErr::InvalidText(_))));
 
     let text_invalid = rng_str(MAX_POST_COMMENT_LENGTH + 1);
     let result = server
-        .comment_add(post1.id, 0, text_invalid, session_key)
+        .comment_add(post1.id, 0, text_invalid, session_token)
         .await;
     assert!(matches!(result, Err(CommentAddErr::InvalidText(_))));
 }

@@ -17,6 +17,10 @@ pub fn u128_to_str(uuid: u128) -> String {
     let mut buffer = [0; 255];
     let mut index = buffer.len();
 
+    if uuid == 0 {
+        return 0.to_string();
+    }
+
     loop {
         if num == 0 {
             break;
@@ -121,6 +125,8 @@ pub fn char_to_num(c: u8) -> u8 {
 fn test_uuid_to_str() {
     init_log();
 
+    assert_eq!(u128_to_str(0), "0");
+    assert_eq!(u128_to_str(1), "1");
     assert_eq!(u128_to_str(10), "A");
     assert_eq!(u128_to_str(61), "z");
     assert_eq!(u128_to_str(62), "10");
@@ -135,6 +141,7 @@ fn test_str_to_uuid() {
     init_log();
 
     // assert_eq!(str_to_uuid("9"), 9);
+    assert_eq!(str_to_u128("0"), 0);
     assert_eq!(str_to_u128("10"), 62);
     assert_eq!(str_to_u128("11"), 63);
     assert_eq!(str_to_u128("7n42DGM5Tflk9n8mt7Fhc7"), u128::MAX);

@@ -118,9 +118,9 @@ mod test_utils {
 }
 
 #[tokio::test]
-async fn test_post_add() {
+async fn test_api_post_add() {
     init_log();
-    let server = crate::TestServer::new().await;
+    let server = crate::TestServer::new(0, "test_api_post_add").await;
 
     let email = "hey@heyadora.com";
     let password = "1nnerogGeron@@$";
@@ -135,11 +135,11 @@ async fn test_post_add() {
 
     assert_eq!(post1.created_at, 1);
 
-    let post1 = server
+    server
         .post_update_state(post1.id, PostState::Active, session_key)
         .await
         .unwrap();
-
+    let post1 = server.post_get_by_key(post1.id, session_key).await.unwrap();
     assert_eq!(post1.created_at, 1);
 
     server.state.set_time(2);
@@ -151,10 +151,11 @@ async fn test_post_add() {
 
     assert_eq!(post2.created_at, 2);
 
-    let post2 = server
+    server
         .post_update_state(post2.id, PostState::Active, session_key)
         .await
         .unwrap();
+    let post1 = server.post_get_by_key(post1.id, session_key).await.unwrap();
 
     assert_eq!(post2.created_at, 2);
 }

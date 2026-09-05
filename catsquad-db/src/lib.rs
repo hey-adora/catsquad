@@ -37,6 +37,8 @@ pub use query::email_change_update_finish::*;
 pub use query::email_change_update_new_add::*;
 pub use query::email_change_update_new_confirm::*;
 pub use query::email_sent_add::*;
+pub use query::post_image_get_by_hash::*;
+pub use query::session_get_all::*;
 // pub use query::email_sent_get_all;
 pub use query::file_image_add::*;
 pub use query::file_image_get_by_hash::*;

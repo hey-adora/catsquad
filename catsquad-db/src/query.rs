@@ -2,6 +2,7 @@
 // TODO ADD AUTH ERROR ON COMMENTS WHEN POST IS DRAFT/HIDDEN
 pub mod comment_add;
 pub mod comment_get_all;
+pub mod comment_get_by_id;
 pub mod comment_remove;
 pub mod comment_search;
 pub mod comment_update_text;
@@ -29,6 +30,7 @@ pub mod password_change_update_confirm;
 pub mod post_add;
 pub mod post_get_all;
 pub mod post_get_by_key;
+pub mod post_image_get_by_hash;
 pub mod post_like_add;
 pub mod post_like_exists_by_post;
 pub mod post_like_get_all;
@@ -44,6 +46,7 @@ pub mod post_update_state;
 pub mod post_update_tags;
 pub mod post_update_title;
 pub mod session_add;
+pub mod session_get_all;
 pub mod session_get_by_key;
 pub mod session_remove;
 pub mod user_add;

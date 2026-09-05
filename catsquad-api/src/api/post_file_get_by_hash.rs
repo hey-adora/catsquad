@@ -7,20 +7,20 @@ use axum::{
     },
     response::IntoResponse,
 };
-use catsquad_db::{DbPostGetByKeyErr, DbUser};
+use catsquad_db::{DbPostGetByKeyErr, DbPostImageGetByHashErr, DbUser};
 use catsquad_log::prelude::*;
 use catsquad_shared::{PostFileGetByHashErr, StorageParams};
 use tokio::fs;
 
 use crate::state::AppState;
 
-fn from_post_get_by_key_err(value: DbPostGetByKeyErr) -> PostFileGetByHashErr {
+fn from_post_image_get_by_hash_err(value: DbPostImageGetByHashErr) -> PostFileGetByHashErr {
     match value {
-        DbPostGetByKeyErr::PostNotFound => PostFileGetByHashErr::PostNotFound,
-        DbPostGetByKeyErr::Unauthorized => {
+        DbPostImageGetByHashErr::NotFound => PostFileGetByHashErr::FileNotFound,
+        DbPostImageGetByHashErr::Unauthorized => {
             PostFileGetByHashErr::Unauthorized("unauthorized".to_string())
         }
-        DbPostGetByKeyErr::Db(_) => PostFileGetByHashErr::InternalServerErr,
+        DbPostImageGetByHashErr::Db(_) => PostFileGetByHashErr::InternalServerErr,
     }
 }
 
@@ -31,7 +31,7 @@ fn from_io_err(_value: std::io::Error) -> PostFileGetByHashErr {
 fn status_code(result: &Result<Vec<u8>, PostFileGetByHashErr>) -> StatusCode {
     match result {
         Ok(_) => StatusCode::OK,
-        Err(PostFileGetByHashErr::PostNotFound) => StatusCode::NOT_FOUND,
+        // Err(PostFileGetByHashErr::PostNotFound) => StatusCode::NOT_FOUND,
         Err(PostFileGetByHashErr::FileNotFound) => StatusCode::NOT_FOUND,
         Err(PostFileGetByHashErr::Unauthorized(_)) => StatusCode::UNAUTHORIZED,
         Err(PostFileGetByHashErr::InternalServerErr) => StatusCode::INTERNAL_SERVER_ERROR,
@@ -46,34 +46,40 @@ pub async fn post_file_get_by_hash(
     //TODO optimize this nonsense, simplify db query
     //the string manipulation at the end is -100000% performance
 
-    let user_usename = db_user
+    let user_username = db_user
         .as_ref()
         .map(|v| v.username.clone())
         .unwrap_or_default();
-    let post_key = params.post_id;
+    let post_id = params.post_id;
     let file_hash = params.file_hash;
 
     let inner = async || -> Result<(Vec<u8>, String), PostFileGetByHashErr> {
-        let post = app
+        // let post = app
+        //     .db
+        //     .post_get_by_id(user_usename, post_key)
+        //     .await
+        //     .map_err(from_post_get_by_key_err)?;
+
+        // let file_hash = post
+        //     .images_hashes
+        //     .into_iter()
+        //     .find(|v| *v == file_hash)
+        //     .ok_or(PostFileGetByHashErr::FileNotFound)?;
+        // let file_hash_str = (file_hash as u64).to_string();
+
+        let image = app
             .db
-            .post_get_by_id(user_usename, post_key)
+            .post_image_get_by_hash(user_username, post_id, file_hash)
             .await
-            .map_err(from_post_get_by_key_err)?;
-
-        let file_hash = post
-            .images_hashes
-            .into_iter()
-            .find(|v| *v == file_hash)
-            .ok_or(PostFileGetByHashErr::FileNotFound)?;
-        let file_hash_str = (file_hash as u64).to_string();
-
+            .map_err(from_post_image_get_by_hash_err)?;
         // TODO GET FROM FILES_IMAGES TABLE
 
         // let file_extension = file.extension;
-        let file_extension = "png".to_string();
+        let file_extension = image.extension;
+        let hash_str = image.hash.to_string();
         let path = app.get_storage_path().await;
         let path = std::path::Path::new(&path);
-        let path = path.join(file_hash_str).with_extension(&file_extension);
+        let path = path.join(hash_str).with_extension(&file_extension);
 
         let bytes = fs::read(&path)
             .await
@@ -150,13 +156,13 @@ mod test_utils {
 
 #[cfg(test)]
 #[tokio::test]
-async fn test_post_file_by_hash() {
+async fn test_api_post_file_by_hash() {
     use catsquad_shared::PostState;
 
     use crate::{auth::create_auth_cookie_str, get_file_hash_for_testing_by_path};
 
     init_log();
-    let server = crate::TestServer::new().await;
+    let server = crate::TestServer::new(0, "test_api_post_file_by_hash").await;
 
     let (_user1, session_key1) = server
         .user_add_full("prime", "prime@heyadora.com", "1234567890111GGd11$")
@@ -172,7 +178,7 @@ async fn test_post_file_by_hash() {
     let result = server
         .post_file_get_by_hash(post1.id, file_hash, session_key1)
         .await;
-    assert!(matches!(result, Err(PostFileGetByHashErr::PostNotFound)));
+    assert!(matches!(result, Err(PostFileGetByHashErr::FileNotFound)));
 
     server
         .post_update_state(post1.id, PostState::Active, session_key1)
@@ -185,19 +191,14 @@ async fn test_post_file_by_hash() {
     assert!(matches!(result, Err(PostFileGetByHashErr::FileNotFound)));
 
     let result = server
-        .client
-        .post_update_file_add(post1.key.clone(), vec!["../assets/favicon.ico".to_string()])
-        .header_add(header::COOKIE, create_auth_cookie_str(session_key1.clone()))
-        .send()
-        .await
-        .into_json()
+        .post_update_file_add(post1.id, &["../assets/favicon.ico"], session_key1)
         .await
         .unwrap();
 
     // let file_hash = result.file[0].hash.clone();
 
     let result = server
-        .post_file_get_by_hash(&post1.key, &file_hash, &session_key1)
+        .post_file_get_by_hash(post1.id, file_hash, session_key1)
         .await
         .unwrap();
 

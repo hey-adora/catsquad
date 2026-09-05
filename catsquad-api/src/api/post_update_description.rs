@@ -87,14 +87,15 @@ mod test_utils {
 
 #[cfg(test)]
 #[tokio::test]
-async fn test_post_update_description() {
+async fn test_api_post_update_description() {
     use crate::auth::create_auth_cookie_str;
     use axum::http::header;
     use catsquad_log::prelude::*;
+    use catsquad_shared::PostState;
 
     init_log();
 
-    let server = crate::TestServer::new().await;
+    let server = crate::TestServer::new(0, "test_api_post_update_description").await;
 
     let (user1, session_key1) = server
         .user_add_full("prime", "prime@heyadora.com", "1234567890111GGd11$")
@@ -113,6 +114,12 @@ async fn test_post_update_description() {
         .post_update_description(post1.id, "description2", session_key1)
         .await
         .unwrap();
+
+    server
+        .post_update_state(post1.id, PostState::Active, session_key1)
+        .await
+        .unwrap();
+
     let post1 = server
         .post_get_by_key(post1.id, session_key1)
         .await

@@ -1,6 +1,6 @@
 use catsquad_log::prelude::*;
 
-pub const LINK_API_POST_FILE_GET_BY_HASH: &str = "/api/post/{post_key}/file/{file_hash}";
+pub const LINK_API_POST_FILE_GET_BY_HASH: &str = "/api/post/{post_id}/file/{file_hash}";
 
 #[derive(Clone, serde::Deserialize, serde::Serialize)]
 pub struct StorageParams {

@@ -22,7 +22,7 @@ impl Db {
         time: u64,
         password_change_token: Uuid,
         new_password: impl Into<String>,
-    ) -> Result<(), DbPasswordChangeUpdateConfirmErr> {
+    ) -> Result<String, DbPasswordChangeUpdateConfirmErr> {
         let pool = &self.db;
         let token = password_change_token;
 
@@ -71,6 +71,26 @@ impl Db {
             user_email
         };
 
+        // delete sessoins
+        {
+            let query = "DELETE FROM sessions WHERE session_user_email = $1";
+
+            let result = sqlx::query(query).bind(&user_email).execute(&mut *tx).await;
+
+            debug!("query: {query}\nresult: {result:#?}");
+
+            let result = match result {
+                Ok(v) => v,
+                Err(err) => {
+                    error!("unexpected db error {err}");
+                    return Err(DbPasswordChangeUpdateConfirmErr::Db(err));
+                }
+            };
+
+            let affected = result.rows_affected();
+            trace!("deleted sessions count {affected}");
+        }
+
         // update user
         {
             let query = "UPDATE users SET
@@ -81,7 +101,7 @@ impl Db {
             let result = sqlx::query(query)
                 .bind(new_password.into())
                 .bind(XTimestamp(time as i64))
-                .bind(user_email)
+                .bind(&user_email)
                 .execute(&mut *tx)
                 .await;
 
@@ -128,7 +148,7 @@ impl Db {
             .await
             .inspect_err(|err| error!("password_change_update_confirm {err}"))?;
 
-        Ok(())
+        Ok(user_email)
     }
 }
 
@@ -138,46 +158,81 @@ async fn test_password_change_update_confirm() {
     init_log();
 
     let db = Db::test_db(0, "test_password_change_update_confirm").await;
-
     let email = "hey@heyadora.com";
-    let invite1 = db.invite_add(0, email, 1).await.unwrap();
-    assert_eq!(invite1.email, email);
 
-    let user = db
-        .user_add(0, "hey", "hey", invite1.token, 10, 10)
-        .await
-        .unwrap();
-    assert_eq!(user.password, "hey");
+    let (user1, user2) = {
+        let invite1 = db.invite_add(0, email, 1).await.unwrap();
+        assert_eq!(invite1.email, email);
+
+        let user = db
+            .user_add(0, "hey", "hey", invite1.token, 10, 10)
+            .await
+            .unwrap();
+        assert_eq!(user.password, "hey");
+
+        let invite2 = db.invite_add(0, "hey2@heyadora.com", 1).await.unwrap();
+        let user2 = db
+            .user_add(0, "hey2", "hey2", invite2.token, 10, 10)
+            .await
+            .unwrap();
+
+        db.session_add(0, &user.email).await.unwrap();
+        db.session_add(1, &user2.email).await.unwrap();
+        let sessions = db.sessoin_get_all().await.unwrap();
+        assert_eq!(sessions.len(), 2);
+        assert_eq!(sessions[0].user_email, user2.email);
+        assert_eq!(sessions[1].user_email, user.email);
+
+        (user, user2)
+    };
 
     let password_change = db.password_change_add(0, email, 10).await.unwrap();
 
-    let result = db
-        .password_change_update_confirm(11, password_change.token, "hey2")
-        .await;
-    assert!(matches!(
-        result,
-        Err(DbPasswordChangeUpdateConfirmErr::Expired)
-    ));
+    // assert expired
+    {
+        let result = db
+            .password_change_update_confirm(11, password_change.token, "hey2")
+            .await;
+        assert!(matches!(
+            result,
+            Err(DbPasswordChangeUpdateConfirmErr::Expired)
+        ));
+    }
 
-    db.password_change_update_confirm(0, password_change.token, "hey2")
-        .await
-        .unwrap();
-    let user = db.user_get_by_email(email).await.unwrap();
-    assert_eq!(user.password, "hey2");
+    // assert success
+    {
+        let result = db
+            .password_change_update_confirm(0, password_change.token, "hey2")
+            .await
+            .unwrap();
+        let user = db.user_get_by_email(email).await.unwrap();
+        assert_eq!(result, user.email);
+        assert_eq!(user.password, "hey2");
+    }
 
-    let result = db
-        .password_change_update_confirm(0, password_change.token, "hey2")
-        .await;
-    assert!(matches!(
-        result,
-        Err(DbPasswordChangeUpdateConfirmErr::AlreadyUsed)
-    ));
+    // assert that old sessions got deleted
+    {
+        let sessions = db.sessoin_get_all().await.unwrap();
+        assert_eq!(sessions.len(), 1);
+        assert_eq!(sessions[0].user_email, user2.email);
+    }
 
-    let result = db
-        .password_change_update_confirm(0, 0_u128.to_be_bytes(), "hey2")
-        .await;
-    assert!(matches!(
-        result,
-        Err(DbPasswordChangeUpdateConfirmErr::TokenNotFound)
-    ));
+    // assert other errors
+    {
+        let result = db
+            .password_change_update_confirm(0, password_change.token, "hey2")
+            .await;
+        assert!(matches!(
+            result,
+            Err(DbPasswordChangeUpdateConfirmErr::AlreadyUsed)
+        ));
+
+        let result = db
+            .password_change_update_confirm(0, 0_u128.to_be_bytes(), "hey2")
+            .await;
+        assert!(matches!(
+            result,
+            Err(DbPasswordChangeUpdateConfirmErr::TokenNotFound)
+        ));
+    }
 }

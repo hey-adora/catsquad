@@ -167,11 +167,11 @@ mod test_utils {
 
 #[cfg(test)]
 #[tokio::test]
-async fn test_email_change_add() {
+async fn test_api_email_change_add() {
     use crate::auth::create_auth_cookie_str;
     use axum::http::header;
     init_log();
-    let server = crate::TestServer::new().await;
+    let server = crate::TestServer::new(0, "test_api_email_change_add").await;
 
     let (user1, session_key) = server
         .user_add_full("hey", "hey@heyadora.com", "1g234567890111GG11$")

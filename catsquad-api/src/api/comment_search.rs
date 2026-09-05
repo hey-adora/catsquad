@@ -37,6 +37,7 @@ pub async fn comment_search(
         let result = app
             .db
             .comment_search(
+                String::new(), // TODO get Option<DbUser> with auth
                 // time,
                 req.post_id,
                 if req.comment_id == 0 {
@@ -92,10 +93,12 @@ mod test_utils {
 
 #[cfg(test)]
 #[tokio::test]
-async fn test_comment_search() {
+async fn test_api_comment_search() {
+    use catsquad_shared::PostState;
+
     init_log();
 
-    let server = crate::TestServer::new().await;
+    let server = crate::TestServer::new(0, "test_api_comment_search").await;
 
     let (user1, session_key1) = server
         .user_add_full("prime", "prime@heyadora.com", "1234567890111GGd11$")
@@ -107,6 +110,11 @@ async fn test_comment_search() {
 
     let post1 = server
         .post_add("title", "description1", "tags1", session_key1.clone())
+        .await
+        .unwrap();
+
+    server
+        .post_update_state(post1.id, PostState::Active, session_key1)
         .await
         .unwrap();
 

@@ -23,7 +23,7 @@ pub struct AppState {
 }
 
 impl AppState {
-    pub async fn mem() -> Self {
+    pub async fn mem(time: u64, test_db: &str) -> Self {
         let tmp_name = rand::distr::Alphanumeric.sample_string(&mut rand::rng(), 16);
         fs::create_dir_all(format!("/tmp/catsquad-dev/{tmp_name}/assets"))
             .await
@@ -42,7 +42,7 @@ impl AppState {
         let assets = Assets::mem();
 
         Self {
-            db: Db::test_db(0, "catsquad").await,
+            db: Db::test_db(time, test_db).await,
             conf: Arc::new(AsyncRwLock::new(conf)),
             time: Some(Arc::new(SyncRwLock::new(0))),
             assets: Arc::new(assets),

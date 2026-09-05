@@ -1,7 +1,7 @@
 use axum::{Extension, Form, Json, extract::State, http::StatusCode, response::IntoResponse};
 use catsquad_db::{DbCommentRemoveErr, DbUser};
 use catsquad_log::prelude::*;
-use catsquad_shared::{CommentRemoveErr, CommentRemoveReq, CommentRes};
+use catsquad_shared::{CommentRemoveErr, CommentRemoveReq, CommentRes, PostState};
 
 use crate::{
     api::{comment_add::from_db_comment, post_add::from_db_post},
@@ -81,13 +81,13 @@ mod test_utils {
 }
 
 #[tokio::test]
-async fn test_comment_remove() {
+async fn test_api_comment_remove() {
     use crate::auth::create_auth_cookie_str;
     use axum::http::header;
 
     init_log();
 
-    let server = crate::TestServer::new().await;
+    let server = crate::TestServer::new(0, "test_api_comment_remove").await;
 
     let (user1, session_key1) = server
         .user_add_full("prime", "prime@heyadora.com", "1234567890111GGd11$")
@@ -102,11 +102,46 @@ async fn test_comment_remove() {
         .await
         .unwrap();
 
-    server.state.set_time(0);
-    let comment1 = server
-        .comment_add(post1.id, 0, "text1", session_key1)
-        .await
-        .unwrap();
+    let comment1 = {
+        // testing permissions on each post_state
+        server
+            .post_update_state(post1.id, PostState::Active, session_key1)
+            .await
+            .unwrap();
+
+        server.state.set_time(0);
+        let comment1 = server
+            .comment_add(post1.id, 0, "text1", session_key1)
+            .await
+            .unwrap();
+
+        server
+            .post_update_state(post1.id, PostState::Hidden, session_key1)
+            .await
+            .unwrap();
+
+        let result = server
+            .comment_remove(comment1.id.clone(), session_key2)
+            .await;
+        assert!(matches!(result, Err(CommentRemoveErr::Unauthorized(_))));
+
+        server
+            .comment_remove(comment1.id.clone(), session_key1)
+            .await
+            .unwrap();
+
+        let comment1 = server
+            .comment_add(post1.id, 0, "text1", session_key1)
+            .await
+            .unwrap();
+
+        server
+            .post_update_state(post1.id, PostState::Active, session_key1)
+            .await
+            .unwrap();
+
+        comment1
+    };
 
     server.state.set_time(1);
     let comment2 = server
