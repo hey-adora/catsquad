@@ -4,13 +4,33 @@ use axum::{
     http::{StatusCode, header},
     response::IntoResponse,
 };
-use catsquad_db::{DbPost, DbPostSearchErr};
-use catsquad_shared::{Order, PostRes, PostSearchErr, PostSearchParams, PostState, TimeRange};
+use catsquad_db::{DbPost, DbPostSearch, DbPostSearchErr};
+use catsquad_shared::{
+    Order, PostSearchErr, PostSearchParams, PostSearchRes, PostState, TimeRange,
+};
 
 use crate::{api::post_add::from_db_post, state::AppState};
 
-pub fn from_db_posts(value: Vec<DbPost>) -> Vec<PostRes> {
-    value.into_iter().map(|v| from_db_post(v)).collect()
+pub fn from_db_posts(value: Vec<DbPostSearch>) -> Vec<PostSearchRes> {
+    value.into_iter().map(from_db_post_search).collect()
+}
+
+pub fn from_db_post_search(value: DbPostSearch) -> PostSearchRes {
+    PostSearchRes {
+        id: value.id,
+        user_username: value.user_username,
+        state: PostState::from(value.state),
+        title: value.title,
+        tags: value.tags,
+        favorites: value.likes_count,
+        description: value.description,
+        image_width: value.image_width,
+        image_height: value.image_height,
+        image_extension: value.image_extension,
+        image_hash: value.image_hash,
+        modified_at: value.modified_at,
+        created_at: value.created_at,
+    }
 }
 
 fn from_db_post_search_err(value: DbPostSearchErr) -> PostSearchErr {
@@ -31,7 +51,7 @@ fn from_db_post_search_err(value: DbPostSearchErr) -> PostSearchErr {
 //         })
 // }
 
-pub fn status_code(result: &Result<Vec<PostRes>, PostSearchErr>) -> StatusCode {
+pub fn status_code(result: &Result<Vec<PostSearchRes>, PostSearchErr>) -> StatusCode {
     match result {
         Ok(_) => StatusCode::OK,
         Err(PostSearchErr::InternalServer) => StatusCode::INTERNAL_SERVER_ERROR,
@@ -52,7 +72,7 @@ pub async fn post_search(
     let limit = req.limit.unwrap_or(50);
     let range = req.range.unwrap_or(TimeRange::MoreOrEqual);
     let order = req.order.unwrap_or(Order::ThreeTwoOne);
-    let inner = async || -> Result<Vec<PostRes>, PostSearchErr> {
+    let inner = async || -> Result<Vec<PostSearchRes>, PostSearchErr> {
         let posts = app
             .db
             .post_search(
@@ -90,7 +110,7 @@ mod test_utils {
             limit: usize,
             range: TimeRange,
             order: Order,
-        ) -> Result<Vec<cs::PostRes>, cs::PostSearchErr> {
+        ) -> Result<Vec<cs::PostSearchRes>, cs::PostSearchErr> {
             self.client
                 .post_search(tags, username, time, limit, range, order)
                 .send()

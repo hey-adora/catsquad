@@ -288,9 +288,9 @@ async fn test_post_update_file_remove() {
         let img1 = db.file_image_get_by_hash(11).await.unwrap();
         let img2 = db.file_image_get_by_hash(12).await.unwrap();
 
-        assert_eq!(post1.images_hashes.len(), 2);
-        assert_eq!(post1.images_hashes[0], 11);
-        assert_eq!(post1.images_hashes[1], 12);
+        assert_eq!(post1.images.len(), 2);
+        assert_eq!(post1.images[0].hash, 11);
+        assert_eq!(post1.images[1].hash, 12);
         assert_eq!(post1.size_bytes, 20);
         assert_eq!(user1.used_storage_bytes, 35);
         assert_eq!(img1.used_count, 1);
@@ -345,8 +345,8 @@ async fn test_post_update_file_remove() {
         let img2 = db.file_image_get_by_hash(12).await.unwrap();
 
         assert_eq!(post1_file, 0);
-        assert_eq!(post1.images_hashes.len(), 1);
-        assert_eq!(post1.images_hashes[0], 12);
+        assert_eq!(post1.images.len(), 1);
+        assert_eq!(post1.images[0].hash, 12);
         assert_eq!(post1.size_bytes, 15);
         assert_eq!(user1.used_storage_bytes, 30);
         assert!(matches!(img1, Err(DbFileImageGetByHashErr::NotFound)));
@@ -374,7 +374,7 @@ async fn test_post_update_file_remove() {
         let img2 = db.file_image_get_by_hash(12).await.unwrap();
 
         assert_eq!(post1_file, 1);
-        assert_eq!(post1.images_hashes.len(), 0);
+        assert_eq!(post1.images.len(), 0);
         assert_eq!(post1.size_bytes, 0);
         assert_eq!(user1.used_storage_bytes, 15);
         assert!(matches!(img1, Err(DbFileImageGetByHashErr::NotFound)));

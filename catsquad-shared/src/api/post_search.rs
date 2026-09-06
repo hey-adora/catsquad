@@ -1,7 +1,24 @@
-use crate::{Order, TimeRange, ToForm, serde_from_option_u128, serde_to_option_u128};
+use crate::{Order, PostState, TimeRange, ToForm, serde_from_option_u128, serde_to_option_u128};
 use catsquad_log::prelude::*;
 
 pub const LINK_API_POST_SEARCH: &str = "/api/posts";
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
+pub struct PostSearchRes {
+    pub id: i64,
+    pub user_username: String,
+    pub state: PostState,
+    pub title: String,
+    pub description: String,
+    pub tags: String,
+    pub favorites: u32,
+    pub image_width: u32,
+    pub image_height: u32,
+    pub image_extension: String,
+    pub image_hash: i64,
+    pub modified_at: u64,
+    pub created_at: u64,
+}
 
 pub fn link_relative_post_search(params: PostSearchParams) -> String {
     format!(

@@ -31,10 +31,13 @@ pub fn UsernameChange() -> impl IntoView {
         };
         let navigate = navigate.clone();
         spawner.spawn(async move {
-            let Some(result) = username_change.change(new_username, current_password).await else {
+            let Some(_) = username_change
+                .change(new_username.clone(), current_password)
+                .await
+            else {
                 return;
             };
-            page.acc_username_set(result.username);
+            page.acc_username_set(new_username);
             navigate(link_back(), NavigateOptions::default());
         });
     };

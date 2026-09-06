@@ -1,7 +1,23 @@
+use crate::{PostFile, PostState};
+
 pub const LINK_API_POST_GET_BY_ID: &str = "/api/post/{post_id}";
 
 pub fn link_relative_post_get_by_key(post_id: i64) -> String {
     format!("/api/post/{}", post_id)
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
+pub struct PostGetRes {
+    pub id: i64,
+    pub user_username: String,
+    pub state: PostState,
+    pub title: String,
+    pub description: String,
+    pub tags: String,
+    pub favorites: u32,
+    pub file: Vec<PostFile>,
+    pub modified_at: u64,
+    pub created_at: u64,
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]

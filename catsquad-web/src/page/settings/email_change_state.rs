@@ -3,7 +3,7 @@ use std::time::Duration;
 
 use catsquad_client::{Client, Response, Sender};
 use catsquad_log::prelude::*;
-use catsquad_shared::{EmailChangeRes, LINK_WEB_SETTINGS};
+use catsquad_shared::{EmailChangeRes, LINK_WEB_SETTINGS, Uuid};
 use catsquad_web_utils::prelude::*;
 use leptos::html;
 use leptos::{prelude::*, task::spawn_local};
@@ -65,16 +65,12 @@ where
         self.handle_result(result)
     }
 
-    pub async fn current_confirm(
-        &self,
-        email_change_key: impl Into<String>,
-        token: impl Into<String>,
-    ) -> Option<EmailChangeRes> {
+    pub async fn current_confirm(&self, email_change_id: i64, token: Uuid) -> Option<()> {
         self.err_general.update(|v| v.clear());
         let client = self.client.get_value();
         let token = token.into();
         let result = client
-            .email_change_update_current_confirm(email_change_key, token)
+            .email_change_update_current_confirm(email_change_id, token)
             .send()
             .await
             .into_json()
@@ -84,14 +80,14 @@ where
 
     pub async fn new_add(
         &self,
-        email_change_key: impl Into<String>,
+        email_change_id: i64,
         new_email: impl Into<String>,
     ) -> Option<EmailChangeRes> {
         self.err_general.update(|v| v.clear());
         let client = self.client.get_value();
         let new_email = new_email.into();
         let result = client
-            .email_change_update_new_add(email_change_key, new_email)
+            .email_change_update_new_add(email_change_id, new_email)
             .send()
             .await
             .into_json()
@@ -100,15 +96,11 @@ where
         self.handle_result(result)
     }
 
-    pub async fn new_confirm(
-        &self,
-        email_change_key: impl Into<String>,
-        token: impl Into<String>,
-    ) -> Option<EmailChangeRes> {
+    pub async fn new_confirm(&self, email_change_id: i64, token: Uuid) -> Option<()> {
         self.err_general.update(|v| v.clear());
         let client = self.client.get_value();
         let result = client
-            .email_change_update_new_confirm(email_change_key, token)
+            .email_change_update_new_confirm(email_change_id, token)
             .send()
             .await
             .into_json()
@@ -117,11 +109,11 @@ where
         self.handle_result(result)
     }
 
-    pub async fn finish(&self, email_change_key: impl Into<String>) -> Option<EmailChangeRes> {
+    pub async fn finish(&self, email_change_id: i64) -> Option<()> {
         self.err_general.update(|v| v.clear());
         let client = self.client.get_value();
         let result = client
-            .email_change_update_finish(email_change_key)
+            .email_change_update_finish(email_change_id)
             .send()
             .await
             .into_json()
@@ -130,12 +122,12 @@ where
         self.handle_result(result)
     }
 
-    pub async fn resend(&self, email_change_key: impl Into<String>) -> Option<EmailChangeRes> {
+    pub async fn resend(&self, email_change_id: i64) -> Option<EmailChangeRes> {
         self.err_general.update(|v| v.clear());
         let client = self.client.get_value();
 
         let result = client
-            .email_change_resend(email_change_key)
+            .email_change_resend(email_change_id)
             .send()
             .await
             .into_json()
@@ -144,12 +136,12 @@ where
         self.handle_result(result)
     }
 
-    pub async fn cancel(&self, email_change_key: impl Into<String>) -> Option<EmailChangeRes> {
+    pub async fn cancel(&self, email_change_id: i64) -> Option<()> {
         self.err_general.update(|v| v.clear());
         let client = self.client.get_value();
 
         let result = client
-            .email_change_update_cancel(email_change_key)
+            .email_change_update_cancel(email_change_id)
             .send()
             .await
             .into_json()
@@ -158,10 +150,7 @@ where
         self.handle_result(result)
     }
 
-    pub fn handle_result<E: ToString>(
-        &self,
-        result: Result<EmailChangeRes, E>,
-    ) -> Option<EmailChangeRes> {
+    pub fn handle_result<R, E: ToString>(&self, result: Result<R, E>) -> Option<R> {
         match result {
             Ok(v) => {
                 return Some(v);
@@ -183,7 +172,7 @@ async fn test_email_change_state() {
 
     catsquad_log::init_log();
     let _owner = crate::init_owner();
-    let server = catsquad_api::TestServer::new().await;
+    let server = catsquad_api::TestServer::new(0, "test_email_change_state").await;
 
     let (user1, session1) = server
         .user_add_full(
@@ -207,7 +196,7 @@ async fn test_email_change_state() {
 
     {
         let result = email_change
-            .current_confirm(email_change_res.id.clone(), "invalid")
+            .current_confirm(email_change_res.id.clone(), 0_u128.to_be_bytes())
             .await;
         assert!(!email_change.err_general.get_untracked().is_empty());
         assert!(result.is_none());
@@ -246,7 +235,7 @@ async fn test_email_change_state() {
 
     {
         let result = email_change
-            .new_confirm(email_change_res.id.clone(), "invalid")
+            .new_confirm(email_change_res.id.clone(), 0_u128.to_be_bytes())
             .await;
 
         assert!(!email_change.err_general.get_untracked().is_empty());
@@ -263,6 +252,6 @@ async fn test_email_change_state() {
         .await
         .unwrap();
 
-    let result = server.user_get_by_session_key(&session1).await.unwrap();
+    let result = server.user_get_by_session_key(session1).await.unwrap();
     assert_eq!(result.email, "prime2@heyadora.com");
 }

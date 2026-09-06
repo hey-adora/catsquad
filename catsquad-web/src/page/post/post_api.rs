@@ -31,8 +31,8 @@ pub struct PostApi {
     pub live_title_length: RwSignal<usize, LocalStorage>,
     pub imgs_links: RwSignal<Vec<(String, f64)>, LocalStorage>,
     pub title: RwSignal<String, LocalStorage>,
-    pub author: RwSignal<String, LocalStorage>,
-    pub author_key: RwSignal<String, LocalStorage>,
+    pub author_username: RwSignal<String, LocalStorage>,
+    // pub author_key: RwSignal<String, LocalStorage>,
     pub author_link: RwSignal<String, LocalStorage>,
     pub tags: RwSignal<String, LocalStorage>,
     // pub tags_is_empty: RwSignal<bool, LocalStorage>,
@@ -42,7 +42,7 @@ pub struct PostApi {
     // pub tags_is_e: RwSignal<String, LocalStorage>,
     pub description: RwSignal<String, LocalStorage>,
     // pub description_is_empty: RwSignal<bool, LocalStorage>,
-    pub favorites: RwSignal<u64, LocalStorage>,
+    pub favorites: RwSignal<u32, LocalStorage>,
     pub post_state: RwSignal<PostState, LocalStorage>,
     // pub api: Client<TSender>,
 }
@@ -73,8 +73,8 @@ impl PostApi {
             // items: RwSignal::new_local(Vec::new()),
             imgs_links: RwSignal::new_local(Vec::<(String, f64)>::new()),
             title: RwSignal::new_local(String::new()),
-            author: RwSignal::new_local(String::new()),
-            author_key: RwSignal::new_local(String::new()),
+            author_username: RwSignal::new_local(String::new()),
+            // author_key: RwSignal::new_local(String::new()),
             author_link: RwSignal::new_local(LINK_WEB_INDEX.to_string()),
             tags: RwSignal::new_local(String::new()),
             live_description_length: RwSignal::new_local(0),
@@ -89,7 +89,7 @@ impl PostApi {
             update_description_mode: RwSignal::new_local(false),
             description: RwSignal::new_local(String::new()),
             // description_is_empty: RwSignal::new_local(true),
-            favorites: RwSignal::new_local(0_u64),
+            favorites: RwSignal::new_local(0),
             post_state: RwSignal::new_local(PostState::Loading),
             // api,
         }
@@ -98,29 +98,29 @@ impl PostApi {
     pub async fn update_description<TSender>(
         &self,
         client: &Client<TSender>,
-        post_key: impl Into<String>,
-        description: impl Into<String>,
+        post_id: i64,
+        new_description: impl Into<String>,
     ) -> Option<()>
     where
         TSender: Sender + Debug + Clone,
         TSender::TResponse: Response + Debug,
     {
-        let description = description.into();
-        debug_data_push("post_description_mutation", description.clone());
+        let new_description = new_description.into();
+        debug_data_push("post_description_mutation", new_description.clone());
 
         self.err_description.update(|v| v.clear());
 
         let result = client
-            .post_update_description(post_key, description)
+            .post_update_description(post_id, new_description.clone())
             .send()
             .await
             .into_json()
             .await;
 
         match result {
-            Ok(v) => {
-                self.live_description_length.set(v.description.len());
-                self.description.set(v.description);
+            Ok(_) => {
+                self.live_description_length.set(new_description.len());
+                self.description.set(new_description);
                 self.update_description_mode.set(false);
                 return Some(());
             }
@@ -144,27 +144,28 @@ impl PostApi {
     pub async fn update_title<TSender>(
         &self,
         client: &Client<TSender>,
-        post_key: impl Into<String>,
-        title: impl Into<String>,
+        post_id: i64,
+        new_title: impl Into<String>,
     ) -> Option<()>
     where
         TSender: Sender + Debug + Clone,
         TSender::TResponse: Response + Debug,
     {
+        let new_title = new_title.into();
         // TODO test this stuff like error cleaning
         self.err_title.update(|v| v.clear());
 
         let result = client
-            .post_update_title(post_key, title)
+            .post_update_title(post_id, new_title.clone())
             .send()
             .await
             .into_json()
             .await;
 
         match result {
-            Ok(v) => {
-                self.live_title_length.set(v.title.len());
-                self.title.set(v.title);
+            Ok(_) => {
+                self.live_title_length.set(new_title.len());
+                self.title.set(new_title);
                 self.update_title_mode.set(false);
                 return Some(());
             }
@@ -188,17 +189,18 @@ impl PostApi {
     pub async fn update_tags<TSender>(
         &self,
         client: &Client<TSender>,
-        post_key: impl Into<String>,
-        tags: impl Into<String>,
+        post_id: i64,
+        new_tags: impl Into<String>,
     ) -> Option<()>
     where
         TSender: Sender + Debug + Clone,
         TSender::TResponse: Response + Debug,
     {
+        let new_tags = new_tags.into();
         self.err_tags.update(|v| v.clear());
 
         let result = client
-            .post_update_tags(post_key, tags)
+            .post_update_tags(post_id, new_tags.clone())
             .send()
             .await
             .into_json()
@@ -206,8 +208,8 @@ impl PostApi {
 
         match result {
             Ok(v) => {
-                self.live_tags_length.set(v.tags.len());
-                self.tags.set(v.tags);
+                self.live_tags_length.set(new_tags.len());
+                self.tags.set(new_tags);
                 self.update_tags_mode.set(false);
                 return Some(());
             }
@@ -228,16 +230,11 @@ impl PostApi {
         None
     }
 
-    pub async fn delete<TSender>(
-        &self,
-        client: &Client<TSender>,
-        post_id: impl Into<String>,
-    ) -> Option<()>
+    pub async fn delete<TSender>(&self, client: &Client<TSender>, post_id: i64) -> Option<()>
     where
         TSender: Sender + Debug + Clone,
         TSender::TResponse: Response + Debug,
     {
-        let post_id = post_id.into();
         let result = client.post_remove(post_id).send().await.into_json().await;
 
         match result {
@@ -256,29 +253,29 @@ impl PostApi {
         None
     }
 
-    pub async fn get<TSender>(&self, client: &Client<TSender>, post_key: impl Into<String>)
+    pub async fn get<TSender>(&self, client: &Client<TSender>, post_id: i64)
     where
         TSender: Sender + Debug + Clone,
         TSender::TResponse: Response + Debug,
     {
-        let post_key = post_key.into();
+        let post_id = post_id.into();
         // let (Some(username), Some(post_id)) = (param_username(), param_post.get_untracked()) else {
         //     return;
         // };
 
         let result = client
-            .post_get_by_key(post_key)
+            .post_get_by_key(post_id)
             .send()
             .await
             .into_json()
             .await;
         match result {
             Ok(post) => {
-                let post_key = post.key.clone();
+                let post_key = post.id;
                 self.live_title_length.set(post.title.len());
                 self.title.set(post.title);
-                self.author.set(post.user.username.clone());
-                self.author_key.set(post.user.key.clone());
+                self.author_username.set(post.user_username.clone());
+                // self.author_key.set(post.user.key.clone());
                 self.author_link.set("/404".to_string());
                 // self.author_link.set(link_user(post.user.username));
                 self.live_tags_length.set(post.tags.len());

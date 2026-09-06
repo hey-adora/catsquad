@@ -75,11 +75,11 @@ impl PageState {
             .unwrap_or("error".to_string())
     }
 
-    pub fn user_key(&self) -> String {
-        self.acc
-            .with(|acc| acc.as_ref().map(|acc| acc.key.clone()))
-            .unwrap_or_default()
-    }
+    // pub fn user_key(&self) -> String {
+    //     self.acc
+    //         .with(|acc| acc.as_ref().map(|acc| acc.key.clone()))
+    //         .unwrap_or_default()
+    // }
 
     pub async fn update_auth(&self) {
         let page = self;

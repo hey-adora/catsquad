@@ -464,6 +464,10 @@ pub mod time {
         }
     }
 
+    pub fn time_now_micro() -> u64 {
+        (time_now_ns() / 1000) as u64
+    }
+
     pub fn ns_to_str(ns: u128) -> String {
         let mut output = String::new();
 

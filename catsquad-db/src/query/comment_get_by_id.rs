@@ -44,7 +44,7 @@ async fn test_comment_get_by_id() {
     use catsquad_shared::PostState;
 
     init_log();
-    let db = Db::test_db(0, "test_comment_remove").await;
+    let db = Db::test_db(0, "test_comment_get_by_id").await;
 
     let invite1 = db.invite_add(0, "hey@heyadora.com", 1).await.unwrap();
     let user = db

@@ -1,5 +1,5 @@
 pub const LINK_WEB_POST: &str = "/p/{id}";
 
-pub fn link_relative_post(post_key: impl AsRef<str>) -> String {
-    format!("/p/{}", post_key.as_ref())
+pub fn link_relative_post(post_id: i64) -> String {
+    format!("/p/{}", post_id)
 }

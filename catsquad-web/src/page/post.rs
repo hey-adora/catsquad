@@ -561,12 +561,12 @@ pub fn Post() -> impl IntoView {
                                     <div class="flex flex-col gap-1">
                                         <div class="flex gap-1">
                                             <p class="text-[1rem] text-base03">"by"</p>
-                                            <a href=move || post_api.author_link.get() class="text-[1rem] font-bold text-base0B">{ move || post_api.author.get() }</a>
+                                            <a href=move || post_api.author_link.get() class="text-[1rem] font-bold text-base0B">{ move || post_api.author_username.get() }</a>
                                         </div>
                                         <p class="text-[1rem]">"9999 followers"</p>
                                     </div>
                                 </div>
-                                <Favorite auth_key_tracked=post_auth_key post_key_tracked=post_key />
+                                <Favorite auth_username_tracked=post_auth_key post_username_tracked=post_key />
                                 // <Show when=move||global_state.is_logged_in().unwrap_or_default()>
                                 //     <BtnSecondary class=move || format!("flex gap-2 place-items-center ") id=move || "btn_favorite" on_click=move|_|post_like_fn()>
                                 //         <span class="mt-[0.1rem]">"Favorite"</span>
@@ -969,8 +969,8 @@ pub fn PostCommentElm(
     // let api = ApiWeb::new();
     let comment_key = comment.id.clone();
     let is_owned_fn = {
-        let key = comment.user.key.clone();
-        move || global_state.user_key() == key
+        let user_username = comment.user_username;
+        move || global_state.acc_username() == user_username
     };
 
     let comment_edit_event = EventListener::new(ev::change, |a| {
@@ -988,21 +988,21 @@ pub fn PostCommentElm(
     let spawner = Spawner::new();
     let kind = if current_depth < max_depth {
         CommentKind2::Reply {
-            parent_key: parent_key.clone(),
+            parent_id: parent_key.clone(),
             parent_items: parent_items,
             parent_replies_count: parent_reply_count,
             comment: comment.clone(),
         }
     } else if current_depth == max_depth {
         CommentKind2::Flat {
-            parent_key: parent_key.clone(),
+            parent_id: parent_key.clone(),
             parent_items: parent_items,
             parent_replies_count: parent_reply_count,
             comment: comment.clone(),
         }
     } else {
         CommentKind2::None {
-            parent_key: parent_key.clone(),
+            parent_id: parent_key.clone(),
             parent_items: parent_items,
             parent_replies_count: parent_reply_count,
             comment: comment.clone(),

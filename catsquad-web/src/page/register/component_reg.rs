@@ -2,7 +2,7 @@ use std::fmt::Debug;
 
 use crate::{Errs, PageState, hook::Spawner, page::create_client};
 use catsquad_client::{Client, Response, Sender};
-use catsquad_shared::{UserAddErr, validate_password, validate_username};
+use catsquad_shared::{UserAddErr, Uuid, str_to_uuid, validate_password, validate_username};
 use catsquad_web_utils::prelude::RwQuery;
 use leptos::{prelude::*, task::spawn_local};
 use web_sys::HtmlInputElement;
@@ -29,7 +29,7 @@ impl RegisterFormState {
         &self,
         client: &Client<TSender>,
         username: impl Into<String>,
-        invite_key: impl Into<String>,
+        invite_token: Uuid,
         password: impl Into<String>,
         password_confirmation: impl Into<String>,
     ) where
@@ -63,7 +63,7 @@ impl RegisterFormState {
         }
 
         let result = client
-            .user_add(username, invite_key, password)
+            .user_add(username, invite_token, password)
             .send()
             .await
             .into_json()
@@ -112,11 +112,11 @@ impl RegisterFormState {
 #[cfg(test)]
 #[tokio::test]
 async fn test_register_form_state() {
-    use catsquad_api::id_to_string;
+    // use catsquad_api::id_to_string;
 
     catsquad_log::init_log();
     let _owner = crate::init_owner();
-    let server = catsquad_api::TestServer::new().await;
+    let server = catsquad_api::TestServer::new(0, "test_register_form_state").await;
     let client = &server.client;
 
     let result = client
@@ -127,7 +127,7 @@ async fn test_register_form_state() {
         .await
         .unwrap();
 
-    let invite_key = server
+    let invite_token = server
         .state
         .db
         .invite_get_all()
@@ -136,15 +136,14 @@ async fn test_register_form_state() {
         .into_iter()
         .find(|v| !v.used && v.email == "prime@heyadora.com")
         .unwrap()
-        .id;
-    let invite_key = id_to_string(invite_key);
+        .token;
 
     let state = RegisterFormState::new();
     state
         .run_register(
             client,
             "he",
-            invite_key,
+            invite_token,
             "1234*455677889dfgdf",
             "1234*455677889GDdfgdf",
         )
@@ -160,7 +159,7 @@ async fn test_register_form_state() {
         .run_register(
             client,
             "hey",
-            "invalid",
+            0_u128.to_be_bytes(),
             "1234*455677889GDdfgdf",
             "1234*3455677889GDdfgdf",
         )
@@ -175,7 +174,7 @@ async fn test_register_form_state() {
 }
 
 pub fn invite_key_to_email(
-    mut fn_invite_key: impl FnMut() -> String + 'static,
+    mut fn_invite_key: impl FnMut() -> Uuid + 'static,
     errs: RwSignal<String>,
 ) -> RwSignal<String> {
     let email = RwSignal::new(String::new());
@@ -216,7 +215,7 @@ pub fn RegisterForm() -> impl IntoView {
     let input_username = NodeRef::new();
     let input_invite_key = RwQuery::<String>::new("token");
     let email = invite_key_to_email(
-        move || input_invite_key.get().unwrap_or_default(),
+        move || str_to_uuid(input_invite_key.get().unwrap_or_default()),
         reg.err_invite_key,
     );
     // let email = Memo::new()
@@ -229,7 +228,7 @@ pub fn RegisterForm() -> impl IntoView {
             input_username
                 .get_untracked()
                 .map(|v: HtmlInputElement| v.value()),
-            input_invite_key.get_untracked(),
+            input_invite_key.get_untracked().map(|v| str_to_uuid(v)),
             input_password
                 .get_untracked()
                 .map(|v: HtmlInputElement| v.value()),

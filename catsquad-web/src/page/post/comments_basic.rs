@@ -13,7 +13,7 @@
 // };
 use catsquad_log::prelude::*;
 use catsquad_shared::CommentRes;
-use catsquad_web_utils::prelude::*;
+use catsquad_web_utils::{prelude::*, time::time_now_micro};
 use leptos::{
     html::{ElementType, Textarea},
     prelude::*,
@@ -32,7 +32,7 @@ use crate::{
 #[derive(Copy, Clone)]
 pub struct CommentsBaisc {
     pub reply_editor_show: RwSignal<bool, LocalStorage>,
-    pub replies_count: RwSignal<usize, LocalStorage>,
+    pub replies_count: RwSignal<u32, LocalStorage>,
     pub comments_manual: CommentsApi2,
     pub err_post: RwSignal<String, LocalStorage>,
     pub items: RwSignal<Vec<CommentRes>, LocalStorage>,
@@ -57,7 +57,7 @@ impl CommentsBaisc {
         // };
         let infinite_fn = InfiniteScrollFn::new(move |_a| {
             spawner.spawn(async move {
-                let time = time_now_ns();
+                let time = time_now_micro();
                 let client = create_client();
                 comments_manual.fetch(time, &client).await;
             });
@@ -95,11 +95,11 @@ impl CommentsBaisc {
         self,
         // post_input: HtmlTextAreaElement,
         comment_container: Element,
-        post_id: String,
+        post_id: i64,
         // comment_key: String,
         // count: usize,
     ) {
-        let time = time_now_ns();
+        let time = time_now_micro();
         let client = create_client();
         self.comments_manual.observe_only(post_id);
         // self.spawner.spawn(self.comments_manual.fetch());

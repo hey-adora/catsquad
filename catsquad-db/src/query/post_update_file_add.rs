@@ -376,8 +376,8 @@ async fn test_post_update_file_add() {
         assert_eq!(post_img1.created_at, 0);
 
         assert_eq!(post1.size_bytes, 5);
-        assert_eq!(post1.images_hashes.len(), 1);
-        assert_eq!(post1.images_hashes[0], post_img1.hash);
+        assert_eq!(post1.images.len(), 1);
+        assert_eq!(post1.images[0].hash, post_img1.hash);
 
         assert_eq!(user1.used_storage_bytes, 5);
     }
@@ -430,9 +430,9 @@ async fn test_post_update_file_add() {
         assert_eq!(post_img2.used_count, 1);
 
         assert_eq!(post1.size_bytes, 7);
-        assert_eq!(post1.images_hashes.len(), 2);
-        assert_eq!(post1.images_hashes[0], 10);
-        assert_eq!(post1.images_hashes[1], 20);
+        assert_eq!(post1.images.len(), 2);
+        assert_eq!(post1.images[0].hash, 10);
+        assert_eq!(post1.images[1].hash, 20);
 
         assert_eq!(user1.used_storage_bytes, 7);
     }
@@ -477,13 +477,13 @@ async fn test_post_update_file_add() {
         assert_eq!(post_img2.used_count, 2);
 
         assert_eq!(post1.size_bytes, 7);
-        assert_eq!(post1.images_hashes.len(), 2);
-        assert_eq!(post1.images_hashes[0], 10);
-        assert_eq!(post1.images_hashes[1], 20);
+        assert_eq!(post1.images.len(), 2);
+        assert_eq!(post1.images[0].hash, 10);
+        assert_eq!(post1.images[1].hash, 20);
 
         assert_eq!(post2.size_bytes, 2);
-        assert_eq!(post2.images_hashes.len(), 1);
-        assert_eq!(post2.images_hashes[0], 20);
+        assert_eq!(post2.images.len(), 1);
+        assert_eq!(post2.images[0].hash, 20);
 
         assert_eq!(user1.used_storage_bytes, 9);
     }

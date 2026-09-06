@@ -11,7 +11,7 @@ where
     TSender::TResponse: Response + Debug,
 {
     pub client: StoredValue<Client<TSender>, LocalStorage>,
-    pub post_key: StoredValue<String>,
+    pub post_id: StoredValue<i64>,
     pub state: RwSignal<LikeState>,
 }
 
@@ -23,7 +23,7 @@ where
     fn clone(&self) -> Self {
         Self {
             client: self.client.clone(),
-            post_key: self.post_key.clone(),
+            post_id: self.post_id.clone(),
             state: self.state.clone(),
         }
     }
@@ -52,24 +52,23 @@ where
     pub fn new(client: Client<TSender>) -> Self {
         Self {
             client: StoredValue::new_local(client),
-            post_key: StoredValue::new(String::new()),
+            post_id: StoredValue::new(0),
             state: RwSignal::new(LikeState::default()),
         }
     }
 
-    pub async fn init(&self, post_key: impl Into<String>) {
+    pub async fn init(&self, post_id: i64) {
         let client = self.client.get_value();
         let state = self.state;
-        let post_key = post_key.into();
         let result = client
-            .post_like_get_by_post(&post_key)
+            .post_like_get_by_post(post_id)
             .send()
             .await
             .into_json()
             .await;
         match result {
             Ok(liked) => {
-                self.post_key.set_value(post_key);
+                self.post_id.set_value(post_id);
                 if liked {
                     state.set(LikeState::Liked);
                 } else {
@@ -86,8 +85,8 @@ where
     pub async fn toggle_like(&self) {
         let state = self.state;
         let client = self.client.get_value();
-        let post_key = self.post_key.get_value();
-        if post_key.is_empty() {
+        let post_key = self.post_id.get_value();
+        if post_key == 0 {
             return;
         }
         match state.get_untracked() {
@@ -136,12 +135,12 @@ where
 #[tokio::test]
 async fn test_post_like_state() {
     use catsquad_api::auth::create_auth_cookie_str;
-    use catsquad_shared::PostState;
+    use catsquad_shared::{PostState, uuid_to_str};
     use http::header;
 
     catsquad_log::init_log();
     let _owner = crate::init_owner();
-    let server = catsquad_api::TestServer::new().await;
+    let server = catsquad_api::TestServer::new(0, "test_post_like_state").await;
 
     let (_user1, session1) = server
         .user_add_full(
@@ -160,7 +159,10 @@ async fn test_post_like_state() {
         .await;
 
     server
-        .inject_header(header::COOKIE, create_auth_cookie_str(session1.clone()))
+        .inject_header(
+            header::COOKIE,
+            create_auth_cookie_str(uuid_to_str(session1)),
+        )
         .await;
 
     let post1 = server
@@ -174,7 +176,7 @@ async fn test_post_like_state() {
 
     server
         .client
-        .post_update_state(post1.key.clone(), PostState::Active)
+        .post_update_state(post1.id, PostState::Active)
         .send()
         .await
         .into_json()
@@ -184,12 +186,15 @@ async fn test_post_like_state() {
     server.remove_header(header::COOKIE).await;
 
     server
-        .inject_header(header::COOKIE, create_auth_cookie_str(session2.clone()))
+        .inject_header(
+            header::COOKIE,
+            create_auth_cookie_str(uuid_to_str(session2)),
+        )
         .await;
 
     let post_like_state = PostLikeState::new(server.client.clone());
     assert_eq!(post_like_state.state.get_untracked(), LikeState::Loading);
-    post_like_state.init(post1.key.clone()).await;
+    post_like_state.init(post1.id).await;
     assert_eq!(post_like_state.state.get_untracked(), LikeState::Unliked);
     post_like_state.toggle_like().await;
     assert_eq!(post_like_state.state.get_untracked(), LikeState::Liked);

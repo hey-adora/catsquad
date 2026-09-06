@@ -1,18 +1,6 @@
 use std::fmt::Debug;
 
 use catsquad_client::{Client, Response, Sender};
-// use crate::{
-//     api::{
-//         Api, ApiWeb, Order, ServerErr, ServerRes, TimeRange, shared::post_comment::UserPostComment,
-//     },
-//     view::{
-//         app::hook::{
-//             use_future::FutureFn, use_infinite_scroll_basic::InfiniteBasic,
-//             use_infinite_scroll_fn::InfiniteItem,
-//         },
-//         toolbox::prelude::*,
-//     },
-// };
 use catsquad_log::prelude::*;
 use catsquad_shared::{CommentRes, Order, TimeRange};
 use catsquad_web_utils::prelude::*;
@@ -28,21 +16,21 @@ pub enum CommentKind2 {
     #[default]
     Root,
     Reply {
-        parent_key: String,
+        parent_id: i64,
         parent_items: RwSignal<Vec<CommentRes>, LocalStorage>,
-        parent_replies_count: RwSignal<usize, LocalStorage>,
+        parent_replies_count: RwSignal<u32, LocalStorage>,
         comment: CommentRes,
     },
     Flat {
-        parent_key: String,
+        parent_id: i64,
         parent_items: RwSignal<Vec<CommentRes>, LocalStorage>,
-        parent_replies_count: RwSignal<usize, LocalStorage>,
+        parent_replies_count: RwSignal<u32, LocalStorage>,
         comment: CommentRes,
     },
     None {
-        parent_key: String,
+        parent_id: i64,
         parent_items: RwSignal<Vec<CommentRes>, LocalStorage>,
-        parent_replies_count: RwSignal<usize, LocalStorage>,
+        parent_replies_count: RwSignal<u32, LocalStorage>,
         comment: CommentRes,
     },
 }
@@ -52,7 +40,7 @@ pub struct CommentsApi2 {
     // ui
     pub items: RwSignal<Vec<CommentRes>, LocalStorage>,
     pub finished: RwSignal<bool, LocalStorage>,
-    pub replies_count: RwSignal<usize, LocalStorage>,
+    pub replies_count: RwSignal<u32, LocalStorage>,
     pub text: RwSignal<String, LocalStorage>,
     pub show_editor: RwSignal<bool, LocalStorage>,
     pub edit_mode: RwSignal<bool, LocalStorage>,
@@ -62,30 +50,18 @@ pub struct CommentsApi2 {
     pub err_update: RwSignal<String, LocalStorage>,
 
     // params
-    pub post_key: StoredValue<String, LocalStorage>,
+    pub post_key: StoredValue<i64, LocalStorage>,
     pub kind: StoredValue<CommentKind2, LocalStorage>,
-    pub fetch_count: usize,
+    pub fetch_count: u32,
 }
 
 impl CommentsApi2 {
-    pub fn new(fetch_count: usize, kind: CommentKind2) -> Self {
+    pub fn new(fetch_count: u32, kind: CommentKind2) -> Self {
         let (replies_count, text) = match &kind {
             CommentKind2::Root => (0, String::new()),
-            CommentKind2::Flat {
-                comment,
-                parent_key,
-                ..
-            }
-            | CommentKind2::None {
-                comment,
-                parent_key,
-                ..
-            }
-            | CommentKind2::Reply {
-                comment,
-                parent_key,
-                ..
-            } => (comment.replies_count, comment.text.clone()),
+            CommentKind2::Flat { comment, .. }
+            | CommentKind2::None { comment, .. }
+            | CommentKind2::Reply { comment, .. } => (comment.replies_count, comment.text.clone()),
         };
 
         // let has_reply_bubble = kind.is_none() && com;
@@ -104,7 +80,7 @@ impl CommentsApi2 {
             err_delete: RwSignal::new_local(String::new()),
             err_update: RwSignal::new_local(String::new()),
             // params
-            post_key: StoredValue::new_local(String::new()),
+            post_key: StoredValue::new_local(0),
             kind: StoredValue::new_local(kind),
             fetch_count,
         }
@@ -118,7 +94,7 @@ impl CommentsApi2 {
             Ok(comments) => {
                 let fetch_count = self.fetch_count;
                 let finished = self.finished;
-                let len = comments.len();
+                let len = comments.len() as u32;
                 let is_finished = finished.get_untracked();
 
                 if len == fetch_count && is_finished {
@@ -140,9 +116,9 @@ impl CommentsApi2 {
 
     async fn fetch_replies<TSender>(
         &self,
-        time: u128,
+        time: u64,
         client: &Client<TSender>,
-        comment_key: String,
+        comment_id: i64,
         flatten: bool,
     ) -> Vec<CommentRes>
     where
@@ -150,7 +126,7 @@ impl CommentsApi2 {
         TSender::TResponse: Response + Debug,
     {
         let post_key = self.post_key.get_value();
-        if post_key.is_empty() {
+        if post_key == 0 {
             warn!("post key not found");
             return Vec::new();
         }
@@ -168,9 +144,9 @@ impl CommentsApi2 {
         let result = client
             .comment_search(
                 post_key,
-                comment_key,
+                comment_id,
                 time,
-                fetch_count,
+                fetch_count as usize,
                 range,
                 order,
                 flatten,
@@ -183,13 +159,13 @@ impl CommentsApi2 {
         self.handle_fetch_result(result)
     }
 
-    async fn fetch_comments<TSender>(&self, time: u128, client: &Client<TSender>) -> Vec<CommentRes>
+    async fn fetch_comments<TSender>(&self, time: u64, client: &Client<TSender>) -> Vec<CommentRes>
     where
         TSender: Sender + Debug + Clone,
         TSender::TResponse: Response + Debug,
     {
         let post_key = self.post_key.get_value();
-        if post_key.is_empty() {
+        if post_key == 0 {
             warn!("post key not found");
             return Vec::new();
         }
@@ -205,15 +181,7 @@ impl CommentsApi2 {
         };
 
         let result = client
-            .comment_search(
-                post_key,
-                String::new(),
-                time,
-                fetch_count,
-                range,
-                order,
-                false,
-            )
+            .comment_search(post_key, 0, time, fetch_count as usize, range, order, false)
             .send()
             .await
             .into_json()
@@ -225,7 +193,7 @@ impl CommentsApi2 {
         self.handle_fetch_result(result)
     }
 
-    pub async fn fetch<TSender>(self, time: u128, client: &Client<TSender>)
+    pub async fn fetch<TSender>(self, time: u64, client: &Client<TSender>)
     where
         TSender: Sender + Debug + Clone,
         TSender::TResponse: Response + Debug,
@@ -259,7 +227,7 @@ impl CommentsApi2 {
                     v.extend(comments);
                     trace!("comments manual after {v:#?}");
 
-                    let len = v.len();
+                    let len = v.len() as u32;
                     trace!("replies count {} {}", replies_count.get_untracked(), len);
                     if replies_count.get_untracked() < len {
                         replies_count.set(len);
@@ -281,7 +249,7 @@ impl CommentsApi2 {
                     v.extend(comments);
                     trace!("comments manual after {v:#?}");
 
-                    let len = v.len();
+                    let len = v.len() as u32;
                     trace!("replies count {} {}", replies_count.get_untracked(), len);
                     if replies_count.get_untracked() < len {
                         replies_count.set(len);
@@ -318,25 +286,27 @@ impl CommentsApi2 {
         TSender: Sender + Debug + Clone,
         TSender::TResponse: Response + Debug,
     {
+        let text = text.into();
+
         let comment_key = match self.kind.get_value() {
             CommentKind2::Root => {
                 return;
             }
 
             CommentKind2::Flat {
-                parent_key,
+                parent_id: parent_key,
                 parent_items,
                 parent_replies_count,
                 comment,
             }
             | CommentKind2::None {
-                parent_key,
+                parent_id: parent_key,
                 parent_items,
                 parent_replies_count,
                 comment,
             }
             | CommentKind2::Reply {
-                parent_key,
+                parent_id: parent_key,
                 parent_items,
                 parent_replies_count,
                 comment,
@@ -344,16 +314,16 @@ impl CommentsApi2 {
         };
 
         let result = client
-            .comment_update_text(comment_key, text)
+            .comment_update_text(comment_key, text.clone())
             .send()
             .await
             .into_json()
             .await;
 
         match result {
-            Ok(comment) => {
+            Ok(_) => {
                 self.edit_mode.set(false);
-                self.text.set(comment.text);
+                self.text.set(text);
             }
             Err(err) => {
                 let err = format!("update comment {err}");
@@ -372,15 +342,15 @@ impl CommentsApi2 {
         TSender: Sender + Debug + Clone,
         TSender::TResponse: Response + Debug,
     {
-        let post_key = self.post_key.get_value();
+        let post_id = self.post_key.get_value();
 
-        if post_key.is_empty() {
+        if post_id == 0 {
             error!("trying to post reply without setting post key");
             return None;
         }
 
         let result = client
-            .comment_add(post_key, String::new(), text)
+            .comment_add(post_id, 0, text)
             .send()
             .await
             .into_json()
@@ -393,21 +363,21 @@ impl CommentsApi2 {
         &self,
         client: &Client<TSender>,
         text: impl Into<String>,
-        comment_key: impl Into<String>,
+        comment_id: i64,
     ) -> Option<CommentRes>
     where
         TSender: Sender + Debug + Clone,
         TSender::TResponse: Response + Debug,
     {
-        let post_key = self.post_key.get_value();
+        let post_id = self.post_key.get_value();
 
-        if post_key.is_empty() {
+        if post_id == 0 {
             error!("trying to post reply without setting post key");
             return None;
         }
 
         let result = client
-            .comment_add(post_key, comment_key.into(), text)
+            .comment_add(post_id, comment_id.into(), text)
             .send()
             .await
             .into_json()
@@ -470,12 +440,12 @@ impl CommentsApi2 {
                             // v.remove(pos);
                         });
                         let len_after = parent.with_untracked(|v| v.len());
-                        let removed = len_before.saturating_sub(len_after);
+                        let removed = len_before.saturating_sub(len_after) as u32;
 
                         // let is_not_none = self.kind.with_value(|v| !v.is_none());
                         // if is_not_none {
                         // }
-                        parent_replies_count.update(|v: &mut usize| {
+                        parent_replies_count.update(|v: &mut u32| {
                             *v = v.saturating_sub(removed);
                         });
                     }
@@ -579,14 +549,14 @@ impl CommentsApi2 {
         }
     }
 
-    pub fn observe_only(&self, post_key: impl Into<String>) {
-        self.post_key.set_value(post_key.into());
+    pub fn observe_only(&self, post_id: i64) {
+        self.post_key.set_value(post_id);
     }
 }
 
 #[cfg(test)]
 pub mod tests {
-    use catsquad_api::{TestServer, auth::create_auth_cookie_str, id_to_string};
+    use catsquad_api::{TestServer, auth::create_auth_cookie_str};
     // use crate::{
     //     api::{shared::post_comment::UserPostComment, tests::ApiTestApp},
     //     init_owner,
@@ -597,7 +567,7 @@ pub mod tests {
     //     },
     // };
     use catsquad_log::prelude::*;
-    use catsquad_shared::{PostRes, PostState};
+    use catsquad_shared::{PostRes, PostState, uuid_to_str};
     use http::header;
     use leptos::prelude::*;
     use std::sync::Arc;
@@ -607,19 +577,22 @@ pub mod tests {
         page::post::comments_api::{CommentKind2, CommentsApi2},
     };
 
-    async fn test_setup() -> (Owner, TestServer, PostRes) {
+    async fn test_setup(db: &str) -> (Owner, TestServer, PostRes) {
         init_log();
         let owner = init_owner();
 
         // let owner = Owner::new_root(Some(Arc::new(HydrateSharedContext::new())));
-        let mut app = TestServer::new().await;
+        let mut app = TestServer::new(0, db).await;
 
-        let (user1, session_key1) = app
+        let (user1, session_token) = app
             .user_add_full("hey", "hey@heyadora.com", "pas$wAord123456789")
             .await;
 
-        app.inject_header(header::COOKIE, create_auth_cookie_str(session_key1.clone()))
-            .await;
+        app.inject_header(
+            header::COOKIE,
+            create_auth_cookie_str(uuid_to_str(session_token)),
+        )
+        .await;
 
         let post = app
             .client
@@ -630,7 +603,7 @@ pub mod tests {
             .await
             .unwrap();
         app.client
-            .post_update_state(post.key.clone(), PostState::Active)
+            .post_update_state(post.id, PostState::Active)
             .send()
             .await
             .into_json()
@@ -649,7 +622,7 @@ pub mod tests {
         // let server = catsquad_api::TestServer::new().await;
         // // let mut app = ApiTestApp::new(10).await;
 
-        let mut time = 0_u128;
+        let mut time = 0_u64;
         // let mut t = move || {
         //     time += 1;
         //     time
@@ -671,29 +644,29 @@ pub mod tests {
         //     .into_res()
         //     .await
         //     .unwrap();
-        let (_owner, server, post) = test_setup().await;
+        let (_owner, server, post) = test_setup("hook_comments_api_post").await;
 
         let hook_root = CommentsApi2::new(2, CommentKind2::Root);
-        hook_root.observe_only(post.key.clone());
+        hook_root.observe_only(post.id);
         // assert!(!hook_root.has_reply_bubble);
 
         time += 1;
-        server.state.set_time(time).await;
+        server.state.set_time(time);
 
         hook_root.post(&server.client, "c0").await;
 
         time += 1;
-        server.state.set_time(time).await;
+        server.state.set_time(time);
 
         hook_root.post(&server.client, "c1").await;
 
         time += 1;
-        server.state.set_time(time).await;
+        server.state.set_time(time);
 
         hook_root.post(&server.client, "c2").await;
 
         time += 1;
-        server.state.set_time(time).await;
+        server.state.set_time(time);
 
         hook_root.post(&server.client, "c3").await;
 
@@ -701,87 +674,87 @@ pub mod tests {
         let hook_reply = CommentsApi2::new(
             2,
             CommentKind2::Reply {
-                parent_key: String::new(),
+                parent_id: 0,
                 parent_items: hook_root.items,
                 parent_replies_count: hook_root.replies_count,
                 comment: c0.clone(),
             },
         );
-        hook_reply.observe_only(post.key.clone());
+        hook_reply.observe_only(post.id);
         // assert!(!hook_reply.has_reply_bubble);
 
         time += 1;
-        server.state.set_time(time).await;
+        server.state.set_time(time);
         hook_reply.post(&server.client, "c0_r0x1").await;
 
         time += 1;
-        server.state.set_time(time).await;
+        server.state.set_time(time);
         hook_reply.post(&server.client, "c0_r1x1").await;
 
         time += 1;
-        server.state.set_time(time).await;
+        server.state.set_time(time);
         hook_reply.post(&server.client, "c0_r2x1").await;
 
         time += 1;
-        server.state.set_time(time).await;
+        server.state.set_time(time);
         hook_reply.post(&server.client, "c0_r3x1").await;
 
         let c0_r0x1 = hook_reply.items.with_untracked(|v| v[0].clone());
         let hook_flat = CommentsApi2::new(
             2,
             CommentKind2::Flat {
-                parent_key: c0.id.clone(),
+                parent_id: c0.id.clone(),
                 parent_items: hook_reply.items,
                 parent_replies_count: hook_reply.replies_count,
                 comment: c0_r0x1.clone(),
             },
         );
-        hook_flat.observe_only(post.key.clone());
+        hook_flat.observe_only(post.id);
         // assert!(!hook_flat.has_reply_bubble);
 
         time += 1;
-        server.state.set_time(time).await;
+        server.state.set_time(time);
         hook_flat.post(&server.client, "c0_r0x2").await;
 
         time += 1;
-        server.state.set_time(time).await;
+        server.state.set_time(time);
         hook_flat.post(&server.client, "c0_r1x2").await;
 
         time += 1;
-        server.state.set_time(time).await;
+        server.state.set_time(time);
         hook_flat.post(&server.client, "c0_r2x2").await;
 
         time += 1;
-        server.state.set_time(time).await;
+        server.state.set_time(time);
         hook_flat.post(&server.client, "c0_r3x2").await;
 
         let c0_r0x2 = hook_flat.items.with_untracked(|v| v[3].clone());
         let hook_none = CommentsApi2::new(
             2,
             CommentKind2::None {
-                parent_key: c0_r0x1.id.clone(),
+                parent_id: c0_r0x1.id.clone(),
                 parent_items: hook_flat.items,
                 parent_replies_count: hook_flat.replies_count,
                 comment: c0_r0x2.clone(),
             },
         );
-        hook_none.observe_only(post.key.clone());
+        hook_none.observe_only(post.id);
         // assert!(!hook_none.has_reply_bubble);
 
         time += 1;
-        server.state.set_time(time).await;
+        server.state.set_time(time);
         hook_none.post(&server.client, "c0_r0x3").await;
 
         time += 1;
-        server.state.set_time(time).await;
+        server.state.set_time(time);
         hook_none.post(&server.client, "c0_r1x3").await;
 
         time += 1;
-        server.state.set_time(time).await;
+        server.state.set_time(time);
         hook_none.post(&server.client, "c0_r2x3").await;
 
         time += 1;
-        server.state.set_time(time).await;
+        server.state.set_time(time);
         hook_none.post(&server.client, "c0_r3x3").await;
 
         let items_root = hook_root.items.get_untracked();
@@ -813,10 +786,7 @@ pub mod tests {
         for comment in all_comments {
             let line = format!(
                 "{} - {} - {} - {:?}\n",
-                id_to_string(comment.id),
-                comment.text,
-                comment.created_at,
-                comment.parent
+                comment.id, comment.text, comment.created_at, comment.parents
             );
             output.push_str(&line);
         }
@@ -825,7 +795,7 @@ pub mod tests {
         // panic!("wtf");
 
         let hook_root = CommentsApi2::new(4, CommentKind2::Root);
-        hook_root.observe_only(post.key.clone());
+        hook_root.observe_only(post.id);
         hook_root.fetch(time, &server.client).await;
         let items_root = hook_root.items.get_untracked();
 
@@ -837,13 +807,13 @@ pub mod tests {
         let hook_reply = CommentsApi2::new(
             4,
             CommentKind2::Reply {
-                parent_key: String::new(),
+                parent_id: 0,
                 parent_items: hook_root.items,
                 parent_replies_count: hook_root.replies_count,
                 comment: c0.clone(),
             },
         );
-        hook_reply.observe_only(post.key.clone());
+        hook_reply.observe_only(post.id);
         hook_reply.fetch(time, &server.client).await;
         let items_reply = hook_reply.items.get_untracked();
 
@@ -855,13 +825,13 @@ pub mod tests {
         let hook_flat = CommentsApi2::new(
             4,
             CommentKind2::Flat {
-                parent_key: c0.id.clone(),
+                parent_id: c0.id.clone(),
                 parent_items: hook_reply.items,
                 parent_replies_count: hook_reply.replies_count,
                 comment: c0_r0x1.clone(),
             },
         );
-        hook_flat.observe_only(post.key.clone());
+        hook_flat.observe_only(post.id);
         hook_flat.fetch(time, &server.client).await;
         let items_flat = hook_flat.items.get_untracked();
 
@@ -900,25 +870,25 @@ pub mod tests {
         //     .await
         //     .unwrap();
 
-        let (_owner, app, post) = test_setup().await;
+        let (_owner, app, post) = test_setup("hook_comments_api_update").await;
 
         let hook_root = CommentsApi2::new(2, CommentKind2::Root);
-        hook_root.observe_only(post.key.clone());
+        hook_root.observe_only(post.id);
 
-        app.state.set_time(2).await;
+        app.state.set_time(2);
         hook_root.post(&app.client, "c0").await;
 
         let c0 = hook_root.items.with_untracked(|v| v[0].clone());
         let hook_reply = CommentsApi2::new(
             2,
             CommentKind2::Reply {
-                parent_key: String::new(),
+                parent_id: 0,
                 parent_items: hook_root.items,
                 parent_replies_count: hook_root.replies_count,
                 comment: c0.clone(),
             },
         );
-        hook_reply.observe_only(post.key.clone());
+        hook_reply.observe_only(post.id);
         hook_reply.edit_mode.set(true);
 
         assert_eq!(hook_reply.text.get_untracked(), "c0");
@@ -931,7 +901,7 @@ pub mod tests {
         trace!("WTF");
         let hook_root = CommentsApi2::new(2, CommentKind2::Root);
         trace!("WTF1");
-        hook_root.observe_only(post.key.clone());
+        hook_root.observe_only(post.id);
         trace!("WTF2");
         hook_root.fetch(2, &app.client).await;
         trace!("WTF3");
@@ -951,7 +921,7 @@ pub mod tests {
 
         // let mut app = TestServer::new().await;
 
-        let mut time = 0_u128;
+        let mut time = 0_u64;
         // let mut t = move || {
         //     time += 1;
         //     time
@@ -973,17 +943,17 @@ pub mod tests {
         //     .into_res()
         //     .await
         //     .unwrap();
-        let (_owner, app, post) = test_setup().await;
+        let (_owner, app, post) = test_setup("hook_comments_api_delete").await;
 
         let hook_root = CommentsApi2::new(2, CommentKind2::Root);
-        hook_root.observe_only(post.key.clone());
+        hook_root.observe_only(post.id);
 
         time += 1;
-        app.state.set_time(time).await;
+        app.state.set_time(time);
         hook_root.post(&app.client, "c0").await;
 
         time += 1;
-        app.state.set_time(time).await;
+        app.state.set_time(time);
         hook_root.post(&app.client, "c1").await;
 
         hook_root.delete(&app.client).await;
@@ -995,20 +965,20 @@ pub mod tests {
         let hook_reply = CommentsApi2::new(
             2,
             CommentKind2::Reply {
-                parent_key: String::new(),
+                parent_id: 0,
                 parent_items: hook_root.items,
                 parent_replies_count: hook_root.replies_count,
                 comment: c0.clone(),
             },
         );
-        hook_reply.observe_only(post.key.clone());
+        hook_reply.observe_only(post.id);
 
         time += 1;
-        app.state.set_time(time).await;
+        app.state.set_time(time);
         hook_reply.post(&app.client, "c0_r0x1").await;
 
         time += 1;
-        app.state.set_time(time).await;
+        app.state.set_time(time);
         hook_reply.post(&app.client, "c0_r1x1").await;
 
         let items_reply = hook_reply.items.get();
@@ -1019,20 +989,20 @@ pub mod tests {
         let hook_flat = CommentsApi2::new(
             2,
             CommentKind2::Flat {
-                parent_key: c0.id.clone(),
+                parent_id: c0.id.clone(),
                 parent_items: hook_reply.items,
                 parent_replies_count: hook_reply.replies_count,
                 comment: c0_r0x1.clone(),
             },
         );
-        hook_flat.observe_only(post.key.clone());
+        hook_flat.observe_only(post.id);
 
         time += 1;
-        app.state.set_time(time).await;
+        app.state.set_time(time);
         hook_flat.post(&app.client, "c0_r0x2").await;
 
         time += 1;
-        app.state.set_time(time).await;
+        app.state.set_time(time);
         hook_flat.post(&app.client, "c0_r1x2").await;
 
         let items_flat = hook_flat.items.get();
@@ -1043,20 +1013,20 @@ pub mod tests {
         let hook_none = CommentsApi2::new(
             2,
             CommentKind2::None {
-                parent_key: c0_r0x1.id.clone(),
+                parent_id: c0_r0x1.id.clone(),
                 parent_items: hook_flat.items,
                 parent_replies_count: hook_flat.replies_count,
                 comment: c0_r0x2,
             },
         );
-        hook_none.observe_only(post.key.clone());
+        hook_none.observe_only(post.id);
 
         time += 1;
-        app.state.set_time(time).await;
+        app.state.set_time(time);
         hook_none.post(&app.client, "c0_r0x3").await;
 
         time += 1;
-        app.state.set_time(time).await;
+        app.state.set_time(time);
         hook_none.post(&app.client, "c0_r1x3").await;
 
         let items_flat = hook_flat.items.get();
@@ -1149,24 +1119,24 @@ pub mod tests {
         //     .into_res()
         //     .await
         //     .unwrap();
-        let (_owner, app, post) = test_setup().await;
+        let (_owner, app, post) = test_setup("hook_comments_api_get").await;
 
         let hook_root = CommentsApi2::new(2, CommentKind2::Root);
-        hook_root.post_key.set_value(post.key.clone());
+        hook_root.post_key.set_value(post.id);
 
         // (app.set_time(0).await, hook_root.post("comment0").await);
         // let comment0 = hook_root.items.with_untracked(|v| v[0].clone());
 
-        let mut time = 0_u128;
+        let mut time = 0_u64;
         // let mut get_time = move || {
         //     time += 1;
         //     time
         // };
 
-        let fn_comment_add = async |parent: String, text: &str| {
+        let fn_comment_add = async |parent: i64, text: &str| {
             // app.state.set_time(get_time()).await;
             app.client
-                .comment_add(post.key.clone(), parent, text)
+                .comment_add(post.id, parent, text)
                 .send()
                 .await
                 .into_json()
@@ -1184,70 +1154,70 @@ pub mod tests {
         //     .unwrap();
         //
         time += 1;
-        app.state.set_time(time).await;
-        let comment0 = fn_comment_add(String::new(), "comment0").await;
+        app.state.set_time(time);
+        let comment0 = fn_comment_add(0, "comment0").await;
         time += 1;
-        app.state.set_time(time).await;
+        app.state.set_time(time);
         let comment0_reply0 = fn_comment_add(comment0.id.clone(), "comment0_reply0").await;
         time += 1;
-        app.state.set_time(time).await;
+        app.state.set_time(time);
         let comment0_reply0_reply0 =
             fn_comment_add(comment0_reply0.id.clone(), "comment0_reply0_reply0").await;
         time += 1;
-        app.state.set_time(time).await;
+        app.state.set_time(time);
         let comment0_reply0_times_3 =
             fn_comment_add(comment0_reply0_reply0.id.clone(), "comment0_reply0_times_3").await;
         time += 1;
-        app.state.set_time(time).await;
+        app.state.set_time(time);
         let comment0_reply0_times_4 = fn_comment_add(
             comment0_reply0_times_3.id.clone(),
             "comment0_reply0_times_4",
         )
         .await;
         time += 1;
-        app.state.set_time(time).await;
+        app.state.set_time(time);
         let comment0_reply0_times_5 = fn_comment_add(
             comment0_reply0_times_4.id.clone(),
             "comment0_reply0_times_5",
         )
         .await;
         time += 1;
-        app.state.set_time(time).await;
+        app.state.set_time(time);
         let comment0_reply0_times_6 = fn_comment_add(
             comment0_reply0_times_5.id.clone(),
             "comment0_reply0_times_6",
         )
         .await;
         time += 1;
-        app.state.set_time(time).await;
+        app.state.set_time(time);
         let comment0_reply0_reply1 =
             fn_comment_add(comment0_reply0.id.clone(), "comment0_reply0_reply1").await;
         time += 1;
-        app.state.set_time(time).await;
+        app.state.set_time(time);
         let comment0_reply0_reply2 =
             fn_comment_add(comment0_reply0.id.clone(), "comment0_reply0_reply2").await;
         time += 1;
-        app.state.set_time(time).await;
+        app.state.set_time(time);
         let comment0_reply0_reply3 =
             fn_comment_add(comment0_reply0.id.clone(), "comment0_reply0_reply3").await;
         time += 1;
-        app.state.set_time(time).await;
+        app.state.set_time(time);
         let comment0_reply1 = fn_comment_add(comment0.id.clone(), "comment0_reply1").await;
         time += 1;
-        app.state.set_time(time).await;
+        app.state.set_time(time);
         let comment0_reply2 = fn_comment_add(comment0.id.clone(), "comment0_reply2").await;
         time += 1;
-        app.state.set_time(time).await;
+        app.state.set_time(time);
         let comment0_reply3 = fn_comment_add(comment0.id.clone(), "comment0_reply3").await;
         time += 1;
-        app.state.set_time(time).await;
-        let comment1 = fn_comment_add(String::new(), "comment1").await;
+        app.state.set_time(time);
+        let comment1 = fn_comment_add(0, "comment1").await;
         time += 1;
-        app.state.set_time(time).await;
-        let comment2 = fn_comment_add(String::new(), "comment2").await;
+        app.state.set_time(time);
+        let comment2 = fn_comment_add(0, "comment2").await;
         time += 1;
-        app.state.set_time(time).await;
-        let comment3 = fn_comment_add(String::new(), "comment3").await;
+        app.state.set_time(time);
+        let comment3 = fn_comment_add(0, "comment3").await;
 
         let replies_count = hook_root.replies_count.get_untracked();
         assert_eq!(replies_count, 0);
@@ -1271,7 +1241,7 @@ pub mod tests {
         assert_eq!(post_comments[2], comment1);
         assert_eq!(post_comments[3].id, comment0.id);
 
-        let comment4 = fn_comment_add(String::new(), "comment4").await;
+        let comment4 = fn_comment_add(0, "comment4").await;
         // let comment4 = app
         //     .add_post_comment(
         //         4,
@@ -1295,13 +1265,13 @@ pub mod tests {
         let hook_comment = CommentsApi2::new(
             2,
             CommentKind2::Reply {
-                parent_key: String::new(),
+                parent_id: 0,
                 parent_items: hook_root.items,
                 parent_replies_count: hook_root.replies_count,
                 comment: comment0.clone(),
             },
         );
-        hook_comment.post_key.set_value(post.key.clone());
+        hook_comment.post_key.set_value(post.id);
 
         hook_comment.fetch(time, &app.client).await;
         let comment0_replies = hook_comment.items.get_untracked();
@@ -1324,13 +1294,13 @@ pub mod tests {
         let hook_reply = CommentsApi2::new(
             2,
             CommentKind2::Reply {
-                parent_key: comment0.id.clone(),
+                parent_id: comment0.id.clone(),
                 parent_items: hook_comment.items,
                 parent_replies_count: hook_comment.replies_count,
                 comment: comment0_reply0.clone(),
             },
         );
-        hook_reply.post_key.set_value(post.key.clone());
+        hook_reply.post_key.set_value(post.id);
 
         // trace!("yo yo yo yo did u run or no");
         hook_reply.fetch(time, &app.client).await;
@@ -1358,13 +1328,13 @@ pub mod tests {
         let hook_flat = CommentsApi2::new(
             2,
             CommentKind2::Flat {
-                parent_key: comment0_reply0.id.clone(),
+                parent_id: comment0_reply0.id.clone(),
                 parent_items: hook_reply.items,
                 parent_replies_count: hook_reply.replies_count,
                 comment: comment0_reply0_reply0.clone(),
             },
         );
-        hook_flat.post_key.set_value(post.key.clone());
+        hook_flat.post_key.set_value(post.id);
 
         trace!("comment0_reply0_reply0 {comment0_reply0_reply0:#?}");
 

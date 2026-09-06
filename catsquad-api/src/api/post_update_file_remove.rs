@@ -147,7 +147,7 @@ async fn test_api_post_update_file_remove() {
         .unwrap();
 
     assert_eq!(result.file.len(), 1);
-    let file1_hash = result.file[0];
+    let file1_hash = result.file[0].hash;
 
     server
         .post_update_file_remove(post1.id, file1_hash, session_key1)

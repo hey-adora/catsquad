@@ -66,6 +66,18 @@ pub use page::upload::*;
 
 pub use uuid::*;
 
+// pub fn get_time_ns() -> u128 {
+//     use std::time::{SystemTime, UNIX_EPOCH};
+//     let time = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
+//     time.as_nanos()
+// }
+
+// pub fn get_time_micro() -> u128 {
+//     use std::time::{SystemTime, UNIX_EPOCH};
+//     let time = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
+//     time.as_micros()
+// }
+
 fn serde_from_uuid<S: serde::Serializer>(v: &Uuid, serializer: S) -> Result<S::Ok, S::Error> {
     use serde::Serialize;
     let v = uuid_to_str(*v);

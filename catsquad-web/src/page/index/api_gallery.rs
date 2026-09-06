@@ -38,7 +38,7 @@ impl GalleryApi {
         client: &Client<TSender>,
         limit: usize,
         size: GalleryContainerSize,
-        time: u128,
+        time: u64,
         range: TimeRange,
         order: Order,
         reverse: bool,
@@ -108,7 +108,7 @@ impl GalleryApi {
         client: &Client<TSender>,
         limit: usize,
         size: GalleryContainerSize,
-        current_time: u128,
+        current_time: u64,
         tags: impl Into<String>,
         username: impl Into<String>,
     ) -> f64
@@ -141,7 +141,7 @@ impl GalleryApi {
         client: &Client<TSender>,
         limit: usize,
         size: GalleryContainerSize,
-        current_time: u128,
+        current_time: u64,
         tags: impl Into<String>,
         username: impl Into<String>,
     ) -> f64
@@ -176,7 +176,7 @@ impl GalleryApi {
         is_bottom: bool,
         limit: usize,
         size: GalleryContainerSize,
-        current_time: u128,
+        current_time: u64,
         tags: impl Into<String>,
         username: impl Into<String>,
     ) -> f64
@@ -223,7 +223,7 @@ pub mod tests {
         let _owner = init_owner();
         // let owner = Owner::new_root(Some(Arc::new(HydrateSharedContext::new())));
         let scroll_corerction = ScrollCorrection::new();
-        let mut app = TestServer::new().await;
+        let mut app = TestServer::new(0, "hook_gallery_api_post").await;
 
         let (user1, session_key1) = app
             .user_add_full("hey", "hey@heyadora.com", "pasA$word123456789")

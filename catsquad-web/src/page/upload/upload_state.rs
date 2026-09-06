@@ -38,6 +38,20 @@ pub struct ParsedPostFile {
     pub err: String,
 }
 
+impl From<i64> for ParsedPostFile {
+    fn from(value: i64) -> Self {
+        Self {
+            name: value.to_string(),
+            size: 0,
+            uploaded_bytes: 0,
+            upload_speed_bytes_a_second: 0,
+            uploaded_percentage: 0,
+            state: ParsedPostFileState::Queue,
+            err: String::new(),
+        }
+    }
+}
+
 impl From<String> for ParsedPostFile {
     fn from(value: String) -> Self {
         Self {
@@ -61,8 +75,8 @@ impl From<&str> for ParsedPostFile {
 impl From<PostFile> for ParsedPostFile {
     fn from(value: PostFile) -> Self {
         Self {
-            name: value.hash,
-            size: value.size_bytes,
+            name: value.hash.to_string(),
+            size: value.size_bytes as u64,
             uploaded_bytes: 0,
             upload_speed_bytes_a_second: 0,
             uploaded_percentage: 0,
@@ -111,7 +125,7 @@ pub enum UploadStateStage {
 
 #[derive(Clone, Copy)]
 pub struct UploadState {
-    pub post_key: StoredValue<String>,
+    pub post_id: StoredValue<i64>,
     pub stage: RwSignal<UploadStateStage>,
     pub title: RwSignal<String>,
     pub title_saved: RwSignal<FieldSaved>,
@@ -129,7 +143,7 @@ pub struct UploadState {
 impl UploadState {
     pub fn new(time: u128) -> Self {
         Self {
-            post_key: StoredValue::new(String::new()),
+            post_id: StoredValue::new(0),
             stage: RwSignal::new(UploadStateStage::Loading),
             title: RwSignal::new(String::new()),
             title_saved: RwSignal::new(FieldSaved::new(time)),
@@ -153,7 +167,7 @@ impl UploadState {
         let result = client.post_add("", "", "").send().await.into_json().await;
         match result {
             Ok(v) => {
-                if self.post_key.try_set_value(v.key).is_some() {
+                if self.post_id.try_set_value(v.id).is_some() {
                     error!("page was disposed");
                     return;
                 }
@@ -270,7 +284,7 @@ impl UploadState {
         TSender: Sender + Debug + Clone,
         TSender::TResponse: Response + Debug,
     {
-        let post_key = self.post_key.get_value();
+        let post_id = self.post_id.get_value();
         let title_field_metadata = self.title_saved.get_untracked();
         if title_field_metadata.saved {
             return;
@@ -278,7 +292,7 @@ impl UploadState {
         let new_title = self.title.get_untracked();
 
         let result = client
-            .post_update_title(&post_key, new_title)
+            .post_update_title(post_id, new_title)
             .send()
             .await
             .into_json()
@@ -301,7 +315,7 @@ impl UploadState {
         TSender: Sender + Debug + Clone,
         TSender::TResponse: Response + Debug,
     {
-        let post_key = self.post_key.get_value();
+        let post_id = self.post_id.get_value();
         let description_field_metadata = self.description_saved.get_untracked();
         if description_field_metadata.saved {
             return;
@@ -309,7 +323,7 @@ impl UploadState {
         let new_description = self.description.get_untracked();
 
         let result = client
-            .post_update_description(&post_key, new_description)
+            .post_update_description(post_id, new_description)
             .send()
             .await
             .into_json()
@@ -334,7 +348,7 @@ impl UploadState {
         TSender: Sender + Debug + Clone,
         TSender::TResponse: Response + Debug,
     {
-        let post_key = self.post_key.get_value();
+        let post_id = self.post_id.get_value();
         let tags_field_metadata = self.tags_saved.get_untracked();
         if tags_field_metadata.saved {
             return;
@@ -342,7 +356,7 @@ impl UploadState {
         let new_tags = self.tags.get_untracked();
 
         let result = client
-            .post_update_tags(&post_key, new_tags)
+            .post_update_tags(post_id, new_tags)
             .send()
             .await
             .into_json()
@@ -365,23 +379,23 @@ impl UploadState {
         TSender: Sender + Debug + Clone,
         TSender::TResponse: Response + Debug,
     {
-        let post_key = self.post_key.get_value();
+        let post_id = self.post_id.get_value();
 
-        if post_key.is_empty() {
+        if post_id == 0 {
             warn!("trying to set state while upload isn't initialized");
             return None;
         }
 
         let result = client
-            .post_update_state(&post_key, PostState::Active)
+            .post_update_state(post_id, PostState::Active)
             .send()
             .await
             .into_json()
             .await;
 
         match result {
-            Ok(v) => {
-                return Some(link_relative_post(v.key));
+            Ok(_) => {
+                return Some(link_relative_post(post_id));
             }
             Err(v) => {
                 self.err_general.set(v.to_string());
@@ -420,14 +434,14 @@ impl UploadState {
         TSender::TResponse: Response + Debug,
         File: Into<SchrodingersFile>,
     {
-        let post_key = self.post_key.try_get_value().unwrap_or_default();
-        if post_key.is_empty() {
+        let post_id = self.post_id.try_get_value().unwrap_or_default();
+        if post_id == 0 {
             warn!("trying upload files when post wasn't initialized");
             return;
         };
 
         let result = client
-            .post_update_file_add(post_key, vec![source_file])
+            .post_update_file_add(post_id, vec![source_file])
             .on_progress({
                 let file = parsed_file.clone();
                 move |stats| {
@@ -459,7 +473,7 @@ impl UploadState {
                 let hash = received_post[0].hash.clone();
 
                 parsed_file.update(|file| {
-                    file.name = hash;
+                    file.name = hash.to_string();
                     file.state = ParsedPostFileState::Uploaded;
                 });
             }
@@ -480,13 +494,18 @@ impl UploadState {
         TSender: Sender + Debug + Clone,
         TSender::TResponse: Response + Debug,
     {
-        let post_key = self.post_key.get_value();
-        if post_key.is_empty() {
+        let post_id = self.post_id.get_value();
+        if post_id == 0 {
             warn!("trying remove files when post wasn't initialized");
             return;
         };
 
-        let (name, state) = parsed_file.with_untracked(|v| (v.name.clone(), v.state.clone()));
+        let (name, state) = parsed_file.with_untracked(|v| {
+            (
+                i64::from_str_radix(&v.name, 10).unwrap_or_default(),
+                v.state.clone(),
+            )
+        });
 
         if state != ParsedPostFileState::Uploaded {
             self.remove_file_parsed(&parsed_file);
@@ -499,7 +518,7 @@ impl UploadState {
         });
 
         let result = client
-            .post_update_file_remove(post_key, name)
+            .post_update_file_remove(post_id, name)
             .send()
             .await
             .into_json()
@@ -546,7 +565,7 @@ async fn test_upload_state_update() {
 
     catsquad_log::init_log();
     let _owner = crate::init_owner();
-    let server = catsquad_api::TestServer::new().await;
+    let server = catsquad_api::TestServer::new(0, "test_upload_state_update").await;
 
     let (_user1, session1) = server
         .user_add_full(
@@ -562,7 +581,7 @@ async fn test_upload_state_update() {
 
     let upload = UploadState::new(0);
 
-    assert_eq!(upload.post_key.get_value(), "");
+    assert_eq!(upload.post_id.get_value(), "");
     assert_eq!(upload.stage.get_untracked(), UploadStateStage::Loading);
     assert_eq!(upload.title_saved.get_untracked().saved, true);
     assert_eq!(upload.title_saved.get_untracked().saved_at, 0);
@@ -594,7 +613,7 @@ async fn test_upload_state_update() {
         upload.update_description(1, &server.client).await;
         upload.update_tags(1, &server.client).await;
 
-        assert!(!upload.post_key.get_value().is_empty());
+        assert!(!upload.post_id.get_value().is_empty());
         assert_eq!(upload.stage.get_untracked(), UploadStateStage::Loaded);
 
         assert_eq!(upload.title_saved.get_untracked().saved, true);
@@ -816,7 +835,7 @@ async fn test_upload_init() -> (catsquad_api::TestServer, Owner, UploadState) {
 
     catsquad_log::init_log();
     let owner = crate::init_owner();
-    let server = catsquad_api::TestServer::new().await;
+    let server = catsquad_api::TestServer::new(0, "test_upload_init").await;
 
     let (_user1, session1) = server
         .user_add_full(

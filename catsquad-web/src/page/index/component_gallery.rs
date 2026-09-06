@@ -1,7 +1,8 @@
 use super::api_gallery::{GalleryApi, GalleryContainerSize};
 use catsquad_log::prelude::*;
-use catsquad_shared::{PostFile, PostRes, link_relative_img, link_relative_post};
+use catsquad_shared::{PostFile, PostSearchRes, link_relative_img, link_relative_post};
 use catsquad_web_utils::prelude::*;
+use catsquad_web_utils::time::time_now_micro;
 use leptos::{html::Div, prelude::*};
 use leptos_router::hooks::query_signal;
 use std::default::Default;
@@ -40,8 +41,8 @@ pub fn Gallery(
     let (get_query_scroll, set_query_scroll) = query_signal::<i32>("scroll");
     let (get_query_gallery_count, set_query_gallery_count) = query_signal::<usize>("img_count");
     let (get_query_direction, set_query_direction) = query_signal::<String>("direction");
-    let (get_query_time, set_query_time) = query_signal::<u128>("time");
-    let set_query_time = move |v: Option<u128>| {
+    let (get_query_time, set_query_time) = query_signal::<u64>("time");
+    let set_query_time = move |v: Option<u64>| {
         debug_data_push(
             "gallery_query_time",
             v.map(|v| v.to_string())
@@ -52,7 +53,7 @@ pub fn Gallery(
     let old_tags = StoredValue::new_local(String::new());
     let (get_query_tags, _set_query_tags) = query_signal::<String>("tags");
 
-    let set_gallery = move |width: u32, height: f64, bottom: bool, limit: usize, time: u128| {
+    let set_gallery = move |width: u32, height: f64, bottom: bool, limit: usize, time: u64| {
         debug_data_push("set_gallery_param_limit", limit.to_string());
 
         let user_username = username.get_untracked().flatten().unwrap_or_default();
@@ -150,7 +151,7 @@ pub fn Gallery(
         let width = gallery_elm.client_width() as u32;
         let height = gallery_elm.client_height() as f64 * 2.0;
         let limit = calc_fit_count(width, height, row_height);
-        let time = time_now_ns();
+        let time = time_now_micro();
         // let time = get_query_time.get_untracked().unwrap_or_else(|| time_now_ns());
         debug_data_push("gallery_interval_top_triggered", "null");
         set_gallery(width, height, false, limit, time);
@@ -174,7 +175,7 @@ pub fn Gallery(
         let width = gallery_elm.client_width() as u32;
         let height = gallery_elm.client_height() as f64 * 2.0;
         let limit = calc_fit_count(width, height, row_height);
-        let time = time_now_ns();
+        let time = time_now_micro();
         // let time = get_query_time.get_untracked().unwrap_or_else(|| time_now_ns());
         debug_data_push("gallery_interval_down_triggered", "null");
         set_gallery(width, height, true, limit, time);
@@ -215,7 +216,7 @@ pub fn Gallery(
         let height = gallery_elm.client_height() as f64 * 2.0;
         let time = get_query_time
             .get_untracked()
-            .unwrap_or_else(|| time_now_ns());
+            .unwrap_or_else(|| time_now_micro());
         let is_bottom = get_query_direction
             .get_untracked()
             .map(|v| v == "down")
@@ -266,7 +267,7 @@ pub fn Gallery(
         let width = gallery_elm.client_width() as u32;
         let height = gallery_elm.client_height() as f64 * 2.0;
         let limit = calc_fit_count(width, height, row_height);
-        let time = time_now_ns();
+        let time = time_now_micro();
 
         debug_data_push("gallery_reset_executed", "null");
         set_gallery(width, height, true, limit, time);
@@ -348,12 +349,12 @@ pub fn Gallery(
 //     </div>
 // </Show>
 
-pub fn elm_id_img_thumbnail(key: impl Into<String>) -> String {
-    format!("{}-thumbnail", key.into())
+pub fn elm_id_img_thumbnail(id: i64) -> String {
+    format!("{}-thumbnail", id)
 }
 
-pub fn elm_id_img_link(key: impl Into<String>) -> String {
-    format!("{}-link", key.into())
+pub fn elm_id_img_link(id: i64) -> String {
+    format!("{}-link", id)
 }
 
 // pub fn GalleryImg<FetchBtmFn, FetchTopFn, OnClickFn>(
@@ -366,14 +367,14 @@ pub fn GalleryImg(img: Img) -> impl IntoView {
     let view_height = img.view_height;
     let img_width = img.width;
     let img_height = img.height;
-    let img_key = img.key.clone();
-    let img_key2 = img.key.clone();
-    let img_key3 = img.key.clone();
+    let img_key = img.id.clone();
+    let img_key2 = img.id.clone();
+    let img_key3 = img.id.clone();
     let img_username = img.username.clone();
     let post_link = img.get_post_link();
     // let post_link_with_history = img.get_post_link_with_history(9999);
     let img_link = img.get_img_link();
-    let files_count = img.files_count;
+    let image_exists = img.image_exists;
 
     let value_left = format!("{view_left}px");
     let value_top = format!("{view_top}px");
@@ -401,7 +402,7 @@ pub fn GalleryImg(img: Img) -> impl IntoView {
            style:width=value_width
            style:height=value_height
         >
-            <Show when=move || files_count != 0>
+            <Show when=move || !image_exists>
                 <img
                     id=elm_id_img_thumbnail(img_key2.clone())
                     style:width=value_width2.clone()
@@ -409,7 +410,7 @@ pub fn GalleryImg(img: Img) -> impl IntoView {
                     src=img_link.clone()
                 />
             </Show>
-            <Show when=move || files_count == 0>
+            <Show when=move || image_exists>
                 <div
                     class="border-2 border-base05 bg-base02 grid items-center text-center"
                     id=elm_id_img_thumbnail(img_key3.clone())
@@ -426,19 +427,19 @@ pub fn GalleryImg(img: Img) -> impl IntoView {
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Img {
-    pub key: String,
+    pub id: i64,
     pub username: String,
-    pub hash: String,
+    pub hash: i64,
     pub extension: String,
     pub width: u32,
     pub height: u32,
-    pub files_count: usize,
+    pub image_exists: bool,
     pub view_width: f64,
     pub view_height: f64,
     pub view_pos_x: f64,
     pub view_pos_y: f64,
-    #[serde(serialize_with = "from_u128_custom")]
-    pub created_at: u128,
+    // #[serde(serialize_with = "from_u128_custom")]
+    pub created_at: u64,
 }
 
 fn from_u128_custom<S: serde::Serializer>(v: &u128, serializer: S) -> Result<S::Ok, S::Error> {
@@ -447,30 +448,31 @@ fn from_u128_custom<S: serde::Serializer>(v: &u128, serializer: S) -> Result<S::
     v.serialize(serializer)
 }
 
-impl From<PostRes> for Img {
-    fn from(user_post: PostRes) -> Self {
-        let files_count = user_post.file.len();
-        let post_thumbnail = user_post.file.first().cloned().unwrap_or(PostFile {
-            width: 400,
-            height: 400,
-            size_bytes: 400 * 400,
-            proccesed: true,
-            hash: "404".to_string(),
-            extension: "webp".to_string(),
-        });
+impl From<PostSearchRes> for Img {
+    fn from(post: PostSearchRes) -> Self {
+        // let files_count = user_post.file.len();
+        // let post_thumbnail = user_post.file.first().cloned().unwrap_or(PostFile {
+        //     width: 400,
+        //     height: 400,
+        //     size_bytes: 400 * 400,
+        //     proccesed: true,
+        //     hash: "404".to_string(),
+        //     extension: "webp".to_string(),
+        // });
+        let image_exists = post.image_hash != 0;
         Self {
-            key: user_post.key,
-            username: user_post.user.username,
-            width: post_thumbnail.width,
-            height: post_thumbnail.height,
-            hash: post_thumbnail.hash,
-            extension: post_thumbnail.extension,
-            files_count,
+            id: post.id,
+            username: post.user_username,
+            width: post.image_width,
+            height: post.image_height,
+            hash: post.image_hash,
+            extension: post.image_extension,
+            image_exists,
             view_width: 0.0,
             view_height: 0.0,
             view_pos_x: 0.0,
             view_pos_y: 0.0,
-            created_at: user_post.created_at,
+            created_at: post.created_at,
         }
     }
 }
@@ -481,7 +483,7 @@ impl Display for Img {
             f,
             "Img::new_full({}, {}, {}, {:.64}, {:.64}, {:.64}, {:.64})",
             // "Img::new_full({}, {}, {}, {:.32}, {:.32}, {:.32}, {:.32})",
-            self.key,
+            self.id,
             self.width,
             self.height,
             self.view_width,
@@ -493,15 +495,15 @@ impl Display for Img {
 }
 
 impl ResizableImage for Img {
-    fn get_id(&self) -> String {
-        self.key.clone()
+    fn get_id(&self) -> i64 {
+        self.id
     }
     fn get_post_link(&self) -> String {
-        link_relative_post(&self.key)
+        link_relative_post(self.id)
         // link_post(&self.username, &self.key)
     }
     fn get_img_link(&self) -> String {
-        link_relative_img(&self.key, &self.hash)
+        link_relative_img(self.id, self.hash)
         // link_img(&self.hash, &self.extension)
     }
     fn get_width(&self) -> u32 {
@@ -542,14 +544,14 @@ impl ResizableImage for Img {
 
 impl Img {
     pub fn new(width: u32, height: u32) -> Self {
-        let id = random_u64();
+        let id = random_u32();
 
         Self {
-            key: id.to_string(),
+            id: id as i64,
             username: "bot".to_string(),
-            hash: "404".to_string(),
+            hash: 0,
             extension: "webp".to_string(),
-            files_count: 0,
+            image_exists: false,
             width,
             height,
             view_width: 0.0,
@@ -560,16 +562,16 @@ impl Img {
         }
     }
 
-    pub fn rand(id: String) -> Self {
+    pub fn rand(id: i64) -> Self {
         let width = random_u32_ranged(500, 1000);
         let height = random_u32_ranged(500, 1000);
 
         Self {
-            key: id,
+            id,
             username: "bot".to_string(),
-            hash: "404".to_string(),
+            hash: 0,
             extension: "webp".to_string(),
-            files_count: 0,
+            image_exists: true,
             width,
             height,
             view_width: 0.0,
@@ -583,14 +585,14 @@ impl Img {
     pub fn rand_vec(n: usize) -> Vec<Self> {
         let mut output = Vec::new();
         for i in 0..n {
-            output.push(Img::rand(i.to_string()));
+            output.push(Img::rand(i as i64));
         }
         output
     }
 }
 
 pub trait ResizableImage {
-    fn get_id(&self) -> String;
+    fn get_id(&self) -> i64;
     fn get_post_link(&self) -> String;
     fn get_img_link(&self) -> String;
     fn get_width(&self) -> u32;

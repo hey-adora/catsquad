@@ -802,7 +802,7 @@ where
     pub fn post_get_by_key(
         &self,
         post_id: i64,
-    ) -> Builder<TSender, catsquad_shared::PostRes, catsquad_shared::PostGetByKeyErr> {
+    ) -> Builder<TSender, catsquad_shared::PostGetRes, catsquad_shared::PostGetByKeyErr> {
         let link = link_relative_post_get_by_key(post_id);
         let params = SenderParams {
             path: link,
@@ -830,7 +830,7 @@ where
         limit: usize,
         range: TimeRange,
         order: Order,
-    ) -> Builder<TSender, Vec<cs::PostRes>, cs::PostSearchErr> {
+    ) -> Builder<TSender, Vec<cs::PostSearchRes>, cs::PostSearchErr> {
         self.get(link_relative_post_search(cs::PostSearchParams {
             time: Some(time),
             range: Some(range),

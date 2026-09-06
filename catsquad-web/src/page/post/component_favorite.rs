@@ -8,30 +8,27 @@ use leptos::prelude::*;
 
 #[component]
 pub fn Favorite(
-    #[prop(optional, into)] post_key_tracked: Option<Callback<(), String>>,
-    #[prop(optional, into)] auth_key_tracked: Option<Callback<(), String>>,
+    #[prop(optional, into)] post_id: Signal<i64>,
+    #[prop(optional, into)] post_user_username: Signal<String>,
 ) -> impl IntoView {
     let page = PageState::get();
     let post_like = PostLikeState::new(create_client());
     let spawner = Spawner::new();
 
     Effect::new(move || {
-        let Some(post_key) = post_key_tracked else {
+        let post_id = post_id.get();
+        if post_id == 0 {
             return;
-        };
-        let post_key = post_key.run(());
+        }
         spawner.spawn(async move {
-            post_like.init(post_key.clone()).await;
+            post_like.init(post_id).await;
         });
     });
 
     let is_visible_fn = move || -> bool {
-        let Some(auth_key) = auth_key_tracked else {
-            return false;
-        };
-        let auth_key = auth_key.run(());
-        let user_key = page.user_key();
-        let is_my_post = auth_key == user_key;
+        let post_user_username = post_user_username.get();
+        let user_username = page.acc_username();
+        let is_my_post = user_username == post_user_username;
         let is_logged_in = page.is_logged_in().unwrap_or_default();
         is_logged_in && !is_my_post
     };

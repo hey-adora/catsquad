@@ -36,8 +36,8 @@ pub fn ImagesEdit(upload: UploadState) -> impl IntoView {
             return;
         };
         // let post_files = upload.files;
-        let post_key = upload.post_key.get_value();
-        if post_key.is_empty() {
+        let post_key = upload.post_id.get_value();
+        if post_key == 0 {
             warn!("upload canceled, post_key is empty");
             return;
         }

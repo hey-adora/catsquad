@@ -4,9 +4,9 @@ use axum::{
     http::{StatusCode, header},
     response::IntoResponse,
 };
-use catsquad_db::{DbPostGetByKeyErr, DbUser};
+use catsquad_db::{DbFileImage, DbPostGet, DbPostGetByKeyErr, DbUser};
 use catsquad_log::prelude::*;
-use catsquad_shared::{PostGetByKeyErr, PostGetByKeyParams, PostRes};
+use catsquad_shared::{PostFile, PostGetByKeyErr, PostGetByKeyParams, PostGetRes, PostState};
 
 use crate::{api::post_add::from_db_post, state::AppState};
 
@@ -17,6 +17,32 @@ pub fn from_db_post_get_by_key_err(value: DbPostGetByKeyErr) -> PostGetByKeyErr 
         }
         DbPostGetByKeyErr::PostNotFound => PostGetByKeyErr::PostNotFound,
         DbPostGetByKeyErr::Db(_) => PostGetByKeyErr::InternalServerErr,
+    }
+}
+
+pub fn from_db_post_get(value: DbPostGet) -> PostGetRes {
+    PostGetRes {
+        id: value.id,
+        user_username: value.user_username,
+        state: PostState::from(value.state),
+        title: value.title,
+        tags: value.tags,
+        favorites: value.likes_count,
+        description: value.description,
+        file: value.images.into_iter().map(from_db_post_file).collect(),
+        modified_at: value.modified_at,
+        created_at: value.created_at,
+    }
+}
+
+pub fn from_db_post_file(value: DbFileImage) -> PostFile {
+    PostFile {
+        extension: value.extension,
+        hash: value.hash,
+        proccesed: value.processed,
+        size_bytes: value.size_bytes,
+        width: value.width,
+        height: value.height,
     }
 }
 
@@ -32,7 +58,7 @@ pub fn from_db_post_get_by_key_err(value: DbPostGetByKeyErr) -> PostGetByKeyErr 
 //         })
 // }
 
-pub fn status_code(result: &Result<PostRes, PostGetByKeyErr>) -> StatusCode {
+pub fn status_code(result: &Result<PostGetRes, PostGetByKeyErr>) -> StatusCode {
     match result {
         Ok(_) => StatusCode::OK,
         Err(PostGetByKeyErr::Unauthorized(_)) => StatusCode::UNAUTHORIZED,
@@ -47,7 +73,7 @@ pub async fn post_get_by_id(
     State(app): State<AppState>,
     Path(params): Path<PostGetByKeyParams>,
 ) -> impl IntoResponse {
-    let inner = async || -> Result<PostRes, PostGetByKeyErr> {
+    let inner = async || -> Result<PostGetRes, PostGetByKeyErr> {
         // let req = params_req(params)?;
         let user_userame = db_user
             .as_ref()
@@ -60,7 +86,7 @@ pub async fn post_get_by_id(
             .await
             .map_err(from_db_post_get_by_key_err)?;
 
-        Ok(from_db_post(post))
+        Ok(from_db_post_get(post))
     };
 
     let result = inner().await;
@@ -80,7 +106,7 @@ mod test_utils {
             &self,
             post_id: i64,
             session_token: Uuid,
-        ) -> Result<cs::PostRes, cs::PostGetByKeyErr> {
+        ) -> Result<cs::PostGetRes, cs::PostGetByKeyErr> {
             self.client
                 .post_get_by_key(post_id)
                 .header_add(

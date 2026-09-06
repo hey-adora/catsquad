@@ -167,11 +167,11 @@ async fn test_post_update_order() {
             .await
             .unwrap();
 
-        assert_eq!(post.images_hashes.len(), 4);
-        assert_eq!(post.images_hashes[0], 10);
-        assert_eq!(post.images_hashes[1], 20);
-        assert_eq!(post.images_hashes[2], 30);
-        assert_eq!(post.images_hashes[3], 40);
+        assert_eq!(post.images.len(), 4);
+        assert_eq!(post.images[0].hash, 10);
+        assert_eq!(post.images[1].hash, 20);
+        assert_eq!(post.images[2].hash, 30);
+        assert_eq!(post.images[3].hash, 40);
     }
 
     // assert success
@@ -183,11 +183,11 @@ async fn test_post_update_order() {
             .post_get_by_id(user.username.clone(), post.id)
             .await
             .unwrap();
-        assert_eq!(post.images_hashes.len(), 4);
-        assert_eq!(post.images_hashes[0], 30);
-        assert_eq!(post.images_hashes[1], 10);
-        assert_eq!(post.images_hashes[2], 20);
-        assert_eq!(post.images_hashes[3], 40);
+        assert_eq!(post.images.len(), 4);
+        assert_eq!(post.images[0].hash, 30);
+        assert_eq!(post.images[1].hash, 10);
+        assert_eq!(post.images[2].hash, 20);
+        assert_eq!(post.images[3].hash, 40);
 
         db.post_update_order(0, user.username.clone(), post.id, 0, 2)
             .await
@@ -196,11 +196,11 @@ async fn test_post_update_order() {
             .post_get_by_id(user.username.clone(), post.id)
             .await
             .unwrap();
-        assert_eq!(post.images_hashes.len(), 4);
-        assert_eq!(post.images_hashes[0], 10);
-        assert_eq!(post.images_hashes[1], 20);
-        assert_eq!(post.images_hashes[2], 30);
-        assert_eq!(post.images_hashes[3], 40);
+        assert_eq!(post.images.len(), 4);
+        assert_eq!(post.images[0].hash, 10);
+        assert_eq!(post.images[1].hash, 20);
+        assert_eq!(post.images[2].hash, 30);
+        assert_eq!(post.images[3].hash, 40);
 
         db.post_update_order(0, user.username.clone(), post.id, 0, 3)
             .await
@@ -209,11 +209,11 @@ async fn test_post_update_order() {
             .post_get_by_id(user.username.clone(), post.id)
             .await
             .unwrap();
-        assert_eq!(post.images_hashes.len(), 4);
-        assert_eq!(post.images_hashes[0], 20);
-        assert_eq!(post.images_hashes[1], 30);
-        assert_eq!(post.images_hashes[2], 40);
-        assert_eq!(post.images_hashes[3], 10);
+        assert_eq!(post.images.len(), 4);
+        assert_eq!(post.images[0].hash, 20);
+        assert_eq!(post.images[1].hash, 30);
+        assert_eq!(post.images[2].hash, 40);
+        assert_eq!(post.images[3].hash, 10);
     }
 
     // assert errors

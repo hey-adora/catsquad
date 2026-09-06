@@ -3,6 +3,46 @@ use catsquad_log::prelude::*;
 use catsquad_shared::{Order, PostState, TimeRange};
 use sqlx::AssertSqlSafe;
 
+#[derive(Debug, Clone, PartialEq, sqlx::FromRow)]
+pub struct DbPostSearch {
+    #[sqlx(rename = "post_id")]
+    pub id: i64,
+    #[sqlx(rename = "post_user_username")]
+    pub user_username: String,
+    #[sqlx(rename = "post_state")]
+    pub state: String, // TODO optimize to be enum
+    #[sqlx(rename = "post_title")]
+    pub title: String,
+    #[sqlx(rename = "post_description")]
+    pub description: String,
+    #[sqlx(rename = "post_tags")]
+    pub tags: String,
+    #[sqlx(rename = "post_likes_count")]
+    #[sqlx(try_from = "i64")]
+    pub likes_count: u32,
+    #[sqlx(rename = "post_size_bytes")]
+    #[sqlx(try_from = "i64")]
+    pub size_bytes: u32,
+    #[sqlx(rename = "post_image_width")]
+    #[sqlx(try_from = "i64")]
+    pub image_width: u32,
+    #[sqlx(rename = "post_image_height")]
+    #[sqlx(try_from = "i64")]
+    pub image_height: u32,
+    #[sqlx(rename = "post_image_extension")]
+    pub image_extension: String,
+    #[sqlx(rename = "post_image_hash")]
+    pub image_hash: i64,
+    // #[sqlx(rename = "post_images_hashes")]
+    // pub images_hashes: Vec<i64>,
+    #[sqlx(rename = "post_modified_at")]
+    #[sqlx(try_from = "XTimestamp")]
+    pub modified_at: u64,
+    #[sqlx(rename = "post_created_at")]
+    #[sqlx(try_from = "XTimestamp")]
+    pub created_at: u64,
+}
+
 #[derive(Debug, thiserror::Error)]
 pub enum DbPostSearchErr {
     #[error("DB error {0}")]
@@ -35,7 +75,7 @@ impl Db {
         limit: usize,
         range: TimeRange,
         order: Order,
-    ) -> Result<Vec<DbPost>, DbPostSearchErr> {
+    ) -> Result<Vec<DbPostSearch>, DbPostSearchErr> {
         let pool = &self.db;
         let user_username = user.into();
         let mut bind_index = 3_usize;
@@ -73,7 +113,24 @@ impl Db {
 
         let query_str = format!(
             "
-            SELECT * FROM posts
+            SELECT
+                post_id,
+                post_user_username,
+                post_state,
+                post_title,
+                post_description,
+                post_tags,
+                post_likes_count,
+                post_size_bytes,
+                coalesce(image_width, 0) as post_image_width,
+                coalesce(image_height, 0) as post_image_height,
+                coalesce(image_extension, '') as post_image_extension,
+                coalesce(image_hash, 0) as post_image_hash,
+                post_modified_at,
+                post_created_at
+
+                FROM posts
+                LEFT JOIN files_images ON post_images_hashes[1]=image_hash
                 WHERE {q_where}
                 ORDER BY post_created_at {q_order}
                 LIMIT $3
@@ -167,11 +224,21 @@ async fn test_post_search() {
     let post2 = add_post_and_activate(3, &user, "3", "description", "one").await;
     let post9 = add_post(4, &user, "9", "description9", "one two three 9").await;
 
+    db.post_update_file_add(0, user.username, post0.id, 10, 666, "jpg", 10, 15)
+        .await
+        .unwrap();
+
     let result = search("", "", 0, 4, 4, true).await;
     assert_eq!(result.len(), 3);
     assert_eq!(result[0].title, "3");
+    assert_eq!(result[0].image_hash, 0);
     assert_eq!(result[1].title, "2");
+    assert_eq!(result[1].image_hash, 0);
     assert_eq!(result[2].title, "1");
+    assert_eq!(result[2].image_width, 10);
+    assert_eq!(result[2].image_height, 15);
+    assert_eq!(result[2].image_extension, "jpg");
+    assert_eq!(result[2].image_hash, 666);
 
     let result = search(" three  two     ", "hey", 3, 3, 2, true).await;
     assert_eq!(result.len(), 1);

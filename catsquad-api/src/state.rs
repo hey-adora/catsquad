@@ -19,7 +19,7 @@ pub struct AppState {
     pub db: Db,
     pub assets: Arc<Assets>,
     conf: Arc<AsyncRwLock<ApiConfig>>,
-    time: Option<Arc<SyncRwLock<u128>>>,
+    time: Option<Arc<SyncRwLock<u64>>>,
 }
 
 impl AppState {
@@ -65,19 +65,19 @@ impl AppState {
         }
     }
 
-    pub fn set_time(&self, new_time: u128) {
+    pub fn set_time(&self, new_time: u64) {
         if let Some(time) = &self.time {
             *time.write().unwrap() = new_time;
         }
     }
 
-    pub fn get_time_ns(&self) -> u128 {
-        if let Some(time) = &self.time {
-            return *time.read().unwrap();
-        }
+    // pub fn get_time_ns(&self) -> u128 {
+    //     if let Some(time) = &self.time {
+    //         return *time.read().unwrap();
+    //     }
 
-        get_time_ns()
-    }
+    //     get_time_ns()
+    // }
 
     pub fn get_time_micro(&self) -> u64 {
         if let Some(time) = &self.time {
