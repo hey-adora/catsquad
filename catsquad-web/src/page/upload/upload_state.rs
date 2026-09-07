@@ -11,13 +11,13 @@ use leptos::prelude::*;
 #[derive(Clone, Copy, Debug)]
 pub struct FieldSaved {
     pub saved: bool,
-    pub saved_at: u128,
-    pub set_at: u128,
-    pub checked_at: u128,
+    pub saved_at: u64,
+    pub set_at: u64,
+    pub checked_at: u64,
 }
 
 impl FieldSaved {
-    pub fn new(time: u128) -> Self {
+    pub fn new(time: u64) -> Self {
         Self {
             saved: true,
             saved_at: time,
@@ -141,7 +141,7 @@ pub struct UploadState {
 }
 
 impl UploadState {
-    pub fn new(time: u128) -> Self {
+    pub fn new(time: u64) -> Self {
         Self {
             post_id: StoredValue::new(0),
             stage: RwSignal::new(UploadStateStage::Loading),
@@ -222,7 +222,7 @@ impl UploadState {
         }
     }
 
-    pub fn set_title(&self, time: u128, title: impl Into<String>) {
+    pub fn set_title(&self, time: u64, title: impl Into<String>) {
         let title = title.into();
         let title = title.trim();
         let result = validate_post_title(title);
@@ -241,7 +241,7 @@ impl UploadState {
         });
     }
 
-    pub fn set_description(&self, time: u128, description: impl Into<String>) {
+    pub fn set_description(&self, time: u64, description: impl Into<String>) {
         let description = description.into();
         let description = description.trim();
         let result = validate_post_description(description);
@@ -260,7 +260,7 @@ impl UploadState {
         });
     }
 
-    pub fn set_tags(&self, time: u128, tags: impl Into<String>) {
+    pub fn set_tags(&self, time: u64, tags: impl Into<String>) {
         let tags = tags.into();
         let tags = tags.trim();
         let result = validate_post_tags(tags);
@@ -279,7 +279,7 @@ impl UploadState {
         });
     }
 
-    pub async fn update_title<TSender>(&self, time: u128, client: &Client<TSender>)
+    pub async fn update_title<TSender>(&self, time: u64, client: &Client<TSender>)
     where
         TSender: Sender + Debug + Clone,
         TSender::TResponse: Response + Debug,
@@ -310,7 +310,7 @@ impl UploadState {
         });
     }
 
-    pub async fn update_description<TSender>(&self, time: u128, client: &Client<TSender>)
+    pub async fn update_description<TSender>(&self, time: u64, client: &Client<TSender>)
     where
         TSender: Sender + Debug + Clone,
         TSender::TResponse: Response + Debug,
@@ -343,7 +343,7 @@ impl UploadState {
         });
     }
 
-    pub async fn update_tags<TSender>(&self, time: u128, client: &Client<TSender>)
+    pub async fn update_tags<TSender>(&self, time: u64, client: &Client<TSender>)
     where
         TSender: Sender + Debug + Clone,
         TSender::TResponse: Response + Debug,
@@ -559,7 +559,7 @@ impl UploadState {
 async fn test_upload_state_update() {
     use catsquad_api::{auth::create_auth_cookie_str, utils::rng_str};
     use catsquad_shared::{
-        MAX_POST_DESCRIPTION_LENGTH, MAX_POST_TAGS_LENGTH, MAX_POST_TITLE_LENGTH,
+        MAX_POST_DESCRIPTION_LENGTH, MAX_POST_TAGS_LENGTH, MAX_POST_TITLE_LENGTH, uuid_to_str,
     };
     use http::header;
 
@@ -576,12 +576,15 @@ async fn test_upload_state_update() {
         .await;
 
     server
-        .inject_header(header::COOKIE, create_auth_cookie_str(session1.clone()))
+        .inject_header(
+            header::COOKIE,
+            create_auth_cookie_str(uuid_to_str(session1)),
+        )
         .await;
 
     let upload = UploadState::new(0);
 
-    assert_eq!(upload.post_id.get_value(), "");
+    assert_eq!(upload.post_id.get_value(), 0);
     assert_eq!(upload.stage.get_untracked(), UploadStateStage::Loading);
     assert_eq!(upload.title_saved.get_untracked().saved, true);
     assert_eq!(upload.title_saved.get_untracked().saved_at, 0);
@@ -613,7 +616,7 @@ async fn test_upload_state_update() {
         upload.update_description(1, &server.client).await;
         upload.update_tags(1, &server.client).await;
 
-        assert!(!upload.post_id.get_value().is_empty());
+        assert_ne!(upload.post_id.get_value(), 0);
         assert_eq!(upload.stage.get_untracked(), UploadStateStage::Loaded);
 
         assert_eq!(upload.title_saved.get_untracked().saved, true);
@@ -750,7 +753,7 @@ async fn test_upload_state_update() {
 #[cfg(test)]
 #[tokio::test]
 async fn test_upload_state_file_add() {
-    let (server, _owner, upload) = test_upload_init().await;
+    let (server, _owner, upload) = test_upload_init("test_upload_state_file_add").await;
 
     let input_files = vec!["../assets/favicon.ico".to_string()];
     let files_signals = upload.set_files(input_files.clone());
@@ -797,7 +800,7 @@ async fn test_upload_state_file_add() {
 #[cfg(test)]
 #[tokio::test]
 async fn test_upload_state_file_remove() {
-    let (server, _owner, upload) = test_upload_init().await;
+    let (server, _owner, upload) = test_upload_init("test_upload_state_file_remove").await;
 
     let input_files = vec!["../assets/favicon.ico".to_string()];
     let files_signals = upload.set_files(input_files.clone());
@@ -829,13 +832,14 @@ async fn test_upload_state_file_remove() {
 }
 
 #[cfg(test)]
-async fn test_upload_init() -> (catsquad_api::TestServer, Owner, UploadState) {
+async fn test_upload_init(db_name: &str) -> (catsquad_api::TestServer, Owner, UploadState) {
     use catsquad_api::auth::create_auth_cookie_str;
+    use catsquad_shared::uuid_to_str;
     use http::header;
 
     catsquad_log::init_log();
     let owner = crate::init_owner();
-    let server = catsquad_api::TestServer::new(0, "test_upload_init").await;
+    let server = catsquad_api::TestServer::new(0, db_name).await;
 
     let (_user1, session1) = server
         .user_add_full(
@@ -846,7 +850,10 @@ async fn test_upload_init() -> (catsquad_api::TestServer, Owner, UploadState) {
         .await;
 
     server
-        .inject_header(header::COOKIE, create_auth_cookie_str(session1.clone()))
+        .inject_header(
+            header::COOKIE,
+            create_auth_cookie_str(uuid_to_str(session1)),
+        )
         .await;
 
     // upload.init creates new post draft

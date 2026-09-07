@@ -6,6 +6,7 @@ use crate::{
 use catsquad_shared::{
     LINK_WEB_INDEX, PasswordResetStage, link_relative_login,
     link_relative_login_password_reset_check, link_relative_login_password_reset_finished,
+    str_to_uuid,
 };
 use leptos::prelude::*;
 use leptos_router::{NavigateOptions, hooks::use_navigate};
@@ -26,9 +27,10 @@ pub fn PasswordReset(
     let password_reset = PasswordChangeState::new(create_client());
 
     let email = move || email_tracked.map(|v| v.run(())).unwrap_or_default();
-    let password_reset_key = move || {
+    let password_reset_token = move || {
         password_reset_key_untracked
             .map(|v| v.run(()))
+            .map(|v| str_to_uuid(v))
             .unwrap_or_default()
     };
     let password_reset_stage_tracked = move || {
@@ -117,10 +119,10 @@ pub fn PasswordReset(
                 ) else {
                     return;
                 };
-                let password_reset_key = password_reset_key();
+                let password_reset_id = password_reset_token();
                 spawner.spawn(async move {
                     let Some(result) = password_reset
-                        .confirm(password_reset_key, new_password, new_password_confirmation)
+                        .confirm(password_reset_id, new_password, new_password_confirmation)
                         .await
                     else {
                         return;

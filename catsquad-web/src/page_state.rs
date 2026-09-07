@@ -1,6 +1,6 @@
 use catsquad_log::prelude::*;
 use catsquad_shared::{SensitiveUserRes, SessionRemoveErr, UserGetBySessionKeyErr};
-use catsquad_web_utils::time::time_now_ns;
+use catsquad_web_utils::time::{time_now_micro, time_now_ns};
 use leptos::prelude::*;
 
 use crate::page::create_client;
@@ -9,7 +9,7 @@ use crate::page::create_client;
 pub struct PageState {
     pub acc: RwSignal<Option<SensitiveUserRes>>,
     pub acc_pending: RwSignal<bool>,
-    pub time: RwSignal<u128>,
+    pub time: RwSignal<u64>,
 }
 
 impl PageState {
@@ -17,7 +17,7 @@ impl PageState {
         //
         Self {
             acc_pending: RwSignal::new(true),
-            time: RwSignal::new(time_now_ns()),
+            time: RwSignal::new(time_now_micro()),
             ..Default::default()
         }
     }
@@ -30,7 +30,7 @@ impl PageState {
         expect_context::<Self>()
     }
 
-    pub fn get_time_ns(&self) -> u128 {
+    pub fn get_time(&self) -> u64 {
         self.time.get()
     }
 

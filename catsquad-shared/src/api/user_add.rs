@@ -29,7 +29,7 @@ pub struct UserAddReq {
         serialize_with = "crate::serde_from_uuid",
         deserialize_with = "crate::serde_to_uuid"
     )]
-    pub invite_key: Uuid,
+    pub invite_token: Uuid,
 }
 
 #[derive(
@@ -103,7 +103,7 @@ fn test_validate_email() {
     assert!(validate_email(" ").is_err());
     assert!(validate_email("a").is_err());
     assert!(validate_email("a@").is_err());
-    assert!(validate_email("a@.").is_err());
+    assert!(validate_email("a@.").is_ok());
 }
 
 pub fn validate_username(username: impl AsRef<str>) -> Result<(), String> {

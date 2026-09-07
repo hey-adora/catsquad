@@ -5,6 +5,7 @@ use catsquad_client::XMLSender;
 use catsquad_log::prelude::*;
 use catsquad_shared::UserGetBySessionKeyErr;
 use catsquad_web_utils::interval;
+use catsquad_web_utils::time::time_now_micro;
 use catsquad_web_utils::time::time_now_ns;
 use leptos::prelude::*;
 use leptos_router::StaticSegment;
@@ -46,7 +47,7 @@ pub fn App() -> impl IntoView {
 
     interval::new(
         move || {
-            let time = time_now_ns();
+            let time = time_now_micro();
             page.time.set(time);
         },
         Duration::from_secs(1),

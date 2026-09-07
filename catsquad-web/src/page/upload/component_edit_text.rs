@@ -1,6 +1,7 @@
 use std::time::Duration;
 
 use catsquad_web_utils::prelude::*;
+use catsquad_web_utils::time::time_now_micro;
 use leptos::prelude::*;
 use web_sys::HtmlTextAreaElement;
 
@@ -34,7 +35,7 @@ pub fn TextEdit(
 
     let _handle = interval::new(
         move || {
-            let time = time_now_ns();
+            let time = time_now_micro();
             let Some(meta_data) = saved_metadata.try_get_untracked() else {
                 return;
             };
@@ -108,9 +109,9 @@ pub fn TextEdit(
         match data.saved {
             true => "saved.".to_string(),
             false => {
-                let time = time_now_ns();
+                let time = time_now_micro();
                 let saving_in = AUTO_SAVE_TIME.saturating_sub(time.saturating_sub(data.set_at));
-                let saving_in = ns_to_str(saving_in);
+                let saving_in = micro_to_str(saving_in);
                 format!("saving in {}", saving_in)
             }
         }

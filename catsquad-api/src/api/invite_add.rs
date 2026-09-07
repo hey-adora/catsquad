@@ -2,8 +2,9 @@ use axum::{Form, Json, extract::State, http::StatusCode, response::IntoResponse}
 use catsquad_db::{DbInvite, DbInviteAddErr, Uuid};
 use catsquad_log::prelude::*;
 use catsquad_shared::{
-    InviteAddErr, InviteAddReq, InviteRes, link_absolute_reg_finish, validate_email,
+    InviteAddErr, InviteAddReq, InviteRes, link_absolute_reg_finish, uuid_to_str, validate_email,
 };
+use url::Url;
 
 use crate::state::AppState;
 
@@ -22,9 +23,12 @@ fn status_code(result: &Result<InviteRes, InviteAddErr>) -> StatusCode {
     }
 }
 
-fn send_email_invite(address: impl AsRef<str>, token: Uuid) -> String {
-    let token = u128::from_be_bytes(token).to_string();
-    let link = link_absolute_reg_finish(address, token);
+fn send_email_invite(address: Url, token: Uuid) -> String {
+    // let token = u128::from_be_bytes(token).to_string();
+    let token = uuid_to_str(token);
+    let link = link_absolute_reg_finish(address, token)
+        .unwrap()
+        .to_string();
     debug!("EMAIL SENT {link}");
     link
 }

@@ -23,8 +23,8 @@ fn from_db_invite(value: DbInvite) -> InviteGetByKeyRes {
 pub fn from_db_invite_get_by_key_err(value: DbInviteGetByKeyErr) -> InviteGetByKeyErr {
     match value {
         DbInviteGetByKeyErr::InviteNotFound => InviteGetByKeyErr::InviteNotFound,
-        DbInviteGetByKeyErr::InviteExpired => InviteGetByKeyErr::InviteAlreadyUsed,
-        DbInviteGetByKeyErr::InviteAlreadyUsed => InviteGetByKeyErr::InviteExpired,
+        DbInviteGetByKeyErr::InviteAlreadyUsed => InviteGetByKeyErr::InviteAlreadyUsed,
+        DbInviteGetByKeyErr::InviteExpired => InviteGetByKeyErr::InviteExpired,
         DbInviteGetByKeyErr::Db(_) => InviteGetByKeyErr::InternalServerErr,
     }
 }

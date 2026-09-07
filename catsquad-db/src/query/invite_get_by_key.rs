@@ -25,12 +25,12 @@ impl Db {
         let pool = &self.db;
         let query = "SELECT invite_email, invite_used, invite_expires_at, invite_modified_at, invite_created_at FROM invites WHERE invite_token = $1";
 
-        trace!("about to run {query}");
-
         let result = sqlx::query_as(query)
             .bind(XUuid(invite_token))
             .fetch_one(pool)
             .await;
+
+        trace!("query {query} results: {result:#?}");
 
         let result = match result {
             Ok(v) => v,

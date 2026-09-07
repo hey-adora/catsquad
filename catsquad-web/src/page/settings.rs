@@ -4,7 +4,7 @@ use crate::{BtnPrimary, BtnSecondary, LinkSecondary, Nav, PageState};
 use catsquad_shared::{
     EmailCangeStage, PasswordCangeStage, SettingsPageParams, SettingsPageStage,
     link_relative_settings_email_change_current_add, link_relative_settings_password_change_add,
-    link_relative_settings_username_change,
+    link_relative_settings_username_change, str_to_uuid, uuid_to_str,
 };
 use catsquad_web_utils::prelude::*;
 use leptos::prelude::*;
@@ -45,11 +45,11 @@ pub fn Settings() -> impl IntoView {
     let email_stage_tracked = move || email_stage.get_or_default();
     let email_stage_untracked = move || email_stage.get_untracked().unwrap_or_default();
 
-    let email_change_key = RwQuery::<String>::new(SettingsPageParams::EmailChangeKey.to_string());
-    let email_change_key_untracked = move || email_change_key.get_untracked().unwrap_or_default();
+    let email_change_id = RwQuery::<i64>::new(SettingsPageParams::EmailChangeKey.to_string());
+    let email_change_id_untracked = move || email_change_id.get_untracked().unwrap_or_default();
 
     let token = RwQuery::<String>::new(SettingsPageParams::Token.to_string());
-    let token_untracked = move || token.get_untracked().unwrap_or_default();
+    let token_untracked = move || str_to_uuid(token.get_untracked().unwrap_or_default());
 
     let new_email = RwQuery::<String>::new(SettingsPageParams::NewEmail.to_string());
     let new_email_tracked = move || new_email.get().unwrap_or_default();
@@ -77,7 +77,7 @@ pub fn Settings() -> impl IntoView {
                 <EmailChange
                     email_change_stage_tracked=email_stage_tracked
                     email_change_stage_untracked=email_stage_untracked
-                    email_change_key_untracked
+                    email_change_id_untracked
                     token_untracked
                     new_email_tracked
                     />
@@ -86,7 +86,7 @@ pub fn Settings() -> impl IntoView {
                 <PasswordChange
                         password_change_stage_tracked=password_stage_tracked
                         password_change_stage_untracked=password_stage_untracked
-                        password_change_key=token_untracked
+                        password_change_token=token_untracked
                     />
             </Show>
             <div class="px-[2rem] mx-auto max-w-[30rem] w-full">

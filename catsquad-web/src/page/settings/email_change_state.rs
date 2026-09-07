@@ -167,7 +167,7 @@ where
 #[tokio::test]
 async fn test_email_change_state() {
     use catsquad_api::auth::create_auth_cookie_str;
-    use catsquad_shared::PostState;
+    use catsquad_shared::{PostState, uuid_to_str};
     use http::header;
 
     catsquad_log::init_log();
@@ -183,7 +183,10 @@ async fn test_email_change_state() {
         .await;
 
     server
-        .inject_header(header::COOKIE, create_auth_cookie_str(session1.clone()))
+        .inject_header(
+            header::COOKIE,
+            create_auth_cookie_str(uuid_to_str(session1)),
+        )
         .await;
 
     let email_change = EmailChangeState::new(server.client.clone());
@@ -202,7 +205,7 @@ async fn test_email_change_state() {
         assert!(result.is_none());
     }
 
-    let email_change_res = email_change
+    email_change
         .current_confirm(email_change_res.id.clone(), current_token.clone())
         .await
         .unwrap();

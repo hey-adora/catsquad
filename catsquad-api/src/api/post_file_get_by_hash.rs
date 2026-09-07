@@ -9,7 +9,7 @@ use axum::{
 };
 use catsquad_db::{DbPostGetByKeyErr, DbPostImageGetByHashErr, DbUser};
 use catsquad_log::prelude::*;
-use catsquad_shared::{PostFileGetByHashErr, StorageParams};
+use catsquad_shared::{PostFileGetByHashErr, StorageParams, u128_to_str};
 use tokio::fs;
 
 use crate::state::AppState;
@@ -76,7 +76,7 @@ pub async fn post_file_get_by_hash(
 
         // let file_extension = file.extension;
         let file_extension = image.extension;
-        let hash_str = image.hash.to_string();
+        let hash_str = u128_to_str((image.hash as u64) as u128);
         let path = app.get_storage_path().await;
         let path = std::path::Path::new(&path);
         let path = path.join(hash_str).with_extension(&file_extension);

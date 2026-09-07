@@ -3,7 +3,7 @@ use super::upload_state::UploadState;
 use crate::{hook::Spawner, page::create_client};
 use catsquad_log::prelude::*;
 use catsquad_shared::MAX_POST_TAGS_LENGTH;
-use catsquad_web_utils::prelude::*;
+use catsquad_web_utils::{prelude::*, time::time_now_micro};
 use leptos::prelude::*;
 
 #[component]
@@ -11,14 +11,14 @@ pub fn TagsEdit(upload: UploadState) -> impl IntoView {
     let spawner = Spawner::new();
     let on_update = move || {
         spawner.spawn(async move {
-            let time = time_now_ns();
+            let time = time_now_micro();
             let client = create_client();
             trace!("auto save tags - running");
             upload.update_tags(time, &client).await;
         });
     };
     let on_set = move |value| {
-        let time = time_now_ns();
+        let time = time_now_micro();
         upload.set_tags(time, value);
     };
     view! {

@@ -42,11 +42,10 @@ pub fn u128_to_str(uuid: u128) -> String {
 }
 
 pub fn str_to_u128(uuid: &str) -> u128 {
-    let chars = uuid.chars();
-    // chars.count()
     if uuid.len() == 0 {
         return 0;
     }
+    let chars = uuid.chars();
     if uuid.len() == 1 {
         return uuid
             .chars()

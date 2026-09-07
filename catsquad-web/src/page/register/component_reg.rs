@@ -213,22 +213,25 @@ pub fn RegisterForm() -> impl IntoView {
     let reg = RegisterFormState::new();
     let spawner = Spawner::new();
     let input_username = NodeRef::new();
-    let input_invite_key = RwQuery::<String>::new("token");
-    let email = invite_key_to_email(
-        move || str_to_uuid(input_invite_key.get().unwrap_or_default()),
-        reg.err_invite_key,
-    );
+    let param_invite_token = RwQuery::<String>::new("token");
+    let invite_token = move || {
+        param_invite_token
+            .with_untracked(|v| v.as_ref().map(|v| str_to_uuid(v)).unwrap_or_default())
+    };
+    let email = invite_key_to_email(invite_token, reg.err_invite_key);
     // let email = Memo::new()
     let input_password = NodeRef::new();
     let input_password_confirmation = NodeRef::new();
     let on_register = move |e: web_sys::SubmitEvent| {
         e.prevent_default();
 
-        let (Some(username), Some(invite_key), Some(password), Some(password_confirmation)) = (
+        // , Some(invite_key)
+
+        let (Some(username), Some(password), Some(password_confirmation)) = (
             input_username
                 .get_untracked()
                 .map(|v: HtmlInputElement| v.value()),
-            input_invite_key.get_untracked().map(|v| str_to_uuid(v)),
+            // input_invite_key.get_untracked().map(|v| str_to_uuid(v)),
             input_password
                 .get_untracked()
                 .map(|v: HtmlInputElement| v.value()),
@@ -239,13 +242,15 @@ pub fn RegisterForm() -> impl IntoView {
             return;
         };
 
+        let invite_token = invite_token();
+
         let client = create_client();
 
         spawner.spawn(async move {
             reg.run_register(
                 &client,
                 username,
-                invite_key,
+                invite_token,
                 password,
                 password_confirmation,
             )

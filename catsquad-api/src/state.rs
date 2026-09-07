@@ -1,4 +1,5 @@
 use catsquad_db::Db;
+use catsquad_log::prelude::*;
 use rand::distr::SampleString;
 use std::{
     path::PathBuf,
@@ -55,10 +56,10 @@ impl AppState {
             .map(|v| PathBuf::from(v))
             .unwrap_or(conf.assets_path.clone());
         let assets = Assets::new(&assets_path).await;
-        let time = get_time_ns();
-        panic!("ADD NORMAL AUTH DB LOGIN");
+        // let time = get_time_micro();
+        error!("ADD AUTH TO DB");
         Self {
-            db: Db::test_db(0, "catsquad").await,
+            db: Db::create(0, "catsquad1").await,
             conf: Arc::new(AsyncRwLock::new(conf)),
             time: None, // dont set time here, it will never update, used only in tests
             assets: Arc::new(assets),
@@ -109,7 +110,7 @@ impl AppState {
     // }
 
     pub async fn get_invite_expiration_micro(&self) -> u64 {
-        (self.conf.read().await.invite_expiration_micros / 1000) as u64
+        self.conf.read().await.invite_expiration_micros
     }
 
     // pub async fn get_password_change_expiration_ns(&self) -> u128 {
@@ -117,7 +118,7 @@ impl AppState {
     // }
 
     pub async fn get_password_change_expiration_micro(&self) -> u64 {
-        (self.conf.read().await.password_change_expiration_micros / 1000) as u64
+        self.conf.read().await.password_change_expiration_micros
     }
 
     pub async fn get_email_change_expiration_micro(&self) -> u64 {

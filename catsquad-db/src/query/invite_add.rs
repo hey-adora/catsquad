@@ -83,13 +83,15 @@ impl Db {
                 VALUES ( $1, $2, $3, $3 )
                 RETURNING invite_token
         ";
-        trace!("about to run {query}");
+
         let result = sqlx::query_as(query)
             .bind(&email)
             .bind(XTimestamp(expires as i64))
             .bind(XTimestamp(time as i64))
             .fetch_one(&mut *tx)
             .await;
+
+        trace!("query: {query}\n$1={email},expires={expires},time={time}\nresult: {result:#?}");
 
         tx.commit().await?;
 
@@ -111,7 +113,7 @@ impl Db {
             modified_at: time,
             created_at: time,
         };
-        trace!("\nquery: {query}\nresult: {db_invite:#?}");
+        // trace!("\nquery: {query}\nresult: {db_invite:#?}");
 
         Ok(db_invite)
     }

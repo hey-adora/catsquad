@@ -1,3 +1,7 @@
+use std::fmt::Display;
+
+use url::Url;
+
 pub const LINK_WEB_REGISTER: &str = "/register";
 
 // pub const PATH_FRONT_END_REGISTER: &'static str = "/register";
@@ -34,7 +38,7 @@ pub fn link_relative_reg_check(email: impl AsRef<str>) -> String {
         //
         LINK_WEB_REGISTER,
         //
-        RegisterPageParams::Stage.to_string(),
+        RegisterPageParams::Stage.to_string(), // TODO use static &str
         RegisterPageStage::CheckEmail.to_string(),
         //
         RegisterPageParams::Email.to_string(),
@@ -42,18 +46,21 @@ pub fn link_relative_reg_check(email: impl AsRef<str>) -> String {
     )
 }
 
-pub fn link_absolute_reg_finish(address: impl AsRef<str>, token: impl AsRef<str>) -> String {
+pub fn link_relative_reg_finish(token: impl Display) -> String {
     format!(
-        "{}{}?{}={}&{}={}",
+        "{}?{}={}&{}={}",
         //
-        address.as_ref(),
         LINK_WEB_REGISTER,
         //
         RegisterPageParams::Stage.to_string(),
         RegisterPageStage::Register.to_string(),
         //
         RegisterPageParams::Token.to_string(),
-        token.as_ref(),
-        // token.as_ref(),
+        token,
     )
+}
+
+pub fn link_absolute_reg_finish(host: Url, token: impl Display) -> Result<Url, url::ParseError> {
+    let input = link_relative_reg_finish(token);
+    host.join(&input)
 }

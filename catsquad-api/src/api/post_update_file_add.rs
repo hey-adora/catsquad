@@ -16,7 +16,7 @@ use catsquad_db::{DbPostUpdateFileAddErr, DbUser};
 use catsquad_log::prelude::*;
 use catsquad_shared::{
     POST_UPDATE_FILE_ADD_PARAMS_FIELD_POST_ID, PostFile, PostUpdateFileAddErr,
-    PostUpdateFileAddParams, SUPPORTED_FILE_EXTENSIONS, uuid_to_str,
+    PostUpdateFileAddParams, SUPPORTED_FILE_EXTENSIONS, u128_to_str, uuid_to_str,
 };
 use futures::{Stream, TryStreamExt};
 use futures_util::StreamExt;
@@ -262,7 +262,7 @@ where
 
     file.flush().await?;
     let hash = hasher.finish();
-    let hash_str = hash.to_string();
+    let hash_str = u128_to_str(hash as u128);
     trace!("hashing in prod {file_path_tmp:?} = {hash}");
 
     // uuid_to_str(uuid)
@@ -485,7 +485,7 @@ async fn test_api_post_update_file_add() {
         let file_path = Path::new(file_path_str);
         let file_extension = file_path.extension().unwrap();
         let hash = get_file_hash_for_testing_by_path(file_path_str).await;
-        let hash_str = (hash as u64).to_string();
+        let hash_str = u128_to_str(hash as u128);
         let storage_path = storage_path.join(&hash_str).with_extension(file_extension);
         let file_path = storage_path.to_str().unwrap().to_string();
         (hash, PathBuf::from(file_path))

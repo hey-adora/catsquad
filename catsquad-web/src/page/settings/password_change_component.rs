@@ -3,7 +3,7 @@ use crate::{
     BtnPrimary, ErrGeneral, Errs, LinkSecondary, PageState, hook::Spawner, page::create_client,
 };
 use catsquad_shared::{
-    EmailCangeStage, LINK_WEB_INDEX, PasswordCangeStage, link_relative_settings,
+    EmailCangeStage, LINK_WEB_INDEX, PasswordCangeStage, Uuid, link_relative_settings,
     link_relative_settings_password_change_check_email,
 };
 use leptos::prelude::*;
@@ -17,14 +17,15 @@ pub fn PasswordChange(
     #[prop(optional, into)] password_change_stage_untracked: Option<
         Callback<(), PasswordCangeStage>,
     >,
-    #[prop(optional, into)] password_change_key: Option<Callback<(), String>>,
+    #[prop(optional, into)] password_change_token: Option<Callback<(), Uuid>>,
 ) -> impl IntoView {
     // let page = PageState::get();
     let link_back = move || link_relative_settings();
     // let current_username = move || page.acc_username();
     let spawner = Spawner::new();
     let password_change = PasswordChangeState::new(create_client());
-    let password_change_key = move || password_change_key.map(|v| v.run(())).unwrap_or_default();
+    let password_change_token =
+        move || password_change_token.map(|v| v.run(())).unwrap_or_default();
     let password_change_stage_tracked = move || {
         password_change_stage_tracked
             .map(|v| v.run(()))
@@ -131,10 +132,14 @@ pub fn PasswordChange(
                 ) else {
                     return;
                 };
-                let password_change_key = password_change_key();
+                let password_change_token = password_change_token();
                 spawner.spawn(async move {
                     let Some(_result) = password_change
-                        .confirm(password_change_key, new_password, new_password_confirmation)
+                        .confirm(
+                            password_change_token,
+                            new_password,
+                            new_password_confirmation,
+                        )
                         .await
                     else {
                         return;

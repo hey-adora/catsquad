@@ -179,6 +179,7 @@ impl Default for ApiConfig {
             invite_expiration_micros: 1800000000,
             password_change_expiration_micros: 1800000000,
             email_change_expiration_micros: 1800000000,
+            // 1800000000
             database_path: PathBuf::from("target/db"),
             storage_path: PathBuf::from("target/storage"),
             assets_path: PathBuf::from("target/dist"),

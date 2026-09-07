@@ -539,7 +539,7 @@ where
             cs::UserAddReq {
                 username: username.into(),
                 password: password.into(),
-                invite_key: invite_key,
+                invite_token: invite_key,
             },
         )
         // let req =

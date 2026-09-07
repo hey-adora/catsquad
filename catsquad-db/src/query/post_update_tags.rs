@@ -1,4 +1,6 @@
-use crate::{Db, DbPostUpdateBuilderTextErr, DbPostUpdateBuilderTextField, proccess_tags};
+use catsquad_shared::proccess_tags;
+
+use crate::{Db, DbPostUpdateBuilderTextErr, DbPostUpdateBuilderTextField};
 
 impl Db {
     pub async fn post_update_tags(

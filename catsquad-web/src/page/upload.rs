@@ -6,10 +6,11 @@ use crate::{
         upload::upload_state::{UploadState, UploadStateStage},
     },
 };
-use catsquad_web_utils::time::time_now_ns;
+use catsquad_web_utils::time::{time_now_micro, time_now_ns};
 use leptos::prelude::*;
 
-const AUTO_SAVE_TIME: u128 = 3000000000; // 3s
+// const AUTO_SAVE_TIME: u128 = 3000000000; // 3s
+const AUTO_SAVE_TIME: u64 = 3000000; // 3s
 
 pub mod component_edit_area;
 pub mod component_edit_description;
@@ -28,7 +29,7 @@ use component_publish::Publish;
 
 #[component]
 pub fn Upload() -> impl IntoView {
-    let time = time_now_ns();
+    let time = time_now_micro();
     let spawner = Spawner::new();
     let upload = UploadState::new(time);
 

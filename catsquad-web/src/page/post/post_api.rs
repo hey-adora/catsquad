@@ -4,7 +4,7 @@ use catsquad_client::{Client, Response, Sender};
 use catsquad_log::prelude::*;
 use catsquad_shared::{
     LINK_WEB_INDEX, PostGetByKeyErr, PostRemoveErr, PostUpdateDescriptionErr, PostUpdateTagsErr,
-    PostUpdateTitleErr, link_relative_img,
+    PostUpdateTitleErr, link_relative_img, proccess_tags,
 };
 use catsquad_web_utils::prelude::*;
 use leptos::prelude::*;
@@ -207,7 +207,8 @@ impl PostApi {
             .await;
 
         match result {
-            Ok(v) => {
+            Ok(_) => {
+                let new_tags = proccess_tags(new_tags);
                 self.live_tags_length.set(new_tags.len());
                 self.tags.set(new_tags);
                 self.update_tags_mode.set(false);
@@ -320,7 +321,7 @@ impl PostApi {
 #[cfg(test)]
 pub mod tests {
     use catsquad_api::{TestServer, auth::create_auth_cookie_str};
-    use catsquad_shared::PostState;
+    use catsquad_shared::{PostState, uuid_to_str};
     use http::header;
     // use crate::{
     //     api::{
@@ -352,18 +353,19 @@ pub mod tests {
 
     #[tokio::test]
     pub async fn hook_post_api_update_description() {
-        let (_owner, app, post_key) = post_setup("title", "0", "").await;
+        let (_owner, app, post_id) =
+            post_setup("hook_post_api_update_description", "title", "0", "").await;
 
         // testing normal
         let post_api = PostApi::new();
-        post_api.get(&app.client, &post_key).await;
+        post_api.get(&app.client, post_id).await;
         assert_eq!(post_api.live_description_length.get_untracked(), 1);
         assert_eq!(post_api.description.get_untracked(), "0");
         post_api.update_description_mode.set(true);
         assert!(post_api.err_description.get_untracked().is_empty());
 
         post_api
-            .update_description(&app.client, &post_key, "22")
+            .update_description(&app.client, post_id, "22")
             .await;
         assert_eq!(post_api.live_description_length.get_untracked(), 2);
         assert_eq!(post_api.description.get_untracked(), "22");
@@ -371,15 +373,13 @@ pub mod tests {
         assert!(post_api.err_description.get_untracked().is_empty());
 
         let post_api = PostApi::new();
-        post_api.get(&app.client, &post_key).await;
+        post_api.get(&app.client, post_id).await;
         assert_eq!(post_api.live_description_length.get_untracked(), 2);
         assert_eq!(post_api.description.get_untracked(), "22");
 
-        post_api.delete(&app.client, &post_key).await;
+        post_api.delete(&app.client, post_id).await;
 
-        post_api
-            .update_description(&app.client, &post_key, "2")
-            .await;
+        post_api.update_description(&app.client, post_id, "2").await;
         assert_eq!(post_api.live_description_length.get_untracked(), 2);
         assert!(!post_api.err_general.get_untracked().is_empty());
 
@@ -388,20 +388,24 @@ pub mod tests {
     }
 
     pub async fn post_setup(
+        db: &str,
         title: impl Into<String>,
         description: impl Into<String>,
         tags: impl Into<String>,
-    ) -> (Owner, TestServer, String) {
+    ) -> (Owner, TestServer, i64) {
         init_log();
         let owner = init_owner();
-        let app = TestServer::new().await;
-        let (user1, session_key1) = app
+        let app = TestServer::new(0, db).await;
+        let (user1, session_token1) = app
             .user_add_full("hey", "hey@heyadora.com", "pas$worFd123456789")
             .await;
-        app.inject_header(header::COOKIE, create_auth_cookie_str(session_key1.clone()))
-            .await;
+        app.inject_header(
+            header::COOKIE,
+            create_auth_cookie_str(uuid_to_str(session_token1)),
+        )
+        .await;
 
-        let post_key = {
+        let post_id = {
             let post = app
                 .client
                 .post_add(title, description, tags)
@@ -411,45 +415,47 @@ pub mod tests {
                 .await
                 .unwrap();
             app.client
-                .post_update_state(&post.key, PostState::Active)
+                .post_update_state(post.id, PostState::Active)
                 .send()
                 .await
                 .into_json()
                 .await
                 .unwrap();
             // app.state.set_time(1).await;
-            post.key.clone()
+            post.id
         };
 
-        (owner, app, post_key)
+        (owner, app, post_id)
     }
 
     #[tokio::test]
     pub async fn hook_post_api_update_title() {
         // let _owner = Owner::new_root(Some(Arc::new(HydrateSharedContext::new())));
-        let (_owner, app, post_key) = post_setup("title", "", "").await;
+        let (_owner, app, post_id) =
+            post_setup("hook_post_api_update_title", "title", "", "").await;
         // testing err
+
         let post_api = PostApi::new();
-        post_api.get(&app.client, "invalid").await;
+        post_api.get(&app.client, 0).await;
         assert!(!post_api.err_general.get_untracked().is_empty());
         assert_eq!(post_api.title.get_untracked(), "");
         assert_eq!(post_api.live_title_length.get_untracked(), 0);
 
         // testing normal
         let post_api = PostApi::new();
-        post_api.get(&app.client, &post_key).await;
+        post_api.get(&app.client, post_id).await;
         assert_eq!(post_api.title.get_untracked(), "title");
         post_api.update_title_mode.set(true);
         assert!(post_api.err_title.get_untracked().is_empty());
         assert_eq!(post_api.live_title_length.get_untracked(), 5);
 
-        post_api.update_title(&app.client, &post_key, "one").await;
+        post_api.update_title(&app.client, post_id, "one").await;
         assert_eq!(post_api.title.get_untracked(), "one");
         assert_eq!(post_api.update_title_mode.get_untracked(), false);
         assert_eq!(post_api.live_title_length.get_untracked(), 3);
 
         let post_api = PostApi::new();
-        post_api.get(&app.client, &post_key).await;
+        post_api.get(&app.client, post_id).await;
         assert_eq!(post_api.title.get_untracked(), "one");
         assert_eq!(post_api.live_title_length.get_untracked(), 3);
 
@@ -459,32 +465,30 @@ pub mod tests {
 
     #[tokio::test]
     pub async fn hook_post_api_update_tags() {
-        let (_owner, app, post_key) = post_setup("title", "", "").await;
+        let (_owner, app, post_id) = post_setup("hook_post_api_update_tags", "title", "", "").await;
 
         // testing err
         let post_api = PostApi::new();
-        post_api.get(&app.client, "invalid").await;
+        post_api.get(&app.client, 0).await;
         assert!(!post_api.err_general.get_untracked().is_empty());
         assert_eq!(post_api.tags.get_untracked(), "");
         assert_eq!(post_api.live_tags_length.get_untracked(), 0);
 
         // testing normal
         let post_api = PostApi::new();
-        post_api.get(&app.client, &post_key).await;
+        post_api.get(&app.client, post_id).await;
         assert_eq!(post_api.tags.get_untracked(), "");
         post_api.update_tags_mode.set(true);
         assert!(post_api.err_tags.get_untracked().is_empty());
         assert_eq!(post_api.live_tags_length.get_untracked(), 0);
 
-        post_api
-            .update_tags(&app.client, &post_key, "oNe     ")
-            .await;
+        post_api.update_tags(&app.client, post_id, "oNe     ").await;
         assert_eq!(post_api.tags.get_untracked(), " one ");
         assert_eq!(post_api.update_tags_mode.get_untracked(), false);
         assert_eq!(post_api.live_tags_length.get_untracked(), 5);
 
         let post_api = PostApi::new();
-        post_api.get(&app.client, &post_key).await;
+        post_api.get(&app.client, post_id).await;
         assert_eq!(post_api.tags.get_untracked(), " one ");
         assert_eq!(post_api.live_tags_length.get_untracked(), 5);
 
@@ -494,12 +498,12 @@ pub mod tests {
 
     #[tokio::test]
     pub async fn hook_post_api_delete() {
-        let (_owner, app, post_key) = post_setup("title", "", "").await;
+        let (_owner, app, post_id) = post_setup("hook_post_api_delete", "title", "", "").await;
 
         let post_api = PostApi::new();
-        post_api.get(&app.client, &post_key).await;
+        post_api.get(&app.client, post_id).await;
 
-        let result = post_api.delete(&app.client, &post_key).await;
+        let result = post_api.delete(&app.client, post_id).await;
         assert!(result.is_some());
 
         let post_all = app.state.db.post_get_all().await.unwrap();
@@ -508,11 +512,11 @@ pub mod tests {
 
     #[tokio::test]
     pub async fn hook_post_api_post() {
-        let (_owner, app, post_key) = post_setup("title", "", "").await;
+        let (_owner, app, post_id) = post_setup("hook_post_api_post", "title", "", "").await;
 
         let post_api = PostApi::new();
-        post_api.get(&app.client, &post_key).await;
+        post_api.get(&app.client, post_id).await;
         assert_eq!(post_api.title.get_untracked(), "title");
-        assert_ne!(post_api.author_key.get_untracked(), "");
+        assert_ne!(post_api.author_username.get_untracked(), "");
     }
 }

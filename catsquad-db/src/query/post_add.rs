@@ -1,6 +1,8 @@
 use crate::XTimestamp;
 use catsquad_log::prelude::*;
-use catsquad_shared::{POST_STATE_ACTIVE, POST_STATE_DRAFT, POST_STATE_HIDDEN, PostState};
+use catsquad_shared::{
+    POST_STATE_ACTIVE, POST_STATE_DRAFT, POST_STATE_HIDDEN, PostState, proccess_tags,
+};
 use sqlx::{AssertSqlSafe, SqlSafeStr};
 
 use crate::{Db, DbUser};
@@ -42,26 +44,6 @@ pub enum DbPostAddErr {
 
     #[error("DB error {0}")]
     Db(#[from] sqlx::Error),
-}
-
-pub fn proccess_tags(tags: impl Into<String>) -> String {
-    let tags = tags.into();
-    let tags_len = tags.len();
-    let tags = tags.to_lowercase();
-    let tags_iter = tags.split_ascii_whitespace();
-    let mut tags = String::with_capacity(tags_len);
-    tags.push(' ');
-    for tag in tags_iter {
-        tags.push_str(tag);
-        tags.push(' ');
-    }
-
-    // no tags = clear spaces
-    if tags.len() == 1 {
-        tags.clear();
-    }
-
-    tags
 }
 
 impl Db {

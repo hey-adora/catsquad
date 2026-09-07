@@ -402,7 +402,7 @@ pub fn GalleryImg(img: Img) -> impl IntoView {
            style:width=value_width
            style:height=value_height
         >
-            <Show when=move || !image_exists>
+            <Show when=move || image_exists>
                 <img
                     id=elm_id_img_thumbnail(img_key2.clone())
                     style:width=value_width2.clone()
@@ -410,7 +410,7 @@ pub fn GalleryImg(img: Img) -> impl IntoView {
                     src=img_link.clone()
                 />
             </Show>
-            <Show when=move || image_exists>
+            <Show when=move || !image_exists>
                 <div
                     class="border-2 border-base05 bg-base02 grid items-center text-center"
                     id=elm_id_img_thumbnail(img_key3.clone())
@@ -460,11 +460,16 @@ impl From<PostSearchRes> for Img {
         //     extension: "webp".to_string(),
         // });
         let image_exists = post.image_hash != 0;
+        let (width, height) = if image_exists {
+            (post.image_width, post.image_height)
+        } else {
+            (400, 400)
+        };
         Self {
             id: post.id,
             username: post.user_username,
-            width: post.image_width,
-            height: post.image_height,
+            width,
+            height,
             hash: post.image_hash,
             extension: post.image_extension,
             image_exists,
@@ -1103,7 +1108,7 @@ mod resize_tests {
 
     #[derive(Debug, Clone)]
     struct Img {
-        pub id: String,
+        pub id: i64,
         pub width: u32,
         pub height: u32,
         pub view_width: f64,
@@ -1144,7 +1149,7 @@ mod resize_tests {
     impl Img {
         pub fn new(id: usize, width: u32, height: u32) -> Self {
             Self {
-                id: id.to_string(),
+                id: id as i64,
                 width,
                 height,
                 view_width: 0.0_f64,
@@ -1164,7 +1169,7 @@ mod resize_tests {
             view_pos_y: f64,
         ) -> Self {
             Self {
-                id: id.to_string(),
+                id: id as i64,
                 width,
                 height,
                 view_width: view_width,
@@ -1176,8 +1181,8 @@ mod resize_tests {
     }
 
     impl ResizableImage for Img {
-        fn get_id(&self) -> String {
-            self.id.clone()
+        fn get_id(&self) -> i64 {
+            self.id
         }
         fn get_post_link(&self) -> String {
             "test".to_string()

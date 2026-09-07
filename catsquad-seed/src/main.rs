@@ -139,7 +139,7 @@ pub async fn post_add(
         .unwrap();
 
     let files = client
-        .post_update_file_add(post1.key.clone(), vec![path])
+        .post_update_file_add(post1.id, vec![path])
         .header_add(header::COOKIE, format!("authorization=Bearer {token}"))
         .send()
         .await
@@ -148,7 +148,7 @@ pub async fn post_add(
         .unwrap();
 
     let post1 = client
-        .post_update_state(post1.key.clone(), PostState::Active)
+        .post_update_state(post1.id, PostState::Active)
         .header_add(header::COOKIE, format!("authorization=Bearer {token}"))
         .send()
         .await

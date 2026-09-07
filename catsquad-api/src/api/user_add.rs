@@ -78,6 +78,7 @@ pub async fn user_add(
     let inner = async || -> Result<SensitiveUserRes, UserAddErr> {
         let username = req.username.trim().to_lowercase();
         let password = req.password;
+        let invite_token = req.invite_token;
         let username_err = validate_username(&username);
         let password_err = validate_password(&password);
 
@@ -98,7 +99,7 @@ pub async fn user_add(
                 time,
                 username,
                 password,
-                req.invite_key,
+                invite_token,
                 MAX_STORAGE,
                 MAX_STORAGE_PER_FILE,
             )

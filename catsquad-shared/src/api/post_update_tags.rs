@@ -23,3 +23,23 @@ pub enum PostUpdateTagsErr {
     #[error("internal server err")]
     InternalServer,
 }
+
+pub fn proccess_tags(tags: impl Into<String>) -> String {
+    let tags = tags.into();
+    let tags_len = tags.len();
+    let tags = tags.to_lowercase();
+    let tags_iter = tags.split_ascii_whitespace();
+    let mut tags = String::with_capacity(tags_len);
+    tags.push(' ');
+    for tag in tags_iter {
+        tags.push_str(tag);
+        tags.push(' ');
+    }
+
+    // no tags = clear spaces
+    if tags.len() == 1 {
+        tags.clear();
+    }
+
+    tags
+}

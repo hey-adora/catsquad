@@ -101,7 +101,7 @@ pub async fn user_password_change_confirm(
                     .await;
             };
 
-            Ok(PasswordChangeUpdateConfirmRes {})
+            Ok(PasswordChangeUpdateConfirmRes { email: user_email })
         };
 
     let result = inner().await;

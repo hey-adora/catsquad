@@ -5,7 +5,7 @@ use crate::{
     page::create_client,
 };
 use catsquad_shared::{
-    EmailCangeStage, LINK_WEB_INDEX, link_relative_settings,
+    EmailCangeStage, LINK_WEB_INDEX, Uuid, link_relative_settings,
     link_relative_settings_email_change_canceled,
     link_relative_settings_email_change_current_check_email,
     link_relative_settings_email_change_finish, link_relative_settings_email_change_finished,
@@ -21,8 +21,8 @@ use web_sys::{HtmlInputElement, MouseEvent};
 pub fn EmailChange(
     #[prop(optional, into)] email_change_stage_tracked: Option<Callback<(), EmailCangeStage>>,
     #[prop(optional, into)] email_change_stage_untracked: Option<Callback<(), EmailCangeStage>>,
-    #[prop(optional, into)] email_change_key_untracked: Option<Callback<(), String>>,
-    #[prop(optional, into)] token_untracked: Option<Callback<(), String>>,
+    #[prop(optional, into)] email_change_id_untracked: Option<Callback<(), i64>>,
+    #[prop(optional, into)] token_untracked: Option<Callback<(), Uuid>>,
     #[prop(optional, into)] new_email_tracked: Option<Callback<(), String>>,
 ) -> impl IntoView {
     let page = PageState::get();
@@ -37,8 +37,8 @@ pub fn EmailChange(
             .map(|v| v.run(()))
             .unwrap_or_default()
     };
-    let email_change_key_untracked = move || {
-        email_change_key_untracked
+    let email_change_id_untracked = move || {
+        email_change_id_untracked
             .map(|v| v.run(()))
             .unwrap_or_default()
     };
@@ -85,7 +85,7 @@ pub fn EmailChange(
                         navigate(&link, NavigateOptions::default());
                     }
                     EmailCangeStage::ChangeEmailCurrentConfirm => {
-                        let email_change_key = email_change_key_untracked();
+                        let email_change_key = email_change_id_untracked();
                         let token = token_untracked();
                         let Some(_) = email_change
                             .current_confirm(email_change_key.clone(), token)
@@ -104,7 +104,7 @@ pub fn EmailChange(
                         else {
                             return;
                         };
-                        let email_change_key = email_change_key_untracked();
+                        let email_change_key = email_change_id_untracked();
                         let Some(_) = email_change
                             .new_add(email_change_key.clone(), new_email.clone())
                             .await
@@ -118,7 +118,7 @@ pub fn EmailChange(
                         navigate(&link, NavigateOptions::default());
                     }
                     EmailCangeStage::ChangeEmailNewConfirm => {
-                        let email_change_key = email_change_key_untracked();
+                        let email_change_key = email_change_id_untracked();
                         let token = token_untracked();
                         let Some(_) = email_change
                             .new_confirm(email_change_key.clone(), token)
@@ -130,21 +130,20 @@ pub fn EmailChange(
                         navigate(&link, NavigateOptions::default());
                     }
                     EmailCangeStage::ChangeEmailFinish => {
-                        let email_change_key = email_change_key_untracked();
-                        let Some(new) = email_change
-                            .finish(email_change_key.clone())
-                            .await
-                            .and_then(|v| v.new)
+                        let email_change_key = email_change_id_untracked();
+                        let Some(_) = email_change.finish(email_change_key.clone()).await
+                        // .and_then(|v| v.new)
                         else {
                             return;
                         };
-                        page.acc_email_set(new.email);
+                        // TODO fetch the email change data on init
+                        page.acc_email_set("example@heyadora.com");
                         let link = link_relative_settings_email_change_finished(email_change_key);
                         navigate(&link, NavigateOptions::default());
                     }
                     EmailCangeStage::ChangeEmailCurrentCheckEmail
                     | EmailCangeStage::ChangeEmailNewCheckEmail => {
-                        let email_change_key = email_change_key_untracked();
+                        let email_change_key = email_change_id_untracked();
                         let Some(_) = email_change.resend(email_change_key).await else {
                             success_msg.update(|v| v.clear());
                             return;
@@ -160,7 +159,7 @@ pub fn EmailChange(
 
     let on_cancel = move |_| {
         success_msg.update(|v| v.clear());
-        let email_change_key = email_change_key_untracked();
+        let email_change_key = email_change_id_untracked();
         let navigate = navigate.clone();
         spawner.spawn(async move {
             let Some(_) = email_change.cancel(email_change_key).await else {

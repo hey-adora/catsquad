@@ -103,9 +103,10 @@ impl Db {
             format!("position(${bind_index} in post_tags) > 0")
         });
 
+        // TODO investigate, somehow works with field `user`
         let q_user = if_empty(&user_username, || {
             bind_index += 1;
-            format!("user = ${bind_index}")
+            format!("post_user_username = ${bind_index}")
         });
 
         let filters = [q_tags, q_time_after, q_user, q_state];
@@ -290,4 +291,9 @@ async fn test_post_search() {
 
     let result = search("tw", "", 1, 3, 3, false).await;
     assert_eq!(result.len(), 0);
+
+    let result = search("two", "hey", 0, 3, 0, false).await;
+    assert_eq!(result.len(), 2);
+    assert_eq!(&result[0].title, "1");
+    assert_eq!(&result[1].title, "2");
 }

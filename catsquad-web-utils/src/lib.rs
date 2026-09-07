@@ -17,7 +17,7 @@ pub mod prelude {
     pub use super::rem_to_px::rem_to_px;
     pub use super::resize_observer::{self, AddResizeObserver, GetContentBoxSize};
     pub use super::rw_signal_tree::RwSignalTree;
-    pub use super::time::{ns_to_str, time_now_ms, time_now_ns};
+    pub use super::time::{micro_to_str, time_now_ms, time_now_ns};
     pub use super::timeout::{SetTimeoutError, set_timeout_fn};
 
     // #[cfg(feature = "testing")]
@@ -468,11 +468,11 @@ pub mod time {
         (time_now_ns() / 1000) as u64
     }
 
-    pub fn ns_to_str(ns: u128) -> String {
+    pub fn micro_to_str(ns: u64) -> String {
         let mut output = String::new();
 
         let table = [
-            (1000_u128, ("ns", "ns")),
+            // (1000_u128, ("ns", "ns")),
             (1000, ("μs", "μs")),
             (1000, ("ms", "ms")),
             (60, ("second", "seconds")),
@@ -516,40 +516,40 @@ pub mod time {
 
         use catsquad_log::init_log;
 
-        use crate::time::ns_to_str;
+        use crate::time::micro_to_str;
 
         #[test]
         fn time_to_str_test() {
             init_log();
 
-            let result = ns_to_str(Duration::from_nanos(1).as_nanos());
-            assert_eq!(result, "1 ns");
+            // let result = micro_to_str(Duration::from_nanos(1).as_nanos());
+            // assert_eq!(result, "1 ns");
 
-            let result = ns_to_str(Duration::from_micros(1).as_nanos());
+            let result = micro_to_str(Duration::from_micros(1).as_micros() as u64);
             assert_eq!(result, "1 μs");
 
-            let result = ns_to_str(Duration::from_millis(1).as_nanos());
+            let result = micro_to_str(Duration::from_millis(1).as_micros() as u64);
             assert_eq!(result, "1 ms");
 
-            let result = ns_to_str(Duration::from_secs(1).as_nanos());
+            let result = micro_to_str(Duration::from_secs(1).as_micros() as u64);
             assert_eq!(result, "1 second");
 
-            let result = ns_to_str(Duration::from_secs(59).as_nanos());
+            let result = micro_to_str(Duration::from_secs(59).as_micros() as u64);
             assert_eq!(result, "59 seconds");
 
-            let result = ns_to_str(Duration::from_secs(60).as_nanos());
+            let result = micro_to_str(Duration::from_secs(60).as_micros() as u64);
             assert_eq!(result, "1 minute");
 
-            let result = ns_to_str(Duration::from_mins(1).as_nanos());
+            let result = micro_to_str(Duration::from_mins(1).as_micros() as u64);
             assert_eq!(result, "1 minute");
 
-            let result = ns_to_str(Duration::from_hours(1).as_nanos());
+            let result = micro_to_str(Duration::from_hours(1).as_micros() as u64);
             assert_eq!(result, "1 hour");
 
-            let result = ns_to_str(Duration::from_hours(24).as_nanos());
+            let result = micro_to_str(Duration::from_hours(24).as_micros() as u64);
             assert_eq!(result, "1 day");
 
-            let result = ns_to_str(Duration::from_hours(24 * 7).as_nanos());
+            let result = micro_to_str(Duration::from_hours(24 * 7).as_micros() as u64);
             assert_eq!(result, "1 week");
         }
     }
@@ -638,6 +638,14 @@ pub mod leptos_helpers {
                 fn_get: get,
                 fn_set: set,
             }
+        }
+
+        pub fn with<R>(&self, callback: impl FnOnce(&Option<T>) -> R) -> R {
+            self.fn_get.with(callback)
+        }
+
+        pub fn with_untracked<R>(&self, callback: impl FnOnce(&Option<T>) -> R) -> R {
+            self.fn_get.with_untracked(callback)
         }
 
         pub fn get(&self) -> Option<T> {

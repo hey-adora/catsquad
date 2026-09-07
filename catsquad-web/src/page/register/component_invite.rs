@@ -124,7 +124,7 @@ impl InviteState {
 async fn test_invite_state() {
     init_log();
     let _owner = crate::init_owner();
-    let server = catsquad_api::TestServer::new().await;
+    let server = catsquad_api::TestServer::new(0, "test_invite_state").await;
     let client = &server.client;
 
     let invite = InviteState::new();
@@ -157,6 +157,7 @@ pub fn InviteForm() -> impl IntoView {
             if !invite.err_general.with_untracked(|v| v.is_empty()) {
                 return;
             }
+            // TODO maybe dont put sensitive info in url? not sure
             let link = link_relative_reg_check(&email);
             navigator(&link, NavigateOptions::default());
         });

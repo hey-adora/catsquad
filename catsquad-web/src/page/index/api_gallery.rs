@@ -206,7 +206,7 @@ impl GalleryApi {
 pub mod tests {
     use catsquad_api::{TestServer, auth::create_auth_cookie_str};
     use catsquad_log::prelude::*;
-    use catsquad_shared::PostState;
+    use catsquad_shared::{PostState, uuid_to_str};
     use http::header;
     use leptos::prelude::*;
     use std::sync::Arc;
@@ -233,8 +233,11 @@ pub mod tests {
             .user_add_full("hey2", "hey2@heyadora.com", "paAs$word123456789")
             .await;
 
-        app.inject_header(header::COOKIE, create_auth_cookie_str(session_key1.clone()))
-            .await;
+        app.inject_header(
+            header::COOKIE,
+            create_auth_cookie_str(uuid_to_str(session_key1)),
+        )
+        .await;
         // app.api.auth_token_overwrite = auth_token.clone();
 
         let post_api = GalleryApi::new(scroll_corerction.clone());
@@ -254,25 +257,25 @@ pub mod tests {
                 .await
                 .unwrap();
             app.client
-                .post_update_state(post1.key.clone(), PostState::Active)
+                .post_update_state(post1.id.clone(), PostState::Active)
                 .send()
                 .await
                 .into_json()
                 .await
                 .unwrap();
         };
-        app.state.set_time(1).await;
+        app.state.set_time(1);
         post_add("title1", "0", "").await;
-        app.state.set_time(2).await;
+        app.state.set_time(2);
         post_add("title2", "0", "").await;
-        app.state.set_time(3).await;
+        app.state.set_time(3);
         post_add("title3", "0", "").await;
 
         let items = post_api.items.get_untracked();
         trace!("aaaaa {items:#?}");
         assert_eq!(items.len(), 0);
 
-        app.state.set_time(4).await;
+        app.state.set_time(4);
         let post_api2 = GalleryApi::new(scroll_corerction.clone());
         post_api2.fetch_btm(&app.client, 10, size, 4, "", "").await;
         let items = post_api2.items.get_untracked();
@@ -341,19 +344,22 @@ pub mod tests {
         assert_eq!(items.len(), 3);
 
         app.remove_header(header::COOKIE).await;
-        app.inject_header(header::COOKIE, create_auth_cookie_str(session_key2.clone()))
-            .await;
+        app.inject_header(
+            header::COOKIE,
+            create_auth_cookie_str(uuid_to_str(session_key2)),
+        )
+        .await;
 
         let post_api = GalleryApi::new(scroll_corerction.clone());
 
-        app.state.set_time(5).await;
+        app.state.set_time(5);
         post_add("title1", "0", "one two three").await;
-        app.state.set_time(6).await;
+        app.state.set_time(6);
         post_add("title2", "0", "one two").await;
-        app.state.set_time(7).await;
+        app.state.set_time(7);
         post_add("title2", "0", "one").await;
 
-        app.state.set_time(8).await;
+        app.state.set_time(8);
         let post_api2 = GalleryApi::new(scroll_corerction.clone());
         post_api2
             .fetch_btm(&app.client, 2, size, 8, "one", "hey2")
@@ -369,7 +375,7 @@ pub mod tests {
         assert_eq!(items.len(), 3);
         assert_eq!(items[2].created_at, 5);
 
-        app.state.set_time(9).await;
+        app.state.set_time(9);
         let post_api2 = GalleryApi::new(scroll_corerction.clone());
         post_api2
             .fetch_btm(&app.client, 3, size, 9, "one two", "hey2")

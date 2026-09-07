@@ -14,6 +14,7 @@
 
 use std::time::Duration;
 
+// use catsquad_api::utils::get_time_micro;
 // use crate::api::shared::post_comment::UserPostComment;
 // use crate::api::{Api, ApiWeb, ApiWebTmp, Server404Err, ServerErr};
 // use crate::path::{PATH_LOGIN, link_home, link_img, link_user};
@@ -47,6 +48,7 @@ use catsquad_shared::{
     MAX_POST_TITLE_LENGTH,
 };
 use catsquad_web_utils::prelude::*;
+use catsquad_web_utils::time::time_now_micro;
 use leptos::{Params, task::spawn_local};
 use leptos::{ev, html, prelude::*};
 use leptos_router::hooks::{use_location, use_params};
@@ -90,7 +92,14 @@ pub fn Post() -> impl IntoView {
 
     let param = use_params::<PostParams>();
     // let param_username = move || param.read().as_ref().ok().and_then(|v| v.username.clone());
-    let param_post = Memo::new(move |_| param.read().as_ref().ok().and_then(|v| v.post.clone()));
+    let param_post_id = Memo::new(move |_| {
+        param
+            .read()
+            .as_ref()
+            .ok()
+            .and_then(|v| v.post.clone())
+            .and_then(|v| i64::from_str_radix(&v, 10).ok())
+    });
 
     let location = use_location();
 
@@ -100,8 +109,8 @@ pub fn Post() -> impl IntoView {
     let description_input_editor = NodeRef::<html::Textarea>::new();
     let title_input_editor = NodeRef::<html::Textarea>::new();
 
-    let post_auth_key = move || post_api.author_key.get();
-    let post_key = move || param_post.get().unwrap_or_default();
+    let post_user_username = move || post_api.author_username.get();
+    let post_id = move || param_post_id.get().unwrap_or_default();
 
     // use_text_counter(description_input_editor, post_api.live_description_length);
     // use_text_counter(edit_tags_input, post_api.live_tags_length);
@@ -127,7 +136,7 @@ pub fn Post() -> impl IntoView {
         // comment_basic.post.run();
     };
     Effect::new(move || {
-        let Some(post_id) = param_post.get() else {
+        let Some(post_id) = param_post_id.get() else {
             return;
         };
 
@@ -139,7 +148,7 @@ pub fn Post() -> impl IntoView {
     Effect::new(move || {
         trace!("comments basic start");
         let (Some(post_id), Some(comment_container_ref)) =
-            (param_post.get(), comment_container_ref.get())
+            (param_post_id.get(), comment_container_ref.get())
         else {
             return;
         };
@@ -258,7 +267,7 @@ pub fn Post() -> impl IntoView {
     };
     let edit_description_save = move || {
         let (Some(post_key), Some(new_description)) = (
-            param_post.get(),
+            param_post_id.get(),
             description_input_editor
                 .get_untracked()
                 .map(|v: HtmlTextAreaElement| v.value()),
@@ -318,7 +327,7 @@ pub fn Post() -> impl IntoView {
 
     let edit_title_save = move || {
         let (Some(post_key), Some(title)) = (
-            param_post.get(),
+            param_post_id.get(),
             title_input_editor
                 .get_untracked()
                 .map(|v: HtmlTextAreaElement| v.value()),
@@ -373,7 +382,7 @@ pub fn Post() -> impl IntoView {
 
     let edit_tags_save = move || {
         let (Some(post_key), Some(tags)) = (
-            param_post.get(),
+            param_post_id.get(),
             edit_tags_input
                 .get_untracked()
                 .map(|v: HtmlTextAreaElement| v.value()),
@@ -446,7 +455,7 @@ pub fn Post() -> impl IntoView {
     };
 
     let delete_post = move |_| {
-        let Some(post_id) = param_post.get() else {
+        let Some(post_id) = param_post_id.get() else {
             return;
         };
         spawner_post.spawn(async move {
@@ -566,7 +575,7 @@ pub fn Post() -> impl IntoView {
                                         <p class="text-[1rem]">"9999 followers"</p>
                                     </div>
                                 </div>
-                                <Favorite auth_username_tracked=post_auth_key post_username_tracked=post_key />
+                                <Favorite post_user_username=post_user_username post_id=post_id />
                                 // <Show when=move||global_state.is_logged_in().unwrap_or_default()>
                                 //     <BtnSecondary class=move || format!("flex gap-2 place-items-center ") id=move || "btn_favorite" on_click=move|_|post_like_fn()>
                                 //         <span class="mt-[0.1rem]">"Favorite"</span>
@@ -731,11 +740,11 @@ pub fn Post() -> impl IntoView {
                                         {
                                             view!{
                                                 <PostCommentElm
-                                                    parent_key=String::new()
+                                                    parent_id=0
                                                     parent_items=comment_basic.items
                                                     parent_reply_count=comment_basic.replies_count
                                                     comment=data
-                                                    param_post
+                                                    param_post_id
                                                     max_depth=2
                                                     parent_depth=0 />
                                             }.into_any()
@@ -948,11 +957,11 @@ pub fn SVGTriangle(#[prop(optional, into)] class: String) -> impl IntoView {
 
 #[component]
 pub fn PostCommentElm(
-    parent_key: String,
+    parent_id: i64,
     parent_items: RwSignal<Vec<CommentRes>, LocalStorage>,
-    parent_reply_count: RwSignal<usize, LocalStorage>,
+    parent_reply_count: RwSignal<u32, LocalStorage>,
     comment: CommentRes,
-    param_post: Memo<Option<String>>,
+    param_post_id: Memo<Option<i64>>,
     max_depth: usize,
     parent_depth: usize,
 ) -> impl IntoView {
@@ -969,7 +978,7 @@ pub fn PostCommentElm(
     // let api = ApiWeb::new();
     let comment_key = comment.id.clone();
     let is_owned_fn = {
-        let user_username = comment.user_username;
+        let user_username = comment.user_username.clone();
         move || global_state.acc_username() == user_username
     };
 
@@ -988,21 +997,21 @@ pub fn PostCommentElm(
     let spawner = Spawner::new();
     let kind = if current_depth < max_depth {
         CommentKind2::Reply {
-            parent_id: parent_key.clone(),
+            parent_id: parent_id,
             parent_items: parent_items,
             parent_replies_count: parent_reply_count,
             comment: comment.clone(),
         }
     } else if current_depth == max_depth {
         CommentKind2::Flat {
-            parent_id: parent_key.clone(),
+            parent_id: parent_id,
             parent_items: parent_items,
             parent_replies_count: parent_reply_count,
             comment: comment.clone(),
         }
     } else {
         CommentKind2::None {
-            parent_id: parent_key.clone(),
+            parent_id: parent_id,
             parent_items: parent_items,
             parent_replies_count: parent_reply_count,
             comment: comment.clone(),
@@ -1033,7 +1042,7 @@ pub fn PostCommentElm(
     };
     let fetch_comments = move || {
         spawner.spawn(async move {
-            let time = time_now_ns();
+            let time = time_now_micro();
             let client = create_client();
             comments_manual.fetch(time, &client).await;
         });
@@ -1046,7 +1055,7 @@ pub fn PostCommentElm(
         }
         replies_shown.set(true);
         spawner.spawn(async move {
-            let time = time_now_ns();
+            let time = time_now_micro();
             let client = create_client();
             comments_manual.fetch(time, &client).await;
         });
@@ -1061,7 +1070,7 @@ pub fn PostCommentElm(
         }
         trace!("KILL ME YOU FUCK 3 {show}");
         spawner.spawn(async move {
-            let time = time_now_ns();
+            let time = time_now_micro();
             let client = create_client();
             comments_manual.fetch(time, &client).await;
         });
@@ -1070,7 +1079,7 @@ pub fn PostCommentElm(
     Effect::new(move || {
         trace!("comments manual start");
         let (Some(post_id),) = (
-            param_post.get(),
+            param_post_id.get(),
             // comment_container_ref.get(),
         ) else {
             return;
@@ -1095,7 +1104,7 @@ pub fn PostCommentElm(
         let Some(last) = comment.parent_id.last() else {
             break 'f false;
         };
-        *last != parent_key
+        *last != parent_id
     };
 
     let bubble = 'f: {
@@ -1113,7 +1122,8 @@ pub fn PostCommentElm(
         let bubble = bubble.clone();
         let comment_key = comment_key.clone();
         move || {
-            let Some(elm) = bubble.and_then(|v| document().get_element_by_id(&v.id)) else {
+            let Some(elm) = bubble.and_then(|v| document().get_element_by_id(&v.id.to_string()))
+            else {
                 warn!("cant find element for bubble click {}", comment_key);
                 return;
             };
@@ -1196,8 +1206,8 @@ pub fn PostCommentElm(
                     </div>
                     <div  class="pl-4  flex flex-col w-full group">
                         <div class="flex gap-2 place-items-center ">
-                            <div class="text-[1.2rem]"> {comment.user.username} </div>
-                            <div class="text-[1rem] text-base03"> {move || ns_to_str(global_state.get_time_ns().saturating_sub(comment.created_at))}" ago"</div>
+                            <div class="text-[1.2rem]"> {comment.user_username.clone()} </div>
+                            <div class="text-[1rem] text-base03"> {move || micro_to_str(global_state.get_time().saturating_sub(comment.created_at))}" ago"</div>
 
                             <Show when={move || is_owned_fn() || comments_manual.edit_mode.get()} >
                                 <div class=move || format!(" gap-2 ml-auto place-items-center {}", if comments_manual.edit_mode.get() {"flex"} else {"group-hover:flex hidden"} )>
@@ -1320,11 +1330,11 @@ pub fn PostCommentElm(
                                             let comment_key = comment_key.clone();
                                             view!{
                                                 <PostCommentElm
-                                                    parent_key=comment_key.clone()
+                                                    parent_id=comment_key.clone()
                                                     parent_items=comments_manual.items
                                                     parent_reply_count=comments_manual.replies_count
                                                     comment=data
-                                                    param_post max_depth=max_depth parent_depth=current_depth />
+                                                    param_post_id max_depth=max_depth parent_depth=current_depth />
                                             }.into_any()
                                         }
                                     </For>

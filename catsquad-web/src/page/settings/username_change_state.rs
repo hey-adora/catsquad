@@ -89,12 +89,12 @@ where
 #[tokio::test]
 async fn test_username_change_state() {
     use catsquad_api::{auth::create_auth_cookie_str, utils::rng_str};
-    use catsquad_shared::{MAX_USERNAME_LENGTH, PostState};
+    use catsquad_shared::{MAX_USERNAME_LENGTH, PostState, uuid_to_str};
     use http::header;
 
     catsquad_log::init_log();
     let _owner = crate::init_owner();
-    let server = catsquad_api::TestServer::new().await;
+    let server = catsquad_api::TestServer::new(0, "test_username_change_state").await;
 
     let (_user1, session1) = server
         .user_add_full(
@@ -105,7 +105,10 @@ async fn test_username_change_state() {
         .await;
 
     server
-        .inject_header(header::COOKIE, create_auth_cookie_str(session1.clone()))
+        .inject_header(
+            header::COOKIE,
+            create_auth_cookie_str(uuid_to_str(session1)),
+        )
         .await;
 
     let username_change = UsernameChangeState::new(server.client.clone());

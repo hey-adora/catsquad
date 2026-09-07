@@ -2,7 +2,7 @@ use std::fmt::Debug;
 
 use catsquad_client::{Client, Response, Sender};
 use catsquad_shared::{
-    PasswordChangeRes, PasswordChangeUpdateConfirmErr, PasswordChangeUpdateConfirmRes,
+    PasswordChangeRes, PasswordChangeUpdateConfirmErr, PasswordChangeUpdateConfirmRes, Uuid,
     validate_password,
 };
 use leptos::prelude::*;
@@ -75,7 +75,7 @@ where
 
     pub async fn confirm(
         &self,
-        password_change_key: impl Into<String>,
+        password_change_token: Uuid,
         new_password: impl Into<String>,
         new_confirm: impl Into<String>,
     ) -> Option<PasswordChangeUpdateConfirmRes> {
@@ -97,7 +97,7 @@ where
 
         let client = self.client.get_value();
         let result = client
-            .password_change_update_confirm(password_change_key, new_password)
+            .password_change_update_confirm(password_change_token, new_password)
             .send()
             .await
             .into_json()
@@ -122,12 +122,12 @@ where
 #[tokio::test]
 async fn test_passowrd_change_state() {
     use catsquad_api::{auth::create_auth_cookie_str, utils::rng_str};
-    use catsquad_shared::{MAX_USERNAME_LENGTH, PostState};
+    use catsquad_shared::{MAX_USERNAME_LENGTH, PostState, uuid_to_str};
     use http::header;
 
     catsquad_log::init_log();
     let _owner = crate::init_owner();
-    let server = catsquad_api::TestServer::new().await;
+    let server = catsquad_api::TestServer::new(0, "test_passowrd_change_state").await;
 
     let (_user1, session1) = server
         .user_add_full(
@@ -138,7 +138,10 @@ async fn test_passowrd_change_state() {
         .await;
 
     server
-        .inject_header(header::COOKIE, create_auth_cookie_str(session1.clone()))
+        .inject_header(
+            header::COOKIE,
+            create_auth_cookie_str(uuid_to_str(session1)),
+        )
         .await;
 
     let password_change = PasswordChangeState::new(server.client.clone());
@@ -146,7 +149,7 @@ async fn test_passowrd_change_state() {
     {
         let res = password_change.add("invalid").await;
         assert!(res.is_none());
-        assert_eq!(password_change.err_general.get_untracked(), "");
+        assert_ne!(password_change.err_general.get_untracked(), "");
         assert_eq!(password_change.err_password.get_untracked(), "");
     }
 
