@@ -24,6 +24,7 @@ export let logout = async (page)=>{
 
   // await page.locator('[id="email"]').fill(email);
   // await page.locator('[id="password"]').fill(password);
+  await page.locator('[id="profile_btn"]').click();
   await page.locator('[id="logout_btn"]').click();
   await page.locator('[id="login_link"]').waitFor();
 

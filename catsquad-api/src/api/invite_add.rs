@@ -56,7 +56,7 @@ pub async fn invite_add(
         let _ = app
             .db
             .email_sent_add(
-                0,
+                time,
                 catsquad_db::DbEmailSentReason::InviteAdd,
                 email,
                 email_body,

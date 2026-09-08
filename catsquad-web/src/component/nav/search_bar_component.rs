@@ -1,17 +1,20 @@
 use catsquad_log::prelude::*;
 use catsquad_shared::{LINK_WEB_INDEX, link_relative_index_search};
-use leptos::{html::Textarea, prelude::*};
+use leptos::{
+    html::{self, Textarea},
+    prelude::*,
+};
 use leptos_router::hooks::{query_signal, use_navigate};
 use wasm_bindgen::JsCast;
 use web_sys::{HtmlInputElement, HtmlTextAreaElement, KeyboardEvent};
 
 #[component]
 pub fn SearchBar() -> impl IntoView {
-    let search_input = NodeRef::<Textarea>::new();
+    let search_input = NodeRef::<html::Input>::new();
     let navigate = use_navigate();
     let (get_query_tags, set_query_tags) = query_signal::<String>("tags");
 
-    let on_search = move |e: KeyboardEvent| {
+    let on_search = move |e: web_sys::KeyboardEvent| {
         let key = e.key();
         trace!("key pressed {key}");
         if key.to_lowercase() != "enter" {
@@ -33,11 +36,13 @@ pub fn SearchBar() -> impl IntoView {
     };
 
     Effect::new(move || {
-        let (Some(search_elm), val): (Option<HtmlTextAreaElement>, Option<String>) =
+        trace!("nav effect 0");
+        let (Some(search_elm), val): (Option<HtmlInputElement>, Option<String>) =
             (search_input.get(), get_query_tags.get())
         else {
             return;
         };
+        trace!("nav effect 1");
         if let Some(v) = val {
             search_elm.set_value(&v);
         } else {
@@ -46,12 +51,41 @@ pub fn SearchBar() -> impl IntoView {
         // let val = ;
     });
 
+    // let value = move || {
+    //     let value = get_query_tags.get().unwrap_or("wtf".to_string());
+    //     trace!("nav value set {value}");
+    //     value
+    // };
+
     view! {
         <input
+            autocomplete="off"
             id="search"
             placeholder="Search"
             on:keydown=on_search
-            class=" rounded text-[1rem] px-[0.8rem] py-[0.2rem] text-base05 bg-base03"
+            node_ref=search_input
+            class="w-full max-w-[20rem] rounded text-[1rem] px-[0.8rem] py-[0.2rem] text-base05 bg-base03"
             />
     }
 }
+// value=value
+// <form autocomplete="off" >
+//             // <div
+//     //     contenteditable=true
+//     //     id="search"
+//     //     on:keydown=on_search
+//     //     class="w-full max-w-[20rem] rounded text-[1rem] px-[0.8rem] py-[0.2rem] text-base05 bg-base03"
+//     //     >
+//     //     {value}
+//     // </div>
+// </form>
+// value=value
+// placeholder="Search"
+// <input type="submit"/>
+// <input
+//     id="search"
+//     placeholder="Search"
+//     value=value
+//     on:keydown=on_search
+//     class="w-full max-w-[20rem] rounded text-[1rem] px-[0.8rem] py-[0.2rem] text-base05 bg-base03"
+//     />

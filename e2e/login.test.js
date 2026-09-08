@@ -8,6 +8,11 @@ import {
 } from "./utils";
 import * as path from 'path';
 
+test("login_logout", async ({ page }) => {
+    await login(page, USER1_EMAIL, PASSWORD);
+    await logout(page); 
+});
+
 test("reset_password", async ({ page }) => {
   const edit_btn = page.locator('[id="password_reset_link"]');
   const confirm_btn = page.locator('[id="confirm_btn"]');
@@ -37,6 +42,10 @@ test("reset_password", async ({ page }) => {
     await page.goto("http://localhost:3000/login");
     await edit_btn.click();
     await input_email.fill(user_email);
+    await confirm_btn.click();
+    await form_section_check.waitFor();
+    await expect(close_btn).toBeVisible();
+    await expect(confirm_btn).toBeHidden();
 
     let link = await get_password_reset_add(page, user_email);
     await page.goto(link);
@@ -60,8 +69,8 @@ test("reset_password", async ({ page }) => {
     await expect(close_btn).toBeVisible();
     await expect(confirm_btn).toBeVisible();
     await input_email.fill(user_email);
-
     await confirm_btn.click();
+
     await form_section_check.waitFor();
     await expect(close_btn).toBeVisible();
     await expect(confirm_btn).toBeHidden();

@@ -70,7 +70,7 @@ pub async fn user_update_username(
         let _ = app
             .db
             .email_sent_add(
-                0,
+                time,
                 catsquad_db::DbEmailSentReason::UserUsernameChange,
                 user_email,
                 email_body,

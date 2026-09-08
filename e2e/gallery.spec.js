@@ -241,7 +241,7 @@ test("reset_query", async ({ page }) => {
   let banner = page.locator('[id="banner"]');
   await banner.click();
 
-  await page.locator(`[data-testid="gallery_mut_index_2"]`).waitFor();
+  await page.locator(`[data-testid="gallery_mut_index_3"]`).waitFor();
   // await page.waitForTimeout(1000);
 
   let first_elm_id_after = await page.locator('[id="gallery"] > a').first().evaluate((elm) => elm.id);
@@ -266,6 +266,7 @@ test("gallery_search", async ({ page }) => {
   let gallery_search = async (
     page,
     first_parsed_debug,
+    test_id_index,
     index,
     mut_index,
     text,
@@ -275,7 +276,7 @@ test("gallery_search", async ({ page }) => {
     await page.locator('[id="search"]').focus();
 
     await page.keyboard.press("Enter");
-    await page.locator(`[data-testid="gallery_mut_index_${index}"]`).waitFor();
+    await page.locator(`[data-testid="gallery_mut_index_${test_id_index}"]`).waitFor();
 
     await page.waitForTimeout(2000);
 
@@ -320,15 +321,15 @@ test("gallery_search", async ({ page }) => {
 
   let first_debug = await get_parsed_debug_state_fn(page);
 
-  await gallery_search(page, first_debug, 1, 1, "dragon", "null");
-  await gallery_search(page, first_debug, 2, 2, "", "22");
-  await gallery_search(page, first_debug, 3, 4, "one", "3");
-  await gallery_search(page, first_debug, 4, 6, "two", "2");
-  await gallery_search(page, first_debug, 5, 8, "three", "1");
-  await gallery_search(page, first_debug, 6, 10, "one", "3");
-  await gallery_search(page, first_debug, 7, 12, "three", "1");
-  await gallery_search(page, first_debug, 8, 14, "", "22");
-  await gallery_search(page, first_debug, 9, 16, "ONE", "3");
+  await gallery_search(page, first_debug, 2, 1, 1, "dragon", "null");
+  await gallery_search(page, first_debug, 3, 2, 2, "", "22");
+  await gallery_search(page, first_debug, 4, 3, 4, "one", "3");
+  await gallery_search(page, first_debug, 5, 4, 6, "two", "2");
+  await gallery_search(page, first_debug, 6, 5, 8, "three", "1");
+  await gallery_search(page, first_debug, 7, 6, 10, "one", "3");
+  await gallery_search(page, first_debug, 8, 7, 12, "three", "1");
+  await gallery_search(page, first_debug, 9, 8, 14, "", "22");
+  await gallery_search(page, first_debug, 10, 9, 16, "ONE", "3");
 });
 
 test("gallery_search_from_diffrent_page", async ({ page }) => {
@@ -361,7 +362,7 @@ test("gallery_search_input_text_from_url", async ({ page }) => {
   let value = await page
     .locator('[id="search"]')
     .first()
-    .evaluate((elm) => elm.textContent);
+    .evaluate((elm) => elm.value);
 
   await page.waitForTimeout(1000);
 
