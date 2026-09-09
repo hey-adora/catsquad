@@ -12,64 +12,21 @@ use web_sys::HtmlInputElement;
 
 #[component]
 pub fn PasswordChange(
-    // #[prop(optional, into)] password_change_stage: Signal<PasswordCangeStage>,
-    #[prop(optional, into)] password_change_stage_tracked: Option<Callback<(), PasswordCangeStage>>,
-    #[prop(optional, into)] password_change_stage_untracked: Option<
-        Callback<(), PasswordCangeStage>,
-    >,
-    #[prop(optional, into)] password_change_token: Option<Callback<(), Uuid>>,
+    #[prop(optional, into)] password_change_stage: Signal<PasswordCangeStage>,
+    #[prop(optional, into)] password_change_token: Signal<Uuid>,
 ) -> impl IntoView {
-    // let page = PageState::get();
     let link_back = move || link_relative_settings();
-    // let current_username = move || page.acc_username();
     let spawner = Spawner::new();
     let password_change = PasswordChangeState::new(create_client());
-    let password_change_token =
-        move || password_change_token.map(|v| v.run(())).unwrap_or_default();
-    let password_change_stage_tracked = move || {
-        password_change_stage_tracked
-            .map(|v| v.run(()))
-            .unwrap_or_default()
-    };
-    let password_change_stage_untracked = move || {
-        password_change_stage_untracked
-            .map(|v| v.run(()))
-            .unwrap_or_default()
-    };
 
-    // PasswordCangeStage::
-    // EmailCangeStage
-    // let input_username = NodeRef::new();
-    // let input_password = NodeRef::new();
     let navigate = use_navigate();
-
-    // let on_confirm = move |_| {
-    //     let (Some(new_username), Some(current_password)) = (
-    //         input_username
-    //             .get_untracked()
-    //             .map(|v: HtmlInputElement| v.value()),
-    //         input_password
-    //             .get_untracked()
-    //             .map(|v: HtmlInputElement| v.value()),
-    //     ) else {
-    //         return;
-    //     };
-    //     let navigate = navigate.clone();
-    //     spawner.spawn(async move {
-    //         let Some(result) = username_change.change(new_username, current_password).await else {
-    //             return;
-    //         };
-    //         page.acc_username_set(result.username);
-    //         navigate(link_back(), NavigateOptions::default());
-    //     });
-    // };
 
     let page = PageState::get();
     let input_new_password = NodeRef::new();
     let input_new_password_confirm = NodeRef::new();
     let user_email = move || page.acc_email();
     let view_msg = move || {
-        match password_change_stage_tracked() {
+        match password_change_stage.get() {
             PasswordCangeStage::PasswordChangeAdd => view! {
                 <p id="pss_add_component">"Send confirmation to \""
                 <span class="text-base0E">{user_email}</span>
@@ -101,15 +58,14 @@ pub fn PasswordChange(
             // }.into_any(),
       }
     };
-    let view_text = move || match password_change_stage_tracked() {
+    let view_text = move || match password_change_stage.get() {
         PasswordCangeStage::PasswordChangeAdd => "Send",
         PasswordCangeStage::PasswordChangeCheckEmail => "",
         PasswordCangeStage::PasswordChangeConfirm => "Confirm",
-        // PasswordCangeStage::PasswordChangeFinished => "",
     };
     let on_confirm = move |_| {
         let navigate = navigate.clone();
-        match password_change_stage_untracked() {
+        match password_change_stage.get_untracked() {
             PasswordCangeStage::PasswordChangeAdd => {
                 let user_email = user_email();
                 spawner.spawn(async move {
@@ -132,7 +88,7 @@ pub fn PasswordChange(
                 ) else {
                     return;
                 };
-                let password_change_token = password_change_token();
+                let password_change_token = password_change_token.get_untracked();
                 spawner.spawn(async move {
                     let Some(_result) = password_change
                         .confirm(
@@ -150,13 +106,11 @@ pub fn PasswordChange(
         }
     };
     let general_errs = move || password_change.err_general.get();
-    // let username_errs = move || username_change.err_username.get();
     let is_loading = move || spawner.is_busy.get();
-    let when_confirm_btn = move || match password_change_stage_tracked() {
+    let when_confirm_btn = move || match password_change_stage.get() {
         PasswordCangeStage::PasswordChangeAdd => true,
         PasswordCangeStage::PasswordChangeCheckEmail => false,
         PasswordCangeStage::PasswordChangeConfirm => true,
-        // PasswordCangeStage::PasswordChangeFinished => "",
     };
 
     view! {

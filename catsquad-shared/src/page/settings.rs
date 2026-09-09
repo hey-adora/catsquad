@@ -79,6 +79,17 @@ pub fn link_relative_settings_email_change_current_add() -> String {
     )
 }
 
+pub fn link_relative_settings_email_change_error() -> String {
+    format!(
+        "/settings?{}={}&{}={}",
+        SettingsPageParams::Stage,
+        SettingsPageStage::EmailChange,
+        //
+        SettingsPageParams::EmailChangeStage,
+        EmailCangeStage::ChangeEmailError,
+    )
+}
+
 pub fn link_relative_settings_email_change_current_check_email(
     email_change_key: impl Display,
 ) -> String {
@@ -201,17 +212,14 @@ pub fn link_relative_settings_email_change_finish(email_change_key: impl Display
     )
 }
 
-pub fn link_relative_settings_email_change_finished(email_change_key: impl Display) -> String {
+pub fn link_relative_settings_email_change_finished() -> String {
     format!(
-        "/settings?{}={}&{}={}&{}={}",
+        "/settings?{}={}&{}={}",
         SettingsPageParams::Stage,
         SettingsPageStage::EmailChange,
         //
         SettingsPageParams::EmailChangeStage,
         EmailCangeStage::ChangeEmailFinished,
-        //
-        SettingsPageParams::EmailChangeKey,
-        email_change_key,
     )
 }
 
@@ -252,6 +260,7 @@ pub enum EmailCangeStage {
     ChangeEmailFinish,
     ChangeEmailFinished,
     ChangeEmailCanceled,
+    ChangeEmailError,
 }
 
 #[derive(

@@ -8,8 +8,8 @@ use catsquad_shared::{
     EmailCangeStage, LINK_WEB_INDEX, Uuid, link_relative_settings,
     link_relative_settings_email_change_canceled,
     link_relative_settings_email_change_current_check_email,
-    link_relative_settings_email_change_finish, link_relative_settings_email_change_finished,
-    link_relative_settings_email_change_new_add,
+    link_relative_settings_email_change_error, link_relative_settings_email_change_finish,
+    link_relative_settings_email_change_finished, link_relative_settings_email_change_new_add,
     link_relative_settings_email_change_new_check_email,
     link_relative_settings_email_change_new_confirm,
 };
@@ -19,42 +19,12 @@ use web_sys::{HtmlInputElement, MouseEvent};
 
 #[component]
 pub fn EmailChange(
-    #[prop(optional, into)] email_change_stage_tracked: Option<Callback<(), EmailCangeStage>>,
-    #[prop(optional, into)] email_change_stage_untracked: Option<Callback<(), EmailCangeStage>>,
-    #[prop(optional, into)] email_change_id_untracked: Option<Callback<(), i64>>,
-    #[prop(optional, into)] token_untracked: Option<Callback<(), Uuid>>,
-    #[prop(optional, into)] new_email_tracked: Option<Callback<(), String>>,
+    #[prop(optional, into)] email_change_stage: Signal<EmailCangeStage>,
+    #[prop(optional, into)] email_change_id: Signal<i64>,
+    #[prop(optional, into)] token: Signal<Uuid>,
+    #[prop(optional, into)] new_email: Signal<String>,
 ) -> impl IntoView {
     let page = PageState::get();
-    let link_back = move || link_relative_settings();
-    let email_change_stage_tracked = move || {
-        email_change_stage_tracked
-            .map(|v| v.run(()))
-            .unwrap_or_default()
-    };
-    let email_change_stage_untracked = move || {
-        email_change_stage_untracked
-            .map(|v| v.run(()))
-            .unwrap_or_default()
-    };
-    let email_change_id_untracked = move || {
-        email_change_id_untracked
-            .map(|v| v.run(()))
-            .unwrap_or_default()
-    };
-    let token_untracked = move || token_untracked.map(|v| v.run(())).unwrap_or_default();
-    let new_email_tracked = move || new_email_tracked.map(|v| v.run(())).unwrap_or_default();
-
-    // let when_stage_email_current_add =
-    //     move || email_change_stage() == EmailCangeStage::ChangeEmailCurrentAdd;
-    // let when_stage_email_current_check_email =
-    //     move || email_change_stage() == EmailCangeStage::ChangeEmailCurrentCheckEmail;
-    // let when_stage_email_current_confirm =
-    //     move || email_change_stage() == EmailCangeStage::ChangeEmailCurrentConfirm;
-    // let when_stage_email_new_add =
-    //     move || email_change_stage() == EmailCangeStage::ChangeEmailNewAdd;
-    // let when_stage_email_new_check_email =
-    //     move || email_change_stage() == EmailCangeStage::ChangeEmailNewCheckEmail;
 
     let navigate = use_navigate();
     let spawner = Spawner::new();
@@ -68,6 +38,29 @@ pub fn EmailChange(
     let is_loading = move || spawner.is_busy.get();
     let general_errs = move || email_change.err_general.get();
 
+    Effect::new({
+        let navigate = navigate.clone();
+        move || {
+            let param_email_change_id = email_change_id.get();
+            // let hook_email_change_id = email_change.email_change_id.get_value();
+            // if param_email_change_id == 0 || hook_email_change_id != 0 {
+
+            if param_email_change_id == 0 {
+                return;
+            }
+
+            let navigate = navigate.clone();
+            spawner.spawn(async move {
+                let result = email_change.init(param_email_change_id).await;
+
+                if result.is_none() {
+                    let link = link_relative_settings_email_change_error();
+                    navigate(&link, NavigateOptions::default());
+                }
+            });
+        }
+    });
+
     let on_click = {
         let navigate = navigate.clone();
 
@@ -75,7 +68,7 @@ pub fn EmailChange(
             let navigate = navigate.clone();
 
             spawner.spawn(async move {
-                match email_change_stage_untracked() {
+                match email_change_stage.get_untracked() {
                     EmailCangeStage::ChangeEmailCurrentAdd => {
                         let Some(result) = email_change.current_add().await else {
                             return;
@@ -85,12 +78,9 @@ pub fn EmailChange(
                         navigate(&link, NavigateOptions::default());
                     }
                     EmailCangeStage::ChangeEmailCurrentConfirm => {
-                        let email_change_key = email_change_id_untracked();
-                        let token = token_untracked();
-                        let Some(_) = email_change
-                            .current_confirm(email_change_key.clone(), token)
-                            .await
-                        else {
+                        let email_change_key = email_change_id.get_untracked();
+                        let token = token.get_untracked();
+                        let Some(_) = email_change.current_confirm(token).await else {
                             return;
                         };
                         let link = link_relative_settings_email_change_new_add(email_change_key);
@@ -104,11 +94,8 @@ pub fn EmailChange(
                         else {
                             return;
                         };
-                        let email_change_key = email_change_id_untracked();
-                        let Some(_) = email_change
-                            .new_add(email_change_key.clone(), new_email.clone())
-                            .await
-                        else {
+                        let email_change_key = email_change_id.get_untracked();
+                        let Some(_) = email_change.new_add(new_email.clone()).await else {
                             return;
                         };
                         let link = link_relative_settings_email_change_new_check_email(
@@ -118,40 +105,34 @@ pub fn EmailChange(
                         navigate(&link, NavigateOptions::default());
                     }
                     EmailCangeStage::ChangeEmailNewConfirm => {
-                        let email_change_key = email_change_id_untracked();
-                        let token = token_untracked();
-                        let Some(_) = email_change
-                            .new_confirm(email_change_key.clone(), token)
-                            .await
-                        else {
+                        let email_change_key = email_change_id.get_untracked();
+                        let token = token.get_untracked();
+                        let Some(_) = email_change.new_confirm(token).await else {
                             return;
                         };
                         let link = link_relative_settings_email_change_finish(email_change_key);
                         navigate(&link, NavigateOptions::default());
                     }
                     EmailCangeStage::ChangeEmailFinish => {
-                        let email_change_key = email_change_id_untracked();
-                        let Some(_) = email_change.finish(email_change_key.clone()).await
-                        // .and_then(|v| v.new)
-                        else {
+                        let Some(_) = email_change.finish().await else {
                             return;
                         };
-                        // TODO fetch the email change data on init
-                        page.acc_email_set("example@heyadora.com");
-                        let link = link_relative_settings_email_change_finished(email_change_key);
+                        let new_email = email_change.new_email.get_untracked();
+                        page.acc_email_set(new_email);
+                        let link = link_relative_settings_email_change_finished();
                         navigate(&link, NavigateOptions::default());
                     }
                     EmailCangeStage::ChangeEmailCurrentCheckEmail
                     | EmailCangeStage::ChangeEmailNewCheckEmail => {
-                        let email_change_key = email_change_id_untracked();
-                        let Some(_) = email_change.resend(email_change_key).await else {
+                        let Some(_) = email_change.resend().await else {
                             success_msg.update(|v| v.clear());
                             return;
                         };
                         success_msg.set("Confirmation email was re-sent.".to_string());
                     }
-                    EmailCangeStage::ChangeEmailFinished => (),
-                    EmailCangeStage::ChangeEmailCanceled => (),
+                    EmailCangeStage::ChangeEmailFinished
+                    | EmailCangeStage::ChangeEmailCanceled
+                    | EmailCangeStage::ChangeEmailError => (),
                 };
             });
         }
@@ -159,10 +140,9 @@ pub fn EmailChange(
 
     let on_cancel = move |_| {
         success_msg.update(|v| v.clear());
-        let email_change_key = email_change_id_untracked();
         let navigate = navigate.clone();
         spawner.spawn(async move {
-            let Some(_) = email_change.cancel(email_change_key).await else {
+            let Some(_) = email_change.cancel().await else {
                 success_msg.update(|v| v.clear());
                 return;
             };
@@ -171,20 +151,23 @@ pub fn EmailChange(
         });
     };
 
-    let when_cancel = move || match email_change_stage_tracked() {
+    let when_cancel = move || match email_change_stage.get() {
         EmailCangeStage::ChangeEmailCurrentAdd
         | EmailCangeStage::ChangeEmailFinished
-        | EmailCangeStage::ChangeEmailCanceled => false,
+        | EmailCangeStage::ChangeEmailCanceled
+        | EmailCangeStage::ChangeEmailError => false,
         _ => true,
     };
 
-    let when_primary = move || match email_change_stage_tracked() {
-        EmailCangeStage::ChangeEmailCanceled | EmailCangeStage::ChangeEmailFinished => false,
+    let when_primary = move || match email_change_stage.get() {
+        EmailCangeStage::ChangeEmailCanceled
+        | EmailCangeStage::ChangeEmailFinished
+        | EmailCangeStage::ChangeEmailError => false,
         _ => true,
     };
 
     let view_msg = move || {
-        match email_change_stage_tracked() {
+        match email_change_stage.get() {
         EmailCangeStage::ChangeEmailCurrentAdd => view! {
             <p id="current_add_component" class="text-center">
                 "Send confirmation email to "
@@ -215,7 +198,7 @@ pub fn EmailChange(
         EmailCangeStage::ChangeEmailNewCheckEmail => view! {
             <p id="new_check_component" class="text-center">
                 "Email Confirmation was sent to "
-                <span class="text-base0E">{new_email_tracked}</span>
+                <span class="text-base0E">{move || new_email.get()}</span>
                 ", confirm it to continue."
             </p>
         }
@@ -236,10 +219,14 @@ pub fn EmailChange(
             <p id="canceled_component" class="text-center">"canceled."</p>
         }
         .into_any(),
+        EmailCangeStage::ChangeEmailError=> view! {
+            <p id="error_component" class="text-center">"Error"</p>
+        }
+        .into_any(),
     }
     };
 
-    let primary_btn_text = move || match email_change_stage_tracked() {
+    let primary_btn_text = move || match email_change_stage.get() {
         EmailCangeStage::ChangeEmailCurrentAdd => "Send",
         EmailCangeStage::ChangeEmailCurrentCheckEmail => "Resend",
         EmailCangeStage::ChangeEmailCurrentConfirm => "Confirm",
@@ -247,14 +234,18 @@ pub fn EmailChange(
         EmailCangeStage::ChangeEmailNewCheckEmail => "Resend",
         EmailCangeStage::ChangeEmailNewConfirm => "Confirm",
         EmailCangeStage::ChangeEmailFinish => "Confirm",
-        EmailCangeStage::ChangeEmailFinished => "",
-        EmailCangeStage::ChangeEmailCanceled => "",
+        EmailCangeStage::ChangeEmailFinished
+        | EmailCangeStage::ChangeEmailCanceled
+        | EmailCangeStage::ChangeEmailError => "",
     };
 
     view! {
         <div class=" bg-base01/80 absolute left-0 top-0 w-[100dvw] h-[100dvh] flex place-items-center justify-center">
             <a class="z-[1] absolute left-0 top-0 w-full h-full" href=link_back></a>
             <div class="z-[2] max-w-[25rem] w-full flex flex-col gap-6 shadow-lg bg-base00 rounded-lg px-6 py-4">
+                // <Show when=move||false>
+                //     ""
+                // </Show>
                 <p class="text-[1.5rem] text-base0A text-center">"Email Change"</p>
                 <Show when=when_success>
                     <p class="text-base0B text-center">{ move || success_msg.get() }</p>

@@ -4,7 +4,8 @@ use catsquad_shared::{PostFile, PostSearchRes, link_relative_img, link_relative_
 use catsquad_web_utils::prelude::*;
 use catsquad_web_utils::time::time_now_micro;
 use leptos::{html::Div, prelude::*};
-use leptos_router::hooks::query_signal;
+use leptos_router::NavigateOptions;
+use leptos_router::hooks::{query_signal, query_signal_with_options};
 use std::default::Default;
 use std::fmt::{Debug, Display};
 use std::time::Duration;
@@ -12,6 +13,10 @@ use web_sys::HtmlDivElement;
 
 use crate::hook::{Intersection, IntersectionSwitch, ScrollCorrection, Spawner};
 use crate::page::create_client;
+
+mod component_loading;
+
+use component_loading::Loading;
 
 pub fn vec_img_to_string<IMG: ResizableImage + Display>(imgs: &[IMG]) -> String {
     let mut output = String::new();
@@ -38,10 +43,20 @@ pub fn Gallery(
 
     let top_intersector_switch = IntersectionSwitch::new();
     let down_intersector_switch = IntersectionSwitch::new();
-    let (get_query_scroll, set_query_scroll) = query_signal::<i32>("scroll");
-    let (get_query_gallery_count, set_query_gallery_count) = query_signal::<usize>("img_count");
-    let (get_query_direction, set_query_direction) = query_signal::<String>("direction");
-    let (get_query_time, set_query_time) = query_signal::<u64>("time");
+
+    let nav_options = NavigateOptions {
+        replace: true,
+        ..Default::default()
+    };
+
+    let (get_query_scroll, set_query_scroll) =
+        query_signal_with_options::<i32>("scroll", nav_options.clone());
+    let (get_query_gallery_count, set_query_gallery_count) =
+        query_signal_with_options::<usize>("img_count", nav_options.clone());
+    let (get_query_direction, set_query_direction) =
+        query_signal_with_options::<String>("direction", nav_options.clone());
+    let (get_query_time, set_query_time) =
+        query_signal_with_options::<u64>("time", nav_options.clone());
     let set_query_time = move |v: Option<u64>| {
         debug_data_push(
             "gallery_query_time",
@@ -51,7 +66,8 @@ pub fn Gallery(
         set_query_time.set(v);
     };
     let old_tags = StoredValue::new_local(String::new());
-    let (get_query_tags, _set_query_tags) = query_signal::<String>("tags");
+    let (get_query_tags, _set_query_tags) =
+        query_signal_with_options::<String>("tags", nav_options);
 
     let set_gallery = move |width: u32, height: f64, bottom: bool, limit: usize, time: u64| {
         debug_data_push("set_gallery_param_limit", limit.to_string());
@@ -325,21 +341,25 @@ pub fn Gallery(
 
     // let is_loading = move || spawner.is_busy.get();
     let test_id = move || format!("gallery_mut_index_{}", test_id.get());
+    let when_loading = move || spawner.is_busy.get();
 
-    let a = view! {
-        <div
-            id="gallery"
-            data-testid=test_id
-            node_ref=gallery_ref
-            class="relative overflow-y-scroll overflow-x-hidden"
-        >
-            {
-                get_imgs
-            }
+    view! {
+        <div class="relative overflow-hidden ">
+            <div
+                id="gallery"
+                data-testid=test_id
+                node_ref=gallery_ref
+                class=" z-10 w-full h-full relative overflow-y-scroll overflow-x-hidden"
+            >
+                {
+                    get_imgs
+                }
+            </div>
+            <Show when=when_loading>
+                <Loading/>
+            </Show>
         </div>
-    };
-
-    a
+    }
 }
 // <Show when=is_loading>
 //     <p id="gallery_loading_bar">"loading..."</p>
@@ -392,35 +412,37 @@ pub fn GalleryImg(img: Img) -> impl IntoView {
     // on:click=on_img_click
 
     view! {
-
         <a
            id=elm_id_img_link(img_key)
            href=post_link
-           class="absolute"
+           class="absolute bg-base00 "
            style:left=value_left
            style:top=value_top
            style:width=value_width
            style:height=value_height
         >
-            <Show when=move || image_exists>
-                <img
-                    id=elm_id_img_thumbnail(img_key2.clone())
-                    style:width=value_width2.clone()
-                    style:height=value_height2.clone()
-                    src=img_link.clone()
-                />
-            </Show>
-            <Show when=move || !image_exists>
-                <div
-                    class="border-2 border-base05 bg-base02 grid items-center text-center"
-                    id=elm_id_img_thumbnail(img_key3.clone())
-                    style:width=value_width3.clone()
-                    style:height=value_height3.clone()
-                >
-                "No Images"
-                </div>
-            </Show>
-
+            <div class="w-full h-full relative ">
+                <Show when=move || image_exists>
+                    <img
+                        class="relative z-10"
+                        id=elm_id_img_thumbnail(img_key2.clone())
+                        style:width=value_width2.clone()
+                        style:height=value_height2.clone()
+                        src=img_link.clone()
+                    />
+                </Show>
+                <Show when=move || !image_exists>
+                    <div
+                        class="relative z-10 border-2 border-base05 bg-base02 grid items-center text-center"
+                        id=elm_id_img_thumbnail(img_key3.clone())
+                        style:width=value_width3.clone()
+                        style:height=value_height3.clone()
+                    >
+                    "No Images"
+                    </div>
+                </Show>
+                <div class="w-[calc(100%-1rem)] h-[calc(100%-1rem)] bg-base02 animate-pulse absolute left-0 top-0 m-[0.5rem] " ></div>
+            </div>
         </a>
     }
 }

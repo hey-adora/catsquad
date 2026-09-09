@@ -143,7 +143,7 @@ mod test_utils {
         ) -> Uuid {
             self.state
                 .db
-                .email_change_get_by_key(time, user.username.clone(), email_change_id)
+                .email_change_get_by_id(time, user.username.clone(), email_change_id)
                 .await
                 .unwrap()
                 .current_token
@@ -157,7 +157,7 @@ mod test_utils {
         ) -> Uuid {
             self.state
                 .db
-                .email_change_get_by_key(time, user.username.clone(), email_change_id)
+                .email_change_get_by_id(time, user.username.clone(), email_change_id)
                 .await
                 .unwrap()
                 .new_token

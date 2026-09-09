@@ -80,7 +80,7 @@ pub async fn email_change_update_new_add(
         // TODO add better error and maybe combine queries
         let email_change = app
             .db
-            .email_change_get_by_key(time, user_username, email_change_id)
+            .email_change_get_by_id(time, user_username, email_change_id)
             .await
             .map_err(|_| EmailChangeUpdateNewAddErr::InternalServer)?;
         let new_token = email_change.new_token;

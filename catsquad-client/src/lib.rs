@@ -847,6 +847,13 @@ where
         self.post_form_empty(cs::LINK_API_EMAIL_CHANGE_ADD)
     }
 
+    pub fn email_change_get_by_id(
+        &self,
+        email_change_id: i64,
+    ) -> Builder<TSender, cs::EmailChangeRes, cs::EmailChangeGetByIdErr> {
+        self.get(cs::link_relative_email_change_get_by_id(email_change_id))
+    }
+
     pub fn email_change_resend(
         &self,
         email_change_id: i64,

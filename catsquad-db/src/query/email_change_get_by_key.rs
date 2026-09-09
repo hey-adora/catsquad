@@ -2,7 +2,7 @@ use crate::{Db, DbEmailChange};
 use catsquad_log::prelude::*;
 
 #[derive(Debug, thiserror::Error)]
-pub enum DbEmailChangeGetByKeyErr {
+pub enum DbEmailChangeGetByIdErr {
     #[error("email change not found")]
     EmailChangeNotFound,
 
@@ -20,12 +20,12 @@ pub enum DbEmailChangeGetByKeyErr {
 }
 
 impl Db {
-    pub async fn email_change_get_by_key(
+    pub async fn email_change_get_by_id(
         &self,
         time: u64,
         user_username: impl Into<String>,
         email_change_id: i64,
-    ) -> Result<DbEmailChange, DbEmailChangeGetByKeyErr> {
+    ) -> Result<DbEmailChange, DbEmailChangeGetByIdErr> {
         let pool = &self.db;
         let user_username = user_username.into();
 
@@ -41,24 +41,24 @@ impl Db {
         let email_change: DbEmailChange = match result {
             Ok(v) => v,
             Err(sqlx::Error::RowNotFound) => {
-                return Err(DbEmailChangeGetByKeyErr::EmailChangeNotFound);
+                return Err(DbEmailChangeGetByIdErr::EmailChangeNotFound);
             }
             Err(err) => {
                 error!("unexpected db error {err}");
-                return Err(DbEmailChangeGetByKeyErr::Db(err));
+                return Err(DbEmailChangeGetByIdErr::Db(err));
             }
         };
 
         if email_change.user_username != user_username {
-            return Err(DbEmailChangeGetByKeyErr::Unauthorized);
+            return Err(DbEmailChangeGetByIdErr::Unauthorized);
         }
 
         if email_change.completed {
-            return Err(DbEmailChangeGetByKeyErr::AlreadyUsed);
+            return Err(DbEmailChangeGetByIdErr::AlreadyUsed);
         }
 
         if email_change.expires_at < time {
-            return Err(DbEmailChangeGetByKeyErr::Expired);
+            return Err(DbEmailChangeGetByIdErr::Expired);
         }
 
         Ok(email_change)
@@ -67,7 +67,7 @@ impl Db {
 
 #[cfg(test)]
 #[tokio::test]
-async fn test_email_change_get_by_key() {
+async fn test_email_change_get_by_id() {
     init_log();
 
     let db = Db::test_db(0, "test_email_change_get_by_key").await;
@@ -82,7 +82,7 @@ async fn test_email_change_get_by_key() {
         .await
         .unwrap();
     let _email_change = db
-        .email_change_get_by_key(0, user.username.clone(), email_change.id)
+        .email_change_get_by_id(0, user.username.clone(), email_change.id)
         .await
         .unwrap();
 }

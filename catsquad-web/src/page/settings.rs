@@ -29,36 +29,23 @@ pub fn Settings() -> impl IntoView {
 
     let stage = RwQuery::<SettingsPageStage>::new(SettingsPageParams::Stage.to_string());
     let stage = move || stage.get_or_default();
-    // let stage = move || {
-    //     stage
-    //         .get()
-    //         .and_then(|v| SettingsPageStage::from_str(&v).ok())
-    //         .unwrap_or_default()
-    // };
+
     let password_stage =
         RwQuery::<PasswordCangeStage>::new(SettingsPageParams::PasswordChangeStage.to_string());
-    let password_stage_tracked = move || password_stage.get_or_default();
-    let password_stage_untracked = move || password_stage.get_untracked().unwrap_or_default();
+    let password_stage = move || password_stage.get_or_default();
 
-    let email_stage =
+    let email_change_stage =
         RwQuery::<EmailCangeStage>::new(SettingsPageParams::EmailChangeStage.to_string());
-    let email_stage_tracked = move || email_stage.get_or_default();
-    let email_stage_untracked = move || email_stage.get_untracked().unwrap_or_default();
+    let email_change_stage = move || email_change_stage.get_or_default();
 
     let email_change_id = RwQuery::<i64>::new(SettingsPageParams::EmailChangeKey.to_string());
-    let email_change_id_untracked = move || email_change_id.get_untracked().unwrap_or_default();
+    let email_change_id = move || email_change_id.get_or_default();
 
     let token = RwQuery::<String>::new(SettingsPageParams::Token.to_string());
-    let token_untracked = move || str_to_uuid(token.get_untracked().unwrap_or_default());
+    let token = move || str_to_uuid(token.get_untracked().unwrap_or_default());
 
     let new_email = RwQuery::<String>::new(SettingsPageParams::NewEmail.to_string());
-    let new_email_tracked = move || new_email.get().unwrap_or_default();
-    // let email_stage = move || {
-    //     email_stage
-    //         .get()
-    //         .and_then(|v| SettingsPageStage::from_str(&v).ok())
-    //         .unwrap_or_default()
-    // };
+    let new_email = move || new_email.get().unwrap_or_default();
 
     let link_username_change = move || link_relative_settings_username_change();
     let link_email_change = move || link_relative_settings_email_change_current_add();
@@ -75,18 +62,16 @@ pub fn Settings() -> impl IntoView {
             </Show>
             <Show when=when_stage_email_change>
                 <EmailChange
-                    email_change_stage_tracked=email_stage_tracked
-                    email_change_stage_untracked=email_stage_untracked
-                    email_change_id_untracked
-                    token_untracked
-                    new_email_tracked
+                    email_change_stage
+                    email_change_id
+                    token
+                    new_email
                     />
             </Show>
             <Show when=when_stage_password_change>
                 <PasswordChange
-                        password_change_stage_tracked=password_stage_tracked
-                        password_change_stage_untracked=password_stage_untracked
-                        password_change_token=token_untracked
+                        password_change_stage=password_stage
+                        password_change_token=token
                     />
             </Show>
             <div class="px-[2rem] mx-auto max-w-[30rem] w-full">

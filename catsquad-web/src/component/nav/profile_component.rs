@@ -16,7 +16,7 @@ pub fn Profile(spawner: Spawner) -> impl IntoView {
 
     let on_menu_click = move |e: MouseEvent| {
         // e.prevent_default();
-        e.stop_propagation();
+        // e.stop_propagation();
     };
 
     let on_logout = move |e: SubmitEvent| {
@@ -30,7 +30,9 @@ pub fn Profile(spawner: Spawner) -> impl IntoView {
     let username = move || page.acc_username();
 
     view! {
-        <button id="profile_btn" on:click=on_open class="size-8 rounded-full bg-base03 relative">
+        <div class="flex relative">
+            <button id="profile_btn" on:click=on_open class="size-8 rounded-full bg-base03">
+            </button>
             <Show when=when_dropdown >
                 <SVGTriangle class="z-[5] size-4 text-base05 absolute left-[100%] top-[100%] transform -translate-x-1/2 -translate-y-1/2"/>
                 <div on:click=on_menu_click class="text-left z-[1] px-4 py-2 rounded-md bg-base03 absolute left-[-100%] top-[calc(100%+2.5rem)] transform -translate-x-1/2 -translate-y-1/2 " >
@@ -41,7 +43,8 @@ pub fn Profile(spawner: Spawner) -> impl IntoView {
                     </form>
                 </div>
             </Show>
-        </button>
+
+        </div>
     }
 }
 // transition-all duration-300 ease-in hover:font-bold

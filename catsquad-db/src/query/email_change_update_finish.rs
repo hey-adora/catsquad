@@ -185,7 +185,7 @@ async fn test_email_change_update_finish() {
         .unwrap();
 
     {
-        use crate::query::email_change_get_by_key::DbEmailChangeGetByKeyErr;
+        use crate::query::email_change_get_by_key::DbEmailChangeGetByIdErr;
 
         let email_change = db
             .email_change_add(0, user.username.clone(), 10)
@@ -245,7 +245,7 @@ async fn test_email_change_update_finish() {
             .await
             .unwrap();
         let result = db
-            .email_change_get_by_key(0, user.username.clone(), email_change.id)
+            .email_change_get_by_id(0, user.username.clone(), email_change.id)
             .await;
         // .unwrap();
         let user = db
@@ -253,7 +253,7 @@ async fn test_email_change_update_finish() {
             .await
             .unwrap();
 
-        assert!(matches!(result, Err(DbEmailChangeGetByKeyErr::AlreadyUsed)));
+        assert!(matches!(result, Err(DbEmailChangeGetByIdErr::AlreadyUsed)));
         assert_eq!(user.email, "hey3@heyadora.com");
 
         let result = db

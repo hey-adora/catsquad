@@ -25,6 +25,7 @@ pub use api::comment_remove::*;
 pub use api::comment_search::*;
 pub use api::comment_update_text::*;
 pub use api::email_change_add::*;
+pub use api::email_change_get_by_id::*;
 pub use api::email_change_resend::*;
 pub use api::email_change_update_cancel::*;
 pub use api::email_change_update_current_confirm::*;

@@ -1,5 +1,5 @@
 use axum::{Extension, Form, Json, extract::State, http::StatusCode, response::IntoResponse};
-use catsquad_db::{DbEmailChangeGetByKeyErr, DbUser};
+use catsquad_db::{DbEmailChangeGetByIdErr, DbUser};
 use catsquad_log::prelude::*;
 use catsquad_shared::{EmailChangeRes, EmailChangeResendErr, EmailChangeResendReq};
 
@@ -11,15 +11,15 @@ use crate::{
     state::AppState,
 };
 
-fn from_db_email_change_get_by_key_err(value: DbEmailChangeGetByKeyErr) -> EmailChangeResendErr {
+fn from_db_email_change_get_by_key_err(value: DbEmailChangeGetByIdErr) -> EmailChangeResendErr {
     match value {
-        DbEmailChangeGetByKeyErr::EmailChangeNotFound => EmailChangeResendErr::NotFound,
-        DbEmailChangeGetByKeyErr::Unauthorized => {
+        DbEmailChangeGetByIdErr::EmailChangeNotFound => EmailChangeResendErr::NotFound,
+        DbEmailChangeGetByIdErr::Unauthorized => {
             EmailChangeResendErr::Unauthorized("unauthorized".to_string())
         }
-        DbEmailChangeGetByKeyErr::AlreadyUsed => EmailChangeResendErr::AlreadyUsed,
-        DbEmailChangeGetByKeyErr::Expired => EmailChangeResendErr::Expired,
-        DbEmailChangeGetByKeyErr::Db(_) => EmailChangeResendErr::InternalServer,
+        DbEmailChangeGetByIdErr::AlreadyUsed => EmailChangeResendErr::AlreadyUsed,
+        DbEmailChangeGetByIdErr::Expired => EmailChangeResendErr::Expired,
+        DbEmailChangeGetByIdErr::Db(_) => EmailChangeResendErr::InternalServer,
     }
 }
 
@@ -48,7 +48,7 @@ pub async fn email_change_resend(
 
         let email_change = app
             .db
-            .email_change_get_by_key(time, user_username, email_change_id)
+            .email_change_get_by_id(time, user_username, email_change_id)
             .await
             .map_err(from_db_email_change_get_by_key_err)?;
         let email_change_id = email_change.id;

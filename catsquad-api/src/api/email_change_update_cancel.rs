@@ -1,5 +1,5 @@
 use axum::{Extension, Form, Json, extract::State, http::StatusCode, response::IntoResponse};
-use catsquad_db::{DbEmailChangeGetByKeyErr, DbEmailChangeUpdateCancelErr, DbUser};
+use catsquad_db::{DbEmailChangeGetByIdErr, DbEmailChangeUpdateCancelErr, DbUser};
 use catsquad_log::prelude::*;
 use catsquad_shared::{EmailChangeRes, EmailChangeUpdateCancelErr, EmailChangeUpdateCancelReq};
 
@@ -168,8 +168,8 @@ async fn test_api_email_change_update_cancel() {
         let result = server
             .state
             .db
-            .email_change_get_by_key(0, user1.username, email_change.id)
+            .email_change_get_by_id(0, user1.username, email_change.id)
             .await;
-        assert!(matches!(result, Err(DbEmailChangeGetByKeyErr::AlreadyUsed)));
+        assert!(matches!(result, Err(DbEmailChangeGetByIdErr::AlreadyUsed)));
     }
 }
