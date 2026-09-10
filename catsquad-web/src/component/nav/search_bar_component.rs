@@ -1,3 +1,4 @@
+use crate::SVGSearch;
 use catsquad_log::prelude::*;
 use catsquad_shared::{LINK_WEB_INDEX, link_relative_index_search};
 use leptos::{
@@ -58,14 +59,20 @@ pub fn SearchBar() -> impl IntoView {
     // };
 
     view! {
-        <input
-            autocomplete="off"
-            id="search"
-            placeholder="Search"
-            on:keydown=on_search
-            node_ref=search_input
-            class="w-full max-w-[20rem] rounded text-[1rem] px-[0.8rem] py-[0.2rem] text-base05 bg-base03"
-            />
+        <div class="flex gap-2 rounded text-[1rem] px-[0.8rem] py-[0.2rem] text-base05 bg-base03 items-center">
+            <label for="search">
+                <SVGSearch class="size-6"/>
+            </label>
+            <input
+                autocomplete="off"
+                id="search"
+                name="search"
+                placeholder="Search"
+                on:keydown=on_search
+                node_ref=search_input
+                class="w-full max-w-[20rem] "
+                />
+        </div>
     }
 }
 // value=value

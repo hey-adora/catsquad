@@ -15,8 +15,10 @@ use crate::hook::{Intersection, IntersectionSwitch, ScrollCorrection, Spawner};
 use crate::page::create_client;
 
 mod component_loading;
+mod component_not_found;
 
 use component_loading::Loading;
+use component_not_found::NotFound;
 
 pub fn vec_img_to_string<IMG: ResizableImage + Display>(imgs: &[IMG]) -> String {
     let mut output = String::new();
@@ -342,6 +344,7 @@ pub fn Gallery(
     // let is_loading = move || spawner.is_busy.get();
     let test_id = move || format!("gallery_mut_index_{}", test_id.get());
     let when_loading = move || spawner.is_busy.get();
+    let when_empty = move || !when_loading() && gallery_api.items.with(|v| v.is_empty());
 
     view! {
         <div class="relative overflow-hidden ">
@@ -357,6 +360,9 @@ pub fn Gallery(
             </div>
             <Show when=when_loading>
                 <Loading/>
+            </Show>
+            <Show when=when_empty>
+                <NotFound/>
             </Show>
         </div>
     }

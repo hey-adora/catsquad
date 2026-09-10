@@ -34,8 +34,8 @@ pub fn Profile(spawner: Spawner) -> impl IntoView {
             <button id="profile_btn" on:click=on_open class="size-8 rounded-full bg-base03">
             </button>
             <Show when=when_dropdown >
-                <SVGTriangle class="z-[5] size-4 text-base05 absolute left-[100%] top-[100%] transform -translate-x-1/2 -translate-y-1/2"/>
-                <div on:click=on_menu_click class="text-left z-[1] px-4 py-2 rounded-md bg-base03 absolute left-[-100%] top-[calc(100%+2.5rem)] transform -translate-x-1/2 -translate-y-1/2 " >
+                <SVGTriangle class="z-[100] size-4 text-base05 absolute left-[100%] top-[100%] transform -translate-x-1/2 -translate-y-1/2"/>
+                <div on:click=on_menu_click class="text-left z-[100] px-4 py-2 rounded-md bg-base03 absolute left-[-100%] top-[calc(100%+2.5rem)] transform -translate-x-1/2 -translate-y-1/2 " >
                     <a href=LINK_WEB_INDEX>{username}</a>
                     <a href=LINK_WEB_SETTINGS>"Settings"</a>
                     <form method="POST" action="" on:submit=on_logout >

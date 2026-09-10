@@ -10,11 +10,9 @@ pub fn SVGTrash(#[prop(optional, into)] class: String) -> impl IntoView {
 }
 
 #[component]
-pub fn SVGArrowDown(#[prop(optional, into)] class: Option<Callback<(), String>>) -> impl IntoView {
-    let class_fn = move || class.map(|v| v.run(())).unwrap_or_default();
-
+pub fn SVGArrowDown(#[prop(optional, into)] class: Signal<String>) -> impl IntoView {
     view! {
-        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class=class_fn>
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class=class>
           <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
         </svg>
     }
@@ -88,6 +86,42 @@ pub fn SVGUpload(
     view! {
         <svg class=class_fn width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg">
           <path stroke="currentColor" stroke-width=stroke d="M6.41667 11V3.52917L4.03333 5.9125L2.75 4.58333L7.33333 0L11.9167 4.58333L10.6333 5.9125L8.25 3.52917V11H6.41667ZM1.83333 14.6667C1.32917 14.6667 0.897722 14.4873 0.539 14.1286C0.180278 13.7699 0.000611111 13.3381 0 12.8333V10.0833H1.83333V12.8333H12.8333V10.0833H14.6667V12.8333C14.6667 13.3375 14.4873 13.7692 14.1286 14.1286C13.7699 14.4879 13.3381 14.6673 12.8333 14.6667H1.83333Z" fill="currentColor"/>
+        </svg>
+    }
+}
+
+#[component]
+pub fn SVGSearch(
+    #[prop(optional, into)] class: Signal<String>,
+    #[prop(optional, into)] stroke: Signal<String>,
+) -> impl IntoView {
+    let stroke = move || {
+        let stroke = stroke.get();
+        if stroke.is_empty() {
+            "1.5".to_string()
+        } else {
+            stroke
+        }
+    };
+
+    view! {
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width=stroke stroke="currentColor" class=class>
+         <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
+        </svg>
+    }
+}
+
+#[component]
+pub fn SVGPaw(#[prop(optional, into)] class: Signal<String>) -> impl IntoView {
+    view! {
+        <svg class=class viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="32" cy="36" r="9" class="fill-base03"/>
+            <circle cx="25" cy="46" r="10" class="fill-base03"/>
+            <circle cx="39" cy="46" r="10" class="fill-base03"/>
+            <circle cx="13.5" cy="28.5" r="7.5" class="fill-base03"/>
+            <circle cx="23.5" cy="15.5" r="7.5" class="fill-base01"/>
+            <circle cx="41.5" cy="15.5" r="7.5" class="fill-base03"/>
+            <circle cx="50.5" cy="29.5" r="7.5" class="fill-base03"/>
         </svg>
     }
 }

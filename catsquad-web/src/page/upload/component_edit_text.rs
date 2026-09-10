@@ -78,10 +78,6 @@ pub fn TextEdit(
         }
     };
 
-    let fn_track = move || {
-        input_text.track();
-    };
-
     let required_text_color = move || match is_valid() {
         ValidState::Valid => "text-base0B",
         ValidState::Error => "text-base08",
@@ -136,18 +132,17 @@ pub fn TextEdit(
                     <li class=move|| format!("ml-[1rem] list-disc {}", required_text_color()) >{required_text}</li>
                 </ul>
             </div>
-            <Errs class=move||"mb-2" error=move||errors.get()/>
+            <Errs class="mb-2" error=move||errors.get()/>
 
 
             <EditArea
                 required
-                is_valid=move||is_valid()
-                class=move||"flex flex-col gap-2"
+                is_valid
+                class="flex flex-col gap-2"
                 >
                 <AutoTextArea
-                    class=move||"w-full select-none"
+                    class="w-full select-none"
                     placeholder=move||title.to_lowercase()
-                    track=fn_track
                     on_focusout=fn_on_focusout
                     on_input=fn_on_input
                     min_height=rem_to_px(min_height_rem).unwrap_or_default()>

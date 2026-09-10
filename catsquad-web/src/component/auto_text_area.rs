@@ -8,22 +8,18 @@ use web_sys::{HtmlElement, HtmlTextAreaElement};
 #[component]
 pub fn AutoTextArea(
     #[prop(optional, into)] node_ref: Option<NodeRef<html::Textarea>>,
-    #[prop(optional, into)] placeholder: Option<Callback<(), String>>,
-    #[prop(optional, into)] id: Option<Callback<(), String>>,
-    #[prop(optional, into)] class: Option<Callback<(), String>>,
-    #[prop(optional, into)] track: Option<Callback<()>>,
+    #[prop(optional, into)] placeholder: Signal<String>,
+    #[prop(optional, into)] id: Signal<String>,
+    #[prop(optional, into)] class: Signal<String>,
     #[prop(optional, into)] on_input: Option<Callback<HtmlTextAreaElement>>,
     #[prop(optional, into)] on_focusout: Option<Callback<HtmlTextAreaElement>>,
     #[prop(optional, into)] on_enter: Option<Callback<HtmlTextAreaElement>>,
     #[prop(default = 500.0)] min_height: f64,
     children: Children,
 ) -> impl IntoView {
-    let id_fn = move || {
-        id.map(|v| v.run(()))
-            .unwrap_or_else(|| "auto-text-area".to_string())
-    };
-    let class_fn = move || class.map(|v| v.run(())).unwrap_or_default();
-    let placeholder_fn = move || placeholder.map(|v| v.run(())).unwrap_or_default();
+    let id_fn = move || id.get();
+    let class_fn = move || class.get();
+    let placeholder_fn = move || placeholder.get();
 
     let height = RwSignal::new(min_height);
     let input = node_ref.unwrap_or_else(|| NodeRef::new());
@@ -67,8 +63,6 @@ pub fn AutoTextArea(
             return;
         };
 
-        // input.track();
-        // fn_on_change();
         mutation.observe_only(
             target,
             MutationObserverOptions::new()
@@ -77,22 +71,6 @@ pub fn AutoTextArea(
                 .subtree(),
         );
     });
-
-    // Effect::new(move || {
-    //     if let Some(f) = track {
-    //         f.run(());
-    //     }
-    //     let Some(input): Option<HtmlTextAreaElement> = input.get_untracked() else {
-    //         return;
-    //     };
-    //     let scroll_height = input.scroll_height() as f64;
-
-    //     if min_height >= scroll_height {
-    //         return;
-    //     }
-
-    //     height.set(scroll_height);
-    // });
 
     let on_focusout = move |_e: web_sys::FocusEvent| {
         trace!("AutoTextArea focusout triggered");

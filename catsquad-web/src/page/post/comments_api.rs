@@ -12,7 +12,7 @@ use wasm_bindgen::JsCast;
 use web_sys::{Element, HtmlElement, HtmlTextAreaElement, MutationObserver, MutationRecord};
 
 #[derive(Default, Clone, strum::Display, strum::EnumIs)]
-pub enum CommentKind2 {
+pub enum CommentKind {
     #[default]
     Root,
     Reply {
@@ -36,7 +36,7 @@ pub enum CommentKind2 {
 }
 
 #[derive(Clone, Copy)]
-pub struct CommentsApi2 {
+pub struct CommentsApi {
     // ui
     pub items: RwSignal<Vec<CommentRes>, LocalStorage>,
     pub finished: RwSignal<bool, LocalStorage>,
@@ -44,24 +44,24 @@ pub struct CommentsApi2 {
     pub text: RwSignal<String, LocalStorage>,
     pub show_editor: RwSignal<bool, LocalStorage>,
     pub edit_mode: RwSignal<bool, LocalStorage>,
-    pub err_post: RwSignal<String, LocalStorage>,
+    pub err_post: RwSignal<String>,
     pub err_fetch: RwSignal<String, LocalStorage>,
     pub err_delete: RwSignal<String, LocalStorage>,
     pub err_update: RwSignal<String, LocalStorage>,
 
     // params
     pub post_key: StoredValue<i64, LocalStorage>,
-    pub kind: StoredValue<CommentKind2, LocalStorage>,
+    pub kind: StoredValue<CommentKind, LocalStorage>,
     pub fetch_count: u32,
 }
 
-impl CommentsApi2 {
-    pub fn new(fetch_count: u32, kind: CommentKind2) -> Self {
+impl CommentsApi {
+    pub fn new(fetch_count: u32, kind: CommentKind) -> Self {
         let (replies_count, text) = match &kind {
-            CommentKind2::Root => (0, String::new()),
-            CommentKind2::Flat { comment, .. }
-            | CommentKind2::None { comment, .. }
-            | CommentKind2::Reply { comment, .. } => (comment.replies_count, comment.text.clone()),
+            CommentKind::Root => (0, String::new()),
+            CommentKind::Flat { comment, .. }
+            | CommentKind::None { comment, .. }
+            | CommentKind::Reply { comment, .. } => (comment.replies_count, comment.text.clone()),
         };
 
         // let has_reply_bubble = kind.is_none() && com;
@@ -75,7 +75,7 @@ impl CommentsApi2 {
             // is_last: RwSignal::new_local(false),
             show_editor: RwSignal::new_local(false),
             edit_mode: RwSignal::new_local(false),
-            err_post: RwSignal::new_local(String::new()),
+            err_post: RwSignal::new(String::new()),
             err_fetch: RwSignal::new_local(String::new()),
             err_delete: RwSignal::new_local(String::new()),
             err_update: RwSignal::new_local(String::new()),
@@ -201,7 +201,7 @@ impl CommentsApi2 {
         self.err_fetch.update(|v| v.clear());
         let kind = self.kind.get_value();
         match kind {
-            CommentKind2::Root => {
+            CommentKind::Root => {
                 let comments = self.fetch_comments(time, client).await;
                 if comments.is_empty() {
                     return;
@@ -213,7 +213,7 @@ impl CommentsApi2 {
                     trace!("comments manual after {v:#?}");
                 });
             }
-            CommentKind2::Reply { comment, .. } => {
+            CommentKind::Reply { comment, .. } => {
                 let comments = self
                     .fetch_replies(time, client, comment.id.clone(), false)
                     .await;
@@ -234,7 +234,7 @@ impl CommentsApi2 {
                     }
                 });
             }
-            CommentKind2::Flat { comment, .. } => {
+            CommentKind::Flat { comment, .. } => {
                 let comments = self
                     .fetch_replies(time, client, comment.id.clone(), true)
                     .await;
@@ -256,7 +256,7 @@ impl CommentsApi2 {
                     }
                 });
             }
-            CommentKind2::None { comment, .. } => {
+            CommentKind::None { comment, .. } => {
                 warn!("not implemented");
                 //
             }
@@ -289,23 +289,23 @@ impl CommentsApi2 {
         let text = text.into();
 
         let comment_key = match self.kind.get_value() {
-            CommentKind2::Root => {
+            CommentKind::Root => {
                 return;
             }
 
-            CommentKind2::Flat {
+            CommentKind::Flat {
                 parent_id: parent_key,
                 parent_items,
                 parent_replies_count,
                 comment,
             }
-            | CommentKind2::None {
+            | CommentKind::None {
                 parent_id: parent_key,
                 parent_items,
                 parent_replies_count,
                 comment,
             }
-            | CommentKind2::Reply {
+            | CommentKind::Reply {
                 parent_id: parent_key,
                 parent_items,
                 parent_replies_count,
@@ -393,22 +393,22 @@ impl CommentsApi2 {
     {
         self.err_delete.update(|v| v.clear());
         match self.kind.get_value() {
-            CommentKind2::Root => {
+            CommentKind::Root => {
                 return;
             }
-            CommentKind2::Flat {
+            CommentKind::Flat {
                 parent_items: parent,
                 comment,
                 parent_replies_count,
                 ..
             }
-            | CommentKind2::Reply {
+            | CommentKind::Reply {
                 parent_items: parent,
                 comment,
                 parent_replies_count,
                 ..
             }
-            | CommentKind2::None {
+            | CommentKind::None {
                 parent_items: parent,
                 comment,
                 parent_replies_count,
@@ -469,7 +469,7 @@ impl CommentsApi2 {
         let kind = self.kind.get_value();
 
         match kind {
-            CommentKind2::Root => {
+            CommentKind::Root => {
                 let Some(comment) = self.post_comment(client, text).await else {
                     error!("failed to post");
                     return;
@@ -484,12 +484,12 @@ impl CommentsApi2 {
                 // self.replies_count.update(|v| *v += 1);
             }
             // CommentKind2::Comment { parent, comment }
-            CommentKind2::Reply {
+            CommentKind::Reply {
                 parent_items: parent,
                 comment,
                 ..
             }
-            | CommentKind2::Flat {
+            | CommentKind::Flat {
                 parent_items: parent,
                 comment,
                 ..
@@ -504,7 +504,7 @@ impl CommentsApi2 {
                 });
                 self.replies_count.update(|v| *v += 1);
             }
-            CommentKind2::None {
+            CommentKind::None {
                 parent_items: parent,
                 comment,
                 parent_replies_count,
@@ -526,19 +526,19 @@ impl CommentsApi2 {
     pub fn is_last(&self) -> bool {
         let kind = self.kind.get_value();
         match kind {
-            CommentKind2::Root => false,
+            CommentKind::Root => false,
             // CommentKind2::Comment { parent, comment }
-            CommentKind2::Reply {
+            CommentKind::Reply {
                 parent_items: parent,
                 comment,
                 ..
             }
-            | CommentKind2::Flat {
+            | CommentKind::Flat {
                 parent_items: parent,
                 comment,
                 ..
             }
-            | CommentKind2::None {
+            | CommentKind::None {
                 parent_items: parent,
                 comment,
                 ..
@@ -549,7 +549,7 @@ impl CommentsApi2 {
         }
     }
 
-    pub fn observe_only(&self, post_id: i64) {
+    pub fn init(&self, post_id: i64) {
         self.post_key.set_value(post_id);
     }
 }
@@ -574,7 +574,7 @@ pub mod tests {
 
     use crate::{
         init_owner,
-        page::post::comments_api::{CommentKind2, CommentsApi2},
+        page::post::comments_api::{CommentKind, CommentsApi},
     };
 
     async fn test_setup(db: &str) -> (Owner, TestServer, PostRes) {
@@ -646,8 +646,8 @@ pub mod tests {
         //     .unwrap();
         let (_owner, server, post) = test_setup("hook_comments_api_post").await;
 
-        let hook_root = CommentsApi2::new(2, CommentKind2::Root);
-        hook_root.observe_only(post.id);
+        let hook_root = CommentsApi::new(2, CommentKind::Root);
+        hook_root.init(post.id);
         // assert!(!hook_root.has_reply_bubble);
 
         time += 1;
@@ -671,16 +671,16 @@ pub mod tests {
         hook_root.post(&server.client, "c3").await;
 
         let c0 = hook_root.items.with_untracked(|v| v[3].clone());
-        let hook_reply = CommentsApi2::new(
+        let hook_reply = CommentsApi::new(
             2,
-            CommentKind2::Reply {
+            CommentKind::Reply {
                 parent_id: 0,
                 parent_items: hook_root.items,
                 parent_replies_count: hook_root.replies_count,
                 comment: c0.clone(),
             },
         );
-        hook_reply.observe_only(post.id);
+        hook_reply.init(post.id);
         // assert!(!hook_reply.has_reply_bubble);
 
         time += 1;
@@ -700,16 +700,16 @@ pub mod tests {
         hook_reply.post(&server.client, "c0_r3x1").await;
 
         let c0_r0x1 = hook_reply.items.with_untracked(|v| v[0].clone());
-        let hook_flat = CommentsApi2::new(
+        let hook_flat = CommentsApi::new(
             2,
-            CommentKind2::Flat {
+            CommentKind::Flat {
                 parent_id: c0.id.clone(),
                 parent_items: hook_reply.items,
                 parent_replies_count: hook_reply.replies_count,
                 comment: c0_r0x1.clone(),
             },
         );
-        hook_flat.observe_only(post.id);
+        hook_flat.init(post.id);
         // assert!(!hook_flat.has_reply_bubble);
 
         time += 1;
@@ -729,16 +729,16 @@ pub mod tests {
         hook_flat.post(&server.client, "c0_r3x2").await;
 
         let c0_r0x2 = hook_flat.items.with_untracked(|v| v[3].clone());
-        let hook_none = CommentsApi2::new(
+        let hook_none = CommentsApi::new(
             2,
-            CommentKind2::None {
+            CommentKind::None {
                 parent_id: c0_r0x1.id.clone(),
                 parent_items: hook_flat.items,
                 parent_replies_count: hook_flat.replies_count,
                 comment: c0_r0x2.clone(),
             },
         );
-        hook_none.observe_only(post.id);
+        hook_none.init(post.id);
         // assert!(!hook_none.has_reply_bubble);
 
         time += 1;
@@ -794,8 +794,8 @@ pub mod tests {
         // trace!("all comments {all_comments:#?}");
         // panic!("wtf");
 
-        let hook_root = CommentsApi2::new(4, CommentKind2::Root);
-        hook_root.observe_only(post.id);
+        let hook_root = CommentsApi::new(4, CommentKind::Root);
+        hook_root.init(post.id);
         hook_root.fetch(time, &server.client).await;
         let items_root = hook_root.items.get_untracked();
 
@@ -804,16 +804,16 @@ pub mod tests {
         assert_eq!(items_root[3].text, "c0");
 
         let c0 = items_root[3].clone();
-        let hook_reply = CommentsApi2::new(
+        let hook_reply = CommentsApi::new(
             4,
-            CommentKind2::Reply {
+            CommentKind::Reply {
                 parent_id: 0,
                 parent_items: hook_root.items,
                 parent_replies_count: hook_root.replies_count,
                 comment: c0.clone(),
             },
         );
-        hook_reply.observe_only(post.id);
+        hook_reply.init(post.id);
         hook_reply.fetch(time, &server.client).await;
         let items_reply = hook_reply.items.get_untracked();
 
@@ -822,16 +822,16 @@ pub mod tests {
         assert_eq!(items_reply[3].text, "c0_r3x1");
 
         let c0_r0x1 = items_reply[0].clone();
-        let hook_flat = CommentsApi2::new(
+        let hook_flat = CommentsApi::new(
             4,
-            CommentKind2::Flat {
+            CommentKind::Flat {
                 parent_id: c0.id.clone(),
                 parent_items: hook_reply.items,
                 parent_replies_count: hook_reply.replies_count,
                 comment: c0_r0x1.clone(),
             },
         );
-        hook_flat.observe_only(post.id);
+        hook_flat.init(post.id);
         hook_flat.fetch(time, &server.client).await;
         let items_flat = hook_flat.items.get_untracked();
 
@@ -872,23 +872,23 @@ pub mod tests {
 
         let (_owner, app, post) = test_setup("hook_comments_api_update").await;
 
-        let hook_root = CommentsApi2::new(2, CommentKind2::Root);
-        hook_root.observe_only(post.id);
+        let hook_root = CommentsApi::new(2, CommentKind::Root);
+        hook_root.init(post.id);
 
         app.state.set_time(2);
         hook_root.post(&app.client, "c0").await;
 
         let c0 = hook_root.items.with_untracked(|v| v[0].clone());
-        let hook_reply = CommentsApi2::new(
+        let hook_reply = CommentsApi::new(
             2,
-            CommentKind2::Reply {
+            CommentKind::Reply {
                 parent_id: 0,
                 parent_items: hook_root.items,
                 parent_replies_count: hook_root.replies_count,
                 comment: c0.clone(),
             },
         );
-        hook_reply.observe_only(post.id);
+        hook_reply.init(post.id);
         hook_reply.edit_mode.set(true);
 
         assert_eq!(hook_reply.text.get_untracked(), "c0");
@@ -899,9 +899,9 @@ pub mod tests {
         assert_eq!(hook_reply.edit_mode.get_untracked(), false);
 
         trace!("WTF");
-        let hook_root = CommentsApi2::new(2, CommentKind2::Root);
+        let hook_root = CommentsApi::new(2, CommentKind::Root);
         trace!("WTF1");
-        hook_root.observe_only(post.id);
+        hook_root.init(post.id);
         trace!("WTF2");
         hook_root.fetch(2, &app.client).await;
         trace!("WTF3");
@@ -945,8 +945,8 @@ pub mod tests {
         //     .unwrap();
         let (_owner, app, post) = test_setup("hook_comments_api_delete").await;
 
-        let hook_root = CommentsApi2::new(2, CommentKind2::Root);
-        hook_root.observe_only(post.id);
+        let hook_root = CommentsApi::new(2, CommentKind::Root);
+        hook_root.init(post.id);
 
         time += 1;
         app.state.set_time(time);
@@ -962,16 +962,16 @@ pub mod tests {
 
         let c0 = hook_root.items.with_untracked(|v| v[1].clone());
 
-        let hook_reply = CommentsApi2::new(
+        let hook_reply = CommentsApi::new(
             2,
-            CommentKind2::Reply {
+            CommentKind::Reply {
                 parent_id: 0,
                 parent_items: hook_root.items,
                 parent_replies_count: hook_root.replies_count,
                 comment: c0.clone(),
             },
         );
-        hook_reply.observe_only(post.id);
+        hook_reply.init(post.id);
 
         time += 1;
         app.state.set_time(time);
@@ -986,16 +986,16 @@ pub mod tests {
 
         let c0_r0x1 = hook_reply.items.with_untracked(|v| v[0].clone());
 
-        let hook_flat = CommentsApi2::new(
+        let hook_flat = CommentsApi::new(
             2,
-            CommentKind2::Flat {
+            CommentKind::Flat {
                 parent_id: c0.id.clone(),
                 parent_items: hook_reply.items,
                 parent_replies_count: hook_reply.replies_count,
                 comment: c0_r0x1.clone(),
             },
         );
-        hook_flat.observe_only(post.id);
+        hook_flat.init(post.id);
 
         time += 1;
         app.state.set_time(time);
@@ -1010,16 +1010,16 @@ pub mod tests {
 
         let c0_r0x2 = hook_flat.items.with_untracked(|v| v[0].clone());
 
-        let hook_none = CommentsApi2::new(
+        let hook_none = CommentsApi::new(
             2,
-            CommentKind2::None {
+            CommentKind::None {
                 parent_id: c0_r0x1.id.clone(),
                 parent_items: hook_flat.items,
                 parent_replies_count: hook_flat.replies_count,
                 comment: c0_r0x2,
             },
         );
-        hook_none.observe_only(post.id);
+        hook_none.init(post.id);
 
         time += 1;
         app.state.set_time(time);
@@ -1121,7 +1121,7 @@ pub mod tests {
         //     .unwrap();
         let (_owner, app, post) = test_setup("hook_comments_api_get").await;
 
-        let hook_root = CommentsApi2::new(2, CommentKind2::Root);
+        let hook_root = CommentsApi::new(2, CommentKind::Root);
         hook_root.post_key.set_value(post.id);
 
         // (app.set_time(0).await, hook_root.post("comment0").await);
@@ -1262,9 +1262,9 @@ pub mod tests {
         assert_eq!(post_comments[2], comment1);
         assert_eq!(post_comments[3].id, comment0.id);
 
-        let hook_comment = CommentsApi2::new(
+        let hook_comment = CommentsApi::new(
             2,
-            CommentKind2::Reply {
+            CommentKind::Reply {
                 parent_id: 0,
                 parent_items: hook_root.items,
                 parent_replies_count: hook_root.replies_count,
@@ -1291,9 +1291,9 @@ pub mod tests {
         assert_eq!(comment0_replies[2], comment0_reply2);
         assert_eq!(comment0_replies[3], comment0_reply3);
 
-        let hook_reply = CommentsApi2::new(
+        let hook_reply = CommentsApi::new(
             2,
-            CommentKind2::Reply {
+            CommentKind::Reply {
                 parent_id: comment0.id.clone(),
                 parent_items: hook_comment.items,
                 parent_replies_count: hook_comment.replies_count,
@@ -1325,9 +1325,9 @@ pub mod tests {
         assert_eq!(comment0_reply0_replies[2], comment0_reply0_reply2);
         assert_eq!(comment0_reply0_replies[3], comment0_reply0_reply3);
 
-        let hook_flat = CommentsApi2::new(
+        let hook_flat = CommentsApi::new(
             2,
-            CommentKind2::Flat {
+            CommentKind::Flat {
                 parent_id: comment0_reply0.id.clone(),
                 parent_items: hook_reply.items,
                 parent_replies_count: hook_reply.replies_count,

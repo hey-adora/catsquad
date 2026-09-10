@@ -2,18 +2,27 @@ use leptos::prelude::*;
 
 #[component]
 pub fn Errs(
-    #[prop(optional, into)] id: Option<Callback<(), String>>,
-    #[prop(optional, into)] error: Option<Callback<(), String>>,
-    #[prop(optional, into)] class: Option<Callback<(), String>>,
+    #[prop(optional, into)] id: Signal<String>,
+    #[prop(optional, into)] error: Signal<String>,
+    #[prop(optional, into)] class: Signal<String>,
 ) -> impl IntoView {
-    let error_fn = move || error.map(|v| v.run(())).unwrap_or_default();
-    let id_fn = move || id.map(|v| v.run(())).unwrap_or_default();
-    let class_fn = move || class.map(|v| v.run(())).unwrap_or_default();
+    let when_is_full = move || !error.with(|v| v.is_empty());
+    let errors = move || {
+        error
+            .get()
+            .trim()
+            .split("\n")
+            .filter(|v| v.len() > 1)
+            .map(|v| v.to_string())
+            .map(move |v: String| view! { <li>{v}</li> })
+            .collect_view()
+    };
+    let class = move || format!("ml-[1rem] text-base08 list-disc {}", class.get());
 
     view! {
-        <Show when=move || !error_fn().is_empty()  >
-            <ul id=id_fn class=move|| format!("ml-[1rem] text-base08 list-disc {}", class_fn())>
-                {move || error_fn().trim().split("\n").filter(|v| v.len() > 1).map(|v| v.to_string()).map(move |v: String| view! { <li>{v}</li> }).collect_view() }
+        <Show when=when_is_full  >
+            <ul id=id class=class >
+                { errors }
             </ul>
         </Show>
     }

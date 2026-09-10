@@ -4,10 +4,10 @@ use web_sys::MouseEvent;
 
 #[component]
 pub fn BtnDelete(
-    #[prop(optional, into)] id: Option<Callback<(), String>>,
-    #[prop(optional, into)] class: Option<Callback<(), String>>,
-    #[prop(optional, into)] is_loading: Option<Callback<(), bool>>,
-    #[prop(optional, into)] disabled: Option<Callback<(), bool>>,
+    #[prop(optional, into)] id: Signal<String>,
+    #[prop(optional, into)] class: Signal<String>,
+    #[prop(optional, into)] is_loading: Signal<bool>,
+    #[prop(optional, into)] disabled: Signal<bool>,
     #[prop(optional, into)] on_click: Option<Callback<MouseEvent>>,
     children: Children,
 ) -> impl IntoView {
@@ -16,21 +16,17 @@ pub fn BtnDelete(
             on_click.run(e);
         }
     };
-    let id_fn = move || id.map(|v| v.run(())).unwrap_or_default();
-    let class_fn = move || class.map(|v| v.run(())).unwrap_or_default();
-    let is_loading_fn = move || is_loading.map(|v| v.run(())).unwrap_or_default();
-    let disabled_fn = move || disabled.map(|v| v.run(())).unwrap_or_default();
-    let is_disabled_fn = move || is_loading_fn() || disabled_fn();
+    let is_disabled_fn = move || is_loading.get() || disabled.get();
 
     let class_on_disable = move || "bg-base03 font-bold text-base01";
     let class_on_active = move || "hover:bg-base05 bg-base08 font-bold text-base01";
 
     view! {
         <Btn
-            id=id_fn
+            id=move || id.get()
             disabled=is_disabled_fn
             on:click=on_click_handler
-            class=class_fn
+            class=move || class.get()
             class_on_disable=class_on_disable
             class_on_active=class_on_active
             >
