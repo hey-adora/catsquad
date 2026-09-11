@@ -63,6 +63,8 @@ pub fn AutoTextArea(
             return;
         };
 
+        fix_height();
+
         mutation.observe_only(
             target,
             MutationObserverOptions::new()
@@ -71,6 +73,9 @@ pub fn AutoTextArea(
                 .subtree(),
         );
     });
+
+    let on_input = move |_| fn_on_change();
+    let style_height = move || format!("{}px", height.get());
 
     let on_focusout = move |_e: web_sys::FocusEvent| {
         trace!("AutoTextArea focusout triggered");
@@ -88,7 +93,6 @@ pub fn AutoTextArea(
         if key.to_lowercase() != "enter" {
             return;
         }
-        e.prevent_default();
 
         trace!("AutoTextArea focusout triggered");
         let Some(input): Option<HtmlTextAreaElement> = input.get_untracked() else {
@@ -105,10 +109,10 @@ pub fn AutoTextArea(
             placeholder=placeholder_fn
             node_ref=input
             id=id_fn
-            on:input=move |_| fn_on_change()
+            on:input=on_input
             on:focusout=on_focusout
             on:keydown=on_enter
-            style:height=move|| format!("{}px", height.get())
+            style:height=style_height
             class=class_fn
             >{children()}</textarea>
     }

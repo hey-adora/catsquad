@@ -57,10 +57,11 @@ pub fn PostTitle(
     };
 
     let when_is_user = move || page.is_logged_in().unwrap_or_default();
-    let when_edit_btn = move || post_api.update_title_mode.get();
+    let when_edit_on = move || post_api.update_title_mode.get();
+    let when_edit_off = move || !when_edit_on();
     let class_title = move || {
         format!(
-            "text-[1.5rem] text-ellipsis {}",
+            "text-[1.5rem] break-all {}",
             if title_is_empty() {
                 "text-base03"
             } else {
@@ -68,47 +69,68 @@ pub fn PostTitle(
             }
         )
     };
+    let class_on_edit = move || {
+        format!(
+            " {} ",
+            if when_edit_on() {
+                "flex gap-2 place-items-center"
+            } else {
+                "inline-block"
+            }
+        )
+    };
     let on_input = move |v: HtmlTextAreaElement| post_api.live_title_length.set(v.value().len());
 
     view! {
-        <Show when=when_is_user >
-            <div class="flex gap-2 place-items-center">
-                <Errs
-                    error=move||post_api.err_title.get()
-                />
-                <Show when=move|| post_api.update_title_mode.get()>
-                    <LengthCounter
-                        class="ml-auto"
-                        counter_current=move||post_api.live_title_length.get()
-                        counter_max=MAX_POST_TITLE_LENGTH
-                    />
+        <div class="flex flex-col gap-2">
+
+            <h1 >
+                <Show when=when_edit_off>
+                    <span class=class_title>{ title }</span>
                 </Show>
-                <EditSaveCancel
-                    id="title"
-                    class_edit="ml-auto"
-                    when=when_edit_btn
-                    on_save=move || edit_title_save()
-                    on_cancel=move || edit_title_mode_toggle()
-                    on_edit=move || edit_title_mode_toggle()
-                />
-            </div>
-        </Show>
-        <div class="flex justify-between">
-            <Show when=move || !post_api.update_title_mode.get()>
-                <h1 class=class_title >{ title }</h1>
-            </Show>
-            <Show when=move || post_api.update_title_mode.get()>
-                <AutoTextArea
-                    id="post_description_editable"
-                    placeholder="title"
-                    node_ref=input_title
-                    on_input
-                    min_height=50.0
-                    class="w-full bg-base01 text-[1.5rem] text-base05 px-4 py-2 rounded-xl"
-                >
-                    {title}
-                </AutoTextArea>
-            </Show>
+
+                "  "
+
+                <Show when=when_is_user >
+                    <span class=class_on_edit>
+                        <Show when=move|| post_api.update_title_mode.get()>
+                            <LengthCounter
+                                class="ml-auto "
+                                counter_current=move||post_api.live_title_length.get()
+                                counter_max=MAX_POST_TITLE_LENGTH
+                            />
+                        </Show>
+
+                        <EditSaveCancel
+                            id="title"
+                            class_edit="ml-auto"
+                            when=when_edit_on
+                            on_save=move || edit_title_save()
+                            on_cancel=move || edit_title_mode_toggle()
+                            on_edit=move || edit_title_mode_toggle()
+                        />
+                    </span>
+                </Show>
+            </h1>
+
+            <Errs
+                error=move||post_api.err_title.get()
+            />
+
+
         </div>
+
+        <Show when=move || post_api.update_title_mode.get()>
+            <AutoTextArea
+                id="post_description_editable"
+                placeholder="title"
+                node_ref=input_title
+                on_input
+                min_height=50.0
+                class="w-full bg-base01 text-[1.5rem] text-base05 px-4 py-2 rounded-xl"
+            >
+                {title}
+            </AutoTextArea>
+        </Show>
     }
 }

@@ -26,7 +26,7 @@ pub struct PostRes {
 #[derive(Debug, Copy, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum PostState {
     Draft,
-    Active,
+    Active, // TODO maybe rename to public
     Hidden,
 }
 

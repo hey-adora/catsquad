@@ -468,7 +468,7 @@ pub mod time {
         (time_now_ns() / 1000) as u64
     }
 
-    pub fn micro_to_str(ns: u64) -> String {
+    pub fn micro_to_str(micro: u64) -> String {
         let mut output = String::new();
 
         let table = [
@@ -493,10 +493,10 @@ pub mod time {
             let prev_size = total_size;
             total_size *= size;
             trace!(
-                "ns({ns}) size({size}) label({label:?}) prev_size({prev_size}) total_size({total_size})"
+                "ns({micro}) size({size}) label({label:?}) prev_size({prev_size}) total_size({total_size})"
             );
-            if ns < total_size {
-                let new_size = ns / prev_size;
+            if micro < total_size {
+                let new_size = micro / prev_size;
                 output.push_str(&new_size.to_string());
                 output.push(' ');
                 output.push_str(if new_size > 1 { label.1 } else { label.0 });

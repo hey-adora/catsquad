@@ -3,8 +3,8 @@ use std::fmt::Debug;
 use catsquad_client::{Client, Response, Sender};
 use catsquad_log::prelude::*;
 use catsquad_shared::{
-    LINK_WEB_INDEX, PostGetByKeyErr, PostRemoveErr, PostUpdateDescriptionErr, PostUpdateTagsErr,
-    PostUpdateTitleErr, link_relative_img, proccess_tags,
+    LINK_WEB_INDEX, PostGetByKeyErr, PostRemoveErr, PostState, PostUpdateDescriptionErr,
+    PostUpdateTagsErr, PostUpdateTitleErr, link_relative_img, proccess_tags,
 };
 use catsquad_web_utils::prelude::*;
 use leptos::prelude::*;
@@ -24,10 +24,10 @@ pub struct PostApi {
     // pub items: RwSignal<Vec<Img>, LocalStorage>,
     pub err_general: RwSignal<String, LocalStorage>,
     pub err_title: RwSignal<String, LocalStorage>,
-    pub err_tags: RwSignal<String, LocalStorage>,
-    pub err_description: RwSignal<String, LocalStorage>,
+    pub err_tags: RwSignal<String>,
+    pub err_description: RwSignal<String>,
     pub live_description_length: RwSignal<usize, LocalStorage>,
-    pub live_tags_length: RwSignal<usize, LocalStorage>,
+    pub live_tags_length: RwSignal<usize>,
     pub live_title_length: RwSignal<usize, LocalStorage>,
     pub imgs_links: RwSignal<Vec<(String, f64)>, LocalStorage>,
     pub title: RwSignal<String, LocalStorage>,
@@ -41,9 +41,11 @@ pub struct PostApi {
     pub update_description_mode: RwSignal<bool, LocalStorage>,
     // pub tags_is_e: RwSignal<String, LocalStorage>,
     pub description: RwSignal<String, LocalStorage>,
+    pub post_state: RwSignal<Option<PostState>>,
     // pub description_is_empty: RwSignal<bool, LocalStorage>,
-    pub favorites: RwSignal<u32, LocalStorage>,
-    pub post_state: RwSignal<PostState, LocalStorage>,
+    pub likes: RwSignal<u32>,
+    pub created_at: RwSignal<u64>,
+    pub api_state: RwSignal<PostApiState>,
     // pub api: Client<TSender>,
 }
 
@@ -59,7 +61,7 @@ pub struct PostApi {
     strum::EnumIs,
 )]
 #[strum(serialize_all = "lowercase")]
-pub enum PostState {
+pub enum PostApiState {
     #[default]
     Loading,
     Normal,
@@ -78,19 +80,21 @@ impl PostApi {
             author_link: RwSignal::new_local(LINK_WEB_INDEX.to_string()),
             tags: RwSignal::new_local(String::new()),
             live_description_length: RwSignal::new_local(0),
-            live_tags_length: RwSignal::new_local(0),
+            live_tags_length: RwSignal::new(0),
             live_title_length: RwSignal::new_local(0),
             err_general: RwSignal::new_local(String::new()),
             err_title: RwSignal::new_local(String::new()),
-            err_tags: RwSignal::new_local(String::new()),
-            err_description: RwSignal::new_local(String::new()),
+            err_tags: RwSignal::new(String::new()),
+            err_description: RwSignal::new(String::new()),
             update_title_mode: RwSignal::new_local(false),
             update_tags_mode: RwSignal::new_local(false),
             update_description_mode: RwSignal::new_local(false),
             description: RwSignal::new_local(String::new()),
             // description_is_empty: RwSignal::new_local(true),
-            favorites: RwSignal::new_local(0),
-            post_state: RwSignal::new_local(PostState::Loading),
+            likes: RwSignal::new(0),
+            created_at: RwSignal::new(0),
+            post_state: RwSignal::new(None),
+            api_state: RwSignal::new(PostApiState::Loading),
             // api,
         }
     }
@@ -128,7 +132,7 @@ impl PostApi {
                 self.err_description.set(err);
             }
             Err(PostUpdateDescriptionErr::PostNotFound) => {
-                self.post_state.set(PostState::NotFound);
+                self.api_state.set(PostApiState::NotFound);
                 self.err_general.set("post not found".to_string());
             }
             Err(err) => {
@@ -173,7 +177,7 @@ impl PostApi {
                 self.err_title.set(err);
             }
             Err(PostUpdateTitleErr::PostNotFound) => {
-                self.post_state.set(PostState::NotFound);
+                self.api_state.set(PostApiState::NotFound);
                 self.err_general.set("post not found".to_string());
             }
             Err(err) => {
@@ -218,7 +222,7 @@ impl PostApi {
                 self.err_tags.set(err);
             }
             Err(PostUpdateTagsErr::PostNotFound) => {
-                self.post_state.set(PostState::NotFound);
+                self.api_state.set(PostApiState::NotFound);
                 self.err_general.set("post not found".to_string());
             }
             Err(err) => {
@@ -240,11 +244,11 @@ impl PostApi {
 
         match result {
             Ok(_) => {
-                self.post_state.set(PostState::Deleted);
+                self.api_state.set(PostApiState::Deleted);
                 return Some(());
             }
             Err(PostRemoveErr::PostNotFound) => {
-                self.post_state.set(PostState::NotFound);
+                self.api_state.set(PostApiState::NotFound);
             }
             Err(err) => {
                 error!("unexpected err {:#?}", { err });
@@ -276,22 +280,14 @@ impl PostApi {
                 self.live_title_length.set(post.title.len());
                 self.title.set(post.title);
                 self.author_username.set(post.user_username.clone());
-                // self.author_key.set(post.user.key.clone());
                 self.author_link.set("/404".to_string());
                 // self.author_link.set(link_user(post.user.username));
                 self.live_tags_length.set(post.tags.len());
                 self.tags.set(post.tags);
                 self.live_description_length.set(post.description.len());
                 self.description.set(post.description);
-                // if post.description.is_empty() {
-                //     self.description.set("No description.".to_string());
-                //     // self.description_is_empty.set(true);
-                // } else {
-                //     self.description.set(post.description);
-                //     // self.description_is_empty.set(false);
-                // }
-
-                self.favorites.set(post.favorites);
+                self.likes.set(post.favorites);
+                self.created_at.set(post.created_at); // TODO maybe check in test
                 self.imgs_links.set(
                     post.file
                         .into_iter()
@@ -303,11 +299,12 @@ impl PostApi {
                         })
                         .collect(),
                 );
-                self.post_state.set(PostState::Normal);
+                self.post_state.set(Some(post.state));
+                self.api_state.set(PostApiState::Normal);
             }
             Err(PostGetByKeyErr::PostNotFound) => {
-                self.post_state.set(PostState::NotFound);
-                self.err_general.set(PostState::NotFound.to_string());
+                self.api_state.set(PostApiState::NotFound);
+                self.err_general.set(PostApiState::NotFound.to_string());
             }
             Err(err) => {
                 let err = format!("unexpected err {:#?}", { err });
