@@ -3,6 +3,7 @@ use catsquad_log::prelude::*;
 pub type Uuid = [u8; 16];
 
 pub const RADIX128: u128 = 62;
+pub const RADIX64: u64 = 62;
 
 pub fn uuid_to_str(uuid: Uuid) -> String {
     u128_to_str(u128::from_be_bytes(uuid))
@@ -10,6 +11,72 @@ pub fn uuid_to_str(uuid: Uuid) -> String {
 
 pub fn str_to_uuid(uuid: impl AsRef<str>) -> Uuid {
     str_to_u128(uuid.as_ref()).to_be_bytes()
+}
+
+pub fn i64_to_str(uuid: i64) -> String {
+    u64_to_str(uuid as u64)
+}
+
+pub fn str_to_i64(uuid: &str) -> i64 {
+    str_to_u64(uuid) as i64
+}
+
+pub fn u64_to_str(uuid: u64) -> String {
+    let mut num = uuid;
+    let mut buffer = [0; 255];
+    let mut index = buffer.len();
+
+    if uuid == 0 {
+        return 0.to_string();
+    }
+
+    loop {
+        if num == 0 {
+            break;
+        }
+        index -= 1;
+
+        let n = num % RADIX64;
+        let c = num_to_char(n as u8);
+        if c == 0 {
+            return String::new();
+        }
+        num = num / RADIX64;
+        buffer[index] = c;
+    }
+    let slice = &buffer[index..];
+    let output = str::from_utf8(slice).unwrap().to_string();
+    trace!("uuid_to_str {output}");
+    output
+}
+
+pub fn str_to_u64(uuid: &str) -> u64 {
+    if uuid.len() == 0 {
+        return 0;
+    }
+    let chars = uuid.chars();
+    if uuid.len() == 1 {
+        return uuid
+            .chars()
+            .next()
+            .map(|v| char_to_num(v as u8))
+            .unwrap_or_default() as u64;
+    }
+
+    let mut buffer = 0_u64;
+    for (i, c) in chars.rev().enumerate().map(|(i, c)| (i as u32, c as u8)) {
+        let n = char_to_num(c);
+        if n == 255 {
+            return 0;
+        }
+
+        trace!("str_to_uuid {buffer} += {RADIX64} ** {i} * {n}");
+        buffer += RADIX64.pow(i) * (n as u64);
+    }
+
+    trace!("str_to_uuid {buffer}");
+
+    buffer
 }
 
 pub fn u128_to_str(uuid: u128) -> String {

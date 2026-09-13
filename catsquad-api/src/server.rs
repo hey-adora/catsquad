@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use axum::{
     Router,
     extract::{DefaultBodyLimit, Path, State},
@@ -14,6 +16,7 @@ use tokio::fs;
 use crate::{
     api::{self, assets::index_404},
     auth::{auth_middleware, auth_optional_middleware},
+    proccess_images::proccess_post_files,
     state::AppState,
 };
 pub async fn server() {
@@ -23,9 +26,45 @@ pub async fn server() {
 
     let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
 
-    let app = app(state).await;
+    let app = app(state.clone()).await;
 
-    axum::serve(listener, app).await.unwrap();
+    let proccess_files = tokio::spawn({
+        let app_state = state.clone();
+        let db = app_state.db.clone();
+        let storage_path = app_state.get_storage_path().await;
+
+        async move {
+            let mut interval = tokio::time::interval(Duration::from_secs(1));
+
+            loop {
+                trace!("proccess thread waiting...");
+                tokio::select! {
+                    _ = tokio::signal::ctrl_c() => {
+                        break;
+                    },
+                    _ = interval.tick() => {},
+                };
+
+                let result = proccess_post_files(0, db.clone(), storage_path.clone(), 1280).await;
+                if let Err(err) = result {
+                    error!("{err}");
+                    break;
+                }
+            }
+        }
+    });
+
+    let shutdown = async {
+        proccess_files.await.unwrap();
+        info!("Shutting down...");
+    };
+
+    axum::serve(listener, app.into_make_service())
+        .with_graceful_shutdown(shutdown)
+        .await
+        .unwrap();
+
+    // axum::serve(listener, app).await.unwrap();
 }
 
 pub async fn app(state: AppState) -> Router {

@@ -3,6 +3,7 @@ mod server;
 mod api;
 mod api_config;
 mod assets;
+mod proccess_images;
 mod state;
 
 pub mod auth;
@@ -27,8 +28,8 @@ pub async fn get_file_size(file_path: impl AsRef<std::path::Path>) -> u32 {
 }
 
 #[cfg(test)]
-pub async fn get_file_hash_for_testing_by_path(file_path: impl AsRef<str>) -> i64 {
-    let file = tokio::fs::read(file_path.as_ref()).await.unwrap();
+pub async fn get_file_hash_for_testing_by_path(file_path: impl AsRef<std::path::Path>) -> i64 {
+    let file = tokio::fs::read(file_path).await.unwrap();
     get_file_hash_for_testing(&file)
 }
 

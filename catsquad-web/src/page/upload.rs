@@ -1,6 +1,6 @@
 use crate::{
     Nav,
-    hook::Spawner,
+    hook::{PostFilesState, Spawner},
     page::{
         create_client,
         upload::upload_state::{UploadState, UploadStateStage},
@@ -32,6 +32,8 @@ pub fn Upload() -> impl IntoView {
     let time = time_now_micro();
     let spawner = Spawner::new();
     let upload = UploadState::new(time);
+    let post_id = move || upload.post_id.get_value();
+    let post_files = upload.files;
 
     Effect::new(move || {
         spawner.spawn(async move {
@@ -46,7 +48,7 @@ pub fn Upload() -> impl IntoView {
             <div class="flex flex-col gap-4 max-w-[25rem] mx-auto" >
                 <Publish upload/>
                 <TitleEdit upload/>
-                <ImagesEdit upload/>
+                <ImagesEdit post_id=post_id files=post_files />
                 <DescriptionEdit upload/>
                 <TagsEdit upload/>
             </div>

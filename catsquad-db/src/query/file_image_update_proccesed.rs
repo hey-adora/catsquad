@@ -14,7 +14,7 @@ pub enum DbPostUpdateProccesedErr {
 }
 
 impl Db {
-    pub async fn post_update_proccsed(
+    pub async fn file_image_update_proccsed(
         &self,
         time: u64,
         file_hash: i64,
@@ -127,7 +127,7 @@ async fn test_post_update_proccesed() {
 
     // assert success
     {
-        let images = db.post_get_unproccesed().await.unwrap();
+        let images = db.file_image_get_unproccesed().await.unwrap();
         assert_eq!(images.len(), 2);
         assert_eq!(images[0].hash, 10);
         assert_eq!(images[0].processed, false);
@@ -136,9 +136,9 @@ async fn test_post_update_proccesed() {
         assert_eq!(images[1].processed, false);
         assert_eq!(images[1].used_count, 1);
 
-        db.post_update_proccsed(6, 10).await.unwrap();
+        db.file_image_update_proccsed(6, 10).await.unwrap();
 
-        let images = db.post_get_unproccesed().await.unwrap();
+        let images = db.file_image_get_unproccesed().await.unwrap();
         assert_eq!(images.len(), 1);
         assert_eq!(images[0].hash, 20);
         assert_eq!(images[0].processed, false);

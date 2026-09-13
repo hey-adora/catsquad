@@ -8,7 +8,9 @@ pub enum DbPostGetUnproccesedErr {
 }
 
 impl Db {
-    pub async fn post_get_unproccesed(&self) -> Result<Vec<DbFileImage>, DbPostGetUnproccesedErr> {
+    pub async fn file_image_get_unproccesed(
+        &self,
+    ) -> Result<Vec<DbFileImage>, DbPostGetUnproccesedErr> {
         let pool = &self.db;
 
         let query = "SELECT * FROM files_images WHERE image_processed = FALSE ORDER BY image_created_at ASC;";

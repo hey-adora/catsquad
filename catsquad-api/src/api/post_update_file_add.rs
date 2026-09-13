@@ -26,7 +26,11 @@ use tokio::{
     io::{AsyncWriteExt, BufWriter},
 };
 
-use crate::{api::post_add::from_db_post, state::AppState};
+use crate::{
+    api::post_add::from_db_post,
+    proccess_images::{storage_file_path, tmp_file_path},
+    state::AppState,
+};
 
 fn from_db_post_update_file_add(value: DbPostUpdateFileAddErr) -> PostUpdateFileAddErr {
     match value {
@@ -216,7 +220,7 @@ pub enum SaveFileErr {
 pub async fn handle_file_saving<S, StreamErr>(
     mut stream: S,
     extension: impl AsRef<str>,
-    save_path: impl AsRef<Path>,
+    storage_path: impl AsRef<Path>,
     max_storage_per_file: u32,
     tmp_path: impl AsRef<Path>,
     // used_storage: usize,
@@ -230,11 +234,12 @@ where
     use rand::distr::SampleString;
     use std::hash::Hasher;
     let tmp_path = tmp_path.as_ref();
-    let save_path = save_path.as_ref();
+    let storage_path = storage_path.as_ref();
     let extension = extension.as_ref();
-    let mut tmp_name = rand::distr::Alphanumeric.sample_string(&mut rand::rng(), 16);
-    tmp_name.push_str("_upload");
-    let file_path_tmp = tmp_path.join(&tmp_name).with_extension(extension);
+    let tmp_name = rand::distr::Alphanumeric.sample_string(&mut rand::rng(), 16);
+    // tmp_name.push_str("_upload");
+    let file_path_tmp = tmp_file_path(tmp_path, tmp_name, extension);
+    // let file_path_tmp = tmp_path.join(&tmp_name).with_extension(extension);
     // let file_path_tmp = Path::new("/tmp/").join(&tmp_name).with_extension("part");
     // extension.as_ref()
     let file = fs::File::create(&file_path_tmp).await?;
@@ -268,7 +273,8 @@ where
     // uuid_to_str(uuid)
 
     let file_path = {
-        let file_path = save_path.join(&hash_str).with_extension(extension);
+        let file_path = storage_file_path(storage_path, hash_str, extension);
+        // let file_path = storage_path.join(&hash_str).with_extension(extension);
         if file_path.exists() {
             trace!("file removed");
             tokio::fs::remove_file(file_path_tmp).await?;
@@ -427,9 +433,14 @@ pub async fn post_update_file_add(
 
 #[cfg(test)]
 mod test_utils {
-    use crate::{TestServer, auth::create_auth_cookie_str};
+    use std::path::{Path, PathBuf};
+
+    use crate::{
+        TestServer, auth::create_auth_cookie_str, get_file_hash_for_testing_by_path,
+        proccess_images::storage_file_path,
+    };
     use axum::http::header;
-    use catsquad_shared::{self as cs, PostFile, PostState, Uuid, uuid_to_str};
+    use catsquad_shared::{self as cs, PostFile, PostState, Uuid, u128_to_str, uuid_to_str};
 
     impl TestServer {
         pub async fn post_update_file_add(
@@ -461,6 +472,21 @@ mod test_utils {
             //     .into_json()
             //     .await
         }
+
+        pub async fn get_file_from_storage_path(
+            &self,
+            storage_path: impl AsRef<Path>,
+            file_path: impl AsRef<Path>,
+        ) -> (i64, PathBuf) {
+            let storage_path = storage_path.as_ref();
+            let file_path = file_path.as_ref();
+            let file_extension = file_path.extension().unwrap();
+            let hash = get_file_hash_for_testing_by_path(file_path).await;
+            let hash_str = u128_to_str((hash as u64) as u128);
+            let file_path = storage_file_path(storage_path, hash_str, file_extension);
+            // let storage_path = storage_path.join(&hash_str).with_extension(file_extension);
+            (hash, file_path)
+        }
     }
 }
 
@@ -481,15 +507,15 @@ async fn test_api_post_update_file_add() {
     let tmp_path = server.state.get_tmp_path().await;
     let storage_path = server.state.get_storage_path().await;
 
-    let get_storage_path = async |file_path_str: &str| {
-        let file_path = Path::new(file_path_str);
-        let file_extension = file_path.extension().unwrap();
-        let hash = get_file_hash_for_testing_by_path(file_path_str).await;
-        let hash_str = u128_to_str(hash as u128);
-        let storage_path = storage_path.join(&hash_str).with_extension(file_extension);
-        let file_path = storage_path.to_str().unwrap().to_string();
-        (hash, PathBuf::from(file_path))
-    };
+    // let get_storage_path = async |file_path_str: &str| {
+    //     let file_path = Path::new(file_path_str);
+    //     let file_extension = file_path.extension().unwrap();
+    //     let hash = get_file_hash_for_testing_by_path(file_path_str).await;
+    //     let hash_str = u128_to_str(hash as u128);
+    //     let storage_path = storage_path.join(&hash_str).with_extension(file_extension);
+    //     let file_path = storage_path.to_str().unwrap().to_string();
+    //     (hash, PathBuf::from(file_path))
+    // };
 
     // let txt_file = "/tmp/test.txt";
     let txt_file = "../flake.nix";
@@ -532,7 +558,9 @@ async fn test_api_post_update_file_add() {
         .post_update_file_add(post1.id, &[favicon_path, txt_file], session_key1)
         .await;
 
-    let (favicon_hash, favicon_storage_path) = get_storage_path(favicon_path).await;
+    let (favicon_hash, favicon_storage_path) = server
+        .get_file_from_storage_path(storage_path, favicon_path)
+        .await;
 
     assert!(!favicon_storage_path.exists());
     assert!(matches!(

@@ -2,14 +2,8 @@ use super::component_edit_area::EditArea;
 use super::upload_state::UploadState;
 use crate::{
     Errs, SVGTrash,
-    hook::Spawner,
-    page::{
-        create_client,
-        upload::{
-            component_edit_text::ValidState,
-            upload_state::{ParsedPostFile, ParsedPostFileState},
-        },
-    },
+    hook::{ParsedPostFile, ParsedPostFileState, PostFilesState, Spawner},
+    page::{create_client, upload::component_edit_text::ValidState},
 };
 use catsquad_log::prelude::*;
 use catsquad_web_utils::prelude::*;
@@ -22,10 +16,14 @@ use web_sys::{File, HtmlInputElement, MouseEvent};
 // fix styling
 
 #[component]
-pub fn ImagesEdit(upload: UploadState) -> impl IntoView {
-    let spawner = Spawner::new();
+pub fn ImagesEdit(
+    #[prop(optional, into)] post_id: Signal<i64>,
+    #[prop(optional, into)] files: RwSignal<Vec<ArcRwSignal<ParsedPostFile>>>,
+) -> impl IntoView {
     let input_files = NodeRef::new();
-    let files = upload.files;
+    let post_files_state = PostFilesState::new(post_id, files);
+
+    let files = post_files_state.files;
 
     let on_file_change = move |e| {
         let Some(new_files) = (input_files.get_untracked() as Option<HtmlInputElement>)
@@ -35,17 +33,14 @@ pub fn ImagesEdit(upload: UploadState) -> impl IntoView {
             warn!("upload canceled, failed to get files");
             return;
         };
-        // let post_files = upload.files;
-        let post_key = upload.post_id.get_value();
-        if post_key == 0 {
-            warn!("upload canceled, post_key is empty");
-            return;
-        }
-        let parset_files = upload.set_files(new_files.clone());
+
+        let parset_files = post_files_state.set_files(new_files.clone());
         for (parset_file, new_file) in parset_files.into_iter().zip(new_files) {
             spawn_local(async move {
                 let client = create_client();
-                upload.update_file(&client, new_file, parset_file).await;
+                post_files_state
+                    .update_file(&client, new_file, parset_file)
+                    .await;
             });
         }
     };
@@ -77,21 +72,21 @@ pub fn ImagesEdit(upload: UploadState) -> impl IntoView {
 
                 ParsedPostFileState::Uploaded => view! {
                     <FileUploadedPreview
-                        upload
+                        post_files_state
                         file
                     />
                 }
                 .into_any(),
                 ParsedPostFileState::Proccesed => view! {
                     <FileProccesedPreview
-                        upload
+                        post_files_state
                         file
                     />
                 }
                 .into_any(),
                 ParsedPostFileState::Error => view! {
                     <FileErrorPreview
-                        upload
+                        post_files_state
                         file
                     />
                 }
@@ -118,7 +113,6 @@ pub fn ImagesEdit(upload: UploadState) -> impl IntoView {
     view! {
         <div class="flex flex-col gap-2">
             <p class="text-[1.3rem] text-base0F ">"Images"</p>
-            <Errs error=move||upload.err_general.get() />
             <EditArea
                 class=move||"flex flex-wrap gap-4 "
                 required=false
@@ -210,7 +204,7 @@ pub fn FileUploadingPreview(file: ArcRwSignal<ParsedPostFile>) -> impl IntoView 
 
 #[component]
 pub fn FileUploadedPreview(
-    upload: UploadState,
+    post_files_state: PostFilesState,
     file: ArcRwSignal<ParsedPostFile>,
 ) -> impl IntoView {
     let name = {
@@ -228,14 +222,14 @@ pub fn FileUploadedPreview(
               <p class="text-[0.7rem]">
                   "completed"
               </p>
-              <TrashCanBtn upload file/>
+              <TrashCanBtn post_files_state file/>
             </div>
     }
 }
 
 #[component]
 pub fn FileProccesedPreview(
-    upload: UploadState,
+    post_files_state: PostFilesState,
     file: ArcRwSignal<ParsedPostFile>,
 ) -> impl IntoView {
     let name = {
@@ -253,13 +247,16 @@ pub fn FileProccesedPreview(
               <p class="text-[0.7rem]">
                   "proccessed"
               </p>
-              <TrashCanBtn upload file/>
+              <TrashCanBtn post_files_state file/>
             </div>
     }
 }
 
 #[component]
-pub fn FileErrorPreview(upload: UploadState, file: ArcRwSignal<ParsedPostFile>) -> impl IntoView {
+pub fn FileErrorPreview(
+    post_files_state: PostFilesState,
+    file: ArcRwSignal<ParsedPostFile>,
+) -> impl IntoView {
     let name = {
         let file = file.clone();
         move || file.with(|v| v.name.clone())
@@ -279,19 +276,22 @@ pub fn FileErrorPreview(upload: UploadState, file: ArcRwSignal<ParsedPostFile>) 
               <p class="text-[0.7rem]">
                   { err }
               </p>
-              <TrashCanBtn upload file/>
+              <TrashCanBtn post_files_state file/>
             </div>
     }
 }
 
 #[component]
-pub fn TrashCanBtn(upload: UploadState, file: ArcRwSignal<ParsedPostFile>) -> impl IntoView {
+pub fn TrashCanBtn(
+    post_files_state: PostFilesState,
+    file: ArcRwSignal<ParsedPostFile>,
+) -> impl IntoView {
     let spawner = Spawner::new();
     let on_click = move |_e: MouseEvent| {
         let file = file.clone();
         spawner.spawn(async move {
             let client = create_client();
-            upload.remove_file(&client, file).await;
+            post_files_state.remove_file(&client, file).await;
         });
     };
 
