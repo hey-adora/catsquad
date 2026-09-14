@@ -18,6 +18,7 @@ pub mod email_sent_get_all;
 pub mod file_image_add;
 pub mod file_image_get_by_hash;
 pub mod file_image_get_unproccesed;
+pub mod file_image_remove;
 pub mod file_image_update_proccesed;
 pub mod invite_add;
 pub mod invite_get_all;

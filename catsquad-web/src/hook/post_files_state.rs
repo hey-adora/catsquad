@@ -379,7 +379,7 @@ async fn test_upload_init(
         .unwrap();
 
     // upload.init creates new post draft
-    let upload = PostFilesState::new(post1.id.into());
+    let upload = PostFilesState::new(post1.id.into(), RwSignal::new(Vec::new()));
     // upload.init(&server.client).await;
 
     (server, owner, upload, post1)

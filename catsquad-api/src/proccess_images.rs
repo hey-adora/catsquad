@@ -152,6 +152,17 @@ pub struct ProccesedFileResult {
     pub already_existed: bool,
 }
 
+#[derive(Debug, thiserror::Error)]
+pub enum ProccessFileErr {
+    #[error("image not found input={input_path} output={output_path}")]
+    ImageNotFound {
+        input_path: PathBuf,
+        output_path: PathBuf,
+    },
+    #[error(transparent)]
+    Other(#[from] anyhow::Error),
+}
+
 pub async fn proccess_post_file(
     storage_path: impl AsRef<Path>,
     file_hash: i64,
@@ -159,7 +170,7 @@ pub async fn proccess_post_file(
     width: u32,
     height: u32,
     resolution_limit: u32,
-) -> Result<ProccesedFileResult, anyhow::Error> {
+) -> Result<ProccesedFileResult, ProccessFileErr> {
     // let storage_file_path = storage_file_path.as_ref();
     // let file_name = storage_file_path
     //     .file_name()
@@ -191,7 +202,7 @@ pub async fn proccess_post_file(
     };
 
     // create thumbnail
-    let arg_output_path = {
+    let (arg_output_path, arg_input_path) = {
         let (new_width, new_height) = scale_resolution(width, height, resolution_limit);
 
         let arg_input_path = storage_file_path(storage_path, file_hash_str, file_extension);
@@ -216,17 +227,20 @@ pub async fn proccess_post_file(
             arg_output_path_str,
         ]);
         trace!("running command {command:?}");
-        let result = command.output().await?;
+        let result = command.output().await.map_err(|err| anyhow!("{err}"))?;
 
-        let result = String::from_utf8(result.stdout)?;
+        let result = String::from_utf8(result.stdout).map_err(|err| anyhow!("{err}"))?;
         let result = result.trim();
         trace!("command output {result}");
 
-        arg_output_path
+        (arg_output_path, arg_input_path)
     };
 
     if !arg_output_path.exists() {
-        return Err(anyhow!("failed to create thumbnail {arg_output_path:?}"));
+        return Err(ProccessFileErr::ImageNotFound {
+            input_path: arg_output_path,
+            output_path: arg_input_path,
+        });
     }
 
     // // let output_path = to_thumbnail_path(arg_input_path)?;
@@ -311,7 +325,15 @@ pub async fn proccess_post_files(
             image.height,
             resolution_limit,
         )
-        .await?;
+        .await;
+
+        if let Err(ProccessFileErr::ImageNotFound { .. }) = result {
+            db.file_image_remove(time, image.hash).await?;
+            continue;
+        }
+
+        result?;
+
         db.file_image_update_proccsed(time, image.hash).await?;
     }
     Ok(())
