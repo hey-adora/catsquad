@@ -41,6 +41,7 @@ fn from_db_post_add_err(value: DbPostAddErr) -> PostAddErr {
     match value {
         DbPostAddErr::UserNotFound => PostAddErr::InternalServer,
         DbPostAddErr::Db(_) => PostAddErr::InternalServer,
+        DbPostAddErr::InternalError => PostAddErr::InternalServer,
     }
 }
 

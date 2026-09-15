@@ -34,7 +34,7 @@ pub fn TextEdit(
     let title_clone2 = title.clone();
 
     let _handle = interval::new(
-        move || {
+        move |_handle| {
             let time = time_now_micro();
             let Some(meta_data) = saved_metadata.try_get_untracked() else {
                 return;

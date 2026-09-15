@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use super::component_edit_area::EditArea;
 use super::upload_state::UploadState;
 use crate::{
@@ -77,7 +79,10 @@ pub fn ImagesEdit(
                     />
                 }
                 .into_any(),
-                ParsedPostFileState::Proccesed => view! {
+                ParsedPostFileState::Proccesed
+                // | ParsedPostFileState::Idling
+                // | ParsedPostFileState::Checking
+                 => view! {
                     <FileProccesedPreview
                         post_files_state
                         file
@@ -126,12 +131,84 @@ pub fn ImagesEdit(
     }
 }
 
+#[derive(Clone)]
+struct ProccessingState {
+    // pub post_id: Signal<i64>,
+    pub check_state: Signal<CheckState>,
+    pub file: ArcRwSignal<ParsedPostFile>,
+}
+
+#[derive(Clone, Copy, Default)]
+struct CheckState {
+    // pub stage: ProccessingLoadingStage,
+    pub attemps: usize,
+    pub attempted_at: u64,
+}
+
+// enum ProccessingLoadingStage {
+//     Idle,
+//     Busy,
+//     Finished,
+// }
+
+impl ProccessingState {
+    pub fn new(file: ArcRwSignal<ParsedPostFile>) -> Self {
+        Self {
+            file,
+            check_state: CheckState::default().into(),
+        }
+    }
+    pub async fn check(self, time: u64) {
+        // self.check_state.with_untracked(|v| v.stage == ProccessingLoadingStage::Busy);
+        // let post_id = self.post_id.get_untracked();
+
+        let file_hash = self.file.with_untracked(|v| v.hash);
+        trace!("checking if file {file_hash} is proccesed");
+
+        let file = self.file;
+        let client = create_client();
+
+        let result = client
+            .post_file_status_get_by_hash(file_hash)
+            .send()
+            .await
+            .into_json()
+            .await;
+
+        match result {
+            Ok(v) => {
+                if v.is_proccesed {
+                    file.update(|v| v.state = ParsedPostFileState::Proccesed);
+                }
+            }
+            Err(err) => {
+                error!("{err}");
+            }
+        }
+    }
+}
+
 #[component]
 pub fn FileQueuePreview(file: ArcRwSignal<ParsedPostFile>) -> impl IntoView {
     let name = {
         let file = file.clone();
         move || file.with(|v| v.name.clone())
     };
+    let spawner = Spawner::new();
+    let proccess_state = ProccessingState::new(file.clone());
+    // let spawner
+
+    let _ = interval::new(
+        move |handle| {
+            let proccess_state = proccess_state.clone();
+            spawner.spawn(async move {
+                proccess_state.check(0).await;
+            });
+        },
+        Duration::from_secs(1),
+    )
+    .inspect_err(|err| error!("{err}"));
+
     // let size = bytes_to_str(file.size as u64);
 
     view! { <div
@@ -142,7 +219,7 @@ pub fn FileQueuePreview(file: ArcRwSignal<ParsedPostFile>) -> impl IntoView {
                   { name }
               </p>
               <p class="text-[0.7rem]">
-                  "waiting..."
+                  "proccessing..."
               </p>
             </div>
     }

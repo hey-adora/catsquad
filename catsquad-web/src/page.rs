@@ -46,7 +46,7 @@ pub fn App() -> impl IntoView {
     });
 
     interval::new(
-        move || {
+        move |_handle| {
             let time = time_now_micro();
             page.time.set(time);
         },

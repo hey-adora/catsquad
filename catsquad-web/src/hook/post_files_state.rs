@@ -6,6 +6,8 @@ use catsquad_shared::PostRes;
 use leptos::prelude::*;
 use std::fmt::Debug;
 
+use crate::page::create_client;
+
 #[derive(Clone, Copy)]
 pub struct PostFilesState {
     // pub err_general: RwSignal<String>,
@@ -16,6 +18,7 @@ pub struct PostFilesState {
 #[derive(Clone)]
 pub struct ParsedPostFile {
     pub name: String,
+    pub hash: i64,
     pub size: u64,
     pub uploaded_bytes: u64,
     pub uploaded_percentage: u64,
@@ -28,6 +31,7 @@ impl From<i64> for ParsedPostFile {
     fn from(value: i64) -> Self {
         Self {
             name: value.to_string(),
+            hash: value,
             size: 0,
             uploaded_bytes: 0,
             upload_speed_bytes_a_second: 0,
@@ -43,6 +47,8 @@ pub enum ParsedPostFileState {
     Queue,
     Uploading,
     Uploaded,
+    // Idling,
+    // Checking,
     Proccesed,
     Error,
     Removing,
@@ -52,6 +58,7 @@ impl From<String> for ParsedPostFile {
     fn from(value: String) -> Self {
         Self {
             name: value,
+            hash: 0,
             size: 0,
             uploaded_bytes: 0,
             upload_speed_bytes_a_second: 0,
@@ -72,6 +79,7 @@ impl From<PostFile> for ParsedPostFile {
     fn from(value: PostFile) -> Self {
         Self {
             name: value.hash.to_string(),
+            hash: value.hash,
             size: value.size_bytes as u64,
             uploaded_bytes: 0,
             upload_speed_bytes_a_second: 0,
@@ -91,6 +99,7 @@ impl From<web_sys::File> for ParsedPostFile {
         let size = file.size();
         Self {
             name: name,
+            hash: 0,
             size: size as u64,
             uploaded_bytes: 0,
             upload_speed_bytes_a_second: 0,
@@ -181,6 +190,7 @@ impl PostFilesState {
 
                 parsed_file.update(|file| {
                     file.name = hash.to_string();
+                    file.hash = hash;
                     file.state = ParsedPostFileState::Uploaded;
                 });
             }

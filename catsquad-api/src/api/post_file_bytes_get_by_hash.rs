@@ -38,7 +38,7 @@ fn status_code(result: &Result<Vec<u8>, PostFileGetByHashErr>) -> StatusCode {
     }
 }
 
-pub async fn post_file_get_by_hash(
+pub async fn post_file_bytes_get_by_hash(
     db_user: Extension<Option<DbUser>>,
     State(app): State<AppState>,
     Path(params): Path<StorageParams>,
@@ -134,14 +134,14 @@ mod test_utils {
     use catsquad_shared::{self as cs, Uuid, uuid_to_str};
 
     impl TestServer {
-        pub async fn post_file_get_by_hash(
+        pub async fn post_file_bytes_get_by_hash(
             &self,
             post_id: i64,
             file_hash: i64,
             session_token: Uuid,
         ) -> Result<Vec<u8>, cs::PostFileGetByHashErr> {
             self.client
-                .post_file_get_by_hash(post_id, file_hash)
+                .post_file_bytes_get_by_hash(post_id, file_hash)
                 .header_add(
                     header::COOKIE,
                     create_auth_cookie_str(uuid_to_str(session_token)),
@@ -156,7 +156,7 @@ mod test_utils {
 
 #[cfg(test)]
 #[tokio::test]
-async fn test_api_post_file_by_hash() {
+async fn test_api_post_file_bytes_by_hash() {
     use catsquad_shared::PostState;
 
     use crate::{auth::create_auth_cookie_str, get_file_hash_for_testing_by_path};
@@ -176,7 +176,7 @@ async fn test_api_post_file_by_hash() {
     let file_hash = get_file_hash_for_testing_by_path("../assets/favicon.ico").await;
 
     let result = server
-        .post_file_get_by_hash(post1.id, file_hash, session_key1)
+        .post_file_bytes_get_by_hash(post1.id, file_hash, session_key1)
         .await;
     assert!(matches!(result, Err(PostFileGetByHashErr::FileNotFound)));
 
@@ -186,7 +186,7 @@ async fn test_api_post_file_by_hash() {
         .unwrap();
 
     let result = server
-        .post_file_get_by_hash(post1.id, file_hash, session_key1)
+        .post_file_bytes_get_by_hash(post1.id, file_hash, session_key1)
         .await;
     assert!(matches!(result, Err(PostFileGetByHashErr::FileNotFound)));
 
@@ -198,7 +198,7 @@ async fn test_api_post_file_by_hash() {
     // let file_hash = result.file[0].hash.clone();
 
     let result = server
-        .post_file_get_by_hash(post1.id, file_hash, session_key1)
+        .post_file_bytes_get_by_hash(post1.id, file_hash, session_key1)
         .await
         .unwrap();
 

@@ -814,7 +814,15 @@ where
         Builder::new(sender, params)
     }
 
-    pub fn post_file_get_by_hash(
+    pub fn post_file_status_get_by_hash(
+        &self,
+        // post_id: i64,
+        file_hash: i64,
+    ) -> Builder<TSender, cs::PostFileGetStatusByHashRes, cs::PostFileStatusGetByHashErr> {
+        self.get(cs::link_relative_post_get_file_status_by_hash(file_hash))
+    }
+
+    pub fn post_file_bytes_get_by_hash(
         &self,
         post_id: i64,
         file_hash: i64,

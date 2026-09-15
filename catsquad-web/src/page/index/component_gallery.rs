@@ -200,7 +200,7 @@ pub fn Gallery(
     });
 
     let _ = interval::new(
-        move || {
+        move |_handle| {
             let Some(gallery_elm) = gallery_ref.get_untracked() else {
                 trace!("gallery NOT found");
                 return;

@@ -1178,7 +1178,7 @@ pub mod interval {
     #[track_caller]
     pub fn new<F>(callback: F, duration: Duration) -> Result<IntervalHandle, ErrorSetInterval>
     where
-        F: Fn() + Clone + 'static,
+        F: Fn(IntervalHandle) + Clone + 'static,
     {
         let handle = IntervalHandle::new();
         let caller_location = std::panic::Location::caller();
@@ -1192,7 +1192,11 @@ pub mod interval {
                     return;
                 }
             };
-            let closure = Closure::<dyn Fn()>::new(callback.clone()).into_js_value();
+            let closure = Closure::<dyn Fn()>::new({
+                let callback = callback.clone();
+                move || callback(handle)
+            })
+            .into_js_value();
             let ms = duration.as_millis() as i32;
             let handle_id = window
                 .set_interval_with_callback_and_timeout_and_arguments_0(
