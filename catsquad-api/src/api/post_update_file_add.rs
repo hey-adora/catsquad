@@ -15,7 +15,7 @@ use bytes::Bytes;
 use catsquad_db::{DbPostUpdateFileAddErr, DbUser};
 use catsquad_log::prelude::*;
 use catsquad_shared::{
-    POST_UPDATE_FILE_ADD_PARAMS_FIELD_POST_ID, PostFile, PostUpdateFileAddErr,
+    POST_UPDATE_FILE_ADD_PARAMS_FIELD_POST_ID, PostImage, PostUpdateFileAddErr,
     PostUpdateFileAddParams, SUPPORTED_FILE_EXTENSIONS, u128_to_str, uuid_to_str,
 };
 use futures::{Stream, TryStreamExt};
@@ -54,7 +54,7 @@ fn from_db_post_update_file_add(value: DbPostUpdateFileAddErr) -> PostUpdateFile
     }
 }
 
-fn status_code(result: &Result<Vec<PostFile>, PostUpdateFileAddErr>) -> StatusCode {
+fn status_code(result: &Result<Vec<PostImage>, PostUpdateFileAddErr>) -> StatusCode {
     match result {
         Ok(_) => StatusCode::OK,
         Err(PostUpdateFileAddErr::NotFilesFound) => StatusCode::BAD_REQUEST,
@@ -371,7 +371,7 @@ pub async fn post_update_file_add(
     let storage_path = app.get_storage_path().await;
     let tmp_path = app.get_tmp_path().await;
 
-    let inner = async || -> Result<Vec<PostFile>, PostUpdateFileAddErr> {
+    let inner = async || -> Result<Vec<PostImage>, PostUpdateFileAddErr> {
         let req = params_req(params)?;
 
         let post_id = req.post_id;
@@ -405,7 +405,7 @@ pub async fn post_update_file_add(
                 .map_err(from_db_post_update_file_add)?;
 
             // post = Some(result);
-            post_files.push(PostFile {
+            post_files.push(PostImage {
                 extension: file.extension,
                 hash: file.saved_file.hash,
                 proccesed: false,
@@ -440,7 +440,7 @@ mod test_utils {
         proccess_images::storage_file_path,
     };
     use axum::http::header;
-    use catsquad_shared::{self as cs, PostFile, PostState, Uuid, u128_to_str, uuid_to_str};
+    use catsquad_shared::{self as cs, PostImage, PostState, Uuid, u128_to_str, uuid_to_str};
 
     impl TestServer {
         pub async fn post_update_file_add(
@@ -450,9 +450,9 @@ mod test_utils {
             post_id: i64,
             files: &[&str],
             session_token: Uuid,
-        ) -> Result<Vec<PostFile>, cs::PostUpdateFileAddErr> {
+        ) -> Result<Vec<PostImage>, cs::PostUpdateFileAddErr> {
             self.client
-                .post_update_file_add(post_id, files.into_iter().map(|v| v.to_string()).collect())
+                .post_update_image_add(post_id, files.into_iter().map(|v| v.to_string()).collect())
                 .header_add(
                     header::COOKIE,
                     create_auth_cookie_str(uuid_to_str(session_token)),

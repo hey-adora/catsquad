@@ -9,77 +9,73 @@ use axum::{
 };
 use catsquad_db::{DbPostGetByKeyErr, DbPostImageGetByHashErr, DbUser};
 use catsquad_log::prelude::*;
-use catsquad_shared::{PostFileGetByHashErr, StorageParams, u128_to_str};
+use catsquad_shared::{
+    FILE_IMAGE_THUMBNAIL_EXTENSION, PostImageBytesGetByHashErr, PostImageBytesGetByHashParams,
+    u128_to_str,
+};
 use tokio::fs;
 
-use crate::state::AppState;
+use crate::{
+    proccess_images::{storage_file_path, thumbnail_file_path},
+    state::AppState,
+};
 
-fn from_post_image_get_by_hash_err(value: DbPostImageGetByHashErr) -> PostFileGetByHashErr {
+fn from_post_image_get_by_hash_err(value: DbPostImageGetByHashErr) -> PostImageBytesGetByHashErr {
     match value {
-        DbPostImageGetByHashErr::NotFound => PostFileGetByHashErr::FileNotFound,
+        DbPostImageGetByHashErr::NotFound => PostImageBytesGetByHashErr::FileNotFound,
         DbPostImageGetByHashErr::Unauthorized => {
-            PostFileGetByHashErr::Unauthorized("unauthorized".to_string())
+            PostImageBytesGetByHashErr::Unauthorized("unauthorized".to_string())
         }
-        DbPostImageGetByHashErr::Db(_) => PostFileGetByHashErr::InternalServerErr,
+        DbPostImageGetByHashErr::Db(_) => PostImageBytesGetByHashErr::InternalServerErr,
     }
 }
 
-fn from_io_err(_value: std::io::Error) -> PostFileGetByHashErr {
-    PostFileGetByHashErr::InternalServerErr
+fn from_io_err(_value: std::io::Error) -> PostImageBytesGetByHashErr {
+    PostImageBytesGetByHashErr::InternalServerErr
 }
 
-fn status_code(result: &Result<Vec<u8>, PostFileGetByHashErr>) -> StatusCode {
+fn status_code(result: &Result<Vec<u8>, PostImageBytesGetByHashErr>) -> StatusCode {
     match result {
         Ok(_) => StatusCode::OK,
         // Err(PostFileGetByHashErr::PostNotFound) => StatusCode::NOT_FOUND,
-        Err(PostFileGetByHashErr::FileNotFound) => StatusCode::NOT_FOUND,
-        Err(PostFileGetByHashErr::Unauthorized(_)) => StatusCode::UNAUTHORIZED,
-        Err(PostFileGetByHashErr::InternalServerErr) => StatusCode::INTERNAL_SERVER_ERROR,
+        Err(PostImageBytesGetByHashErr::FileNotFound) => StatusCode::NOT_FOUND,
+        Err(PostImageBytesGetByHashErr::Unauthorized(_)) => StatusCode::UNAUTHORIZED,
+        Err(PostImageBytesGetByHashErr::InternalServerErr) => StatusCode::INTERNAL_SERVER_ERROR,
     }
 }
 
-pub async fn post_file_bytes_get_by_hash(
-    db_user: Extension<Option<DbUser>>,
-    State(app): State<AppState>,
-    Path(params): Path<StorageParams>,
+pub async fn get_file_image(
+    app: AppState,
+    user_username: impl Into<String>,
+    post_id: i64,
+    file_hash: i64,
+    thumbnail: bool,
 ) -> impl IntoResponse {
-    //TODO optimize this nonsense, simplify db query
-    //the string manipulation at the end is -100000% performance
-
-    let user_username = db_user
-        .as_ref()
-        .map(|v| v.username.clone())
-        .unwrap_or_default();
-    let post_id = params.post_id;
-    let file_hash = params.file_hash;
-
-    let inner = async || -> Result<(Vec<u8>, String), PostFileGetByHashErr> {
-        // let post = app
-        //     .db
-        //     .post_get_by_id(user_usename, post_key)
-        //     .await
-        //     .map_err(from_post_get_by_key_err)?;
-
-        // let file_hash = post
-        //     .images_hashes
-        //     .into_iter()
-        //     .find(|v| *v == file_hash)
-        //     .ok_or(PostFileGetByHashErr::FileNotFound)?;
-        // let file_hash_str = (file_hash as u64).to_string();
-
+    let inner = async || -> Result<(Vec<u8>, String), PostImageBytesGetByHashErr> {
         let image = app
             .db
-            .post_image_get_by_hash(user_username, post_id, file_hash)
+            .post_image_get_by_hash(user_username.into(), post_id, file_hash)
             .await
             .map_err(from_post_image_get_by_hash_err)?;
-        // TODO GET FROM FILES_IMAGES TABLE
 
-        // let file_extension = file.extension;
-        let file_extension = image.extension;
-        let hash_str = u128_to_str((image.hash as u64) as u128);
-        let path = app.get_storage_path().await;
-        let path = std::path::Path::new(&path);
-        let path = path.join(hash_str).with_extension(&file_extension);
+        // TODO OPTIMIZE THIS BULLSH*T
+
+        let storage_path = app.get_storage_path().await;
+        let file_name = u128_to_str((image.hash as u64) as u128);
+
+        let (file_extension, path) = if thumbnail {
+            if !image.processed {
+                return Err(PostImageBytesGetByHashErr::FileNotFound);
+            }
+            let extension = FILE_IMAGE_THUMBNAIL_EXTENSION.to_string();
+            let path = thumbnail_file_path(storage_path, file_name);
+
+            (extension, path)
+        } else {
+            let extension = image.extension;
+            let path = storage_file_path(storage_path, file_name, &extension);
+            (extension, path)
+        };
 
         let bytes = fs::read(&path)
             .await
@@ -88,15 +84,6 @@ pub async fn post_file_bytes_get_by_hash(
         Ok((bytes, file_extension))
     };
 
-    // let storage_path = app.get_storage_path().await;
-    // let storage_path = std::path::Path::new(&storage_path);
-    // let file_key = params.file_hash;
-    // let path = storage_path.join(file_key);
-
-    // if file_key.
-    // path.
-
-    // let bytes = fs::read(path).await;
     let result = inner().await;
     match result {
         Ok((bytes, extension)) => {
@@ -124,7 +111,24 @@ pub async fn post_file_bytes_get_by_hash(
             )
         }
     }
-    // application/json
+}
+
+pub async fn post_file_bytes_get_by_hash(
+    db_user: Extension<Option<DbUser>>,
+    State(app): State<AppState>,
+    Path(params): Path<PostImageBytesGetByHashParams>,
+) -> impl IntoResponse {
+    //TODO optimize this nonsense, simplify db query
+    //the string manipulation at the end is -100000% performance
+
+    let user_username = db_user
+        .as_ref()
+        .map(|v| v.username.clone())
+        .unwrap_or_default();
+    let post_id = params.post_id;
+    let file_hash = params.file_hash;
+
+    get_file_image(app, user_username, post_id, file_hash, false).await
 }
 
 #[cfg(test)]
@@ -134,12 +138,12 @@ mod test_utils {
     use catsquad_shared::{self as cs, Uuid, uuid_to_str};
 
     impl TestServer {
-        pub async fn post_file_bytes_get_by_hash(
+        pub async fn post_image_bytes_get_by_hash(
             &self,
             post_id: i64,
             file_hash: i64,
             session_token: Uuid,
-        ) -> Result<Vec<u8>, cs::PostFileGetByHashErr> {
+        ) -> Result<Vec<u8>, cs::PostImageBytesGetByHashErr> {
             self.client
                 .post_file_bytes_get_by_hash(post_id, file_hash)
                 .header_add(
@@ -156,7 +160,7 @@ mod test_utils {
 
 #[cfg(test)]
 #[tokio::test]
-async fn test_api_post_file_bytes_by_hash() {
+async fn test_api_post_image_bytes_by_hash() {
     use catsquad_shared::PostState;
 
     use crate::{auth::create_auth_cookie_str, get_file_hash_for_testing_by_path};
@@ -176,9 +180,12 @@ async fn test_api_post_file_bytes_by_hash() {
     let file_hash = get_file_hash_for_testing_by_path("../assets/favicon.ico").await;
 
     let result = server
-        .post_file_bytes_get_by_hash(post1.id, file_hash, session_key1)
+        .post_image_bytes_get_by_hash(post1.id, file_hash, session_key1)
         .await;
-    assert!(matches!(result, Err(PostFileGetByHashErr::FileNotFound)));
+    assert!(matches!(
+        result,
+        Err(PostImageBytesGetByHashErr::FileNotFound)
+    ));
 
     server
         .post_update_state(post1.id, PostState::Active, session_key1)
@@ -186,9 +193,12 @@ async fn test_api_post_file_bytes_by_hash() {
         .unwrap();
 
     let result = server
-        .post_file_bytes_get_by_hash(post1.id, file_hash, session_key1)
+        .post_image_bytes_get_by_hash(post1.id, file_hash, session_key1)
         .await;
-    assert!(matches!(result, Err(PostFileGetByHashErr::FileNotFound)));
+    assert!(matches!(
+        result,
+        Err(PostImageBytesGetByHashErr::FileNotFound)
+    ));
 
     let result = server
         .post_update_file_add(post1.id, &["../assets/favicon.ico"], session_key1)
@@ -198,7 +208,7 @@ async fn test_api_post_file_bytes_by_hash() {
     // let file_hash = result.file[0].hash.clone();
 
     let result = server
-        .post_file_bytes_get_by_hash(post1.id, file_hash, session_key1)
+        .post_image_bytes_get_by_hash(post1.id, file_hash, session_key1)
         .await
         .unwrap();
 

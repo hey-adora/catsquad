@@ -16,6 +16,7 @@ pub const MAX_USERNAME_LENGTH: usize = 32;
 pub const MIN_USERNAME_LENGTH: usize = 3;
 pub const MIN_PASSWORD_LENGTH: usize = 12;
 pub const MAX_PASSWORD_LENGTH: usize = 100;
+pub const FILE_IMAGE_THUMBNAIL_EXTENSION: &'static str = "webp";
 
 pub use api::Order;
 pub use api::TimeRange;
@@ -45,6 +46,7 @@ pub use api::post_like_get_post::*;
 pub use api::post_like_remove::*;
 pub use api::post_remove::*;
 pub use api::post_search::*;
+pub use api::post_thumbnail_bytes_get_by_hash::*;
 pub use api::post_update_description::*;
 pub use api::post_update_file_add::*;
 pub use api::post_update_file_remove::*;

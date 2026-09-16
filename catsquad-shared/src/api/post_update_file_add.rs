@@ -1,52 +1,10 @@
 // use catsquad_log::prelude::*;
 
-// pub const LINK_API_POST_UPDATE_FILE_ADD: &str = "/api/post_update_file_add";
 pub const LINK_API_POST_UPDATE_FILE_ADD: &str = "/api/post/{post_id}/image";
 
 pub fn link_relative_post_update_file_add(post_id: i64) -> String {
     format!("/api/post/{}/image", post_id)
 }
-
-#[derive(
-    Default, Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq, thiserror::Error,
-)]
-pub enum PostFileGetByHashErr {
-    // #[error("post not found")]
-    // PostNotFound,
-    #[error("post file not found")]
-    FileNotFound,
-
-    #[error("unauthorized {0}")]
-    Unauthorized(String),
-
-    #[default]
-    #[error("internal server err")]
-    InternalServerErr,
-}
-
-// #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
-// pub struct PostRes {
-//     pub key: String,
-//     pub user: UserRes,
-//     pub show: bool,
-//     pub title: String,
-//     pub description: String,
-//     pub tags: String,
-//     pub favorites: u64,
-//     pub file: Vec<PostFile>,
-//     pub modified_at: u128,
-//     pub created_at: u128,
-// }
-
-// #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
-// pub struct PostFile {
-//     pub extension: String,
-//     pub hash: String,
-//     pub proccesed: bool,
-//     pub size_bytes: usize,
-//     pub width: u32,
-//     pub height: u32,
-// }
 
 #[derive(
     Default, thiserror::Error, Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize,

@@ -1,5 +1,5 @@
 use crate::{
-    BtnDelete, SVGTrash,
+    BtnDelete, PageState, SVGTrash,
     hook::Spawner,
     page::{create_client, post::post_api::PostApi},
 };
@@ -12,6 +12,7 @@ pub fn PostControls(
     post_api: PostApi,
     #[prop(optional, into)] post_id: Signal<i64>,
 ) -> impl IntoView {
+    let page = PageState::get();
     let delete_post = move |_| {
         let post_id = post_id.get();
         if post_id == 0 {
@@ -38,18 +39,21 @@ pub fn PostControls(
     };
 
     let class_state = move || format!("{} font-bold px-2 py-1 rounded-md", state_color());
+    let when_is_user = move || page.is_logged_in().unwrap_or_default();
 
     view! {
-        <div class="col-span-2 flex justify-between px-4 md:px-6 ">
-            <div>
-                <p class=class_state>{state}</p>
+        <Show when=when_is_user>
+            <div class="col-span-2 flex justify-between px-4 md:px-6 ">
+                <div>
+                    <p class=class_state>{state}</p>
+                </div>
+                <div>
+                    <BtnDelete on_click=delete_post>
+                        "Delete"
+                    </BtnDelete>
+                </div>
             </div>
-            <div>
-                <BtnDelete on_click=delete_post>
-                    "Delete"
-                </BtnDelete>
-            </div>
-        </div>
+        </Show>
     }
 }
 // <SVGTrash class="size-[1rem] text-base08 "/>

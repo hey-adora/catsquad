@@ -4,10 +4,13 @@ use catsquad_client::{Client, Response, Sender};
 use catsquad_log::prelude::*;
 use catsquad_shared::{
     LINK_WEB_INDEX, PostGetByKeyErr, PostRemoveErr, PostState, PostUpdateDescriptionErr,
-    PostUpdateTagsErr, PostUpdateTitleErr, link_relative_img, proccess_tags,
+    PostUpdateTagsErr, PostUpdateTitleErr, link_relative_post_image_bytes_get_by_hash,
+    proccess_tags,
 };
 use catsquad_web_utils::prelude::*;
 use leptos::prelude::*;
+
+use crate::hook::{ParsedPostImage, ParsedPostImageState};
 // use crate::{
 //     api::{Api, Server404Err, ServerErr, ServerUpdatePostDescriptionErr},
 //     path::{link_home, link_img, link_user},
@@ -29,6 +32,7 @@ pub struct PostApi {
     pub live_description_length: RwSignal<usize, LocalStorage>,
     pub live_tags_length: RwSignal<usize>,
     pub live_title_length: RwSignal<usize, LocalStorage>,
+    pub imgs: RwSignal<Vec<ArcRwSignal<ParsedPostImage>>>,
     pub imgs_links: RwSignal<Vec<(String, f64)>, LocalStorage>,
     pub title: RwSignal<String, LocalStorage>,
     pub author_username: RwSignal<String, LocalStorage>,
@@ -73,6 +77,7 @@ impl PostApi {
     pub fn new() -> Self {
         Self {
             // items: RwSignal::new_local(Vec::new()),
+            imgs: RwSignal::new(Vec::new()),
             imgs_links: RwSignal::new_local(Vec::<(String, f64)>::new()),
             title: RwSignal::new_local(String::new()),
             author_username: RwSignal::new_local(String::new()),
@@ -258,7 +263,7 @@ impl PostApi {
         None
     }
 
-    pub async fn get<TSender>(&self, client: &Client<TSender>, post_id: i64)
+    pub async fn init<TSender>(&self, client: &Client<TSender>, post_id: i64)
     where
         TSender: Sender + Debug + Clone,
         TSender::TResponse: Response + Debug,
@@ -288,12 +293,37 @@ impl PostApi {
                 self.description.set(post.description);
                 self.likes.set(post.favorites);
                 self.created_at.set(post.created_at); // TODO maybe check in test
+                self.imgs.set(
+                    post.images
+                        .clone()
+                        .into_iter()
+                        .map(|v| {
+                            ArcRwSignal::new(ParsedPostImage {
+                                name: v.hash.to_string(),
+                                hash: v.hash,
+                                size: 0,
+                                uploaded_bytes: 0,
+                                uploaded_percentage: 0,
+                                upload_speed_bytes_a_second: 0,
+                                state: if v.proccesed {
+                                    ParsedPostImageState::Completed
+                                } else {
+                                    ParsedPostImageState::Processing
+                                },
+                                err: String::new(),
+                            })
+                        })
+                        .collect(),
+                );
                 self.imgs_links.set(
-                    post.file
+                    post.images
                         .into_iter()
                         .map(|file| {
                             (
-                                link_relative_img(post_key.clone(), file.hash),
+                                link_relative_post_image_bytes_get_by_hash(
+                                    post_key.clone(),
+                                    file.hash,
+                                ),
                                 file.width as f64 / file.height as f64,
                             )
                         })
@@ -355,7 +385,7 @@ pub mod tests {
 
         // testing normal
         let post_api = PostApi::new();
-        post_api.get(&app.client, post_id).await;
+        post_api.init(&app.client, post_id).await;
         assert_eq!(post_api.live_description_length.get_untracked(), 1);
         assert_eq!(post_api.description.get_untracked(), "0");
         post_api.update_description_mode.set(true);
@@ -370,7 +400,7 @@ pub mod tests {
         assert!(post_api.err_description.get_untracked().is_empty());
 
         let post_api = PostApi::new();
-        post_api.get(&app.client, post_id).await;
+        post_api.init(&app.client, post_id).await;
         assert_eq!(post_api.live_description_length.get_untracked(), 2);
         assert_eq!(post_api.description.get_untracked(), "22");
 
@@ -433,14 +463,14 @@ pub mod tests {
         // testing err
 
         let post_api = PostApi::new();
-        post_api.get(&app.client, 0).await;
+        post_api.init(&app.client, 0).await;
         assert!(!post_api.err_general.get_untracked().is_empty());
         assert_eq!(post_api.title.get_untracked(), "");
         assert_eq!(post_api.live_title_length.get_untracked(), 0);
 
         // testing normal
         let post_api = PostApi::new();
-        post_api.get(&app.client, post_id).await;
+        post_api.init(&app.client, post_id).await;
         assert_eq!(post_api.title.get_untracked(), "title");
         post_api.update_title_mode.set(true);
         assert!(post_api.err_title.get_untracked().is_empty());
@@ -452,7 +482,7 @@ pub mod tests {
         assert_eq!(post_api.live_title_length.get_untracked(), 3);
 
         let post_api = PostApi::new();
-        post_api.get(&app.client, post_id).await;
+        post_api.init(&app.client, post_id).await;
         assert_eq!(post_api.title.get_untracked(), "one");
         assert_eq!(post_api.live_title_length.get_untracked(), 3);
 
@@ -466,14 +496,14 @@ pub mod tests {
 
         // testing err
         let post_api = PostApi::new();
-        post_api.get(&app.client, 0).await;
+        post_api.init(&app.client, 0).await;
         assert!(!post_api.err_general.get_untracked().is_empty());
         assert_eq!(post_api.tags.get_untracked(), "");
         assert_eq!(post_api.live_tags_length.get_untracked(), 0);
 
         // testing normal
         let post_api = PostApi::new();
-        post_api.get(&app.client, post_id).await;
+        post_api.init(&app.client, post_id).await;
         assert_eq!(post_api.tags.get_untracked(), "");
         post_api.update_tags_mode.set(true);
         assert!(post_api.err_tags.get_untracked().is_empty());
@@ -485,7 +515,7 @@ pub mod tests {
         assert_eq!(post_api.live_tags_length.get_untracked(), 5);
 
         let post_api = PostApi::new();
-        post_api.get(&app.client, post_id).await;
+        post_api.init(&app.client, post_id).await;
         assert_eq!(post_api.tags.get_untracked(), " one ");
         assert_eq!(post_api.live_tags_length.get_untracked(), 5);
 
@@ -498,7 +528,7 @@ pub mod tests {
         let (_owner, app, post_id) = post_setup("hook_post_api_delete", "title", "", "").await;
 
         let post_api = PostApi::new();
-        post_api.get(&app.client, post_id).await;
+        post_api.init(&app.client, post_id).await;
 
         let result = post_api.delete(&app.client, post_id).await;
         assert!(result.is_some());
@@ -512,7 +542,7 @@ pub mod tests {
         let (_owner, app, post_id) = post_setup("hook_post_api_post", "title", "", "").await;
 
         let post_api = PostApi::new();
-        post_api.get(&app.client, post_id).await;
+        post_api.init(&app.client, post_id).await;
         assert_eq!(post_api.title.get_untracked(), "title");
         assert_ne!(post_api.author_username.get_untracked(), "");
     }

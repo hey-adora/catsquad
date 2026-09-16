@@ -139,7 +139,7 @@ pub async fn post_add(
         .unwrap();
 
     let files = client
-        .post_update_file_add(post1.id, vec![path])
+        .post_update_image_add(post1.id, vec![path])
         .header_add(header::COOKIE, format!("authorization=Bearer {token}"))
         .send()
         .await

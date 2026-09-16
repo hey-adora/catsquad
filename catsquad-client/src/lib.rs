@@ -1,6 +1,6 @@
 use catsquad_log::prelude::*;
 use catsquad_shared::{
-    self as cs, Order, PostFile, PostSearchParams, PostState, TimeRange, ToForm, Uuid,
+    self as cs, Order, PostImage, PostSearchParams, PostState, TimeRange, ToForm, Uuid,
     link_relative_invite_get_by_key, link_relative_post_get_by_key, link_relative_post_remove,
     link_relative_post_search, uuid_to_str,
 };
@@ -227,48 +227,48 @@ pub enum Body {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum BodyField {
-    File(SchrodingersFile),
+    File(SchrodingersImage),
     Text(String),
     Bytes(Vec<u8>),
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum SchrodingersFile {
+pub enum SchrodingersImage {
     FilePath(String),
     WebFile(web_sys::File),
 }
 
-impl SchrodingersFile {
+impl SchrodingersImage {
     pub fn into_file_path(self) -> String {
         match self {
-            SchrodingersFile::FilePath(v) => v,
-            SchrodingersFile::WebFile(_) => panic!("trying to run web stuff on non-web stuff"),
+            SchrodingersImage::FilePath(v) => v,
+            SchrodingersImage::WebFile(_) => panic!("trying to run web stuff on non-web stuff"),
         }
     }
 
     pub fn into_web_file(self) -> web_sys::File {
         match self {
-            SchrodingersFile::FilePath(_) => panic!("trying to run non-web stuff on web stuff"),
-            SchrodingersFile::WebFile(v) => v,
+            SchrodingersImage::FilePath(_) => panic!("trying to run non-web stuff on web stuff"),
+            SchrodingersImage::WebFile(v) => v,
         }
     }
 }
 
-impl From<web_sys::File> for SchrodingersFile {
+impl From<web_sys::File> for SchrodingersImage {
     fn from(value: web_sys::File) -> Self {
-        SchrodingersFile::WebFile(value)
+        SchrodingersImage::WebFile(value)
     }
 }
 
-impl From<String> for SchrodingersFile {
+impl From<String> for SchrodingersImage {
     fn from(value: String) -> Self {
-        SchrodingersFile::FilePath(value)
+        SchrodingersImage::FilePath(value)
     }
 }
 
-impl From<&str> for SchrodingersFile {
+impl From<&str> for SchrodingersImage {
     fn from(value: &str) -> Self {
-        SchrodingersFile::FilePath(value.to_string())
+        SchrodingersImage::FilePath(value.to_string())
     }
 }
 
@@ -625,11 +625,11 @@ where
         self.get(cs::link_relative_post_like_get_by_post(post_id))
     }
 
-    pub fn post_update_file_add<F: Into<SchrodingersFile>>(
+    pub fn post_update_image_add<F: Into<SchrodingersImage>>(
         &self,
         post_id: i64,
         files: Vec<F>,
-    ) -> Builder<TSender, Vec<PostFile>, catsquad_shared::PostUpdateFileAddErr> {
+    ) -> Builder<TSender, Vec<PostImage>, catsquad_shared::PostUpdateFileAddErr> {
         let body = files
             .into_iter()
             .enumerate()
@@ -646,7 +646,7 @@ where
         Builder::new(sender, params)
     }
 
-    pub fn post_update_file_remove(
+    pub fn post_update_image_remove(
         &self,
         post_id: i64,
         hash: i64,
@@ -826,8 +826,20 @@ where
         &self,
         post_id: i64,
         file_hash: i64,
-    ) -> Builder<TSender, Vec<u8>, cs::PostFileGetByHashErr> {
-        self.get(cs::link_relative_img(post_id, file_hash))
+    ) -> Builder<TSender, Vec<u8>, cs::PostImageBytesGetByHashErr> {
+        self.get(cs::link_relative_post_image_bytes_get_by_hash(
+            post_id, file_hash,
+        ))
+    }
+
+    pub fn post_thumbnail_bytes_get_by_hash(
+        &self,
+        post_id: i64,
+        file_hash: i64,
+    ) -> Builder<TSender, Vec<u8>, cs::PostImageBytesGetByHashErr> {
+        self.get(cs::link_relative_post_thumbnail_bytes_get_by_hash(
+            post_id, file_hash,
+        ))
     }
 
     pub fn post_search(

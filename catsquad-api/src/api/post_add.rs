@@ -2,7 +2,7 @@ use axum::{Extension, Form, Json, extract::State, http::StatusCode, response::In
 use catsquad_db::{DbPost, DbPostAddErr, DbUser};
 use catsquad_log::prelude::*;
 use catsquad_shared::{
-    PostAddErr, PostAddReq, PostFile, PostRes, PostState, validate_post_description,
+    PostAddErr, PostAddReq, PostImage, PostRes, PostState, validate_post_description,
     validate_post_tags, validate_post_title,
 };
 
@@ -20,7 +20,8 @@ pub fn from_db_post(value: DbPost) -> PostRes {
         tags: value.tags,
         favorites: value.likes_count,
         description: value.description,
-        file: value.images_hashes,
+        images_hashes: value.images_hashes,
+        images_status: value.images_status,
         modified_at: value.modified_at,
         created_at: value.created_at,
     }

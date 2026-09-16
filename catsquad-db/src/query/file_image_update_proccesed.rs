@@ -32,7 +32,7 @@ impl Db {
             .execute(pool)
             .await;
 
-        debug!("query: {query}\nresult: {result:#?}");
+        debug!("file_image_update_proccsed query: {query}\nresult: {result:#?}");
 
         let result = match result {
             Ok(v) => v,

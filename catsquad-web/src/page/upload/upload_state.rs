@@ -1,14 +1,14 @@
 use std::fmt::Debug;
 
-use catsquad_client::{Client, Response, SchrodingersFile, Sender};
+use catsquad_client::{Client, Response, SchrodingersImage, Sender};
 use catsquad_log::prelude::*;
 use catsquad_shared::{
-    PostAddErr, PostFile, PostState, link_relative_post, validate_post_description,
+    PostAddErr, PostImage, PostState, link_relative_post, validate_post_description,
     validate_post_tags, validate_post_title,
 };
 use leptos::prelude::*;
 
-use crate::hook::ParsedPostFile;
+use crate::hook::{ParsedPostImage, ParsedPostImageState};
 
 #[derive(Clone, Copy, Debug)]
 pub struct FieldSaved {
@@ -47,7 +47,7 @@ pub struct UploadState {
     pub description_saved: RwSignal<FieldSaved>,
     pub tags: RwSignal<String>,
     pub tags_saved: RwSignal<FieldSaved>,
-    pub files: RwSignal<Vec<ArcRwSignal<ParsedPostFile>>>,
+    pub files: RwSignal<Vec<ArcRwSignal<ParsedPostImage>>>,
     pub err_general: RwSignal<String>,
     pub err_title: RwSignal<String>,
     pub err_description: RwSignal<String>,
@@ -104,9 +104,25 @@ impl UploadState {
                 if self
                     .files
                     .try_set(
-                        v.file
+                        v.images_hashes
                             .into_iter()
-                            .map(|v| ArcRwSignal::new(ParsedPostFile::from(v)))
+                            .zip(v.images_status)
+                            .map(|(hash, is_proccesed)| {
+                                ArcRwSignal::new(ParsedPostImage {
+                                    name: hash.to_string(),
+                                    hash: hash,
+                                    size: 0,
+                                    uploaded_bytes: 0,
+                                    uploaded_percentage: 0,
+                                    upload_speed_bytes_a_second: 0,
+                                    state: if is_proccesed {
+                                        ParsedPostImageState::Completed
+                                    } else {
+                                        ParsedPostImageState::Processing
+                                    },
+                                    err: String::new(),
+                                })
+                            })
                             .collect(),
                     )
                     .is_some()

@@ -1,3 +1,4 @@
+use crate::page::upload::component_edit_files::ImagesView;
 use crate::{hook::Spawner, page::post::post_api::PostApi};
 use catsquad_log::prelude::*;
 use catsquad_web_utils::file::GetFiles;
@@ -11,72 +12,74 @@ pub fn PostPreviews(
     post_api: PostApi,
     #[prop(optional, into)] post_id: Signal<i64>,
 ) -> impl IntoView {
-    let upload_image = NodeRef::<html::Input>::new();
+    let images = post_api.imgs;
+    // let upload_image = NodeRef::<html::Input>::new();
 
-    let on_upload = move |_| {
-        let (Some(files),): (Option<Vec<web_sys::File>>,) = (
-            (upload_image.get_untracked())
-                .and_then(|f: HtmlInputElement| f.files())
-                .map(|f| f.get_files()),
-            // upload_title.get_untracked() as Option<HtmlInputElement>,
-            // upload_description.get_untracked() as Option<HtmlTextAreaElement>,
-            // upload_tags.get_untracked() as Option<HtmlTextAreaElement>,
-        ) else {
-            return;
-        };
+    // let on_upload = move |_| {
+    //     let (Some(files),): (Option<Vec<web_sys::File>>,) = (
+    //         (upload_image.get_untracked())
+    //             .and_then(|f: HtmlInputElement| f.files())
+    //             .map(|f| f.get_files()),
+    //         // upload_title.get_untracked() as Option<HtmlInputElement>,
+    //         // upload_description.get_untracked() as Option<HtmlTextAreaElement>,
+    //         // upload_tags.get_untracked() as Option<HtmlTextAreaElement>,
+    //     ) else {
+    //         return;
+    //     };
 
-        // uploader.upload(&files[..]);
+    //     // uploader.upload(&files[..]);
 
-        trace!("files selected: {}", files.len());
-    };
+    //     trace!("files selected: {}", files.len());
+    // };
 
-    let previews = move || {
-        let mut imgs = post_api.imgs_links.get();
+    // let previews = move || {
+    //     let mut imgs = post_api.imgs_links.get();
 
-        // imgs.push((String::new(), 0.0);
+    //     // imgs.push((String::new(), 0.0);
 
-        let mut views = imgs
-            .into_iter()
-            .enumerate()
-            .map(|(i, (url, ratio))| {
-                view! {
-                    <PreviewImg
-                        index=move|| i
-                        link=move|| url.clone()
-                    />
-                }
-                .into_any()
-            })
-            .collect_view();
+    //     let mut views = imgs
+    //         .into_iter()
+    //         .enumerate()
+    //         .map(|(i, (url, ratio))| {
+    //             view! {
+    //                 <PreviewImg
+    //                     index=move|| i
+    //                     link=move|| url.clone()
+    //                 />
+    //             }
+    //             .into_any()
+    //         })
+    //         .collect_view();
 
-        let preview_add = {
-            // let i = views.len();
-            // let id = format!("#id{i}");
-            // let id2 = id.clone();
+    //     let preview_add = {
+    //         // let i = views.len();
+    //         // let id = format!("#id{i}");
+    //         // let id2 = id.clone();
 
-            view! {
-                <div>
-                    <label
-                        id="previw_add"
-                        for="image"
-                        class="text-[2rem] grid place-items-center h-[5rem] w-[5rem] rounded-xl bg-base05/10 bg-cover bg-center border-2 border-base05"
-                        >"+"</label>
-                    <input class="left-0 top-0 w-0 h-0 absolute z-[-1] opacity-0" on:change=on_upload type="file" id="image" name="image" node_ref=upload_image multiple />
-                </div>
-            }
-        };
+    //         view! {
+    //             <div>
+    //                 <label
+    //                     id="previw_add"
+    //                     for="image"
+    //                     class="text-[2rem] grid place-items-center h-[5rem] w-[5rem] rounded-xl bg-base05/10 bg-cover bg-center border-2 border-base05"
+    //                     >"+"</label>
+    //                 <input class="left-0 top-0 w-0 h-0 absolute z-[-1] opacity-0" on:change=on_upload type="file" id="image" name="image" node_ref=upload_image multiple />
+    //             </div>
+    //         }
+    //     };
 
-        views.push(preview_add.into_any());
+    //     views.push(preview_add.into_any());
 
-        views
-    };
+    //     views
+    // };
 
     view! {
         <div class="flex justify-start gap-2 flex flex-wrap">
-            { previews }
+            <ImagesView post_id images />
         </div>
     }
 }
+// { previews }
 
 #[component]
 pub fn PreviewImg(

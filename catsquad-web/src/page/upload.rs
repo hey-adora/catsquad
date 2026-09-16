@@ -1,6 +1,6 @@
 use crate::{
     Nav,
-    hook::{PostFilesState, Spawner},
+    hook::{PostImagesState, Spawner},
     page::{
         create_client,
         upload::upload_state::{UploadState, UploadStateStage},
@@ -48,7 +48,7 @@ pub fn Upload() -> impl IntoView {
             <div class="flex flex-col gap-4 max-w-[25rem] mx-auto" >
                 <Publish upload/>
                 <TitleEdit upload/>
-                <ImagesEdit post_id=post_id files=post_files />
+                <ImagesEdit post_id=post_id images=post_files />
                 <DescriptionEdit upload/>
                 <TagsEdit upload/>
             </div>

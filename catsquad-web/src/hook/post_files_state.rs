@@ -1,6 +1,6 @@
-use catsquad_client::{Client, Response, SchrodingersFile, Sender};
+use catsquad_client::{Client, Response, SchrodingersImage, Sender};
 use catsquad_log::prelude::*;
-use catsquad_shared::PostFile;
+use catsquad_shared::PostImage;
 #[cfg(test)]
 use catsquad_shared::PostRes;
 use leptos::prelude::*;
@@ -9,25 +9,25 @@ use std::fmt::Debug;
 use crate::page::create_client;
 
 #[derive(Clone, Copy)]
-pub struct PostFilesState {
+pub struct PostImagesState {
     // pub err_general: RwSignal<String>,
     pub post_id: Signal<i64>,
-    pub files: RwSignal<Vec<ArcRwSignal<ParsedPostFile>>>,
+    pub images: RwSignal<Vec<ArcRwSignal<ParsedPostImage>>>,
 }
 
 #[derive(Clone)]
-pub struct ParsedPostFile {
+pub struct ParsedPostImage {
     pub name: String,
     pub hash: i64,
     pub size: u64,
     pub uploaded_bytes: u64,
     pub uploaded_percentage: u64,
     pub upload_speed_bytes_a_second: u64,
-    pub state: ParsedPostFileState,
+    pub state: ParsedPostImageState,
     pub err: String,
 }
 
-impl From<i64> for ParsedPostFile {
+impl From<i64> for ParsedPostImage {
     fn from(value: i64) -> Self {
         Self {
             name: value.to_string(),
@@ -36,25 +36,25 @@ impl From<i64> for ParsedPostFile {
             uploaded_bytes: 0,
             upload_speed_bytes_a_second: 0,
             uploaded_percentage: 0,
-            state: ParsedPostFileState::Queue,
+            state: ParsedPostImageState::Queue,
             err: String::new(),
         }
     }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub enum ParsedPostFileState {
+pub enum ParsedPostImageState {
     Queue,
     Uploading,
-    Uploaded,
+    Processing,
     // Idling,
     // Checking,
-    Proccesed,
+    Completed,
     Error,
     Removing,
 }
 
-impl From<String> for ParsedPostFile {
+impl From<String> for ParsedPostImage {
     fn from(value: String) -> Self {
         Self {
             name: value,
@@ -63,20 +63,20 @@ impl From<String> for ParsedPostFile {
             uploaded_bytes: 0,
             upload_speed_bytes_a_second: 0,
             uploaded_percentage: 0,
-            state: ParsedPostFileState::Queue,
+            state: ParsedPostImageState::Queue,
             err: String::new(),
         }
     }
 }
 
-impl From<&str> for ParsedPostFile {
+impl From<&str> for ParsedPostImage {
     fn from(value: &str) -> Self {
         From::<String>::from(value.to_string())
     }
 }
 
-impl From<PostFile> for ParsedPostFile {
-    fn from(value: PostFile) -> Self {
+impl From<PostImage> for ParsedPostImage {
+    fn from(value: PostImage) -> Self {
         Self {
             name: value.hash.to_string(),
             hash: value.hash,
@@ -85,15 +85,15 @@ impl From<PostFile> for ParsedPostFile {
             upload_speed_bytes_a_second: 0,
             uploaded_percentage: 0,
             state: match value.proccesed {
-                true => ParsedPostFileState::Proccesed,
-                false => ParsedPostFileState::Uploaded,
+                true => ParsedPostImageState::Completed,
+                false => ParsedPostImageState::Processing,
             },
             err: String::new(),
         }
     }
 }
 
-impl From<web_sys::File> for ParsedPostFile {
+impl From<web_sys::File> for ParsedPostImage {
     fn from(file: web_sys::File) -> Self {
         let name = file.name();
         let size = file.size();
@@ -104,69 +104,69 @@ impl From<web_sys::File> for ParsedPostFile {
             uploaded_bytes: 0,
             upload_speed_bytes_a_second: 0,
             uploaded_percentage: 0,
-            state: ParsedPostFileState::Queue,
+            state: ParsedPostImageState::Queue,
             err: String::new(),
         }
     }
 }
 
-impl PostFilesState {
-    pub fn new(post_id: Signal<i64>, files: RwSignal<Vec<ArcRwSignal<ParsedPostFile>>>) -> Self {
+impl PostImagesState {
+    pub fn new(post_id: Signal<i64>, images: RwSignal<Vec<ArcRwSignal<ParsedPostImage>>>) -> Self {
         Self {
             post_id,
-            files,
+            images,
             // files: RwSignal::new(Vec::new()),
             // err_general: RwSignal::new(String::new()),
         }
     }
 
-    pub fn set_files<I>(&self, files: I) -> Vec<ArcRwSignal<ParsedPostFile>>
+    pub fn set_images<I>(&self, images: I) -> Vec<ArcRwSignal<ParsedPostImage>>
     where
         I: IntoIterator + Clone,
-        I::Item: Into<ParsedPostFile>,
+        I::Item: Into<ParsedPostImage>,
     {
-        let files_signals = files
+        let images_signals = images
             .into_iter()
-            .map(|v| ArcRwSignal::new(Into::<ParsedPostFile>::into(v)))
-            .collect::<Vec<ArcRwSignal<ParsedPostFile>>>();
+            .map(|v| ArcRwSignal::new(Into::<ParsedPostImage>::into(v)))
+            .collect::<Vec<ArcRwSignal<ParsedPostImage>>>();
 
-        self.files.update({
-            let files_signals = files_signals.clone();
-            |parsed_files| {
-                parsed_files.extend(files_signals);
+        self.images.update({
+            let images_signals = images_signals.clone();
+            |parsed_images| {
+                parsed_images.extend(images_signals);
             }
         });
 
-        files_signals
+        images_signals
     }
 
-    pub async fn update_file<TSender, File>(
+    pub async fn update_image<TSender, TImage>(
         &self,
         client: &Client<TSender>,
-        source_file: File,
-        parsed_file: ArcRwSignal<ParsedPostFile>,
+        source_image: TImage,
+        parsed_image: ArcRwSignal<ParsedPostImage>,
     ) where
         TSender: Sender + Debug + Clone,
         TSender::TResponse: Response + Debug,
-        File: Into<SchrodingersFile>,
+        TImage: Into<SchrodingersImage>,
     {
         let post_id = self.post_id.try_get_untracked().unwrap_or_default();
         if post_id == 0 {
-            warn!("trying upload files when post wasn't initialized");
+            warn!("trying upload images when post wasn't initialized");
             return;
         };
 
         let result = client
-            .post_update_file_add(post_id, vec![source_file])
+            .post_update_image_add(post_id, vec![source_image])
             .on_progress({
-                let file = parsed_file.clone();
+                let image = parsed_image.clone();
                 move |stats| {
                     trace!("UPLOADING {stats:?}");
-                    file.update(|parsed_file| {
-                        parsed_file.state = ParsedPostFileState::Uploading;
-                        parsed_file.uploaded_bytes = stats.completed_bytes;
-                        parsed_file.upload_speed_bytes_a_second = stats.upload_speed_bytes;
-                        parsed_file.uploaded_percentage = stats.completed_precentage;
+                    image.update(|parsed_image| {
+                        parsed_image.state = ParsedPostImageState::Uploading;
+                        parsed_image.uploaded_bytes = stats.completed_bytes;
+                        parsed_image.upload_speed_bytes_a_second = stats.upload_speed_bytes;
+                        parsed_image.uploaded_percentage = stats.completed_precentage;
                     });
                 }
             })
@@ -179,63 +179,59 @@ impl PostFilesState {
             Ok(received_post) => {
                 if received_post.len() != 1 {
                     warn!("received wrong data\n{received_post:#?}");
-                    parsed_file.update(|file| {
-                        file.state = ParsedPostFileState::Error;
-                        file.err = "received wrong response".to_string();
+                    parsed_image.update(|image| {
+                        image.state = ParsedPostImageState::Error;
+                        image.err = "received wrong response".to_string();
                     });
                     return;
                 }
 
                 let hash = received_post[0].hash.clone();
 
-                parsed_file.update(|file| {
-                    file.name = hash.to_string();
-                    file.hash = hash;
-                    file.state = ParsedPostFileState::Uploaded;
+                parsed_image.update(|image| {
+                    image.name = hash.to_string();
+                    image.hash = hash;
+                    image.state = ParsedPostImageState::Processing;
                 });
             }
             Err(err) => {
-                parsed_file.update(|file| {
-                    file.state = ParsedPostFileState::Error;
-                    file.err = err.to_string();
+                parsed_image.update(|image| {
+                    image.state = ParsedPostImageState::Error;
+                    image.err = err.to_string();
                 });
             }
         }
     }
 
-    pub async fn remove_file<TSender>(
+    pub async fn remove_image<TSender>(
         &self,
         client: &Client<TSender>,
-        parsed_file: ArcRwSignal<ParsedPostFile>,
+        parsed_image: ArcRwSignal<ParsedPostImage>,
     ) where
         TSender: Sender + Debug + Clone,
         TSender::TResponse: Response + Debug,
     {
         let post_id = self.post_id.try_get_untracked().unwrap_or_default();
         if post_id == 0 {
-            warn!("trying remove files when post wasn't initialized");
+            warn!("trying remove images when post wasn't initialized");
             return;
         };
 
-        let (name, state) = parsed_file.with_untracked(|v| {
-            (
-                i64::from_str_radix(&v.name, 10).unwrap_or_default(),
-                v.state.clone(),
-            )
-        });
+        let (hash, state) = parsed_image.with_untracked(|v| (v.hash, v.state.clone()));
 
-        if state != ParsedPostFileState::Uploaded {
-            self.remove_file_parsed(&parsed_file);
-
+        if state == ParsedPostImageState::Queue {
+            self.remove_image_parsed(&parsed_image);
             return;
         }
 
-        parsed_file.update(|v| {
-            v.state = ParsedPostFileState::Removing;
+        // TODO add uploading cancel button
+
+        parsed_image.update(|v| {
+            v.state = ParsedPostImageState::Removing;
         });
 
         let result = client
-            .post_update_file_remove(post_id, name)
+            .post_update_image_remove(post_id, hash)
             .send()
             .await
             .into_json()
@@ -243,27 +239,27 @@ impl PostFilesState {
 
         match result {
             Ok(v) => {
-                self.remove_file_parsed(&parsed_file);
+                self.remove_image_parsed(&parsed_image);
             }
             Err(err) => {
-                parsed_file.update(|file| {
-                    file.state = ParsedPostFileState::Error;
-                    file.err = err.to_string();
+                parsed_image.update(|image| {
+                    image.state = ParsedPostImageState::Error;
+                    image.err = format!("err removing image: {err}");
                 });
             }
         }
     }
 
-    fn remove_file_parsed(&self, remove_file: &ArcRwSignal<ParsedPostFile>) {
+    fn remove_image_parsed(&self, remove_image: &ArcRwSignal<ParsedPostImage>) {
         let Some(pos) = self
-            .files
-            .with_untracked(|v| v.iter().position(|v| *v == *remove_file))
+            .images
+            .with_untracked(|v| v.iter().position(|v| *v == *remove_image))
         else {
-            warn!("trying remove file that doesnt exist");
+            warn!("trying remove image that doesnt exist");
             return;
         };
 
-        self.files.update(|v| {
+        self.images.update(|v| {
             v.remove(pos);
         });
 
@@ -273,28 +269,37 @@ impl PostFilesState {
 
 #[cfg(test)]
 #[tokio::test]
-async fn test_post_files_state_file_add() {
-    let (server, _owner, upload, post1) = test_upload_init("test_upload_state_file_add").await;
+async fn test_post_images_state_image_add() {
+    let (server, _owner, upload, post1) = test_upload_init("test_upload_state_images_add").await;
 
-    let input_files = vec!["../assets/favicon.ico".to_string()];
-    let files_signals = upload.set_files(input_files.clone());
+    let input_images = vec!["../assets/favicon.ico".to_string()];
+    let images_signals = upload.set_images(input_images.clone());
 
-    assert_eq!(files_signals.len(), 1);
+    assert_eq!(images_signals.len(), 1);
     assert_eq!(
-        files_signals[0].get_untracked().name,
+        images_signals[0].with_untracked(|v| v.state),
+        ParsedPostImageState::Queue
+    );
+    assert_eq!(
+        images_signals[0].get_untracked().name,
         "../assets/favicon.ico"
     );
 
+    // upload.fil
+
     upload
-        .update_file(
+        .update_image(
             &server.client,
-            input_files[0].clone(),
-            files_signals[0].clone(),
+            input_images[0].clone(),
+            images_signals[0].clone(),
         )
         .await;
 
-    assert_eq!(files_signals[0].get_untracked().name, "3905551641572326689");
-    assert_eq!(files_signals[0].get_untracked().err, "");
+    assert_eq!(
+        images_signals[0].get_untracked().name,
+        "3905551641572326689"
+    );
+    assert_eq!(images_signals[0].get_untracked().err, "");
     // assert_eq!(upload.er)
 
     // post_add in this context only GETS the post
@@ -308,34 +313,50 @@ async fn test_post_files_state_file_add() {
         .await
         .unwrap();
 
-    assert_eq!(post1.file.len(), 1);
+    assert_eq!(post1.images_hashes.len(), 1);
 
-    let files_signals = upload.files.get_untracked();
-    assert_eq!(files_signals.len(), 1);
+    let images_signals = upload.images.get_untracked();
+    assert_eq!(images_signals.len(), 1);
     assert_eq!(
-        files_signals[0].get_untracked().state,
-        ParsedPostFileState::Uploaded
+        images_signals[0].get_untracked().state,
+        ParsedPostImageState::Processing
     );
 }
 
 #[cfg(test)]
 #[tokio::test]
-async fn test_upload_state_file_remove() {
-    let (server, _owner, upload, post1) = test_upload_init("test_upload_state_file_remove").await;
+async fn test_upload_state_image_remove() {
+    let (server, _owner, upload, post1) = test_upload_init("test_upload_state_image_remove").await;
 
-    let input_files = vec!["../assets/favicon.ico".to_string()];
-    let files_signals = upload.set_files(input_files.clone());
+    let input_images = vec!["../assets/favicon.ico".to_string()];
+    let images_signals = upload.set_images(input_images.clone());
+    let image = input_images[0].clone();
+    let image_signal = images_signals[0].clone();
+
+    {
+        let images = upload.images.get();
+        assert_eq!(images.len(), 1);
+        assert_eq!(
+            images[0].with_untracked(|v| v.state),
+            ParsedPostImageState::Queue
+        );
+
+        upload
+            .remove_image(&server.client, image_signal.clone())
+            .await;
+        let image_err = image_signal.with_untracked(|v| v.err.clone());
+
+        let images = upload.images.get_untracked();
+        assert_eq!(image_err, "");
+        assert_eq!(images.len(), 0);
+    }
 
     upload
-        .update_file(
-            &server.client,
-            input_files[0].clone(),
-            files_signals[0].clone(),
-        )
+        .update_image(&server.client, image, image_signal.clone())
         .await;
 
     upload
-        .remove_file(&server.client, files_signals[0].clone())
+        .remove_image(&server.client, image_signal.clone())
         .await;
 
     // post_add in this context only GETS the post
@@ -349,13 +370,13 @@ async fn test_upload_state_file_remove() {
         .await
         .unwrap();
 
-    assert_eq!(post1.file.len(), 0);
+    assert_eq!(post1.images_hashes.len(), 0);
 }
 
 #[cfg(test)]
 async fn test_upload_init(
     db_name: &str,
-) -> (catsquad_api::TestServer, Owner, PostFilesState, PostRes) {
+) -> (catsquad_api::TestServer, Owner, PostImagesState, PostRes) {
     use catsquad_api::auth::create_auth_cookie_str;
     use catsquad_shared::uuid_to_str;
     use http::header;
@@ -389,7 +410,7 @@ async fn test_upload_init(
         .unwrap();
 
     // upload.init creates new post draft
-    let upload = PostFilesState::new(post1.id.into(), RwSignal::new(Vec::new()));
+    let upload = PostImagesState::new(post1.id.into(), RwSignal::new(Vec::new()));
     // upload.init(&server.client).await;
 
     (server, owner, upload, post1)

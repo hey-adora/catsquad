@@ -1,6 +1,8 @@
 use super::api_gallery::{GalleryApi, GalleryContainerSize};
 use catsquad_log::prelude::*;
-use catsquad_shared::{PostFile, PostSearchRes, link_relative_img, link_relative_post};
+use catsquad_shared::{
+    PostImage, PostSearchRes, link_relative_post, link_relative_post_image_bytes_get_by_hash,
+};
 use catsquad_web_utils::prelude::*;
 use catsquad_web_utils::time::time_now_micro;
 use leptos::{html::Div, prelude::*};
@@ -536,7 +538,7 @@ impl ResizableImage for Img {
         // link_post(&self.username, &self.key)
     }
     fn get_img_link(&self) -> String {
-        link_relative_img(self.id, self.hash)
+        link_relative_post_image_bytes_get_by_hash(self.id, self.hash)
         // link_img(&self.hash, &self.extension)
     }
     fn get_width(&self) -> u32 {

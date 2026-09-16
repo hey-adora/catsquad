@@ -3,8 +3,13 @@ use leptos::prelude::*;
 use leptos_router::hooks::use_location;
 
 #[component]
-pub fn PostSelectedImg(post_api: PostApi) -> impl IntoView {
+pub fn PostSelectedImg(
+    #[prop(optional, into)] post_id: Signal<i64>,
+    post_api: PostApi,
+) -> impl IntoView {
     let location = use_location();
+    // let images = post_api.imgs;
+    // let post_id = post_api.i
     let selected_img = move || -> AnyView {
         let hash = location.hash.get();
         let imgs_links = post_api.imgs_links.get();
@@ -30,9 +35,11 @@ pub fn PostSelectedImg(post_api: PostApi) -> impl IntoView {
     };
 
     view! {
-
         <div class="lg:hidden h-[50vh] flex justify-center place-items-center bg-base02" >
             { selected_img }
         </div>
     }
 }
+// <div class="lg:hidden h-[50vh] flex justify-center place-items-center bg-base02" >
+//     { selected_img }
+// </div>

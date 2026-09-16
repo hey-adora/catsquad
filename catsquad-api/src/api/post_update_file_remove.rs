@@ -3,7 +3,7 @@ use axum::{Extension, Form, Json, extract::State, http::StatusCode, response::In
 use catsquad_db::{DbPostUpdateFileRemoveErr, DbUser};
 use catsquad_log::prelude::*;
 use catsquad_shared::{
-    PostFile, PostRes, PostState, PostUpdateFileRemoveErr, PostUpdateFileRemoveReq,
+    PostImage, PostRes, PostState, PostUpdateFileRemoveErr, PostUpdateFileRemoveReq,
 };
 
 fn from_db_post_update_file_remove_err(
@@ -75,7 +75,7 @@ pub async fn post_update_file_remove(
 mod test_utils {
     use crate::{TestServer, auth::create_auth_cookie_str};
     use axum::http::header;
-    use catsquad_shared::{self as cs, PostFile, PostState, Uuid, uuid_to_str};
+    use catsquad_shared::{self as cs, PostImage, PostState, Uuid, uuid_to_str};
 
     impl TestServer {
         pub async fn post_update_file_remove(
@@ -85,7 +85,7 @@ mod test_utils {
             session_token: Uuid,
         ) -> Result<(), cs::PostUpdateFileRemoveErr> {
             self.client
-                .post_update_file_remove(post_id, file_hash)
+                .post_update_image_remove(post_id, file_hash)
                 .header_add(
                     header::COOKIE,
                     create_auth_cookie_str(uuid_to_str(session_token)),
@@ -146,8 +146,8 @@ async fn test_api_post_update_file_remove() {
         .await
         .unwrap();
 
-    assert_eq!(result.file.len(), 1);
-    let file1_hash = result.file[0].hash;
+    assert_eq!(result.images.len(), 1);
+    let file1_hash = result.images[0].hash;
 
     server
         .post_update_file_remove(post1.id, file1_hash, session_key1)
@@ -159,5 +159,5 @@ async fn test_api_post_update_file_remove() {
         .await
         .unwrap();
 
-    assert_eq!(result.file.len(), 0);
+    assert_eq!(result.images.len(), 0);
 }

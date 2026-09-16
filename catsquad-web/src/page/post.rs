@@ -74,7 +74,7 @@ pub fn Post() -> impl IntoView {
 
         spawner_post.spawn(async move {
             let client = create_client();
-            post_api.get(&client, post_id).await;
+            post_api.init(&client, post_id).await;
             // post_like_api.init(post_id).await;
         });
     });
@@ -105,7 +105,7 @@ pub fn Post() -> impl IntoView {
             <Show when=when_show >
                 <div class="flex flex-col lg:grid grid-rows-[auto_1fr] grid-cols-[2fr_1fr] lg:max-h-[calc(100vh-3rem)] gap-2  md:gap-6">
                     <PostControls spawner=spawner_post post_api post_id/>
-                    <PostSelectedImg post_api />
+                    <PostSelectedImg post_id post_api />
                     <PostImgs post_api />
                     <div class="flex flex-col gap-2 md:gap-6 px-4 md:px-6  lg:overflow-y-scroll">
                         <PostPreviews spawner=spawner_post post_api post_id/>

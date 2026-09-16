@@ -73,7 +73,7 @@ impl Db {
 
         let post_state = PostState::from(post_state);
         match post_state {
-            PostState::Hidden if post_user_username == user_username => (),
+            PostState::Draft | PostState::Hidden if post_user_username == user_username => (),
             PostState::Active => (),
             _ => return Err(DbPostImageGetByHashErr::Unauthorized),
         }
@@ -118,77 +118,75 @@ async fn test_post_image_get_by_hash() {
         .await
         .unwrap();
 
-    db.post_update_state(0, user1.username.clone(), post1.id, PostState::Active)
-        .await
-        .unwrap();
-
     let image = db
         .post_update_file_add(0, user1.username.clone(), post1.id, 19, 666, "ico", 10, 15)
         .await
         .unwrap();
 
-    let image2 = db
+    let _image2 = db
         .post_update_file_add(0, user1.username.clone(), post1.id, 29, 266, "png", 20, 25)
         .await
         .unwrap();
 
-    let result = db
-        .post_image_get_by_hash(user1.username.clone(), post1.id, 666)
+    // assert not found
+    {
+        let result = db
+            .post_image_get_by_hash(user2.username.clone(), post1.id, 667)
+            .await;
+
+        assert!(matches!(result, Err(DbPostImageGetByHashErr::NotFound)));
+    }
+
+    // assert when state is draft
+    {
+        let result = db
+            .post_image_get_by_hash(user1.username.clone(), post1.id, 666)
+            .await
+            .unwrap();
+        assert_eq!(image.hash, result.hash);
+
+        let result = db
+            .post_image_get_by_hash(user2.username.clone(), post1.id, 666)
+            .await;
+
+        assert!(matches!(result, Err(DbPostImageGetByHashErr::Unauthorized)));
+    }
+
+    db.post_update_state(0, user1.username.clone(), post1.id, PostState::Active)
         .await
         .unwrap();
-    assert_eq!(image.hash, result.hash);
 
-    // {
-    //     let result = db
-    //         .post_get_by_id(user1.username.clone(), post1.id.clone())
-    //         .await;
-    //     assert!(matches!(result, Err(DbPostGetByKeyErr::PostNotFound)));
+    // assert when state is active
+    {
+        let result = db
+            .post_image_get_by_hash(user1.username.clone(), post1.id, 666)
+            .await
+            .unwrap();
+        assert_eq!(image.hash, result.hash);
 
-    //     let result = db
-    //         .post_get_by_id(user2.username.clone(), post1.id.clone())
-    //         .await;
-    //     assert!(matches!(result, Err(DbPostGetByKeyErr::PostNotFound)));
-    // }
+        let result = db
+            .post_image_get_by_hash(user2.username.clone(), post1.id, 666)
+            .await
+            .unwrap();
+        assert_eq!(image.hash, result.hash);
+    }
 
-    // db.post_update_state(
-    //     0,
-    //     user1.username.clone(),
-    //     post1.id.clone(),
-    //     PostState::Active,
-    // )
-    // .await
-    // .unwrap();
+    db.post_update_state(0, user1.username.clone(), post1.id, PostState::Hidden)
+        .await
+        .unwrap();
 
-    // {
-    //     let result = db
-    //         .post_get_by_id(user1.username.clone(), post1.id.clone())
-    //         .await;
-    //     assert!(matches!(result, Ok(_)));
+    // assert when state is hidden
+    {
+        let result = db
+            .post_image_get_by_hash(user1.username.clone(), post1.id, 666)
+            .await
+            .unwrap();
+        assert_eq!(image.hash, result.hash);
 
-    //     let result = db
-    //         .post_get_by_id(user2.username.clone(), post1.id.clone())
-    //         .await;
-    //     assert!(matches!(result, Ok(_)));
-    // }
+        let result = db
+            .post_image_get_by_hash(user2.username.clone(), post1.id, 666)
+            .await;
 
-    // db.post_update_state(
-    //     0,
-    //     user1.username.clone(),
-    //     post1.id.clone(),
-    //     PostState::Hidden,
-    // )
-    // .await
-    // .unwrap();
-
-    // {
-    //     let result = db
-    //         .post_get_by_id(user1.username.clone(), post1.id.clone())
-    //         .await;
-    //     assert!(matches!(result, Ok(_)));
-
-    //     let result = db
-    //         .post_get_by_id(user2.username.clone(), post1.id.clone())
-    //         .await;
-    //     assert!(matches!(result, Err(DbPostGetByKeyErr::Unauthorized)));
-    // }
+        assert!(matches!(result, Err(DbPostImageGetByHashErr::Unauthorized)));
+    }
 }

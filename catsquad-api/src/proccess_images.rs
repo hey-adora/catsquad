@@ -120,7 +120,7 @@ pub enum ProccessFileErr {
     Other(#[from] anyhow::Error),
 }
 
-pub async fn proccess_post_file(
+pub async fn proccess_post_image(
     storage_path: impl AsRef<Path>,
     file_hash: i64,
     file_extension: impl AsRef<OsStr>,
@@ -197,7 +197,7 @@ pub async fn proccess_post_file(
 
 #[cfg(test)]
 #[tokio::test]
-async fn test_proccess_post_file_() {
+async fn test_proccess_post_image_() {
     use tokio::fs;
 
     init_log();
@@ -209,17 +209,17 @@ async fn test_proccess_post_file_() {
 
     let storage_file_path = storage_file_path(storage_path.clone(), "0", "svg");
 
-    let result = proccess_post_file(storage_path.clone(), 0, "jpg", 10, 10, 10).await;
+    let result = proccess_post_image(storage_path.clone(), 0, "jpg", 10, 10, 10).await;
     assert!(matches!(result, Err(_)));
 
     fs::copy(img_path, storage_file_path).await.unwrap();
 
-    let result = proccess_post_file(storage_path.clone(), 0, "svg", 10, 10, 10).await;
+    let result = proccess_post_image(storage_path.clone(), 0, "svg", 10, 10, 10).await;
     trace!("{result:#?}");
     assert!(matches!(result, Ok(_)));
 }
 
-pub async fn proccess_post_files(
+pub async fn proccess_post_images(
     time: u64,
     db: Db,
     storage_path: impl AsRef<Path>,
@@ -228,7 +228,7 @@ pub async fn proccess_post_files(
     let storage_path = storage_path.as_ref();
     let images = db.file_image_get_unproccesed().await?;
     for image in images {
-        let result = proccess_post_file(
+        let result = proccess_post_image(
             storage_path,
             image.hash,
             image.extension,
@@ -266,19 +266,28 @@ async fn test_proccess_post_files() {
         .await
         .unwrap();
 
+    assert_eq!(post1.images_status.len(), 0);
+
     let files = server
         .post_update_file_add(post1.id, &["../assets/favicon.ico"], session_key1)
         .await
         .unwrap();
 
+    // get updated one
+    let post1 = server.post_add("", "", "", session_key1).await.unwrap();
+
     let file = files[0].clone();
     let file_hash_str = i64_to_str(file.hash);
     let storage_path = server.state.get_storage_path().await;
-    let file_path = storage_file_path(
-        storage_path.clone(),
-        file_hash_str.clone(),
-        file.extension.clone(),
-    );
+
+    let file_path = {
+        let file_path = storage_file_path(
+            storage_path.clone(),
+            file_hash_str.clone(),
+            file.extension.clone(),
+        );
+        file_path
+    };
     let file_thumbnail_path = thumbnail_file_path(storage_path.clone(), file_hash_str);
     let is_proccesed = server
         .post_file_status_get_by_hash(file.hash)
@@ -289,13 +298,21 @@ async fn test_proccess_post_files() {
     trace!("{file_path:?}");
     trace!("{file_thumbnail_path:?}");
 
+    assert_eq!(post1.images_status.len(), 1);
+    assert_eq!(post1.images_status[0], false);
     assert!(file_path.exists());
     assert!(!file_thumbnail_path.exists());
     assert!(!is_proccesed);
 
-    proccess_post_files(0, server.state.db.clone(), storage_path.clone(), 1280)
+    proccess_post_images(0, server.state.db.clone(), storage_path.clone(), 1280)
         .await
         .unwrap();
+
+    // get updated one
+    let post1 = server.post_add("", "", "", session_key1).await.unwrap();
+
+    assert_eq!(post1.images_status.len(), 1);
+    assert_eq!(post1.images_status[0], true);
 
     let is_proccesed = server
         .post_file_status_get_by_hash(file.hash)
@@ -307,7 +324,7 @@ async fn test_proccess_post_files() {
     assert!(file_thumbnail_path.exists());
     assert!(is_proccesed);
 
-    proccess_post_files(0, server.state.db.clone(), storage_path, 1280)
+    proccess_post_images(0, server.state.db.clone(), storage_path, 1280)
         .await
         .unwrap();
 

@@ -23,6 +23,7 @@ pub mod post_like_get_post;
 pub mod post_like_remove;
 pub mod post_remove;
 pub mod post_search;
+pub mod post_thumbnail_bytes_get_by_hash;
 pub mod post_update_description;
 pub mod post_update_file_add;
 pub mod post_update_file_remove;

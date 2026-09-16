@@ -16,7 +16,7 @@ use tokio::fs;
 use crate::{
     api::{self, assets::index_404},
     auth::{auth_middleware, auth_optional_middleware},
-    proccess_images::proccess_post_files,
+    proccess_images::proccess_post_images,
     state::AppState,
 };
 pub async fn server() {
@@ -37,7 +37,8 @@ pub async fn server() {
             let mut interval = tokio::time::interval(Duration::from_secs(1));
 
             loop {
-                trace!("proccess thread waiting...");
+                // TODO make this queue maybe
+                // trace!("proccess thread waiting...");
                 tokio::select! {
                     _ = tokio::signal::ctrl_c() => {
                         break;
@@ -45,10 +46,9 @@ pub async fn server() {
                     _ = interval.tick() => {},
                 };
 
-                let result = proccess_post_files(0, db.clone(), storage_path.clone(), 1280).await;
+                let result = proccess_post_images(0, db.clone(), storage_path.clone(), 1280).await;
                 if let Err(err) = result {
                     error!("{err}");
-                    break;
                 }
             }
         }
@@ -143,8 +143,12 @@ pub async fn app(state: AppState) -> Router {
             get(api::post_get_by_id),
         )
         .route(
-            catsquad_shared::LINK_API_POST_FILE_BYTES_GET_BY_HASH,
+            catsquad_shared::LINK_API_POST_IMAGE_BYTES_GET_BY_HASH,
             get(api::post_file_bytes_get_by_hash),
+        )
+        .route(
+            catsquad_shared::LINK_API_POST_THUMBNAIL_BYTES_GET_BY_HASH,
+            get(api::post_thumbnail_bytes_get_by_hash),
         )
         .route_layer(middleware::from_fn_with_state(
             state.clone(),

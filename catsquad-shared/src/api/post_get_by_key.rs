@@ -1,4 +1,4 @@
-use crate::{PostFile, PostState};
+use crate::{PostImage, PostState};
 
 pub const LINK_API_POST_GET_BY_ID: &str = "/api/post/{post_id}";
 
@@ -15,7 +15,7 @@ pub struct PostGetRes {
     pub description: String,
     pub tags: String,
     pub favorites: u32,
-    pub file: Vec<PostFile>,
+    pub images: Vec<PostImage>,
     pub modified_at: u64,
     pub created_at: u64,
 }

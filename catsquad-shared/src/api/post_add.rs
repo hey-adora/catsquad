@@ -17,8 +17,8 @@ pub struct PostRes {
     pub description: String,
     pub tags: String,
     pub favorites: u32,
-    // pub file: Vec<PostFile>,
-    pub file: Vec<i64>,
+    pub images_hashes: Vec<i64>,
+    pub images_status: Vec<bool>,
     pub modified_at: u64,
     pub created_at: u64,
 }
@@ -91,7 +91,7 @@ impl Display for PostState {
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
-pub struct PostFile {
+pub struct PostImage {
     pub extension: String,
     pub hash: i64,
     pub proccesed: bool,
