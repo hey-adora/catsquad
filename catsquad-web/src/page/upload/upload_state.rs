@@ -3,7 +3,7 @@ use std::fmt::Debug;
 use catsquad_client::{Client, Response, SchrodingersImage, Sender};
 use catsquad_log::prelude::*;
 use catsquad_shared::{
-    PostAddErr, PostImage, PostState, link_relative_post, validate_post_description,
+    PostAddErr, PostImage, PostState, i64_to_str, link_relative_post, validate_post_description,
     validate_post_tags, validate_post_title,
 };
 use leptos::prelude::*;
@@ -109,9 +109,12 @@ impl UploadState {
                             .zip(v.images_status)
                             .map(|(hash, is_proccesed)| {
                                 ArcRwSignal::new(ParsedPostImage {
-                                    name: hash.to_string(),
+                                    name: i64_to_str(hash),
                                     hash: hash,
                                     size: 0,
+                                    width: 0,
+                                    height: 0,
+                                    ratio: 0.,
                                     uploaded_bytes: 0,
                                     uploaded_percentage: 0,
                                     upload_speed_bytes_a_second: 0,

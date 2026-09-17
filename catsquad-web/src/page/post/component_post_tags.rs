@@ -52,7 +52,8 @@ pub fn PostTags(
         });
     };
 
-    let when_is_user = move || page.is_logged_in().unwrap_or_default();
+    let when_is_owner = move || page.acc_username() == post_api.author_username.get();
+    // let when_is_user = move || page.is_logged_in().unwrap_or_default();
     let when_edit = move || post_api.update_tags_mode.get();
     let when_tag_full = move || post_api.tags.with(|v| !v.is_empty());
     let on_input = move |v: HtmlTextAreaElement| post_api.live_tags_length.set(v.value().len());
@@ -64,7 +65,7 @@ pub fn PostTags(
                 <h1 class="text-[1.3rem] text-base0F">"Tags"</h1>
                 <div class="flex gap-2 items-center">
 
-                    <Show when=when_is_user>
+                    <Show when=when_is_owner>
                         <Show when=when_edit>
                             <LengthCounter
                                 counter_current=post_api.live_tags_length

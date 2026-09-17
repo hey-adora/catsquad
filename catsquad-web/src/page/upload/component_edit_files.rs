@@ -3,7 +3,7 @@ use std::time::Duration;
 use super::component_edit_area::EditArea;
 use super::upload_state::UploadState;
 use crate::{
-    Errs, SVGTrash,
+    Errs, PageState, SVGTrash,
     hook::{ParsedPostImage, ParsedPostImageState, PostImagesState, Spawner},
     page::{create_client, upload::component_edit_text::ValidState},
 };
@@ -20,9 +20,11 @@ use web_sys::{File, HtmlInputElement, MouseEvent};
 
 #[component]
 pub fn ImagesEdit(
+    #[prop(into)] author_username: Signal<String>,
     #[prop(optional, into)] post_id: Signal<i64>,
     #[prop(optional, into)] images: RwSignal<Vec<ArcRwSignal<ParsedPostImage>>>,
 ) -> impl IntoView {
+    // let on_link = move |f| format!("");
     let is_valid = move || {
         let state = images.with(|v| {
             if v.is_empty() {
@@ -46,7 +48,7 @@ pub fn ImagesEdit(
                 required=false
                 is_valid=move||is_valid()
                 >
-                <ImagesView post_id images/>
+                <ImagesView author_username post_id images/>
             </EditArea>
         </div>
     }
@@ -54,12 +56,30 @@ pub fn ImagesEdit(
 
 #[component]
 pub fn ImagesView(
+    #[prop(optional, into)] on_click: Option<Callback<MouseEvent>>,
+    #[prop(optional, into)] on_link: Option<Callback<ArcRwSignal<ParsedPostImage>, String>>,
+    #[prop(into)] author_username: Signal<String>,
     #[prop(optional, into)] post_id: Signal<i64>,
     #[prop(optional, into)] images: RwSignal<Vec<ArcRwSignal<ParsedPostImage>>>,
 ) -> impl IntoView {
+    let page = PageState::get();
     let input_files = NodeRef::new();
     let post_files_state = PostImagesState::new(post_id, images);
     let images = post_files_state.images;
+
+    let on_click = move |e: MouseEvent| {
+        if let Some(f) = on_click {
+            f.run(e)
+        }
+    };
+
+    let on_link = move |file: ArcRwSignal<ParsedPostImage>| {
+        if let Some(f) = on_link {
+            f.run(file)
+        } else {
+            "".to_string()
+        }
+    };
 
     let on_file_change = move |e| {
         let Some(new_files) = (input_files.get_untracked() as Option<HtmlInputElement>)
@@ -108,6 +128,7 @@ pub fn ImagesView(
 
                 ParsedPostImageState::Processing => view! {
                     <FileProcessingPreview
+                        author_username
                         post_files_state
                         file
                     />
@@ -118,6 +139,9 @@ pub fn ImagesView(
                 // | ParsedPostFileState::Checking
                  => view! {
                     <FileCompletedPreview
+                        on_link
+                        on_click
+                        author_username
                         post_files_state
                         file
                     />
@@ -125,6 +149,7 @@ pub fn ImagesView(
                 .into_any(),
                 ParsedPostImageState::Error => view! {
                     <FileErrorPreview
+                        author_username
                         post_files_state
                         file
                     />
@@ -135,10 +160,14 @@ pub fn ImagesView(
             .into_any()
     };
 
+    let when_is_owner = move || page.acc_username() == author_username.get();
+
     view! {
         { view_files }
-        <PreviewAdd fn_for=move||"image"/>
-        <input class="absolute z-[-1] opacity-0" on:change=on_file_change type="file" id="image" name="image" node_ref=input_files multiple />
+        <Show when=when_is_owner>
+            <PreviewAdd fn_for=move||"image"/>
+            <input class="absolute z-[-1] opacity-0" on:change=on_file_change type="file" id="image" name="image" node_ref=input_files multiple />
+        </Show>
     }
 }
 
@@ -278,12 +307,32 @@ pub fn FileUploadingPreview(file: ArcRwSignal<ParsedPostImage>) -> impl IntoView
 
 #[component]
 pub fn FileCompletedPreview(
+    #[prop(optional, into)] on_click: Option<Callback<MouseEvent>>,
+    #[prop(optional, into)] on_link: Option<Callback<ArcRwSignal<ParsedPostImage>, String>>,
+    #[prop(into)] author_username: Signal<String>,
     post_files_state: PostImagesState,
     file: ArcRwSignal<ParsedPostImage>,
 ) -> impl IntoView {
-    let name = {
+    // let name = {
+    //     let file = file.clone();
+    //     move || file.with(|v| v.name.clone())
+    // };
+
+    let link = {
         let file = file.clone();
-        move || file.with(|v| v.name.clone())
+        move || {
+            if let Some(f) = on_link {
+                f.run(file.clone())
+            } else {
+                String::new()
+            }
+        }
+    };
+
+    let on_click = move |e: MouseEvent| {
+        if let Some(f) = on_click {
+            f.run(e)
+        }
     };
 
     let style_bg_img = {
@@ -298,18 +347,48 @@ pub fn FileCompletedPreview(
         }
     };
 
-    view! { <div
+    let when_is_link = {
+        let link = link.clone();
+        move || !link().is_empty()
+    };
+
+    let fallback = {
+        let file = file.clone();
+        let style_bg_img = style_bg_img.clone();
+        move || {
+            view! {
+                <div
+                on:click=on_click.clone()
+                id="previw_add"
+                class="p-2 relative flex flex-col gap-1 bg-cover place-items-center size-[8rem] rounded-xl bg-base05/10 bg-cover bg-center border-2 border-base05"
+                style:background-image=style_bg_img.clone()
+                >
+                  <TrashCanBtn author_username post_files_state file=file.clone()/>
+                </div>
+
+            }
+        }
+    };
+
+    view! {
+        <Show when=when_is_link fallback >
+            <a
+            on:click=on_click.clone()
+            href=link.clone()
             id="previw_add"
             class="p-2 relative flex flex-col gap-1 bg-cover place-items-center size-[8rem] rounded-xl bg-base05/10 bg-cover bg-center border-2 border-base05"
-            style:background-image=style_bg_img
+            style:background-image=style_bg_img.clone()
             >
-              <TrashCanBtn post_files_state file/>
-            </div>
+              <TrashCanBtn author_username post_files_state file=file.clone()/>
+            </a>
+        </Show>
+
     }
 }
 
 #[component]
 pub fn FileProcessingPreview(
+    #[prop(into)] author_username: Signal<String>,
     post_files_state: PostImagesState,
     file: ArcRwSignal<ParsedPostImage>,
 ) -> impl IntoView {
@@ -341,13 +420,14 @@ pub fn FileProcessingPreview(
               <p class="text-[0.7rem]">
                   "proccessing..."
               </p>
-              <TrashCanBtn post_files_state file/>
+              <TrashCanBtn author_username post_files_state file/>
             </div>
     }
 }
 
 #[component]
 pub fn FileErrorPreview(
+    #[prop(into)] author_username: Signal<String>,
     post_files_state: PostImagesState,
     file: ArcRwSignal<ParsedPostImage>,
 ) -> impl IntoView {
@@ -370,16 +450,18 @@ pub fn FileErrorPreview(
               <p class="text-[0.7rem]">
                   { err }
               </p>
-              <TrashCanBtn post_files_state file/>
+              <TrashCanBtn author_username post_files_state file/>
             </div>
     }
 }
 
 #[component]
 pub fn TrashCanBtn(
+    #[prop(into)] author_username: Signal<String>,
     post_files_state: PostImagesState,
     file: ArcRwSignal<ParsedPostImage>,
 ) -> impl IntoView {
+    let page = PageState::get();
     let spawner = Spawner::new();
     let on_click = move |_e: MouseEvent| {
         let file = file.clone();
@@ -388,11 +470,14 @@ pub fn TrashCanBtn(
             post_files_state.remove_image(&client, file).await;
         });
     };
+    let when_is_owner = move || page.acc_username() == author_username.get();
 
     view! {
-        <button on:click=on_click>
-            <SVGTrash class="bg-base03 p-[0.35rem] text-base08 rounded-full absolute left-[100%] top-[100%] transform -translate-x-1/2 -translate-y-1/2 size-[2.0rem]" />
-        </button>
+        <Show when=when_is_owner>
+            <button on:click=on_click.clone()>
+                <SVGTrash class="bg-base03 p-[0.35rem] text-base08 rounded-full absolute left-[100%] top-[100%] transform -translate-x-1/2 -translate-y-1/2 size-[2.0rem]" />
+            </button>
+        </Show>
     }
 }
 

@@ -12,7 +12,6 @@ test_server = [
 test_backdoors = []
 
 [dependencies]
-anyhow = { workspace = true }
 axum = { workspace = true }
 catsquad-db = { workspace = true }
 catsquad-log = { workspace = true }
@@ -20,6 +19,7 @@ catsquad-shared = { workspace = true }
 rand = { workspace = true }
 serde_json = { workspace = true }
 serde = { workspace = true }
+anyhow = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true, features = ["macros", "rt-multi-thread", "process", "signal"] }
 argon2 = { workspace = true }

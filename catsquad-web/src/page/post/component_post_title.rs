@@ -56,7 +56,8 @@ pub fn PostTitle(
         });
     };
 
-    let when_is_user = move || page.is_logged_in().unwrap_or_default();
+    let when_is_owner = move || page.acc_username() == post_api.author_username.get();
+    // let when_is_user = move || page.is_logged_in().unwrap_or_default();
     let when_edit_on = move || post_api.update_title_mode.get();
     let when_edit_off = move || !when_edit_on();
     let class_title = move || {
@@ -91,7 +92,7 @@ pub fn PostTitle(
 
                 "  "
 
-                <Show when=when_is_user >
+                <Show when=when_is_owner >
                     <span class=class_on_edit>
                         <Show when=move|| post_api.update_title_mode.get()>
                             <LengthCounter

@@ -4,7 +4,7 @@ use catsquad_client::{Client, Response, Sender};
 use catsquad_log::prelude::*;
 use catsquad_shared::{
     LINK_WEB_INDEX, PostGetByKeyErr, PostRemoveErr, PostState, PostUpdateDescriptionErr,
-    PostUpdateTagsErr, PostUpdateTitleErr, link_relative_post_image_bytes_get_by_hash,
+    PostUpdateTagsErr, PostUpdateTitleErr, i64_to_str, link_relative_post_image_bytes_get_by_hash,
     proccess_tags,
 };
 use catsquad_web_utils::prelude::*;
@@ -25,26 +25,26 @@ use crate::hook::{ParsedPostImage, ParsedPostImageState};
 pub struct PostApi {
     // ui
     // pub items: RwSignal<Vec<Img>, LocalStorage>,
-    pub err_general: RwSignal<String, LocalStorage>,
-    pub err_title: RwSignal<String, LocalStorage>,
+    pub err_general: RwSignal<String>,
+    pub err_title: RwSignal<String>,
     pub err_tags: RwSignal<String>,
     pub err_description: RwSignal<String>,
-    pub live_description_length: RwSignal<usize, LocalStorage>,
+    pub live_description_length: RwSignal<usize>,
     pub live_tags_length: RwSignal<usize>,
-    pub live_title_length: RwSignal<usize, LocalStorage>,
+    pub live_title_length: RwSignal<usize>,
     pub imgs: RwSignal<Vec<ArcRwSignal<ParsedPostImage>>>,
-    pub imgs_links: RwSignal<Vec<(String, f64)>, LocalStorage>,
-    pub title: RwSignal<String, LocalStorage>,
-    pub author_username: RwSignal<String, LocalStorage>,
+    // pub imgs_links: RwSignal<Vec<(String, f64)>>,
+    pub title: RwSignal<String>,
+    pub author_username: RwSignal<String>,
     // pub author_key: RwSignal<String, LocalStorage>,
-    pub author_link: RwSignal<String, LocalStorage>,
-    pub tags: RwSignal<String, LocalStorage>,
+    pub author_link: RwSignal<String>,
+    pub tags: RwSignal<String>,
     // pub tags_is_empty: RwSignal<bool, LocalStorage>,
-    pub update_title_mode: RwSignal<bool, LocalStorage>,
-    pub update_tags_mode: RwSignal<bool, LocalStorage>,
-    pub update_description_mode: RwSignal<bool, LocalStorage>,
+    pub update_title_mode: RwSignal<bool>,
+    pub update_tags_mode: RwSignal<bool>,
+    pub update_description_mode: RwSignal<bool>,
     // pub tags_is_e: RwSignal<String, LocalStorage>,
-    pub description: RwSignal<String, LocalStorage>,
+    pub description: RwSignal<String>,
     pub post_state: RwSignal<Option<PostState>>,
     // pub description_is_empty: RwSignal<bool, LocalStorage>,
     pub likes: RwSignal<u32>,
@@ -78,23 +78,23 @@ impl PostApi {
         Self {
             // items: RwSignal::new_local(Vec::new()),
             imgs: RwSignal::new(Vec::new()),
-            imgs_links: RwSignal::new_local(Vec::<(String, f64)>::new()),
-            title: RwSignal::new_local(String::new()),
-            author_username: RwSignal::new_local(String::new()),
+            // imgs_links: RwSignal::new(Vec::<(String, f64)>::new()),
+            title: RwSignal::new(String::new()),
+            author_username: RwSignal::new(String::new()),
             // author_key: RwSignal::new_local(String::new()),
-            author_link: RwSignal::new_local(LINK_WEB_INDEX.to_string()),
-            tags: RwSignal::new_local(String::new()),
-            live_description_length: RwSignal::new_local(0),
+            author_link: RwSignal::new(LINK_WEB_INDEX.to_string()),
+            tags: RwSignal::new(String::new()),
+            live_description_length: RwSignal::new(0),
             live_tags_length: RwSignal::new(0),
-            live_title_length: RwSignal::new_local(0),
-            err_general: RwSignal::new_local(String::new()),
-            err_title: RwSignal::new_local(String::new()),
+            live_title_length: RwSignal::new(0),
+            err_general: RwSignal::new(String::new()),
+            err_title: RwSignal::new(String::new()),
             err_tags: RwSignal::new(String::new()),
             err_description: RwSignal::new(String::new()),
-            update_title_mode: RwSignal::new_local(false),
-            update_tags_mode: RwSignal::new_local(false),
-            update_description_mode: RwSignal::new_local(false),
-            description: RwSignal::new_local(String::new()),
+            update_title_mode: RwSignal::new(false),
+            update_tags_mode: RwSignal::new(false),
+            update_description_mode: RwSignal::new(false),
+            description: RwSignal::new(String::new()),
             // description_is_empty: RwSignal::new_local(true),
             likes: RwSignal::new(0),
             created_at: RwSignal::new(0),
@@ -263,6 +263,21 @@ impl PostApi {
         None
     }
 
+    pub fn imgs_links(&self, post_id: i64) -> Vec<(String, f64, i64)> {
+        self.imgs
+            .get()
+            .into_iter()
+            .map(|f| {
+                let (ratio, hash) = f.with(|v| (v.ratio, v.hash));
+                (
+                    link_relative_post_image_bytes_get_by_hash(post_id, hash),
+                    ratio,
+                    hash,
+                )
+            })
+            .collect()
+    }
+
     pub async fn init<TSender>(&self, client: &Client<TSender>, post_id: i64)
     where
         TSender: Sender + Debug + Clone,
@@ -297,38 +312,23 @@ impl PostApi {
                     post.images
                         .clone()
                         .into_iter()
-                        .map(|v| {
-                            ArcRwSignal::new(ParsedPostImage {
-                                name: v.hash.to_string(),
-                                hash: v.hash,
-                                size: 0,
-                                uploaded_bytes: 0,
-                                uploaded_percentage: 0,
-                                upload_speed_bytes_a_second: 0,
-                                state: if v.proccesed {
-                                    ParsedPostImageState::Completed
-                                } else {
-                                    ParsedPostImageState::Processing
-                                },
-                                err: String::new(),
-                            })
-                        })
+                        .map(|v| ArcRwSignal::new(ParsedPostImage::from(v)))
                         .collect(),
                 );
-                self.imgs_links.set(
-                    post.images
-                        .into_iter()
-                        .map(|file| {
-                            (
-                                link_relative_post_image_bytes_get_by_hash(
-                                    post_key.clone(),
-                                    file.hash,
-                                ),
-                                file.width as f64 / file.height as f64,
-                            )
-                        })
-                        .collect(),
-                );
+                // self.imgs_links.set(
+                //     post.images
+                //         .into_iter()
+                //         .map(|file| {
+                //             (
+                //                 link_relative_post_image_bytes_get_by_hash(
+                //                     post_key.clone(),
+                //                     file.hash,
+                //                 ),
+                //                 file.width as f64 / file.height as f64,
+                //             )
+                //         })
+                //         .collect(),
+                // );
                 self.post_state.set(Some(post.state));
                 self.api_state.set(PostApiState::Normal);
             }

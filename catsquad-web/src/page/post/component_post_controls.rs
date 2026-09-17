@@ -39,10 +39,10 @@ pub fn PostControls(
     };
 
     let class_state = move || format!("{} font-bold px-2 py-1 rounded-md", state_color());
-    let when_is_user = move || page.is_logged_in().unwrap_or_default();
+    let when_is_owner = move || page.acc_username() == post_api.author_username.get();
 
     view! {
-        <Show when=when_is_user>
+        <Show when=when_is_owner>
             <div class="col-span-2 flex justify-between px-4 md:px-6 ">
                 <div>
                     <p class=class_state>{state}</p>

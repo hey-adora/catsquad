@@ -1,10 +1,11 @@
+use crate::hook::{ParsedPostImage, PostImageId};
 use crate::page::upload::component_edit_files::ImagesView;
 use crate::{hook::Spawner, page::post::post_api::PostApi};
 use catsquad_log::prelude::*;
 use catsquad_web_utils::file::GetFiles;
 use leptos::{html, prelude::*};
 use leptos_router::hooks::use_location;
-use web_sys::HtmlInputElement;
+use web_sys::{HtmlInputElement, MouseEvent};
 
 #[component]
 pub fn PostPreviews(
@@ -13,6 +14,14 @@ pub fn PostPreviews(
     #[prop(optional, into)] post_id: Signal<i64>,
 ) -> impl IntoView {
     let images = post_api.imgs;
+    let post_author_username = post_api.author_username.clone();
+    let on_click = move |e: MouseEvent| {
+        // trace!("");
+    };
+
+    let on_link =
+        move |f: ArcRwSignal<ParsedPostImage>| f.with(|v| PostImageId::new(v.hash).to_hashtag());
+
     // let upload_image = NodeRef::<html::Input>::new();
 
     // let on_upload = move |_| {
@@ -75,7 +84,7 @@ pub fn PostPreviews(
 
     view! {
         <div class="flex justify-start gap-2 flex flex-wrap">
-            <ImagesView post_id images />
+            <ImagesView on_link on_click=on_click author_username=post_author_username post_id images />
         </div>
     }
 }

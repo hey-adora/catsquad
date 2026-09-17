@@ -17,7 +17,8 @@ pub fn PostDescription(
 ) -> impl IntoView {
     let page = PageState::get();
     let description_input_editor = NodeRef::<html::Textarea>::new();
-    let when_is_user = move || page.is_logged_in().unwrap_or_default();
+    let when_is_owner = move || page.acc_username() == post_api.author_username.get();
+    // let when_is_user = move || page.is_logged_in().unwrap_or_default();
     let when_edit = move || post_api.update_description_mode.get();
 
     let edit_description_mode_toggle = move || {
@@ -64,7 +65,7 @@ pub fn PostDescription(
                 <h1 class="text-[1.3rem] text-base0F">"Description"</h1>
                 <div class="flex gap-2 items-center">
 
-                    <Show when=when_is_user >
+                    <Show when=when_is_owner >
                         <Show when=when_edit>
                             <LengthCounter
                                 counter_current=move||post_api.live_description_length.get()

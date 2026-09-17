@@ -1,5 +1,5 @@
 use crate::{
-    Nav,
+    Nav, PageState,
     hook::{PostImagesState, Spawner},
     page::{
         create_client,
@@ -30,8 +30,11 @@ use component_publish::Publish;
 #[component]
 pub fn Upload() -> impl IntoView {
     let time = time_now_micro();
+    let page = PageState::get();
     let spawner = Spawner::new();
     let upload = UploadState::new(time);
+
+    let post_author_username = move || page.acc_username();
     let post_id = move || upload.post_id.get_value();
     let post_files = upload.files;
 
@@ -48,7 +51,7 @@ pub fn Upload() -> impl IntoView {
             <div class="flex flex-col gap-4 max-w-[25rem] mx-auto" >
                 <Publish upload/>
                 <TitleEdit upload/>
-                <ImagesEdit post_id=post_id images=post_files />
+                <ImagesEdit author_username=post_author_username post_id=post_id images=post_files />
                 <DescriptionEdit upload/>
                 <TagsEdit upload/>
             </div>

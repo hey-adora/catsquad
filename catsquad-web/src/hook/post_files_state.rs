@@ -1,10 +1,11 @@
+use anyhow::anyhow;
 use catsquad_client::{Client, Response, SchrodingersImage, Sender};
 use catsquad_log::prelude::*;
-use catsquad_shared::PostImage;
 #[cfg(test)]
 use catsquad_shared::PostRes;
+use catsquad_shared::{PostImage, i64_to_str, str_to_i64};
 use leptos::prelude::*;
-use std::fmt::Debug;
+use std::fmt::{Debug, Display};
 
 use crate::page::create_client;
 
@@ -20,11 +21,88 @@ pub struct ParsedPostImage {
     pub name: String,
     pub hash: i64,
     pub size: u64,
+    pub width: u32,
+    pub height: u32,
+    pub ratio: f64,
     pub uploaded_bytes: u64,
     pub uploaded_percentage: u64,
     pub upload_speed_bytes_a_second: u64,
     pub state: ParsedPostImageState,
     pub err: String,
+}
+
+const POST_IMGAGE_ID_PREFIX: &'static str = "img_";
+
+#[derive(Clone, Copy, PartialEq, Debug)]
+pub struct PostImageId(pub i64);
+
+impl PostImageId {
+    pub fn new(hash: i64) -> Self {
+        // Self(format!("img_{}", i64_to_str(hash)))
+        Self(hash)
+    }
+
+    pub fn to_hashtag(&self) -> String {
+        format!("#{}", self)
+    }
+
+    pub fn to_id(&self) -> String {
+        self.to_string()
+    }
+}
+
+impl<T> From<T> for PostImageId
+where
+    T: AsRef<str>,
+{
+    fn from(value: T) -> Self {
+        let value = value.as_ref();
+        let prefix_len = POST_IMGAGE_ID_PREFIX.len();
+        trace!("{} <= {}", value.len(), prefix_len);
+        if value.len() <= prefix_len {
+            return Self(0);
+        }
+        let first_char = value.chars().next();
+        let id = if first_char == Some('#') {
+            trace!("{} <= {}", value.len(), prefix_len + 1);
+            if value.len() <= prefix_len + 1 {
+                return Self(0);
+            }
+            &value[prefix_len + 1..]
+        } else {
+            &value[prefix_len..]
+        };
+
+        let id = str_to_i64(id);
+
+        Self(id)
+    }
+}
+
+// impl From<String> for PostImageId {
+//     fn from(value: String) -> Self {
+//         From::<&str>::from(&value)
+//     }
+// }
+
+impl Display for PostImageId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let output = format!("{}{}", POST_IMGAGE_ID_PREFIX, i64_to_str(self.0));
+        write!(f, "{}", output)
+    }
+}
+
+#[cfg(test)]
+#[test]
+fn test_post_image_id() {
+    init_log();
+    let id = PostImageId::new(5);
+    let id_str = id.to_string();
+    assert_eq!(id_str, "img_5");
+    let result = PostImageId::from("img_5");
+    assert_eq!(result, id);
+    let result = PostImageId::from("#img_5");
+    assert_eq!(result, id);
 }
 
 impl From<i64> for ParsedPostImage {
@@ -33,6 +111,9 @@ impl From<i64> for ParsedPostImage {
             name: value.to_string(),
             hash: value,
             size: 0,
+            width: 0,
+            height: 0,
+            ratio: 0.,
             uploaded_bytes: 0,
             upload_speed_bytes_a_second: 0,
             uploaded_percentage: 0,
@@ -60,6 +141,9 @@ impl From<String> for ParsedPostImage {
             name: value,
             hash: 0,
             size: 0,
+            width: 0,
+            height: 0,
+            ratio: 0.,
             uploaded_bytes: 0,
             upload_speed_bytes_a_second: 0,
             uploaded_percentage: 0,
@@ -81,6 +165,9 @@ impl From<PostImage> for ParsedPostImage {
             name: value.hash.to_string(),
             hash: value.hash,
             size: value.size_bytes as u64,
+            width: value.width,
+            height: value.height,
+            ratio: value.width as f64 / value.height as f64,
             uploaded_bytes: 0,
             upload_speed_bytes_a_second: 0,
             uploaded_percentage: 0,
@@ -100,6 +187,9 @@ impl From<web_sys::File> for ParsedPostImage {
         Self {
             name: name,
             hash: 0,
+            width: 0,
+            height: 0,
+            ratio: 0.,
             size: size as u64,
             uploaded_bytes: 0,
             upload_speed_bytes_a_second: 0,
