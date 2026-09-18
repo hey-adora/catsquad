@@ -6,7 +6,6 @@ use leptos_router::hooks::use_location;
 #[component]
 pub fn PostSelectedImg(#[prop(into)] post_id: Signal<i64>, post_api: PostApi) -> impl IntoView {
     let location = use_location();
-    // let images = post_api.imgs;
     let selected_img = move || -> AnyView {
         let post_id = post_id.get();
         let hash = location.hash.get();
@@ -19,14 +18,7 @@ pub fn PostSelectedImg(#[prop(into)] post_id: Signal<i64>, post_api: PostApi) ->
                 .cloned()
         });
 
-        // let imgs_links = post_api.imgs_links(post_id);
-        // let selected_n = if hash.len() > 3 {
-        //     usize::from_str_radix(&hash[3..], 10).unwrap_or_default()
-        // } else {
-        //     0
-        // };
-        let Some(file) = selected_file else {
-            // (selected_url, selected_ratio, hash)
+        let Some(_) = selected_file else {
             return view! {
                 <p>
                     "No Image"
@@ -49,6 +41,3 @@ pub fn PostSelectedImg(#[prop(into)] post_id: Signal<i64>, post_api: PostApi) ->
         </div>
     }
 }
-// <div class="lg:hidden h-[50vh] flex justify-center place-items-center bg-base02" >
-//     { selected_img }
-// </div>

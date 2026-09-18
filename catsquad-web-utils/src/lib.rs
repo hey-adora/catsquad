@@ -492,9 +492,9 @@ pub mod time {
         for (size, label) in table {
             let prev_size = total_size;
             total_size *= size;
-            trace!(
-                "ns({micro}) size({size}) label({label:?}) prev_size({prev_size}) total_size({total_size})"
-            );
+            // trace!(
+            //     "ns({micro}) size({size}) label({label:?}) prev_size({prev_size}) total_size({total_size})"
+            // );
             if micro < total_size {
                 let new_size = micro / prev_size;
                 output.push_str(&new_size.to_string());

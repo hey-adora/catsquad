@@ -1,17 +1,18 @@
-use std::time::Duration;
+use std::{sync::Arc, time::Duration};
 
 use super::component_edit_area::EditArea;
 use super::upload_state::UploadState;
 use crate::{
-    Errs, PageState, SVGTrash,
-    hook::{ParsedPostImage, ParsedPostImageState, PostImagesState, Spawner},
+    Errs, Floater, PageState, SVGTrash,
+    hook::{EventListener, ParsedPostImage, ParsedPostImageState, PostImagesState, Spawner},
     page::{create_client, upload::component_edit_text::ValidState},
 };
 use catsquad_log::prelude::*;
 use catsquad_shared::link_relative_post_thumbnail_bytes_get_by_hash;
 use catsquad_web_utils::prelude::*;
-use leptos::{prelude::*, task::spawn_local};
-use web_sys::{File, HtmlInputElement, MouseEvent};
+use leptos::{ev, html::div, prelude::*, task::spawn_local};
+use wasm_bindgen::JsCast;
+use web_sys::{File, HtmlElement, HtmlInputElement, MouseEvent};
 
 // TODO
 // add cancel upload
@@ -238,7 +239,6 @@ pub fn FileQueuePreview(file: ArcRwSignal<ParsedPostImage>) -> impl IntoView {
     // let size = bytes_to_str(file.size as u64);
 
     view! { <div
-            id="previw_add"
             class="p-2 relative flex flex-col gap-1 place-items-center size-[8rem] rounded-xl bg-base05/10 bg-cover bg-center border-2 border-base05"
             >
               <p class="text-[0.8rem] max-w-[100%] max-h-[100%] break-all overflow-hidden text-ellipsis">
@@ -279,7 +279,6 @@ pub fn FileUploadingPreview(file: ArcRwSignal<ParsedPostImage>) -> impl IntoView
     };
 
     view! { <div
-            id="previw_add"
             class="p-2 relative grid grid-rows-[auto_1fr_auto] gap-1 place-items-center size-[8rem] rounded-xl bg-base02 bg-cover bg-center border-2 border-base05"
             >
               <p class="text-[0.8rem] max-w-[100%] max-h-[100%] break-all overflow-hidden text-ellipsis">
@@ -359,7 +358,6 @@ pub fn FileCompletedPreview(
             view! {
                 <div
                 on:click=on_click.clone()
-                id="previw_add"
                 class="p-2 relative flex flex-col gap-1 bg-cover place-items-center size-[8rem] rounded-xl bg-base05/10 bg-cover bg-center border-2 border-base05"
                 style:background-image=style_bg_img.clone()
                 >
@@ -370,17 +368,37 @@ pub fn FileCompletedPreview(
         }
     };
 
+    let view_cloned = move || {
+        view! {
+            <a
+                on:click=on_click.clone()
+                href=link.clone()
+                class="p-2 relative flex flex-col gap-1 bg-cover place-items-center size-[8rem] rounded-xl bg-base05/10 bg-cover bg-center border-2 border-base05  "
+                style:background-image=style_bg_img.clone()
+            >
+                <div
+                    class="z-[2] bg-base03 p-[0.35rem] text-base08 rounded-full absolute left-[100%] top-[0] transform -translate-x-1/2 -translate-y-1/2 size-[2.0rem]">
+                </div>
+              <TrashCanBtn
+                  author_username=author_username.clone()
+                  post_files_state=post_files_state.clone()
+                  file=file.clone()
+                />
+            </a>
+        }.into_any()
+    };
+
+    // let v = Show(ShowProps {
+    //     // children: { TypedChildrenFn(Arc::new(move || div())) },
+    //     children: TypedChildrenFn::from(div()),
+    //     when: move || false,
+    //     fallback: { div() },
+    // });
+    //
+    // <Floater fix_leptos_please=view_cloned.clone().into() />
     view! {
         <Show when=when_is_link fallback >
-            <a
-            on:click=on_click.clone()
-            href=link.clone()
-            id="previw_add"
-            class="p-2 relative flex flex-col gap-1 bg-cover place-items-center size-[8rem] rounded-xl bg-base05/10 bg-cover bg-center border-2 border-base05"
-            style:background-image=style_bg_img.clone()
-            >
-              <TrashCanBtn author_username post_files_state file=file.clone()/>
-            </a>
+            <Floater fix_leptos_please=view_cloned.clone().into() />
         </Show>
 
     }
@@ -411,7 +429,6 @@ pub fn FileProcessingPreview(
     .inspect_err(|err| error!("{err}"));
 
     view! { <div
-            id="previw_add"
             class="p-2 relative flex flex-col gap-1 place-items-center size-[8rem] rounded-xl bg-base05/10 bg-cover bg-center border-2 border-base05"
             >
               <p class="text-[0.8rem] max-w-[100%] max-h-[100%] break-all overflow-hidden text-ellipsis">
@@ -493,7 +510,6 @@ pub fn PreviewAdd(
     // let location = use_location();
 
     view! { <label
-            id="previw_add"
             for=move||fn_for()
             class=move ||  {
                 // let hash = location.hash.get();

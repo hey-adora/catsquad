@@ -39,7 +39,7 @@ pub fn Comment(
         move || global_state.acc_username() == user_username
     };
 
-    let comment_edit_event = EventListener::new(ev::change, |a| {
+    let comment_edit_event = EventListener::new(ev::change, |_, a| {
         trace!("omg is it working edit magic");
 
         //
