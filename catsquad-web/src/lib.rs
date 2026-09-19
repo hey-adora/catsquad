@@ -15,7 +15,7 @@ pub use component::btn_secondary::BtnSecondary;
 pub use component::display::Display;
 pub use component::error_general::ErrGeneral;
 pub use component::errors::Errs;
-pub use component::floater::Floater;
+pub use component::floater::*;
 pub use component::length_counter::LengthCounter;
 pub use component::link_primary::LinkPrimary;
 pub use component::link_secondary::LinkSecondary;

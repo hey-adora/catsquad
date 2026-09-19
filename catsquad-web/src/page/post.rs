@@ -107,7 +107,7 @@ pub fn Post() -> impl IntoView {
                     <PostControls spawner=spawner_post post_api post_id/>
                     <PostSelectedImg post_id post_api />
                     <PostImgs post_id post_api />
-                    <div class="flex flex-col gap-2 md:gap-6 px-4 md:px-6  lg:overflow-y-scroll">
+                    <div class="flex flex-col gap-2 md:gap-6 px-4 md:px-6 py-[1rem] lg:overflow-y-scroll">
                         <PostPreviews spawner=spawner_post post_api post_id/>
                         <PostStats post_api/>
                         <div class="flex flex-col gap-2">

@@ -3,7 +3,7 @@ use std::{sync::Arc, time::Duration};
 use super::component_edit_area::EditArea;
 use super::upload_state::UploadState;
 use crate::{
-    Errs, Floater, PageState, SVGTrash,
+    Errs, Floater, PageState, SVGTrash, Zone, ZoneData,
     hook::{EventListener, ParsedPostImage, ParsedPostImageState, PostImagesState, Spawner},
     page::{create_client, upload::component_edit_text::ValidState},
 };
@@ -43,7 +43,7 @@ pub fn ImagesEdit(
     };
     view! {
         <div class="flex flex-col gap-2">
-            <p class="text-[1.3rem] text-base0F ">"Images"</p>
+            <p class="text-[1.3rem] text-base0F  ">"Images"</p>
             <EditArea
                 class=move||"flex flex-wrap gap-4 "
                 required=false
@@ -63,6 +63,8 @@ pub fn ImagesView(
     #[prop(optional, into)] post_id: Signal<i64>,
     #[prop(optional, into)] images: RwSignal<Vec<ArcRwSignal<ParsedPostImage>>>,
 ) -> impl IntoView {
+    let spawner = Spawner::new();
+
     let page = PageState::get();
     let input_files = NodeRef::new();
     let post_files_state = PostImagesState::new(post_id, images);
@@ -83,6 +85,7 @@ pub fn ImagesView(
     };
 
     let on_file_change = move |e| {
+        trace!("on_file_change");
         let Some(new_files) = (input_files.get_untracked() as Option<HtmlInputElement>)
             .and_then(|f: HtmlInputElement| f.files())
             .map(|f| f.get_files())
@@ -102,12 +105,20 @@ pub fn ImagesView(
         }
     };
 
+    let zones = ZoneData::new();
+    let on_drop = move |(zone_index, float_index)| {
+        trace!("on_drop {} {}", zone_index, float_index);
+    };
+
     let view_files = move || {
+        trace!("view_files updating");
         // upload.
         images
             .get()
             .into_iter()
-            .map(|file| match file.with(|v| v.state.clone()) {
+            .enumerate()
+            .map(|(index, file)| {
+                let block = match file.with(|v| v.state.clone()) {
                 ParsedPostImageState::Queue => view! {
                     <FileQueuePreview
                         file
@@ -142,6 +153,8 @@ pub fn ImagesView(
                     <FileCompletedPreview
                         on_link
                         on_click
+                        zones
+                        file_index=index
                         author_username
                         post_files_state
                         file
@@ -156,15 +169,22 @@ pub fn ImagesView(
                     />
                 }
                 .into_any(),
+                };
+                view! {
+                    <Zone zone_index=index zones on_drop/>
+                    {block}
+                }
             })
             .collect_view()
             .into_any()
     };
 
     let when_is_owner = move || page.acc_username() == author_username.get();
+    // let last_index = move || images.with(|v| v.len());
 
     view! {
         { view_files }
+        <Zone zone_index=1000 zones on_drop/>
         <Show when=when_is_owner>
             <PreviewAdd fn_for=move||"image"/>
             <input class="absolute z-[-1] opacity-0" on:change=on_file_change type="file" id="image" name="image" node_ref=input_files multiple />
@@ -306,6 +326,8 @@ pub fn FileUploadingPreview(file: ArcRwSignal<ParsedPostImage>) -> impl IntoView
 
 #[component]
 pub fn FileCompletedPreview(
+    #[prop(into)] zones: ZoneData,
+    #[prop(into)] file_index: Signal<usize>,
     #[prop(optional, into)] on_click: Option<Callback<MouseEvent>>,
     #[prop(optional, into)] on_link: Option<Callback<ArcRwSignal<ParsedPostImage>, String>>,
     #[prop(into)] author_username: Signal<String>,
@@ -377,9 +399,10 @@ pub fn FileCompletedPreview(
                 style:background-image=style_bg_img.clone()
             >
                 <div
-                    class="z-[2] bg-base03 p-[0.35rem] text-base08 rounded-full absolute left-[100%] top-[0] transform -translate-x-1/2 -translate-y-1/2 size-[2.0rem]">
+                    class="text-center z-[2] bg-base03 px-[0.5rem] text-base08 rounded-full absolute left-[0] top-[0] transform -translate-x-1/2 -translate-y-1/2 ">
+                    {file_index}
                 </div>
-              <TrashCanBtn
+                <TrashCanBtn
                   author_username=author_username.clone()
                   post_files_state=post_files_state.clone()
                   file=file.clone()
@@ -398,7 +421,7 @@ pub fn FileCompletedPreview(
     // <Floater fix_leptos_please=view_cloned.clone().into() />
     view! {
         <Show when=when_is_link fallback >
-            <Floater fix_leptos_please=view_cloned.clone().into() />
+            <Floater zones floater_index=file_index fix_leptos_please=view_cloned.clone().into() />
         </Show>
 
     }
