@@ -173,7 +173,7 @@ async fn test_post_get_by_key() {
         .await
         .unwrap();
 
-    db.post_update_file_add(0, user1.username.clone(), post1.id, 10, 555, "jpg", 10, 15)
+    db.post_update_image_add(0, user1.username.clone(), post1.id, 10, 555, "jpg", 10, 15)
         .await
         .unwrap();
 

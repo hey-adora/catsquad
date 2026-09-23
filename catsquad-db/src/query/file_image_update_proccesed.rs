@@ -61,7 +61,7 @@ impl Db {
 #[cfg(test)]
 #[tokio::test]
 async fn test_post_update_proccesed() {
-    use crate::{DbPost, DbUser};
+    use crate::{DbPostGet, DbUser};
 
     init_log();
 
@@ -107,8 +107,8 @@ async fn test_post_update_proccesed() {
     // add images
     {
         let add_post_file_fn =
-            async |time: u64, user: &DbUser, post: &DbPost, hash: i64, size: u32| {
-                db.post_update_file_add(
+            async |time: u64, user: &DbUser, post: &DbPostGet, hash: i64, size: u32| {
+                db.post_update_image_add(
                     time,
                     user.username.clone(),
                     post.id,

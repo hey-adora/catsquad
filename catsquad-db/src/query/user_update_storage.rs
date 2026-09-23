@@ -67,7 +67,7 @@ async fn test_user_update_storage() {
         .await
         .unwrap();
     assert_eq!(user.max_storage_bytes, 10);
-    assert_eq!(user.max_storage_per_file_bytes, 5);
+    assert_eq!(user.max_storage_per_image_bytes, 5);
 
     db.user_update_storage(0, user.username.clone(), 10, 5)
         .await
@@ -76,5 +76,5 @@ async fn test_user_update_storage() {
     let user = db.user_get_by_username("hey").await.unwrap();
 
     assert_eq!(user.max_storage_bytes, 10);
-    assert_eq!(user.max_storage_per_file_bytes, 5);
+    assert_eq!(user.max_storage_per_image_bytes, 5);
 }

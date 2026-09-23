@@ -3,6 +3,7 @@ use crate::{
     hook::{PostImagesState, Spawner},
     page::{
         create_client,
+        post::post_api::PostApi,
         upload::upload_state::{UploadState, UploadStateStage},
     },
 };
@@ -33,17 +34,32 @@ pub fn Upload() -> impl IntoView {
     let page = PageState::get();
     let spawner = Spawner::new();
     let upload = UploadState::new(time);
+    // let post_api = PostApi::new();
 
     let post_author_username = move || page.acc_username();
     let post_id = move || upload.post_id.get_value();
     let post_files = upload.files;
+    // let ab = post_api.imgs;
 
     Effect::new(move || {
         spawner.spawn(async move {
             let client = create_client();
             upload.init(&client).await;
+            // let post_id = post_id();
+            // post_api.init(&client, 616).await;
         });
     });
+
+    // Effect::new(move || {
+    //     let post_id = post_id();
+    //     if post_id == 0 {
+    //         return;
+    //     }
+    //     spawner.spawn(async move {
+    //         let client = create_client();
+    //         post_api.init(&client, post_id).await;
+    //     });
+    // });
 
     view! {
         <main>

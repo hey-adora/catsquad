@@ -8,6 +8,7 @@ use catsquad_client::{Client, ReqwestSender};
 //     },
 // };
 use catsquad_log::prelude::*;
+use catsquad_seed::create_img;
 use catsquad_shared::PostState;
 use clap::{Command, arg};
 use http::header;
@@ -99,33 +100,7 @@ pub async fn post_add(
     let description = description.into();
     let tags = tags.into();
     let path = "/tmp/img.png";
-    let mut rng = rand::rng();
-    let mut image = RgbImage::new(200, 200);
-    let r = rng.random_range(200u8..255);
-    let g = rng.random_range(200u8..255);
-    let b = rng.random_range(200u8..255);
-    for (x, y, pixel) in image.enumerate_pixels_mut() {
-        *pixel = image::Rgb([r, g, b]);
-    }
-    let height = 64.0;
-    let scale = PxScale {
-        x: height * 2.0,
-        y: height,
-    };
-
-    let font = FontRef::try_from_slice(include_bytes!("../../assets/noto_sans.ttf")).unwrap();
-    let img = draw_text(
-        &mut image,
-        Rgb([0u8, 0u8, 0u8]),
-        0,
-        50,
-        scale,
-        &font,
-        &img_text,
-    );
-    img.save(path).unwrap();
-
-    let img = fs::read(path).await.unwrap();
+    create_img(path, img_text);
 
     let sender = ReqwestSender::new(ORIGIN);
     let client = Client::new(sender);

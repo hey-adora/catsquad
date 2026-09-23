@@ -57,6 +57,7 @@ pub fn PostDescription(
             }
         )
     };
+    let when_description_full = move || post_api.description.with(|v| !v.is_empty());
 
     view! {
 
@@ -83,13 +84,15 @@ pub fn PostDescription(
                 </div>
             </div>
 
-            <Errs error=post_api.err_description />
+            <Errs id="description_errors" error=post_api.err_description />
 
             <Show when=move || post_api.update_description_mode.get() fallback=move || view!{
                 <pre
                     id="post_description"
                     class=class_description>
-                    { description }
+                    <Show when=when_description_full fallback={move || view!{<span class="text-base03">"No description."</span>} }>
+                        { description }
+                    </Show>
                 </pre>
             }>
 

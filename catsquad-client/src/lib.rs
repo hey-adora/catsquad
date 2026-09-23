@@ -629,7 +629,7 @@ where
         &self,
         post_id: i64,
         files: Vec<F>,
-    ) -> Builder<TSender, Vec<PostImage>, catsquad_shared::PostUpdateFileAddErr> {
+    ) -> Builder<TSender, Vec<PostImage>, catsquad_shared::PostUpdateImageAddErr> {
         let body = files
             .into_iter()
             .enumerate()
@@ -650,8 +650,8 @@ where
         &self,
         post_id: i64,
         hash: i64,
-    ) -> Builder<TSender, (), catsquad_shared::PostUpdateFileRemoveErr> {
-        let req = catsquad_shared::PostUpdateFileRemoveReq { post_id, hash };
+    ) -> Builder<TSender, (), catsquad_shared::PostUpdateImageRemoveErr> {
+        let req = catsquad_shared::PostUpdateImageRemoveReq { post_id, hash };
         trace!("input req {req:?}");
         let req = req
             .to_form()
@@ -666,6 +666,22 @@ where
         };
         let sender = self.sender.clone();
         Builder::new(sender, params)
+    }
+
+    pub fn post_update_image_ord(
+        &self,
+        post_id: i64,
+        image_index_a: usize,
+        image_index_b: usize,
+    ) -> Builder<TSender, (), cs::PostUpdateImageOrdErr> {
+        self.post_form(
+            cs::link_relative_post_update_image_ord(),
+            cs::PostUpdateImageOrdReq {
+                post_id,
+                image_index_a,
+                image_index_b,
+            },
+        )
     }
 
     pub fn user_get_by_session_key(
@@ -802,7 +818,7 @@ where
     pub fn post_get_by_key(
         &self,
         post_id: i64,
-    ) -> Builder<TSender, catsquad_shared::PostGetRes, catsquad_shared::PostGetByKeyErr> {
+    ) -> Builder<TSender, catsquad_shared::PostRes, catsquad_shared::PostGetByKeyErr> {
         let link = link_relative_post_get_by_key(post_id);
         let params = SenderParams {
             path: link,

@@ -105,7 +105,7 @@ async fn test_api_post_file_status_by_hash() {
         .unwrap();
 
     let result = server
-        .post_update_file_add(post1.id, &["../assets/favicon.ico"], session_token1)
+        .post_update_image_add(post1.id, &["../assets/favicon.ico"], session_token1)
         .await
         .unwrap();
 

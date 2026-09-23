@@ -24,7 +24,7 @@ mod component_post_selected_img;
 mod component_post_stats;
 mod component_post_tags;
 mod component_post_title;
-mod post_api;
+pub mod post_api;
 mod post_like_state;
 
 use component_comments::Comments;

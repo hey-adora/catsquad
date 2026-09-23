@@ -1,6 +1,8 @@
 use catsquad_log::prelude::*;
 use leptos::ev;
+use leptos::html;
 use leptos::prelude::*;
+use leptos::tachys::html::node_ref::node_ref;
 use wasm_bindgen::JsCast;
 use web_sys::Element;
 use web_sys::HtmlDivElement;
@@ -9,38 +11,105 @@ use web_sys::MouseEvent;
 
 use crate::hook::EventListener;
 
-// #[derive(Clone, Copy)]
-// pub struct ZoneData<T: Send + Sync + 'static> {
-//     pub is_active: RwSignal<bool>,
-//     pub mouse_xy: RwSignal<(f64, f64)>,
-//     pub data: RwSignal<Option<T>>,
-// }
-
 #[derive(Clone, Copy)]
 pub struct ZoneData {
-    pub waiting_for_drop: RwSignal<bool>,
+    pub floater_index: RwSignal<Option<usize>>,
     pub zones: RwSignal<Vec<Zone>>,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Zone {
     pub zone_index: usize,
-    pub is_active: bool,
+    pub is_selected: bool,
     pub target: Element,
     pub callback: Callback<(usize, usize)>,
-    // pub x: f64,
-    // pub y: f64,
-    // pub width: f64,
-    // pub height: f64,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum ZoneStage {
+    None,
+    Active,
+    Selected,
 }
 
 impl ZoneData {
     pub fn new() -> Self {
         Self {
-            waiting_for_drop: RwSignal::new(false),
+            floater_index: RwSignal::new(None),
             zones: RwSignal::new(Vec::new()),
         }
     }
+}
+
+pub fn calc_zone_stages(
+    floater_index: Option<usize>,
+    zone_index: usize,
+    is_selected: bool,
+) -> ZoneStage {
+    match (floater_index, is_selected) {
+        (Some(float_index), false) if float_index != zone_index => ZoneStage::Active,
+        (Some(_), true) => ZoneStage::Selected,
+        _ => ZoneStage::None,
+    }
+}
+
+#[cfg(test)]
+#[test]
+fn test_calc_zone_stages() {
+    assert_eq!(
+        vec![
+            calc_zone_stages(Some(2), 0, false),
+            // floater 0
+            calc_zone_stages(Some(2), 1, false),
+            // floater 1
+            calc_zone_stages(Some(2), 2, false),
+            // floater 2 - active
+            calc_zone_stages(Some(2), 3, false),
+            // floater 3
+            // calc_zone_stages(Some(2), 4, false),
+        ],
+        vec![
+            ZoneStage::Active,
+            // floater 0
+            ZoneStage::Active,
+            // floater 1
+            ZoneStage::None,
+            // floater 2 - active
+            ZoneStage::Active,
+            // floater 3
+            // ZoneStage::Active,
+        ]
+    );
+
+    // use catsquad_api::auth::create_auth_cookie_str;
+    // use catsquad_shared::uuid_to_str;
+    // use http::header;
+
+    // catsquad_log::init_log();
+    // let _owner = crate::init_owner();
+
+    // let server = catsquad_api::TestServer::new(0, "test_which_zone_is_active").await;
+
+    // let (_user1, session1) = server
+    //     .user_add_full(
+    //         "prime1",
+    //         "prime1@heyadora.com",
+    //         "235j4t49ngerigrog#IOTNOnfo",
+    //     )
+    //     .await;
+
+    // server
+    //     .inject_header(
+    //         header::COOKIE,
+    //         create_auth_cookie_str(uuid_to_str(session1)),
+    //     )
+    //     .await;
+
+    // upload.init creates new post draft
+    // let upload = UploadState::new(0);
+    // upload.init(&server.client).await;
+
+    // (server, owner, upload)
 }
 
 pub fn mouse_inside_box_bounds(
@@ -69,16 +138,13 @@ fn test_inside_box_bounds() {
     assert!(!mouse_inside_box_bounds(15., 7., 5., 2., 10., 4.));
 }
 
-// pub fn Floater(fix_leptos_please: Callback<(), AnyView>) -> impl IntoView {
-
-// #[component(transparent)]
-// pub fn Floater(children: Children) -> impl IntoView {
 #[component]
 pub fn Floater(
-    #[prop(into)] zones: ZoneData,
+    zones: ZoneData,
     #[prop(into)] floater_index: Signal<usize>,
-    // #[prop(into)] on_drop: Callback<()>,
-    fix_leptos_please: Callback<(), AnyView>,
+    #[prop(optional, into)] disabled: Signal<bool>,
+    children: ChildrenFn,
+    // view_fn: Callback<(), AnyView>,
 ) -> impl IntoView {
     let float_elm = NodeRef::new();
     let is_floating = RwSignal::new(false);
@@ -96,21 +162,30 @@ pub fn Floater(
     };
 
     let update_zones = move |mouse_x: f64, mouse_y: f64| {
-        let z_iter = zones.zones.get_untracked().into_iter().enumerate();
+        let Some(z_iter) = zones.zones.try_get_untracked() else {
+            return;
+        };
+        let z_iter = z_iter.into_iter().enumerate();
         for (i, z) in z_iter {
-            let is_active = z.is_active;
+            let is_active = z.is_selected;
             let new_is_active = check_if_mouse_inside_zone(mouse_x, mouse_y, z.target);
             if is_active != new_is_active {
-                zones.zones.update(|v| v[i].is_active = new_is_active);
+                trace!("11111111 update_zones");
+                zones.zones.try_update(|v| v[i].is_selected = new_is_active);
             }
         }
     };
 
     let run_on_drop = move |mouse_x: f64, mouse_y: f64| {
-        let z_iter = zones.zones.get_untracked().into_iter().enumerate();
+        let Some(z_iter) = zones.zones.try_get_untracked() else {
+            return;
+        };
+        let z_iter = z_iter.into_iter().enumerate();
         for (i, z) in z_iter {
             if check_if_mouse_inside_zone(mouse_x, mouse_y, z.target) {
-                let floater_index = floater_index.get();
+                let Some(floater_index) = floater_index.try_get_untracked() else {
+                    return;
+                };
                 zones
                     .zones
                     .with_untracked(|v| v[i].callback.run((z.zone_index, floater_index)));
@@ -124,32 +199,20 @@ pub fn Floater(
         let mouse_y = e.client_y() as f64;
         float_xy.set((mouse_x, mouse_y));
         update_zones(mouse_x, mouse_y);
-        // let Some((zone, new_is_active)) = check_if_in_zone(mouse_x, mouse_y) else {
-        //     return;
-        // };
-        // trace!("update_float 1 {} == {}", zone.is_active, new_is_active);
-        // if zone.is_active == new_is_active {
-        //     return;
-        // }
-        // trace!("update_float 2");
-        // let zone_index = zone.index;
-        // zones.zones.update(|v| {
-        //     if let Some(pos) = v.iter().position(|v| v.index == zone_index) {
-        //         v[pos].is_active = new_is_active;
-        //     }
-        // });
     };
 
     let dom_mousemove = EventListener::new(ev::mousemove, move |inner, e: MouseEvent| {
         trace!("dom_mousemove");
-        if !is_floating.get_untracked()
-            && click_xy.with_untracked(|(click_x, click_y)| {
-                let (float_x, float_y) = float_xy.get_untracked();
-                (float_x - *click_x).abs() > 10. || (*click_y - float_y).abs() > 10.
-            })
-        {
+        let moved_10_px = click_xy.with_untracked(|(click_x, click_y)| {
+            let Some((float_x, float_y)) = float_xy.try_get_untracked() else {
+                return false;
+            };
+            (float_x - *click_x).abs() > 10. || (*click_y - float_y).abs() > 10.
+        });
+        let floater_index = floater_index.get();
+        if !is_floating.try_get_untracked().unwrap_or_default() && moved_10_px {
             is_floating.set(true);
-            zones.waiting_for_drop.set(true);
+            zones.floater_index.set(Some(floater_index));
             // zone.index.set(index.get_untracked());
         }
         update_float(e);
@@ -162,7 +225,7 @@ pub fn Floater(
         run_on_drop(mouse_x, mouse_y);
         dom_mousemove.remove();
         is_floating.set(false);
-        zones.waiting_for_drop.set(false);
+        zones.floater_index.set(None);
         inner.remove();
     });
 
@@ -170,7 +233,7 @@ pub fn Floater(
         trace!("dom_mouseleave");
         dom_mousemove.remove();
         is_floating.set(false);
-        zones.waiting_for_drop.set(false);
+        zones.floater_index.set(None);
         inner.remove();
     });
 
@@ -189,6 +252,10 @@ pub fn Floater(
     };
 
     let float_mousedown = move |e: MouseEvent| {
+        trace!("float_mousedown {:#?}", zones.zones.try_get_untracked());
+        if disabled.try_get_untracked().unwrap_or_default() {
+            return;
+        }
         let Some(target): Option<HtmlElement> = e.target().map(|v| v.unchecked_into()) else {
             return;
         };
@@ -207,20 +274,38 @@ pub fn Floater(
         click_xy.set((mouse_x, mouse_y));
         set_float(e);
     };
-    let style_left = move || format!("{}px", float_xy.get().0 - offset_xy.get().0);
-    let style_top = move || format!("{}px", float_xy.get().1 - offset_xy.get().1);
+    let style_left = move || {
+        let (Some((float_x, _)), Some((offset_x, _))) = (float_xy.try_get(), offset_xy.try_get())
+        else {
+            return "0px".to_string();
+        };
+
+        format!("{}px", float_x - offset_x)
+    };
+    let style_top = move || {
+        let (Some((_, float_y)), Some((_, offset_y))) = (float_xy.try_get(), offset_xy.try_get())
+        else {
+            return "0px".to_string();
+        };
+
+        format!("{}px", float_y - offset_y)
+    };
     let style_position = move || {
-        if is_floating.get() {
+        if is_floating.try_get().unwrap_or_default() {
             "absolute"
         } else {
             "inherit"
         }
     };
     let style_z = move || {
-        if is_floating.get() { "100" } else { "auto" }
+        if is_floating.try_get().unwrap_or_default() {
+            "100"
+        } else {
+            "auto"
+        }
     };
-    let children = move || fix_leptos_please.run(());
-    let when_is_floating = move || is_floating.get();
+    // let view_fn = move || view_fn.run(());
+    let when_is_floating = move || is_floating.try_get().unwrap_or_default();
 
     view! {
         <div
@@ -232,11 +317,10 @@ pub fn Floater(
             node_ref=float_elm
             on:mousedown=float_mousedown
             >
-            {children}
+            { children() }
         </div>
         <Show when=when_is_floating>
             <div class="size-[8rem] border-2 border-base05 rounded-xl "></div>
-
         </Show>
     }
 }
@@ -244,36 +328,18 @@ pub fn Floater(
 #[component]
 pub fn Zone(
     #[prop(into)] zone_index: Signal<usize>,
-    #[prop(into)] zones: ZoneData,
+    zones: ZoneData,
     #[prop(into)] on_drop: Callback<(usize, usize)>,
-    // #[prop(into)] view_zone: Callback<>,
 ) -> impl IntoView {
-    let target = NodeRef::new();
-
-    let class_glow = move || {
-        let zone_index = zone_index.get();
-        let glow = match (
-            zones.waiting_for_drop.get(),
-            zones.zones.with(|v| {
-                v.iter()
-                    .find(|v| v.zone_index == zone_index)
-                    .map(|v| v.is_active)
-                    .unwrap_or_default()
-            }),
-        ) {
-            (true, false) => "h-[8rem] w-[2rem] bg-base08",
-            (true, true) => "h-[8rem] w-[2rem] bg-base0B",
-            _ => "",
-        };
-        format!(" rounded {glow}",)
-    };
+    let target = NodeRef::<html::Div>::new();
 
     Effect::new(move || {
-        let zone_index = zone_index.get_untracked();
+        let Some(target): Option<HtmlDivElement> = target.get() else {
+            return;
+        };
+        let zone_index = zone_index.get();
+        trace!("zone_effect {zone_index}");
         zones.zones.update(|v| {
-            let Some(target): Option<HtmlDivElement> = target.get_untracked() else {
-                return;
-            };
             let target: Element = target.into();
 
             if let Some(pos) = v.iter().position(|v| v.zone_index == zone_index) {
@@ -283,14 +349,15 @@ pub fn Zone(
             v.push(Zone {
                 zone_index,
                 target,
-                is_active: false,
+                is_selected: false,
                 callback: on_drop,
             });
         });
     });
 
     on_cleanup(move || {
-        let zone_index = zone_index.get_untracked();
+        let zone_index = zone_index.get();
+        trace!("on_cleanup {zone_index}");
         zones.zones.update(|v| {
             if let Some(pos) = v.iter().position(|v| v.zone_index == zone_index) {
                 v.remove(pos);
@@ -298,9 +365,65 @@ pub fn Zone(
         });
     });
 
-    view! {
-        <div node_ref=target class=class_glow>
+    let zone_stage = move || -> ZoneStage {
+        let zone_index = zone_index.get();
+        trace!("zone_stage {zone_index}");
+        let floater_index = zones.floater_index.get();
+        let is_selected = zones.zones.with(|v| {
+            v.iter()
+                .find(|v| v.zone_index == zone_index)
+                .map(|v| v.is_selected)
+                .unwrap_or_default()
+        });
+        calc_zone_stages(floater_index, zone_index, is_selected)
+        // match (
+        //     zones.floater_index.get(),
+        //     zones.zones.with(|v| {
+        //         v.iter()
+        //             .find(|v| v.zone_index == zone_index)
+        //             .map(|v| v.is_selected)
+        //             .unwrap_or_default()
+        //     }),
+        // ) {
+        //     (Some(floater_index), false) if floater_index != zone_index =>
+        //     // if floater_index != zone_index.saturating_sub(1)
+        //     //     && floater_index != zone_index + 1
+        //     //     && floater_index != zone_index =>
+        //     {
+        //         ZoneStage::Active
+        //     }
+        //     (Some(_), true) => ZoneStage::Selected,
+        //     _ => ZoneStage::None,
+        // }
+    };
 
-        </div>
+    let class_fn = move || match zone_stage() {
+        ZoneStage::None => "hidden",
+        ZoneStage::Active => "h-[8rem] w-[2rem] bg-base08",
+        ZoneStage::Selected => "h-[8rem] w-[2rem] bg-base0B",
+    };
+
+    let when_to_show = move || zone_stage() != ZoneStage::None;
+
+    view! {
+        <Show when=when_to_show>
+          <div node_ref=target class=class_fn></div>
+        </Show>
     }
 }
+
+// let id = move || id.try_get();
+// let class_fn = move || match stage {
+//     ZoneStage::None => "hidden",
+//     ZoneStage::Waiting => "h-[8rem] w-[2rem] bg-base08",
+//     ZoneStage::Hovering => "h-[8rem] w-[2rem] bg-base0B",
+// };
+// let when_to_show = move || stage != ZoneStage::None;
+
+// // <Show when=when_to_show>
+// //     <div id=id class=class_fn></div>
+// // </Show>
+// view! {
+//     <div id=id class=class_fn></div>
+// }
+// .into_any()

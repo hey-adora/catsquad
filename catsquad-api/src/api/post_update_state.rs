@@ -3,7 +3,7 @@ use catsquad_db::{DbPostUpdateStateErr, DbUser};
 use catsquad_log::prelude::*;
 use catsquad_shared::{PostUpdateStateErr, PostUpdateStateReq};
 
-use crate::{api::post_add::from_db_post, state::AppState};
+use crate::state::AppState;
 
 fn from_db_post_update_state_err(value: DbPostUpdateStateErr) -> PostUpdateStateErr {
     match value {

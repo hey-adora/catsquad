@@ -96,7 +96,7 @@ async fn test_api_post_thumbnail_bytes_by_hash() {
     ));
 
     let _result = server
-        .post_update_file_add(post1.id, &["../assets/favicon.ico"], session_key1)
+        .post_update_image_add(post1.id, &["../assets/favicon.ico"], session_key1)
         .await
         .unwrap();
 

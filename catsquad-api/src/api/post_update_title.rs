@@ -5,7 +5,7 @@ use catsquad_shared::{
     PostRes, PostState, PostUpdateTitleErr, PostUpdateTitleReq, validate_post_title,
 };
 
-use crate::{api::post_add::from_db_post, auth::verify_password, state::AppState};
+use crate::state::AppState;
 
 fn from_db_post_update_title_err(value: DbPostUpdateBuilderTextErr) -> PostUpdateTitleErr {
     match value {

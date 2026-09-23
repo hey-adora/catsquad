@@ -26,6 +26,7 @@ pub mod post_search;
 pub mod post_thumbnail_bytes_get_by_hash;
 pub mod post_update_description;
 pub mod post_update_image_add;
+pub mod post_update_image_ord;
 pub mod post_update_image_remove;
 pub mod post_update_state;
 pub mod post_update_tags;

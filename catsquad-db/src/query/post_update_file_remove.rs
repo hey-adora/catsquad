@@ -267,13 +267,13 @@ async fn test_post_update_file_remove() {
 
     // add few imgs
     {
-        db.post_update_file_add(0, user.username.clone(), post2.id, 15, 12, "png", 10, 10)
+        db.post_update_image_add(0, user.username.clone(), post2.id, 15, 12, "png", 10, 10)
             .await
             .unwrap();
-        db.post_update_file_add(0, user.username.clone(), post1.id, 5, 11, "png", 10, 10)
+        db.post_update_image_add(0, user.username.clone(), post1.id, 5, 11, "png", 10, 10)
             .await
             .unwrap();
-        db.post_update_file_add(0, user.username.clone(), post1.id, 15, 12, "png", 10, 10)
+        db.post_update_image_add(0, user.username.clone(), post1.id, 15, 12, "png", 10, 10)
             .await
             .unwrap();
 

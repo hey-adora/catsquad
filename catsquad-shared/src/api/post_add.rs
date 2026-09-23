@@ -10,18 +10,32 @@ pub const LINK_API_POST_ADD: &str = "/api/post";
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
 pub struct PostRes {
     pub id: i64,
-    // pub user: RedactedUserRes,
     pub user_username: String,
     pub state: PostState,
     pub title: String,
     pub description: String,
     pub tags: String,
     pub favorites: u32,
-    pub images_hashes: Vec<i64>,
-    pub images_status: Vec<bool>,
+    pub images: Vec<PostImage>,
     pub modified_at: u64,
     pub created_at: u64,
 }
+
+// #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
+// pub struct PostRes {
+//     pub id: i64,
+//     // pub user: RedactedUserRes,
+//     pub user_username: String,
+//     pub state: PostState,
+//     pub title: String,
+//     pub description: String,
+//     pub tags: String,
+//     pub favorites: u32,
+//     pub images_hashes: Vec<i64>,
+//     pub images_status: Vec<bool>,
+//     pub modified_at: u64,
+//     pub created_at: u64,
+// }
 
 #[derive(Debug, Copy, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum PostState {

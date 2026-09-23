@@ -28,6 +28,7 @@ pub fn from_db_user_sensitive(value: DbUser) -> SensitiveUserRes {
     SensitiveUserRes {
         // key: id_to_string(value.id),
         username: value.username,
+        max_storage_bytes: value.max_storage_bytes,
         email: value.email,
         created_at: value.created_at,
     }

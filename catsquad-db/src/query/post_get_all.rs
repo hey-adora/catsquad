@@ -48,7 +48,7 @@ async fn test_post_get_all() {
         .unwrap();
 
     let _file = db
-        .post_update_file_add(0, user.username.clone(), post1.id, 10, 333, "png", 10, 10)
+        .post_update_image_add(0, user.username.clone(), post1.id, 10, 333, "png", 10, 10)
         .await
         .unwrap();
 

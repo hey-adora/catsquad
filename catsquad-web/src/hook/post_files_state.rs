@@ -6,6 +6,7 @@ use catsquad_shared::PostRes;
 use catsquad_shared::{PostImage, i64_to_str, str_to_i64};
 use leptos::prelude::*;
 use std::fmt::{Debug, Display};
+// TODO add test for REMOVE when error
 
 use crate::page::create_client;
 
@@ -24,7 +25,7 @@ pub struct ParsedPostImage {
     pub width: u32,
     pub height: u32,
     pub ratio: f64,
-    pub uploaded_bytes: u64,
+    pub uploaded_bytes: u64, // TODO maybe change to u32, as its stored in db
     pub uploaded_percentage: u64,
     pub upload_speed_bytes_a_second: u64,
     pub state: ParsedPostImageState,
@@ -210,6 +211,10 @@ impl PostImagesState {
         }
     }
 
+    pub fn get(&self, index: usize) -> Option<ArcRwSignal<ParsedPostImage>> {
+        self.images.with(|v| v.get(index).cloned())
+    }
+
     pub fn set_images<I>(&self, images: I) -> Vec<ArcRwSignal<ParsedPostImage>>
     where
         I: IntoIterator + Clone,
@@ -309,7 +314,7 @@ impl PostImagesState {
 
         let (hash, state) = parsed_image.with_untracked(|v| (v.hash, v.state.clone()));
 
-        if state == ParsedPostImageState::Queue {
+        if state == ParsedPostImageState::Queue || state == ParsedPostImageState::Error {
             self.remove_image_parsed(&parsed_image);
             return;
         }
@@ -403,7 +408,7 @@ async fn test_post_images_state_image_add() {
         .await
         .unwrap();
 
-    assert_eq!(post1.images_hashes.len(), 1);
+    assert_eq!(post1.images.len(), 1);
 
     let images_signals = upload.images.get_untracked();
     assert_eq!(images_signals.len(), 1);
@@ -460,7 +465,7 @@ async fn test_upload_state_image_remove() {
         .await
         .unwrap();
 
-    assert_eq!(post1.images_hashes.len(), 0);
+    assert_eq!(post1.images.len(), 0);
 }
 
 #[cfg(test)]

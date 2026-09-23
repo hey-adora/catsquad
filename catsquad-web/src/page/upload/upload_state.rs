@@ -104,28 +104,10 @@ impl UploadState {
                 if self
                     .files
                     .try_set(
-                        v.images_hashes
+                        v.images
                             .into_iter()
-                            .zip(v.images_status)
-                            .map(|(hash, is_proccesed)| {
-                                ArcRwSignal::new(ParsedPostImage {
-                                    name: i64_to_str(hash),
-                                    hash: hash,
-                                    size: 0,
-                                    width: 0,
-                                    height: 0,
-                                    ratio: 0.,
-                                    uploaded_bytes: 0,
-                                    uploaded_percentage: 0,
-                                    upload_speed_bytes_a_second: 0,
-                                    state: if is_proccesed {
-                                        ParsedPostImageState::Completed
-                                    } else {
-                                        ParsedPostImageState::Processing
-                                    },
-                                    err: String::new(),
-                                })
-                            })
+                            // .zip(v.images_status)
+                            .map(|image| ArcRwSignal::new(ParsedPostImage::from(image)))
                             .collect(),
                     )
                     .is_some()

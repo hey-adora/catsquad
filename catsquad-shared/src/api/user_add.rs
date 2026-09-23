@@ -17,6 +17,7 @@ pub struct RedactedUserRes {
 pub struct SensitiveUserRes {
     // pub key: i64,
     pub username: String,
+    pub max_storage_bytes: u32, // TODO add max per image and add that to UI
     pub email: String,
     pub created_at: u64,
 }

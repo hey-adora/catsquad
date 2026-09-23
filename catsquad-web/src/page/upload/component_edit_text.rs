@@ -10,7 +10,7 @@ use super::upload_state::FieldSaved;
 use crate::page::upload::AUTO_SAVE_TIME;
 use crate::{AutoTextArea, Errs, LengthCounter};
 
-#[derive(Default, Clone, Copy, strum::EnumIs)]
+#[derive(Default, Clone, Copy, strum::EnumIs, PartialEq)]
 pub enum ValidState {
     Empty,
     #[default]

@@ -266,10 +266,10 @@ async fn test_proccess_post_files() {
         .await
         .unwrap();
 
-    assert_eq!(post1.images_status.len(), 0);
+    assert_eq!(post1.images.len(), 0);
 
     let files = server
-        .post_update_file_add(post1.id, &["../assets/favicon.ico"], session_key1)
+        .post_update_image_add(post1.id, &["../assets/favicon.ico"], session_key1)
         .await
         .unwrap();
 
@@ -298,8 +298,8 @@ async fn test_proccess_post_files() {
     trace!("{file_path:?}");
     trace!("{file_thumbnail_path:?}");
 
-    assert_eq!(post1.images_status.len(), 1);
-    assert_eq!(post1.images_status[0], false);
+    assert_eq!(post1.images.len(), 1);
+    assert_eq!(post1.images[0].proccesed, false);
     assert!(file_path.exists());
     assert!(!file_thumbnail_path.exists());
     assert!(!is_proccesed);
@@ -311,8 +311,8 @@ async fn test_proccess_post_files() {
     // get updated one
     let post1 = server.post_add("", "", "", session_key1).await.unwrap();
 
-    assert_eq!(post1.images_status.len(), 1);
-    assert_eq!(post1.images_status[0], true);
+    assert_eq!(post1.images.len(), 1);
+    assert_eq!(post1.images[0].proccesed, true);
 
     let is_proccesed = server
         .post_file_status_get_by_hash(file.hash)

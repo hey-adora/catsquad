@@ -30,8 +30,12 @@ wasm-bindgen = { version = "0.2.122" }
 # web
 # uuid = { version = "1.25.0", features = ["v7"] }
 strum = { version = "0.27.1", features = ["strum_macros", "derive"] }
+# leptos = { version = "0.8.20", features = ["csr"] }
+# leptos_router = { version = "0.8.15" }
 leptos = { version = "0.8.17", features = ["csr"] }
 leptos_router = { version = "0.8.12" }
+# leptos_axum = { version = "0.8.8" }
+# leptos_meta = { version = "0.8.6" }
 console_error_panic_hook = "0.1.7"
 hydration_context = { version = "0.3.0" }
 # client
@@ -44,6 +48,7 @@ catsquad-api = { path = "catsquad-api" }
 catsquad-shared = { path = "catsquad-shared" }
 catsquad-client = { path = "catsquad-client" }
 catsquad-web-utils = { path = "catsquad-web-utils" }
+catsquad-seed = { path = "catsquad-seed" }
 
 serde = { version = "1.0.229", features = ["serde_derive"] }
 serde_urlencoded = "0.7.1"
@@ -61,8 +66,6 @@ imageproc = "0.25.0"
 
 # criterion = "0.8.2"
 # chromiumoxide = "0.9.1"
-leptos_axum = { version = "0.8.8" }
-leptos_meta = { version = "0.8.6" }
 any_spawner = { version = "0.3.0" }
 # little_exif = "0.6.14"
 image = "0.25.6"

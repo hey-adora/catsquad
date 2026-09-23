@@ -9,7 +9,7 @@ use catsquad_shared::{
     Order, PostSearchErr, PostSearchParams, PostSearchRes, PostState, TimeRange,
 };
 
-use crate::{api::post_add::from_db_post, state::AppState};
+use crate::state::AppState;
 
 pub fn from_db_posts(value: Vec<DbPostSearch>) -> Vec<PostSearchRes> {
     value.into_iter().map(from_db_post_search).collect()

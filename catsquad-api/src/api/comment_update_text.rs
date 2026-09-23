@@ -1,15 +1,10 @@
+use crate::state::AppState;
 use axum::{Extension, Form, Json, extract::State, http::StatusCode, response::IntoResponse};
 use catsquad_db::{DbCommentUpdateTextErr, DbUser};
 use catsquad_log::prelude::*;
 use catsquad_shared::{
     CommentRes, CommentUpdateTextErr, CommentUpdateTextReq, MAX_POST_COMMENT_LENGTH, PostState,
     PostUpdateTagsErr, validate_comment_text,
-};
-
-use crate::{
-    api::{comment_add::from_db_comment, post_add::from_db_post},
-    state::AppState,
-    utils::rng_str,
 };
 
 fn from_db_comment_update_text_err(value: DbCommentUpdateTextErr) -> CommentUpdateTextErr {
@@ -91,8 +86,7 @@ mod test_utils {
 
 #[tokio::test]
 async fn test_api_comment_update_text() {
-    use crate::auth::create_auth_cookie_str;
-    use axum::http::header;
+    use crate::utils::rng_str;
 
     init_log();
 

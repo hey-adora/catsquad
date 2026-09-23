@@ -100,7 +100,7 @@ async fn test_user_username_change() {
             .unwrap();
         db.invite_add(0, "hey3@heyadora.com", 10).await.unwrap();
         db.session_add(0, user1.email.clone()).await.unwrap();
-        db.post_update_file_add(
+        db.post_update_image_add(
             0,
             user1.username.clone(),
             post1.id,

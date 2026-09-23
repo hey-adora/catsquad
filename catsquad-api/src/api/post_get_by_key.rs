@@ -6,9 +6,9 @@ use axum::{
 };
 use catsquad_db::{DbFileImage, DbPostGet, DbPostGetByKeyErr, DbUser};
 use catsquad_log::prelude::*;
-use catsquad_shared::{PostGetByKeyErr, PostGetByKeyParams, PostGetRes, PostImage, PostState};
+use catsquad_shared::{PostGetByKeyErr, PostGetByKeyParams, PostImage, PostRes, PostState};
 
-use crate::{api::post_add::from_db_post, state::AppState};
+use crate::state::AppState;
 
 pub fn from_db_post_get_by_key_err(value: DbPostGetByKeyErr) -> PostGetByKeyErr {
     match value {
@@ -20,8 +20,8 @@ pub fn from_db_post_get_by_key_err(value: DbPostGetByKeyErr) -> PostGetByKeyErr 
     }
 }
 
-pub fn from_db_post_get(value: DbPostGet) -> PostGetRes {
-    PostGetRes {
+pub fn from_db_post_get(value: DbPostGet) -> PostRes {
+    PostRes {
         id: value.id,
         user_username: value.user_username,
         state: PostState::from(value.state),
@@ -58,7 +58,7 @@ pub fn from_db_post_file(value: DbFileImage) -> PostImage {
 //         })
 // }
 
-pub fn status_code(result: &Result<PostGetRes, PostGetByKeyErr>) -> StatusCode {
+pub fn status_code(result: &Result<PostRes, PostGetByKeyErr>) -> StatusCode {
     match result {
         Ok(_) => StatusCode::OK,
         Err(PostGetByKeyErr::Unauthorized(_)) => StatusCode::UNAUTHORIZED,
@@ -73,7 +73,7 @@ pub async fn post_get_by_id(
     State(app): State<AppState>,
     Path(params): Path<PostGetByKeyParams>,
 ) -> impl IntoResponse {
-    let inner = async || -> Result<PostGetRes, PostGetByKeyErr> {
+    let inner = async || -> Result<PostRes, PostGetByKeyErr> {
         // let req = params_req(params)?;
         let user_userame = db_user
             .as_ref()
@@ -106,7 +106,7 @@ mod test_utils {
             &self,
             post_id: i64,
             session_token: Uuid,
-        ) -> Result<cs::PostGetRes, cs::PostGetByKeyErr> {
+        ) -> Result<cs::PostRes, cs::PostGetByKeyErr> {
             self.client
                 .post_get_by_key(post_id)
                 .header_add(

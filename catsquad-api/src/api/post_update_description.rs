@@ -4,7 +4,7 @@ use catsquad_shared::{
     PostRes, PostUpdateDescriptionErr, PostUpdateDescriptionReq, validate_post_description,
 };
 
-use crate::{api::post_add::from_db_post, state::AppState};
+use crate::state::AppState;
 
 fn from_db_post_update_description_err(
     value: DbPostUpdateBuilderTextErr,

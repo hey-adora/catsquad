@@ -9,12 +9,12 @@ pub fn link_relative_post_update_file_add(post_id: i64) -> String {
 #[derive(
     Default, thiserror::Error, Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize,
 )]
-pub enum PostUpdateFileAddErr {
+pub enum PostUpdateImageAddErr {
     #[error("file already exists")]
     Duplicate,
 
     #[error("no files found in your request data")]
-    NotFilesFound,
+    NotImagesFound,
 
     #[error("post id param not found")]
     ParamNotFoundPostId,
@@ -31,9 +31,9 @@ pub enum PostUpdateFileAddErr {
     #[error("stream error {0}")]
     StreamErr(String),
 
-    #[error("file {file_name} is too big, max file size {max}, stopped upload at: {got}")]
-    FileTooBig {
-        file_name: String,
+    #[error("file {image_name} is too big, max file size {max}, stopped upload at: {got}")]
+    ImageTooBig {
+        image_name: String,
         max: u32,
         got: u32,
     },
@@ -42,7 +42,7 @@ pub enum PostUpdateFileAddErr {
     PostNotFound,
 
     #[error("file \"{0}\" must have extension in their name, such as .png")]
-    FileHasNoExtension(String),
+    ImageHasNoExtension(String),
 
     #[error("file extension {0} is not supported")]
     UnsupportedExtension(String),
@@ -58,10 +58,10 @@ pub enum PostUpdateFileAddErr {
 pub struct PostUpdateFileAddReq {}
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
-pub struct PostUpdateFileAddParams {
+pub struct PostUpdateImageAddParams {
     pub post_id: i64,
 }
-pub const POST_UPDATE_FILE_ADD_PARAMS_FIELD_POST_ID: &'static str = "post_id";
+pub const POST_UPDATE_IMAGE_ADD_PARAMS_FIELD_POST_ID: &'static str = "post_id";
 
 // #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
 // pub struct PostUpdateFileAddReq {

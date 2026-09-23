@@ -3,11 +3,7 @@ use catsquad_db::{DbCommentRemoveErr, DbUser};
 use catsquad_log::prelude::*;
 use catsquad_shared::{CommentRemoveErr, CommentRemoveReq, CommentRes, PostState};
 
-use crate::{
-    api::{comment_add::from_db_comment, post_add::from_db_post},
-    state::AppState,
-    utils::rng_str,
-};
+use crate::state::AppState;
 
 fn from_db_comment_remove(value: DbCommentRemoveErr) -> CommentRemoveErr {
     match value {

@@ -6,21 +6,23 @@ use axum::{
 };
 use catsquad_db::{DbSession, DbSessionAddErr, DbUser, DbUserGetByEmailErr};
 use catsquad_log::prelude::*;
-use catsquad_shared::{SessionAddErr, SessionAddReq, SessionRes};
+use catsquad_shared::{SensitiveUserRes, SessionAddErr, SessionAddReq};
 
 use crate::{
+    api::user_add::from_db_user_sensitive,
     auth::{create_auth_cookie, verify_password},
     state::AppState,
 };
 
-fn from_db_session(value: DbUser) -> SessionRes {
-    SessionRes {
-        // key: id_to_string(value.user.id),
-        username: value.username,
-        email: value.email,
-        created_at: value.created_at,
-    }
-}
+// fn from_db_session(value: DbUser) -> SensitiveUserRes {
+//     SensitiveUserRes {
+//         // key: id_to_string(value.user.id),
+
+//         username: value.username,
+//         email: value.email,
+//         created_at: value.created_at,
+//     }
+// }
 
 fn from_db_get_by_email_err(value: DbUserGetByEmailErr) -> SessionAddErr {
     match value {
@@ -36,7 +38,7 @@ fn from_db_session_add_err(value: DbSessionAddErr) -> SessionAddErr {
     }
 }
 
-fn status_code(result: &Result<SessionRes, SessionAddErr>) -> StatusCode {
+fn status_code(result: &Result<SensitiveUserRes, SessionAddErr>) -> StatusCode {
     match result {
         Ok(_) => StatusCode::OK,
         Err(SessionAddErr::InvalidCredentials) => StatusCode::UNAUTHORIZED,
@@ -93,7 +95,7 @@ pub async fn session_add(
     match result {
         Ok((user, session)) => {
             let headers = create_auth_cookie(session.token);
-            let result = Ok(from_db_session(user));
+            let result = Ok(from_db_user_sensitive(user));
             let status_code = status_code(&result);
             (status_code, headers, Json(result))
         }

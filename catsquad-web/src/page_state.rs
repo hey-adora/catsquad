@@ -47,6 +47,12 @@ impl PageState {
         self.acc_pending.get()
     }
 
+    pub fn acc_max_storage_bytes(&self) -> u32 {
+        self.acc
+            .with(|v| v.as_ref().map(|v| v.max_storage_bytes))
+            .unwrap_or_default()
+    }
+
     pub fn acc_username(&self) -> String {
         self.acc
             .with(|v| v.as_ref().map(|v| v.username.clone()))

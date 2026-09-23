@@ -119,12 +119,12 @@ async fn test_post_image_get_by_hash() {
         .unwrap();
 
     let image = db
-        .post_update_file_add(0, user1.username.clone(), post1.id, 19, 666, "ico", 10, 15)
+        .post_update_image_add(0, user1.username.clone(), post1.id, 19, 666, "ico", 10, 15)
         .await
         .unwrap();
 
     let _image2 = db
-        .post_update_file_add(0, user1.username.clone(), post1.id, 29, 266, "png", 20, 25)
+        .post_update_image_add(0, user1.username.clone(), post1.id, 29, 266, "png", 20, 25)
         .await
         .unwrap();
 

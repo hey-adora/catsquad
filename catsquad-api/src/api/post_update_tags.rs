@@ -5,7 +5,7 @@ use catsquad_shared::{
     PostRes, PostState, PostUpdateTagsErr, PostUpdateTagsReq, validate_post_tags,
 };
 
-use crate::{api::post_add::from_db_post, state::AppState};
+use crate::state::AppState;
 
 fn from_db_post_update_tags_err(value: DbPostUpdateBuilderTextErr) -> PostUpdateTagsErr {
     match value {

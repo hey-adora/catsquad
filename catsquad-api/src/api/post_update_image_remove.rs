@@ -1,43 +1,43 @@
-use crate::{api::post_add::from_db_post, state::AppState};
+use crate::state::AppState;
 use axum::{Extension, Form, Json, extract::State, http::StatusCode, response::IntoResponse};
 use catsquad_db::{DbPostUpdateFileRemoveErr, DbUser};
 use catsquad_log::prelude::*;
 use catsquad_shared::{
-    PostImage, PostRes, PostState, PostUpdateFileRemoveErr, PostUpdateFileRemoveReq,
+    PostImage, PostRes, PostState, PostUpdateImageRemoveErr, PostUpdateImageRemoveReq,
 };
 
 fn from_db_post_update_file_remove_err(
     value: DbPostUpdateFileRemoveErr,
-) -> PostUpdateFileRemoveErr {
+) -> PostUpdateImageRemoveErr {
     match value {
-        DbPostUpdateFileRemoveErr::PostNotFound => PostUpdateFileRemoveErr::PostNotFound,
+        DbPostUpdateFileRemoveErr::PostNotFound => PostUpdateImageRemoveErr::PostNotFound,
         DbPostUpdateFileRemoveErr::Unauthorized => {
-            PostUpdateFileRemoveErr::Unauthorized("unauthorized".to_string())
+            PostUpdateImageRemoveErr::Unauthorized("unauthorized".to_string())
         }
-        DbPostUpdateFileRemoveErr::FileNotFound => PostUpdateFileRemoveErr::FileNotFound,
-        DbPostUpdateFileRemoveErr::Db(_) => PostUpdateFileRemoveErr::InternalServer,
-        DbPostUpdateFileRemoveErr::InternalError(_) => PostUpdateFileRemoveErr::InternalServer,
+        DbPostUpdateFileRemoveErr::FileNotFound => PostUpdateImageRemoveErr::FileNotFound,
+        DbPostUpdateFileRemoveErr::Db(_) => PostUpdateImageRemoveErr::InternalServer,
+        DbPostUpdateFileRemoveErr::InternalError(_) => PostUpdateImageRemoveErr::InternalServer,
     }
 }
 
-fn status_code(result: &Result<(), PostUpdateFileRemoveErr>) -> StatusCode {
+fn status_code(result: &Result<(), PostUpdateImageRemoveErr>) -> StatusCode {
     match result {
         Ok(_) => StatusCode::OK,
-        Err(PostUpdateFileRemoveErr::PostNotFound) => StatusCode::NOT_FOUND,
-        Err(PostUpdateFileRemoveErr::FileNotFound) => StatusCode::BAD_REQUEST,
-        Err(PostUpdateFileRemoveErr::Unauthorized(_)) => StatusCode::UNAUTHORIZED,
-        Err(PostUpdateFileRemoveErr::InternalServer) => StatusCode::INTERNAL_SERVER_ERROR,
+        Err(PostUpdateImageRemoveErr::PostNotFound) => StatusCode::NOT_FOUND,
+        Err(PostUpdateImageRemoveErr::FileNotFound) => StatusCode::BAD_REQUEST,
+        Err(PostUpdateImageRemoveErr::Unauthorized(_)) => StatusCode::UNAUTHORIZED,
+        Err(PostUpdateImageRemoveErr::InternalServer) => StatusCode::INTERNAL_SERVER_ERROR,
     }
 }
 
 pub async fn post_update_file_remove(
     db_user: Extension<DbUser>,
     State(app): State<AppState>,
-    Form(req): Form<PostUpdateFileRemoveReq>,
+    Form(req): Form<PostUpdateImageRemoveReq>,
 ) -> impl IntoResponse {
     let time = app.get_time_micro();
 
-    let inner = async || -> Result<(), PostUpdateFileRemoveErr> {
+    let inner = async || -> Result<(), PostUpdateImageRemoveErr> {
         let user_username = db_user.username.clone();
         let post_id = req.post_id;
         let hash = req.hash;
@@ -83,7 +83,7 @@ mod test_utils {
             post_id: i64,
             file_hash: i64,
             session_token: Uuid,
-        ) -> Result<(), cs::PostUpdateFileRemoveErr> {
+        ) -> Result<(), cs::PostUpdateImageRemoveErr> {
             self.client
                 .post_update_image_remove(post_id, file_hash)
                 .header_add(
@@ -132,7 +132,7 @@ async fn test_api_post_update_file_remove() {
         .unwrap();
 
     let _result = server
-        .post_update_file_add(post1.id, &["../assets/favicon.ico"], session_key1)
+        .post_update_image_add(post1.id, &["../assets/favicon.ico"], session_key1)
         .await
         .unwrap();
 

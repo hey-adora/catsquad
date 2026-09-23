@@ -225,7 +225,7 @@ async fn test_post_search() {
     let post2 = add_post_and_activate(3, &user, "3", "description", "one").await;
     let post9 = add_post(4, &user, "9", "description9", "one two three 9").await;
 
-    db.post_update_file_add(0, user.username, post0.id, 10, 666, "jpg", 10, 15)
+    db.post_update_image_add(0, user.username, post0.id, 10, 666, "jpg", 10, 15)
         .await
         .unwrap();
 

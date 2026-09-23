@@ -1,31 +1,26 @@
+use crate::{api::post_get_by_key::from_db_post_get, state::AppState};
 use axum::{Extension, Form, Json, extract::State, http::StatusCode, response::IntoResponse};
-use catsquad_db::{DbPost, DbPostAddErr, DbUser};
-use catsquad_log::prelude::*;
+use catsquad_db::{DbPostAddErr, DbUser};
 use catsquad_shared::{
-    PostAddErr, PostAddReq, PostImage, PostRes, PostState, validate_post_description,
-    validate_post_tags, validate_post_title,
+    PostAddErr, PostAddReq, PostRes, validate_post_description, validate_post_tags,
+    validate_post_title,
 };
 
-use crate::{
-    api::user_add::{from_db_user_redacted, from_db_user_sensitive},
-    state::AppState,
-};
-
-pub fn from_db_post(value: DbPost) -> PostRes {
-    PostRes {
-        id: value.id,
-        user_username: value.user_username,
-        state: PostState::from(value.state),
-        title: value.title,
-        tags: value.tags,
-        favorites: value.likes_count,
-        description: value.description,
-        images_hashes: value.images_hashes,
-        images_status: value.images_status,
-        modified_at: value.modified_at,
-        created_at: value.created_at,
-    }
-}
+// pub fn from_db_post(value: DbPost) -> PostRes {
+//     PostRes {
+//         id: value.id,
+//         user_username: value.user_username,
+//         state: PostState::from(value.state),
+//         title: value.title,
+//         tags: value.tags,
+//         favorites: value.likes_count,
+//         description: value.description,
+//         images_hashes: value.images_hashes,
+//         images_status: value.images_status,
+//         modified_at: value.modified_at,
+//         created_at: value.created_at,
+//     }
+// }
 
 // pub fn from_db_post_file(value: DbPostFile) -> PostFile {
 //     PostFile {
@@ -82,7 +77,7 @@ pub async fn post_add(
             .await
             .map_err(from_db_post_add_err)?;
 
-        Ok(from_db_post(post))
+        Ok(from_db_post_get(post))
     };
 
     let result = inner().await;
@@ -119,8 +114,12 @@ mod test_utils {
     }
 }
 
+#[cfg(test)]
 #[tokio::test]
 async fn test_api_post_add() {
+    use catsquad_log::prelude::*;
+    use catsquad_shared::PostState;
+
     init_log();
     let server = crate::TestServer::new(0, "test_api_post_add").await;
 

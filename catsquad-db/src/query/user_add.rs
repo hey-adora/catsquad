@@ -14,7 +14,7 @@ pub struct DbUser {
     pub used_storage_bytes: u32,
     #[sqlx(rename = "user_max_storage_per_file_bytes")]
     #[sqlx(try_from = "i64")]
-    pub max_storage_per_file_bytes: u32,
+    pub max_storage_per_image_bytes: u32,
     #[sqlx(rename = "user_max_storage_bytes")]
     #[sqlx(try_from = "i64")]
     pub max_storage_bytes: u32,
@@ -193,7 +193,7 @@ impl Db {
             password,
             used_storage_bytes: 0,
             max_storage_bytes,
-            max_storage_per_file_bytes,
+            max_storage_per_image_bytes: max_storage_per_file_bytes,
             modified_at: time,
             created_at: time,
         })
@@ -228,7 +228,7 @@ async fn test_user_add() {
         assert_eq!(result.password, "hey");
         assert_eq!(result.used_storage_bytes, 0);
         assert_eq!(result.max_storage_bytes, 10);
-        assert_eq!(result.max_storage_per_file_bytes, 5);
+        assert_eq!(result.max_storage_per_image_bytes, 5);
         assert_eq!(result.modified_at, 3);
         assert_eq!(result.created_at, 3);
 

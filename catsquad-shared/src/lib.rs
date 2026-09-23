@@ -5,7 +5,8 @@ mod uuid;
 pub const DEFAULT_GLOBAL_MAX_UPLOAD_SIZE: usize = 1000000000; // 1GB i think
 pub const MAX_STORAGE_PER_FILE: u32 = 1024 * 1000 * 30; // 30MB
 pub const MAX_STORAGE: u32 = 1024 * 1000 * 1000 * 2; // 2GB
-pub const SUPPORTED_FILE_EXTENSIONS: &[&str] = &["ico", "svg", "jpg", "jpeg", "png", "webp"];
+pub const SUPPORTED_IMAGE_EXTENSIONS: &[&str] = &["ico", "svg", "jpg", "jpeg", "png", "webp"];
+pub const MAX_POST_IMAGES_COUNT: usize = 10000;
 pub const MAX_POST_DESCRIPTION_LENGTH: usize = 2000;
 pub const MAX_POST_COMMENT_LENGTH: usize = 2000;
 pub const MAX_POST_TAGS_LENGTH: usize = 2000;
@@ -49,6 +50,7 @@ pub use api::post_search::*;
 pub use api::post_thumbnail_bytes_get_by_hash::*;
 pub use api::post_update_description::*;
 pub use api::post_update_image_add::*;
+pub use api::post_update_image_ord::*;
 pub use api::post_update_image_remove::*;
 pub use api::post_update_state::*;
 pub use api::post_update_tags::*;

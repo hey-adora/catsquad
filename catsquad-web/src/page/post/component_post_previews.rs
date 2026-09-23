@@ -1,6 +1,7 @@
+use crate::ZoneData;
 use crate::hook::{ParsedPostImage, PostImageId};
 use crate::page::upload::component_edit_files::ImagesView;
-use crate::{hook::Spawner, page::post::post_api::PostApi};
+use crate::{BtnPrimary, BtnSecondary, hook::Spawner, page::post::post_api::PostApi};
 use catsquad_log::prelude::*;
 use catsquad_web_utils::file::GetFiles;
 use leptos::{html, prelude::*};
@@ -15,12 +16,14 @@ pub fn PostPreviews(
 ) -> impl IntoView {
     let images = post_api.imgs;
     let post_author_username = post_api.author_username.clone();
+    let update_images_mode = post_api.update_images_mode;
     let on_click = move |e: MouseEvent| {
         // trace!("");
     };
 
     let on_link =
         move |f: ArcRwSignal<ParsedPostImage>| f.with(|v| PostImageId::new(v.hash).to_hashtag());
+    let images_count = move || images.with(|v| v.len());
 
     // let upload_image = NodeRef::<html::Input>::new();
 
@@ -81,10 +84,37 @@ pub fn PostPreviews(
 
     //     views
     // };
+    // disabled=disable_save_when_fn
+    // <BtnPrimary  class=class_save id=id_save_fn on_click=on_save_fn>
+    //     "Save"
+    // </BtnPrimary>
+    // <BtnSecondary class="fle" id=id_cancel_fn on_click=on_cancel_fn>
+    //     "Cancel"
+    // </BtnSecondary>
+    let toggle_edit_mode = move |e: MouseEvent| {
+        update_images_mode.update(|v| *v = !*v);
+    };
+    let image_view_disabled = move || !update_images_mode.get();
+    let toggle_edit_mode_btn_text = move || {
+        if update_images_mode.get() {
+            "Cancel"
+        } else {
+            "Edit"
+        }
+    };
 
     view! {
-        <div class="flex justify-start gap-2 flex flex-wrap">
-            <ImagesView on_link on_click=on_click author_username=post_author_username post_id images />
+        <div class="flex flex-col gap-2">
+            <div class="flex justify-between">
+                <p>{images_count}" images"</p>
+                <BtnSecondary class="w-[5rem]" on_click=toggle_edit_mode>
+                    {toggle_edit_mode_btn_text}
+                </BtnSecondary>
+            </div>
+            <div class="flex justify-start gap-2 flex flex-wrap">
+                <ImagesView disabled=image_view_disabled spawner author_username=post_author_username post_id images />
+                // <ImagesView disabled=image_view_disabled on_link on_click=on_click author_username=post_author_username post_id images />
+            </div>
         </div>
     }
 }

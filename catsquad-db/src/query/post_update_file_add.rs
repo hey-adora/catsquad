@@ -2,12 +2,12 @@ use crate::{Db, DbFileImage, DbImageKind, XTimestamp};
 use catsquad_log::prelude::*;
 
 #[derive(Debug, thiserror::Error)]
-pub enum DbPostUpdateFileAddErr {
+pub enum DbPostUpdateImageAddErr {
     #[error("not enough storage")]
     OutOfStorage,
 
     #[error("file too big")]
-    FileTooBig,
+    ImageTooBig,
 
     #[error("post not found")]
     PostNotFound,
@@ -16,7 +16,7 @@ pub enum DbPostUpdateFileAddErr {
     Unauthorized,
 
     #[error("file already exists")]
-    FileAlreadyExists,
+    ImageAlreadyExists,
 
     #[error("DB error {0}")]
     Db(#[from] sqlx::Error),
@@ -28,7 +28,7 @@ pub enum DbPostUpdateFileAddErr {
 // TODO make it so it doesnt use user's space if file is duplicate
 
 impl Db {
-    pub async fn post_update_file_add(
+    pub async fn post_update_image_add(
         &self,
         time: u64,
         user_username: impl Into<String>,
@@ -38,7 +38,7 @@ impl Db {
         file_extension: impl Into<String>,
         file_width: u32,
         file_height: u32,
-    ) -> Result<DbFileImage, DbPostUpdateFileAddErr> {
+    ) -> Result<DbFileImage, DbPostUpdateImageAddErr> {
         let user_username = user_username.into();
         let file_extension = file_extension.into();
 
@@ -64,7 +64,7 @@ impl Db {
                 Err(sqlx::Error::RowNotFound) => (false, 1, file_size), // 1 because we will create this img next
                 Err(err) => {
                     error!("unexpected db error {err}");
-                    return Err(DbPostUpdateFileAddErr::Db(err));
+                    return Err(DbPostUpdateImageAddErr::Db(err));
                 }
             };
 
@@ -86,7 +86,7 @@ impl Db {
                 Ok(v) => v,
                 Err(err) => {
                     error!("unexpected db error (post_update_file_add) {err}");
-                    return Err(DbPostUpdateFileAddErr::Db(err));
+                    return Err(DbPostUpdateImageAddErr::Db(err));
                 }
             };
 
@@ -99,7 +99,7 @@ impl Db {
                     "negative storage detected in post_update_file_add user_used_storage_bytes({user_used_storage_bytes}) user_max_storage_per_file_bytes({user_max_storage_per_file_bytes}) user_max_storage_bytes({user_max_storage_bytes})"
                 );
                 error!("{error}");
-                return Err(DbPostUpdateFileAddErr::InternalError(error));
+                return Err(DbPostUpdateImageAddErr::InternalError(error));
             }
 
             let user_used_storage_bytes = user_used_storage_bytes as u32;
@@ -107,11 +107,11 @@ impl Db {
             let user_max_storage_bytes = user_max_storage_bytes as u32;
 
             if user_used_storage_bytes + file_size > user_max_storage_bytes {
-                return Err(DbPostUpdateFileAddErr::OutOfStorage);
+                return Err(DbPostUpdateImageAddErr::OutOfStorage);
             }
 
             if file_size > user_max_storage_per_file_bytes {
-                return Err(DbPostUpdateFileAddErr::FileTooBig);
+                return Err(DbPostUpdateImageAddErr::ImageTooBig);
             }
 
             user_used_storage_bytes
@@ -129,11 +129,11 @@ impl Db {
             let result = match result {
                 Ok(v) => v,
                 Err(sqlx::Error::RowNotFound) => {
-                    return Err(DbPostUpdateFileAddErr::PostNotFound);
+                    return Err(DbPostUpdateImageAddErr::PostNotFound);
                 }
                 Err(err) => {
                     error!("unexpected db error {err}");
-                    return Err(DbPostUpdateFileAddErr::Db(err));
+                    return Err(DbPostUpdateImageAddErr::Db(err));
                 }
             };
 
@@ -141,12 +141,12 @@ impl Db {
                 result;
 
             if user_username != post_user_username {
-                return Err(DbPostUpdateFileAddErr::Unauthorized);
+                return Err(DbPostUpdateImageAddErr::Unauthorized);
             }
 
             let constains_hash = post_images_hashes.contains(&file_hash);
             if constains_hash {
-                return Err(DbPostUpdateFileAddErr::FileAlreadyExists);
+                return Err(DbPostUpdateImageAddErr::ImageAlreadyExists);
             }
 
             (post_images_hashes, post_size_bytes as u32)
@@ -186,7 +186,7 @@ impl Db {
                     Ok(_v) => (),
                     Err(err) => {
                         error!("unexpected db error {err}");
-                        return Err(DbPostUpdateFileAddErr::Db(err));
+                        return Err(DbPostUpdateImageAddErr::Db(err));
                     }
                 };
             }
@@ -207,7 +207,7 @@ impl Db {
                 Ok(v) => v,
                 Err(err) => {
                     error!("unexpected db error {err}");
-                    return Err(DbPostUpdateFileAddErr::Db(err));
+                    return Err(DbPostUpdateImageAddErr::Db(err));
                 }
             };
 
@@ -240,7 +240,7 @@ impl Db {
                 Ok(v) => v,
                 Err(err) => {
                     error!("unexpected db error {err}");
-                    return Err(DbPostUpdateFileAddErr::Db(err));
+                    return Err(DbPostUpdateImageAddErr::Db(err));
                 }
             };
 
@@ -276,7 +276,7 @@ impl Db {
                 Ok(v) => v,
                 Err(err) => {
                     error!("unexpected db error {err}");
-                    return Err(DbPostUpdateFileAddErr::Db(err));
+                    return Err(DbPostUpdateImageAddErr::Db(err));
                 }
             };
 
@@ -331,7 +331,7 @@ async fn test_post_update_file_add() {
             .post_add(0, user1.username.clone(), "title1", "description1", "tags")
             .await
             .unwrap();
-        assert_eq!(post1.images_hashes.len(), 0);
+        assert_eq!(post1.images.len(), 0);
 
         db.post_update_state(0, user1.username.clone(), post1.id, PostState::Active)
             .await
@@ -343,16 +343,16 @@ async fn test_post_update_file_add() {
     // assert error
     {
         let result = db
-            .post_update_file_add(0, user1.username.clone(), post1.id, 6, 10, "png", 10, 10)
+            .post_update_image_add(0, user1.username.clone(), post1.id, 6, 10, "png", 10, 10)
             .await;
-        assert!(matches!(result, Err(DbPostUpdateFileAddErr::FileTooBig)));
+        assert!(matches!(result, Err(DbPostUpdateImageAddErr::ImageTooBig)));
     }
 
     // assert success
     // users, posts and files_images tables must be updated
     {
         let post_img1 = db
-            .post_update_file_add(0, user1.username.clone(), post1.id, 5, 10, "png", 10, 8)
+            .post_update_image_add(0, user1.username.clone(), post1.id, 5, 10, "png", 10, 8)
             .await
             .unwrap();
         let post1 = db
@@ -385,35 +385,35 @@ async fn test_post_update_file_add() {
     // assert errors
     {
         let result = db
-            .post_update_file_add(0, user1.username.clone(), post1.id, 50, 2, "png", 10, 10)
+            .post_update_image_add(0, user1.username.clone(), post1.id, 50, 2, "png", 10, 10)
             .await;
-        assert!(matches!(result, Err(DbPostUpdateFileAddErr::OutOfStorage)));
+        assert!(matches!(result, Err(DbPostUpdateImageAddErr::OutOfStorage)));
 
         let result = db
-            .post_update_file_add(0, user1.username.clone(), post1.id, 3, 10, "png", 10, 10)
+            .post_update_image_add(0, user1.username.clone(), post1.id, 3, 10, "png", 10, 10)
             .await;
         trace!("{result:?} == Err(DbPostUpdateFileAddErr::FileAlreadyExists)");
         assert!(matches!(
             result,
-            Err(DbPostUpdateFileAddErr::FileAlreadyExists)
+            Err(DbPostUpdateImageAddErr::ImageAlreadyExists)
         ));
 
         let result = db
-            .post_update_file_add(0, user1.username.clone(), 0, 1, 2, "png", 10, 10)
+            .post_update_image_add(0, user1.username.clone(), 0, 1, 2, "png", 10, 10)
             .await;
-        assert!(matches!(result, Err(DbPostUpdateFileAddErr::PostNotFound)));
+        assert!(matches!(result, Err(DbPostUpdateImageAddErr::PostNotFound)));
 
         let result = db
-            .post_update_file_add(0, user2.username.clone(), post1.id, 5, 2, "png", 10, 10)
+            .post_update_image_add(0, user2.username.clone(), post1.id, 5, 2, "png", 10, 10)
             .await;
-        assert!(matches!(result, Err(DbPostUpdateFileAddErr::Unauthorized)));
+        assert!(matches!(result, Err(DbPostUpdateImageAddErr::Unauthorized)));
     }
 
     // assert success
     // second image, check if storage adds up correctly
     {
         let post_img2 = db
-            .post_update_file_add(0, user1.username.clone(), post1.id, 2, 20, "png", 10, 8)
+            .post_update_image_add(0, user1.username.clone(), post1.id, 2, 20, "png", 10, 8)
             .await
             .unwrap();
         let post1 = db
@@ -442,7 +442,7 @@ async fn test_post_update_file_add() {
             .post_add(0, user1.username.clone(), "title2", "description2", "tags")
             .await
             .unwrap();
-        assert_eq!(post.images_hashes.len(), 0);
+        assert_eq!(post.images.len(), 0);
 
         db.post_update_state(0, user1.username.clone(), post.id, PostState::Active)
             .await
@@ -456,7 +456,7 @@ async fn test_post_update_file_add() {
     {
         // 200 gets ignored, original file size is used
         let post_img2 = db
-            .post_update_file_add(0, user1.username.clone(), post2.id, 200, 20, "png", 10, 8)
+            .post_update_image_add(0, user1.username.clone(), post2.id, 200, 20, "png", 10, 8)
             .await
             .unwrap();
         let post1 = db

@@ -1,4 +1,4 @@
-use crate::XTimestamp;
+use crate::{DbFileImage, DbPostGet, XTimestamp};
 use catsquad_log::prelude::*;
 use catsquad_shared::{
     POST_STATE_ACTIVE, POST_STATE_DRAFT, POST_STATE_HIDDEN, PostState, proccess_tags,
@@ -29,8 +29,8 @@ pub struct DbPost {
     pub size_bytes: u32,
     #[sqlx(rename = "post_images_hashes")]
     pub images_hashes: Vec<i64>,
-    #[sqlx(rename = "post_images_status", skip)]
-    pub images_status: Vec<bool>,
+    // #[sqlx(rename = "post_images_status", skip)]
+    // pub images_status: Vec<bool>,
     // #[sqlx(rename = "post_modified_at")]
     #[sqlx(rename = "post_modified_at")]
     #[sqlx(try_from = "XTimestamp")]
@@ -83,7 +83,7 @@ impl Db {
         title: impl Into<String>,
         description: impl Into<String>,
         tags: impl Into<String>,
-    ) -> Result<DbPost, DbPostAddErr> {
+    ) -> Result<DbPostGet, DbPostAddErr> {
         // let user_id = create_user_id(user_key);
         let pool = &self.db;
 
@@ -116,7 +116,7 @@ impl Db {
             }
         };
 
-        let Some(mut post) = post else {
+        let Some(post) = post else {
             // add post
             let query = "
             INSERT INTO posts (
@@ -167,75 +167,126 @@ impl Db {
                 likes_count: 0,
                 size_bytes: 0,
                 images_hashes: Vec::new(),
-                images_status: Vec::new(),
+                // images_status: Vec::new(),
                 modified_at: time,
                 created_at: time,
             };
 
             tx.commit().await?;
 
-            return Ok(post);
+            return Ok(post.into());
         };
 
-        // get files status
-        {
+        // get images
+        let mut post = {
             let query = "SELECT
-                                    hash, image_processed
-                                    FROM unnest($1) hash
-                                    INNER JOIN files_images
-                                    ON hash=image_hash
-                                    ORDER BY hash DESC";
+                                    image_hash,
+                                    image_extension,
+                                    image_kind,
+                                    image_size_bytes,
+                                    image_processed,
+                                    image_used_count,
+                                    image_width,
+                                    image_height,
+                                    image_modified_at,
+                                    image_created_at
+                                 FROM unnest($2)
+                                  INNER JOIN files_images ON unnest=image_hash
+                                 ";
 
             let result = sqlx::query_as(query)
+                .bind(post.id)
                 .bind(&post.images_hashes)
-                .fetch_all(&mut *tx)
+                .fetch_all(pool)
                 .await;
 
-            debug!(
-                "query {query} $1={:?} result {result:#?}",
-                post.images_hashes
-            );
-
-            let images_status: Vec<(i64, bool)> = match result {
-                Ok(post) => post,
+            let images: Vec<DbFileImage> = match result {
+                Ok(v) => v,
                 Err(err) => {
                     error!("unexpected db error {err}");
                     return Err(DbPostAddErr::Db(err));
                 }
             };
 
-            let sorted_imagus_status = post
+            let images_sorted = post
                 .images_hashes
                 .clone()
                 .into_iter()
-                .map(|hash| {
-                    let item = images_status
-                        .iter()
-                        .find(|(q_hash, _status)| *q_hash == hash)
-                        .map(|v| v.1);
-
-                    item
-                })
-                .collect::<Option<Vec<bool>>>()
+                .map(|hash| images.iter().find(|img| img.hash == hash).cloned())
+                .collect::<Option<Vec<DbFileImage>>>()
                 .ok_or(DbPostAddErr::InternalError)
                 .inspect_err(|_| {
                     error!(
-                        " image status didnt match result expected {:?}, got {:?}",
-                        &post.images_hashes, images_status
+                        " image status didnt match result expected {:#?}, got {:#?}",
+                        &post.images_hashes, images
                     )
                 })?;
 
-            if sorted_imagus_status.len() != post.images_hashes.len() {
-                error!(
-                    "invalid image_status length, got {} expected {}",
-                    sorted_imagus_status.len(),
-                    post.images_hashes.len()
-                );
-                return Err(DbPostAddErr::InternalError);
-            }
+            let mut post: DbPostGet = post.into();
 
-            post.images_status = sorted_imagus_status;
-        }
+            post.images = images_sorted;
+
+            post
+        };
+        // // get files status
+        // {
+        //     let query = "SELECT
+        //                             hash, image_processed
+        //                             FROM unnest($1) hash
+        //                             INNER JOIN files_images
+        //                             ON hash=image_hash
+        //                             ORDER BY hash DESC";
+
+        //     let result = sqlx::query_as(query)
+        //         .bind(&post.images_hashes)
+        //         .fetch_all(&mut *tx)
+        //         .await;
+
+        //     debug!(
+        //         "query {query} $1={:?} result {result:#?}",
+        //         post.images_hashes
+        //     );
+
+        //     let images_status: Vec<(i64, bool)> = match result {
+        //         Ok(post) => post,
+        //         Err(err) => {
+        //             error!("unexpected db error {err}");
+        //             return Err(DbPostAddErr::Db(err));
+        //         }
+        //     };
+
+        //     let sorted_imagus_status = post
+        //         .images_hashes
+        //         .clone()
+        //         .into_iter()
+        //         .map(|hash| {
+        //             let item = images_status
+        //                 .iter()
+        //                 .find(|(q_hash, _status)| *q_hash == hash)
+        //                 .map(|v| v.1);
+
+        //             item
+        //         })
+        //         .collect::<Option<Vec<bool>>>()
+        //         .ok_or(DbPostAddErr::InternalError)
+        //         .inspect_err(|_| {
+        //             error!(
+        //                 " image status didnt match result expected {:?}, got {:?}",
+        //                 &post.images_hashes, images_status
+        //             )
+        //         })?;
+
+        //     if sorted_imagus_status.len() != post.images_hashes.len() {
+        //         error!(
+        //             "invalid image_status length, got {} expected {}",
+        //             sorted_imagus_status.len(),
+        //             post.images_hashes.len()
+        //         );
+        //         return Err(DbPostAddErr::InternalError);
+        //     }
+
+        //     post.images_status = sorted_imagus_status;
+        // }
 
         // update post
         {
@@ -340,7 +391,7 @@ async fn test_post_add() {
     assert_eq!(post1.tags, " tags ");
     assert_eq!(post1.likes_count, 0);
     assert_eq!(post1.size_bytes, 0);
-    assert_eq!(post1.images_hashes, vec![] as Vec<i64>);
+    assert_eq!(post1.images, Vec::new());
     assert_eq!(post1.modified_at, 0);
     assert_eq!(post1.created_at, 0);
 

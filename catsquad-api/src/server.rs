@@ -121,7 +121,7 @@ pub async fn app(state: AppState) -> Router {
     let api_router_upload = Router::new()
         .route(
             catsquad_shared::LINK_API_POST_UPDATE_FILE_ADD,
-            post(api::post_update_file_add),
+            post(api::post_update_image_add),
         )
         .layer(DefaultBodyLimit::max(DEFAULT_GLOBAL_MAX_UPLOAD_SIZE))
         .route_layer(middleware::from_fn_with_state(
@@ -178,6 +178,10 @@ pub async fn app(state: AppState) -> Router {
             post(api::post_like_add),
         )
         .route(
+            catsquad_shared::LINK_API_POST_UPDATE_IMAGE_ORD,
+            post(api::post_update_image_ord),
+        )
+        .route(
             catsquad_shared::LINK_API_POST_LIKE_REMOVE,
             post(api::post_like_remove),
         )
@@ -186,7 +190,7 @@ pub async fn app(state: AppState) -> Router {
             get(api::post_like_get_by_post),
         )
         .route(
-            catsquad_shared::LINK_API_POST_UPDATE_FILE_REMOVE,
+            catsquad_shared::LINK_API_POST_UPDATE_IMAGE_REMOVE,
             post(api::post_update_file_remove),
         )
         .route(

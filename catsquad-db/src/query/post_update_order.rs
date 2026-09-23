@@ -1,5 +1,6 @@
 use crate::{Db, XTimestamp};
 use catsquad_log::prelude::*;
+use catsquad_shared::arr_remove_and_insert;
 
 #[derive(Debug, thiserror::Error)]
 pub enum DbPostUpdateOrderErr {
@@ -25,8 +26,8 @@ impl Db {
         time: u64,
         user_username: impl Into<String>,
         post_id: i64,
-        selected_pos: usize,
-        new_pos: usize,
+        pos_a: usize,
+        pos_b: usize,
     ) -> Result<(), DbPostUpdateOrderErr> {
         let user_username = user_username.into();
 
@@ -62,7 +63,7 @@ impl Db {
                 return Err(DbPostUpdateOrderErr::Unauthorized);
             }
 
-            if new_pos >= hashes_len || selected_pos >= hashes_len {
+            if pos_b >= hashes_len || pos_a >= hashes_len {
                 return Err(DbPostUpdateOrderErr::InvalidIndex);
             }
 
@@ -72,9 +73,7 @@ impl Db {
         // update post
         {
             let mut new_post_images_hashes = post_images_hashes;
-            let hash = new_post_images_hashes.remove(selected_pos);
-            new_post_images_hashes.insert(new_pos, hash);
-            // new_post_images_hashes.swap(selected_pos, new_pos);
+            arr_remove_and_insert(&mut new_post_images_hashes, pos_a, pos_b);
 
             let query = "UPDATE posts SET
                             post_images_hashes = $1,
@@ -115,7 +114,7 @@ impl Db {
 #[cfg(test)]
 #[tokio::test]
 async fn test_post_update_order() {
-    use crate::DbPost;
+    use crate::DbPostGet;
 
     init_log();
 
@@ -153,8 +152,8 @@ async fn test_post_update_order() {
 
     // add images
     {
-        let add_post_file_fn = async |post: &DbPost, hash: i64, size: u32| {
-            db.post_update_file_add(0, user.username.clone(), post.id, size, hash, "png", 50, 50)
+        let add_post_file_fn = async |post: &DbPostGet, hash: i64, size: u32| {
+            db.post_update_image_add(0, user.username.clone(), post.id, size, hash, "png", 50, 50)
                 .await
         };
 

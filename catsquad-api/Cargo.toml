@@ -37,6 +37,7 @@ url = { workspace = true }
 tower= { workspace = true, features = ["util"] }
 axum-test = { workspace = true } 
 catsquad-client = { workspace = true, features = ["axum_test"] }
+catsquad-seed = { workspace = true }
 # divan = { workspace = true }
 
 [[bench]]
