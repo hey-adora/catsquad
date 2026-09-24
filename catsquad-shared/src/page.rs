@@ -8,4 +8,28 @@ pub mod register;
 pub mod settings;
 pub mod upload;
 
+pub const MODAL_QUERY_PARAM_NAME: &'static str = "modal_confirm";
+
+#[derive(
+    Default, Debug, Clone, PartialEq, PartialOrd, strum::EnumString, strum::Display, strum::EnumIs,
+)]
+#[strum(serialize_all = "lowercase")]
+pub enum ModalQueryParamValue {
+    #[default]
+    None,
+    Enabled,
+}
+
+pub fn modal_query_params() -> &'static str {
+    "modal_confirm=enabled"
+}
+
+// pub const MODAL_QUERY_PARAM_STATE: &'static str = "enabled";
+// #[derive(Debug, Clone, PartialEq, PartialOrd, strum::EnumString, strum::Display, strum::EnumIs)]
+// #[strum(serialize_all = "lowercase")]
+// pub enum ModalConfirmStage {
+//     ,
+//     Token,
+// }
+
 // pub const PATH_FRONT_END_REGISTER: &'static str = "/register";

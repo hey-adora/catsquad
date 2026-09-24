@@ -267,7 +267,7 @@ pub fn Comment(
                             <div class="text-[1rem] text-base03"> {move || micro_to_str(global_state.get_time().saturating_sub(comment.created_at))}" ago"</div>
 
                             <Show when={move || is_owned_fn() || comments_manual.edit_mode.get()} >
-                                <div class=move || format!(" gap-2 ml-auto place-items-center {}", if comments_manual.edit_mode.get() {"flex"} else {"group-hover:flex hidden"} )>
+                                <div class="gap-2 ml-auto place-items-center flex">
                                     <button on:click=click_edit class=move || format!("text-center   rounded-full font-semibold text-[0.8rem] font-medium px-[0.8rem] w-[4rem]  {}", if comments_manual.edit_mode.get() { " hover:bg-base05 bg-base0D text-base01" } else { " text-base05 bg-base01 hover:bg-base05 hover:text-base01" })>
                                         <Show when={move || comments_manual.edit_mode.get() } fallback={move || "Edit" }>
                                             "Save"

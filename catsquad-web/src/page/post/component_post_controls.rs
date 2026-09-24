@@ -48,7 +48,11 @@ pub fn PostControls(
                     <p class=class_state>{state}</p>
                 </div>
                 <div>
-                    <BtnDelete on_click=delete_post>
+                    <BtnDelete
+                        modal_enable=true
+                        modal_title="delete post"
+                        modal_text="are you sure you want to delete post?"
+                        on_click=delete_post>
                         "Delete"
                     </BtnDelete>
                 </div>

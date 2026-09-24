@@ -1,7 +1,7 @@
-use crate::ZoneData;
 use crate::hook::{ParsedPostImage, PostImageId};
 use crate::page::upload::component_edit_files::ImagesView;
 use crate::{BtnPrimary, BtnSecondary, hook::Spawner, page::post::post_api::PostApi};
+use crate::{PageState, ZoneData};
 use catsquad_log::prelude::*;
 use catsquad_web_utils::file::GetFiles;
 use leptos::{html, prelude::*};
@@ -14,6 +14,7 @@ pub fn PostPreviews(
     post_api: PostApi,
     #[prop(optional, into)] post_id: Signal<i64>,
 ) -> impl IntoView {
+    let page = PageState::get();
     let images = post_api.imgs;
     let post_author_username = post_api.author_username.clone();
     let update_images_mode = post_api.update_images_mode;
@@ -91,6 +92,8 @@ pub fn PostPreviews(
     // <BtnSecondary class="fle" id=id_cancel_fn on_click=on_cancel_fn>
     //     "Cancel"
     // </BtnSecondary>
+    // <ImagesView disabled=image_view_disabled on_link on_click=on_click author_username=post_author_username post_id images />
+
     let toggle_edit_mode = move |e: MouseEvent| {
         update_images_mode.update(|v| *v = !*v);
     };
@@ -102,18 +105,20 @@ pub fn PostPreviews(
             "Edit"
         }
     };
+    let when_is_owner = move || page.acc_username() == post_api.author_username.get();
 
     view! {
         <div class="flex flex-col gap-2">
             <div class="flex justify-between">
                 <p>{images_count}" images"</p>
-                <BtnSecondary class="w-[5rem]" on_click=toggle_edit_mode>
-                    {toggle_edit_mode_btn_text}
-                </BtnSecondary>
+                <Show when=when_is_owner>
+                    <BtnSecondary class="w-[5rem]" on_click=toggle_edit_mode>
+                        {toggle_edit_mode_btn_text}
+                    </BtnSecondary>
+                </Show>
             </div>
             <div class="flex justify-start gap-2 flex flex-wrap">
                 <ImagesView disabled=image_view_disabled spawner author_username=post_author_username post_id images />
-                // <ImagesView disabled=image_view_disabled on_link on_click=on_click author_username=post_author_username post_id images />
             </div>
         </div>
     }

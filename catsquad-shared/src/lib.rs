@@ -62,9 +62,12 @@ pub use api::user_add::*;
 pub use api::user_get_by_session_key::*;
 pub use api::user_update_username::*;
 
+pub use page::MODAL_QUERY_PARAM_NAME;
+pub use page::ModalQueryParamValue;
 pub use page::assets::*;
 pub use page::index::*;
 pub use page::login::*;
+pub use page::modal_query_params;
 pub use page::post::*;
 pub use page::register::*;
 pub use page::settings::*;

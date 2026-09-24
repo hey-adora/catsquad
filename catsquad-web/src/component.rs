@@ -10,5 +10,7 @@ pub mod floater;
 pub mod length_counter;
 pub mod link_primary;
 pub mod link_secondary;
+pub mod modal;
+pub mod modal_confirm;
 pub mod nav;
 pub mod svgs;

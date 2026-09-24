@@ -613,7 +613,7 @@ pub mod leptos_helpers {
     use leptos_router::params::{Params, ParamsError};
     use std::str::FromStr;
 
-    #[derive(Clone)]
+    #[derive(Clone, Debug)]
     pub struct RwQuery<T: FromStr + ToString + Clone + Sync + Send + Default + PartialEq + 'static> {
         pub fn_get: Memo<Option<T>>,
         pub fn_set: SignalSetter<Option<T>>,

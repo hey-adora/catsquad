@@ -2,13 +2,13 @@ use leptos::prelude::*;
 
 #[component]
 pub fn ErrGeneral(
-    #[prop(optional, into)] id: Option<Callback<(), String>>,
-    #[prop(optional, into)] error: Option<Callback<(), String>>,
-    #[prop(optional, into)] class: Option<Callback<(), String>>,
+    #[prop(optional, into)] id: Signal<String>,
+    #[prop(optional, into)] error: Signal<String>,
+    #[prop(optional, into)] class: Signal<String>,
 ) -> impl IntoView {
-    let error_fn = move || error.map(|v| v.run(())).unwrap_or_default();
-    let id_fn = move || id.map(|v| v.run(())).unwrap_or_default();
-    let class_fn = move || class.map(|v| v.run(())).unwrap_or_default();
+    let error_fn = move || error.get();
+    let id_fn = move || id.get();
+    let class_fn = move || class.get();
 
     view! {
         <Show when=move || !error_fn().is_empty()  >

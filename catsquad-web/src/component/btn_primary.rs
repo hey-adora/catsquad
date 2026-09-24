@@ -4,10 +4,10 @@ use web_sys::MouseEvent;
 
 #[component]
 pub fn BtnPrimary(
-    #[prop(optional, into)] id: Option<Callback<(), String>>,
-    #[prop(optional, into)] class: Option<Callback<(), String>>,
-    #[prop(optional, into)] is_loading: Option<Callback<(), bool>>,
-    #[prop(optional, into)] disabled: Option<Callback<(), bool>>,
+    #[prop(optional, into)] id: Signal<String>,
+    #[prop(optional, into)] class: Signal<String>,
+    #[prop(optional, into)] is_loading: Signal<bool>,
+    #[prop(optional, into)] disabled: Signal<bool>,
     #[prop(optional, into)] on_click: Option<Callback<MouseEvent>>,
     children: Children,
 ) -> impl IntoView {
@@ -16,10 +16,10 @@ pub fn BtnPrimary(
             on_click.run(e);
         }
     };
-    let id_fn = move || id.map(|v| v.run(())).unwrap_or_default();
-    let class_fn = move || class.map(|v| v.run(())).unwrap_or_default();
-    let is_loading_fn = move || is_loading.map(|v| v.run(())).unwrap_or_default();
-    let disabled_fn = move || disabled.map(|v| v.run(())).unwrap_or_default();
+    let id_fn = move || id.get();
+    let class_fn = move || class.get();
+    let is_loading_fn = move || is_loading.get();
+    let disabled_fn = move || disabled.get();
     let is_disabled_fn = move || is_loading_fn() || disabled_fn();
 
     let class_on_disable = move || "bg-base03 font-bold text-base01";

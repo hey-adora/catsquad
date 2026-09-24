@@ -7,6 +7,9 @@ pub fn BtnDelete(
     #[prop(optional, into)] id: Signal<String>,
     #[prop(optional, into)] class: Signal<String>,
     #[prop(optional, into)] is_loading: Signal<bool>,
+    #[prop(optional, into)] modal_enable: Signal<bool>,
+    #[prop(optional, into)] modal_title: Signal<String>,
+    #[prop(optional, into)] modal_text: Signal<String>,
     #[prop(optional, into)] disabled: Signal<bool>,
     #[prop(optional, into)] on_click: Option<Callback<MouseEvent>>,
     children: Children,
@@ -25,8 +28,11 @@ pub fn BtnDelete(
         <Btn
             id=move || id.get()
             disabled=is_disabled_fn
-            on:click=on_click_handler
+            on_click=on_click_handler
             class=move || class.get()
+            modal_enable
+            modal_title
+            modal_text
             class_on_disable=class_on_disable
             class_on_active=class_on_active
             >

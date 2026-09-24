@@ -1,7 +1,10 @@
-use crate::Nav;
 use crate::hook::Spawner;
 use crate::page::create_client;
 use crate::page::post::post_like_state::PostLikeState;
+use crate::{Modal, ModalConfirm, ModalConfirmDto, ModalConfirmLevel, Nav};
+use catsquad_log::prelude::*;
+use catsquad_shared::MODAL_QUERY_PARAM_NAME;
+use catsquad_web_utils::prelude::RwQuery;
 use leptos::Params;
 use leptos::prelude::*;
 use leptos_router::hooks::{use_location, use_params};
@@ -79,30 +82,44 @@ pub fn Post() -> impl IntoView {
         });
     });
 
-    let when_not_found = move || post_api.api_state.get().is_not_found();
-    let when_deleted = move || post_api.api_state.get().is_deleted();
-    let when_show = move || {
+    let when_post_not_found = move || post_api.api_state.get().is_not_found();
+    let when_post_deleted = move || post_api.api_state.get().is_deleted();
+    let when_post_show = move || {
         let state = post_api.api_state.get();
         state.is_normal() || state.is_loading()
     };
+
+    // let when_post_confirm_delete = move || true;
 
     view! {
         <main node_ref=main_ref class="relative font-hi grid gap-6 grid-rows-[auto_1fr] h-screen text-base05">
             <Nav/>
 
-            <Show when=when_not_found >
+            <Show when=when_post_not_found >
                 <div class="grid place-items-center text-[1.5rem] ">
                     "Not Found"
                 </div>
             </Show>
 
-            <Show when=when_deleted >
+            <Show when=when_post_deleted >
                 <div class="grid place-items-center text-[1.5rem] ">
                     "deleted"
                 </div>
             </Show>
 
-            <Show when=when_show >
+            <ModalConfirm/>
+
+            // <button on:click=modal_run >"TEST"</button>
+
+            // <Show when=when_post_confirm_delete >
+            //     <Modal>
+            //         <p class="text-[1.5rem] text-base08 text-center">"Post Deletion"</p>
+            //         <p>"wow"</p>
+            //         <LinkSecondary id=move||"close_modal_btn" link=link_back>"Cancel"</LinkSecondary>
+            //     </Modal>
+            // </Show>
+
+            <Show when=when_post_show >
                 <div class="flex flex-col lg:grid grid-rows-[auto_1fr] grid-cols-[2fr_1fr] lg:max-h-[calc(100vh-3rem)] gap-2  md:gap-6">
                     <PostControls spawner=spawner_post post_api post_id/>
                     <PostSelectedImg post_id post_api />

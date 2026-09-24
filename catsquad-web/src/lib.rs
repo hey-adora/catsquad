@@ -19,6 +19,8 @@ pub use component::floater::*;
 pub use component::length_counter::LengthCounter;
 pub use component::link_primary::LinkPrimary;
 pub use component::link_secondary::LinkSecondary;
+pub use component::modal::Modal;
+pub use component::modal_confirm::*;
 pub use component::nav::Nav;
 pub use component::svgs::*;
 pub use page_state::PageState;

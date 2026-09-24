@@ -429,6 +429,14 @@ pub fn FileCompletedPreview(
                 .unwrap_or_default()
         }
     };
+    let image_size = {
+        move || {
+            images_state
+                .get(image_index)
+                .map(|v| v.with(|v| bytes_to_str(v.size)))
+                .unwrap_or_default()
+        }
+    };
     let style_bg_img = move || {
         images_state
             .get(image_index)
@@ -451,10 +459,19 @@ pub fn FileCompletedPreview(
             </div>
         }
     };
+    let image_size_view = move || {
+        view! {
+            <div
+                class="text-center bg-base03 px-[0.5rem] text-base05 rounded-full absolute left-[0] top-[100%] transform -translate-y-full ">
+                {image_size}
+            </div>
+        }
+    };
     let inner_view = move || {
         view! {
             {image_index_view}
             <Show when=when_enabled>
+                {image_size_view}
                 <TrashCanBtn author_username images_state image_index />
             </Show>
         }
@@ -586,11 +603,12 @@ pub fn TrashCanBtn(
         });
     };
     let when_is_owner = move || page.acc_username() == author_username.get();
+    // <SVGTrash class="bg-base03 p-[0.35rem] text-base08 rounded-full z-[3] absolute left-[100%] top-[100%] transform -translate-x-1/2 -translate-y-1/2 size-[2.0rem]" />
 
     view! {
         <Show when=when_is_owner>
             <button on:click=on_click.clone()>
-                <SVGTrash class="bg-base03 p-[0.35rem] text-base08 rounded-full z-[3] absolute left-[100%] top-[100%] transform -translate-x-1/2 -translate-y-1/2 size-[2.0rem]" />
+                <SVGTrash class="bg-base03 p-[0.35rem] text-base08 rounded-full z-[3] absolute left-[100%] top-[100%] transform -translate-x-full -translate-y-full size-[2.0rem]" />
             </button>
         </Show>
     }

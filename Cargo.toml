@@ -128,4 +128,5 @@ web-sys = { version = "0.3.91", features = [
     "XmlHttpRequest",
     "XmlHttpRequestResponseType",
     "XmlHttpRequestUpload",
+    "History",
 ] }

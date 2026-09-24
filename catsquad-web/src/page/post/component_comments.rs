@@ -75,7 +75,7 @@ pub fn Comments(#[prop(optional, into)] post_id: Signal<i64>) -> impl IntoView {
                     <Errs error=comment_basic.err_post />
                     <div class="flex justify-between place-items-center">
                         <p class="text-[1rem]">"0/2000"</p>
-                        <BtnPrimary id=move|_:()|String::new() on_click=move |_| post_comment() class=move || "ml-auto">
+                        <BtnPrimary on_click=move |_| post_comment() class="ml-auto">
                             "Post"
                         </BtnPrimary>
                     </div>

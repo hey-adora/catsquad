@@ -26,6 +26,7 @@ use register::Register as PageRegister;
 use settings::Settings as PageSettings;
 use upload::Upload as PageUpload;
 
+use crate::ModalConfirmDto;
 use crate::PageState;
 use crate::hook::Spawner;
 
@@ -36,6 +37,8 @@ pub fn create_client() -> Client<XMLSender> {
 #[component]
 pub fn App() -> impl IntoView {
     PageState::set();
+    ModalConfirmDto::set();
+
     let page = PageState::get();
     let spawner = Spawner::new();
 

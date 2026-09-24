@@ -126,14 +126,19 @@ pub fn Gallery(
     };
 
     let set_scroll_top = move |gallery_elm: &HtmlDivElement| {
-        let scroll_top = gallery_elm.scroll_top();
+        let new_scroll_top = gallery_elm.scroll_top();
+        let prev_scroll_top = get_query_scroll.get_untracked().unwrap_or_default();
+        if new_scroll_top == prev_scroll_top {
+            return;
+        }
+
         let id = gallery_elm.id();
-        trace!("scroll top of {} {}", id, scroll_top);
-        debug_data_push("gallery_scroll_set", scroll_top.to_string());
-        set_query_scroll.set(if scroll_top == 0 {
+        trace!("scroll top of {} {}", id, new_scroll_top);
+        debug_data_push("gallery_scroll_set", new_scroll_top.to_string());
+        set_query_scroll.set(if new_scroll_top == 0 {
             None
         } else {
-            Some(scroll_top)
+            Some(new_scroll_top)
         });
     };
 
@@ -210,7 +215,6 @@ pub fn Gallery(
             if gallery_api.is_empty() {
                 return;
             }
-
             set_scroll_top(&gallery_elm);
         },
         Duration::from_millis(500),
