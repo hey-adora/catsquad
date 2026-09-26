@@ -14,6 +14,7 @@ use post_api::PostApi;
 mod comments_api;
 mod comments_basic;
 mod component_comment;
+mod component_comment_text;
 mod component_comments;
 mod component_edit_btn;
 mod component_favorite;

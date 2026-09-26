@@ -1,4 +1,4 @@
-use crate::Btn;
+use crate::{Btn, BtnSize};
 use leptos::prelude::*;
 use web_sys::MouseEvent;
 
@@ -9,6 +9,7 @@ pub fn BtnPrimary(
     #[prop(optional, into)] is_loading: Signal<bool>,
     #[prop(optional, into)] disabled: Signal<bool>,
     #[prop(optional, into)] on_click: Option<Callback<MouseEvent>>,
+    #[prop(optional, into)] size: Signal<BtnSize>,
     children: Children,
 ) -> impl IntoView {
     let on_click_handler = move |e| {
@@ -33,6 +34,7 @@ pub fn BtnPrimary(
             class=class_fn
             class_on_disable=class_on_disable
             class_on_active=class_on_active
+            size
             >
             {children()}
         </Btn>

@@ -12,10 +12,10 @@ use web_sys::Element;
 
 #[derive(Copy, Clone)]
 pub struct CommentsBaisc {
-    pub replies_count: RwSignal<u32, LocalStorage>,
+    pub replies_count: RwSignal<u32>,
     pub comments_manual: CommentsApi,
     pub err_post: RwSignal<String>,
-    pub items: RwSignal<Vec<CommentRes>, LocalStorage>,
+    pub items: RwSignal<Vec<CommentRes>>,
     pub infinite_fn: InfiniteScrollFn,
 }
 

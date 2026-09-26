@@ -1,4 +1,4 @@
-use crate::{BtnPrimary, BtnSecondary};
+use crate::{BtnPrimary, BtnSecondary, BtnSize};
 use leptos::prelude::*;
 
 #[component]
@@ -12,11 +12,16 @@ pub fn EditSaveCancel(
     #[prop(optional, into)] on_save: Option<Callback<()>>,
     #[prop(optional, into)] on_cancel: Option<Callback<()>>,
     #[prop(optional, into)] on_edit: Option<Callback<()>>,
+    #[prop(optional, into)] size: Signal<BtnSize>,
 ) -> impl IntoView {
     // let global_state = expect_context::<GlobalState>();
-    let class_save = move || format!("w-[5rem] {}", class_save.get());
-    let class_cancel = move || format!("w-[5rem] {}", class_cancel.get());
-    let class_edit = move || format!("w-[5rem] {}", class_edit.get());
+    let class_size = move || match size.get() {
+        BtnSize::Small => "w-[4rem]",
+        BtnSize::Normal => "w-[5rem]",
+    };
+    let class_save = move || format!("{} {}", class_size(), class_save.get());
+    let class_cancel = move || format!("{} {}", class_size(), class_cancel.get());
+    let class_edit = move || format!("{} {}", class_size(), class_edit.get());
 
     let on_save_fn = move |e| {
         if let Some(f) = on_save {
@@ -43,15 +48,15 @@ pub fn EditSaveCancel(
 
     view! {
         <Show when=when_fn >
-            <BtnPrimary disabled=disable_save_when_fn class=class_save id=id_save_fn on_click=on_save_fn>
+            <BtnPrimary size disabled=disable_save_when_fn class=class_save id=id_save_fn on_click=on_save_fn>
                 "Save"
             </BtnPrimary>
-            <BtnSecondary class=class_cancel id=id_cancel_fn on_click=on_cancel_fn>
+            <BtnSecondary size class=class_cancel id=id_cancel_fn on_click=on_cancel_fn>
                 "Cancel"
             </BtnSecondary>
         </Show>
         <Show when=move || !when_fn() >
-            <BtnSecondary class=class_edit id=id_edit_fn on_click=on_edit_fn>
+            <BtnSecondary size class=class_edit id=id_edit_fn on_click=on_edit_fn>
                 "Edit"
             </BtnSecondary>
         </Show>

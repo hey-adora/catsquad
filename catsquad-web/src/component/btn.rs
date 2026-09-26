@@ -5,6 +5,13 @@ use catsquad_web_utils::prelude::RwQuery;
 use leptos::prelude::*;
 use web_sys::MouseEvent;
 
+#[derive(Clone, Copy, Default)]
+pub enum BtnSize {
+    Small,
+    #[default]
+    Normal,
+}
+
 #[component]
 pub fn Btn(
     #[prop(optional, into)] id: Signal<String>,
@@ -17,6 +24,7 @@ pub fn Btn(
     #[prop(optional, into)] on_click: Option<Callback<MouseEvent>>,
     #[prop(optional, into)] class_on_disable: Signal<String>,
     #[prop(optional, into)] class_on_active: Signal<String>,
+    #[prop(optional, into)] size: Signal<BtnSize>,
     children: Children,
 ) -> impl IntoView {
     let id_fn = move || id.get();
@@ -28,9 +36,15 @@ pub fn Btn(
 
     let is_disabled_fn = move || is_loading_fn() || disabled_fn();
 
+    let size_class = move || match size.get() {
+        BtnSize::Small => "text-[0.8rem] leading-[0.8rem] px-[0.8rem] py-[0.25rem]",
+        BtnSize::Normal => "text-[1rem] leading-[1rem] px-[1rem] py-[0.5rem]",
+    };
+
     let class_fn = move || {
         format!(
-            "flex gap-2 place-content-center rounded-xl text-[1rem] leading-[1rem] px-[1rem] py-[0.5rem]  {} {}",
+            "flex gap-2 place-content-center rounded-xl {} {} {}",
+            size_class(),
             if is_disabled_fn() {
                 class_on_disable()
             } else {

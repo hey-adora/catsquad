@@ -1,7 +1,10 @@
+use super::component_comment_text::CommentText;
+use crate::BtnSize;
 use crate::hook::Spawner;
 use crate::page::create_client;
 use crate::page::post::comments_api::{CommentKind, CommentsApi};
-use crate::{PageState, SVGArrowDown, SVGTrash, SVGTriangle, hook::EventListener};
+use crate::page::post::component_edit_btn::EditSaveCancel;
+use crate::{Btn, Errs, PageState, SVGArrowDown, SVGTrash, SVGTriangle, hook::EventListener};
 use catsquad_log::prelude::*;
 use catsquad_shared::CommentRes;
 use catsquad_web_utils::time::{micro_to_str, time_now_micro};
@@ -10,13 +13,16 @@ use leptos::ev;
 use leptos::html;
 use leptos::prelude::*;
 use std::time::Duration;
-use web_sys::{HtmlDivElement, ScrollBehavior, ScrollIntoViewOptions, ScrollLogicalPosition};
+use web_sys::{
+    HtmlDivElement, HtmlPreElement, HtmlTextAreaElement, MouseEvent, ScrollBehavior,
+    ScrollIntoViewOptions, ScrollLogicalPosition,
+};
 
 #[component]
 pub fn Comment(
     parent_id: i64,
-    parent_items: RwSignal<Vec<CommentRes>, LocalStorage>,
-    parent_reply_count: RwSignal<u32, LocalStorage>,
+    parent_items: RwSignal<Vec<CommentRes>>,
+    parent_reply_count: RwSignal<u32>,
     comment: CommentRes,
     post_id: Signal<i64>,
     max_depth: usize,
@@ -25,7 +31,7 @@ pub fn Comment(
     let current_depth = parent_depth + 1;
     let global_state = PageState::get();
     let comment_container_ref = NodeRef::<html::Div>::new();
-    let comment_edit_ref = NodeRef::new();
+    let comment_edit_ref = NodeRef::<html::Textarea>::new();
     let comment_input_ref = NodeRef::<html::Textarea>::new();
     let flatten = current_depth >= max_depth;
     let reply_render_comments = current_depth <= max_depth;
@@ -39,17 +45,17 @@ pub fn Comment(
         move || global_state.acc_username() == user_username
     };
 
-    let comment_edit_event = EventListener::new(ev::change, |_, a| {
-        trace!("omg is it working edit magic");
+    // let comment_edit_event = EventListener::new(ev::change, |_, a| {
+    //     trace!("omg is it working edit magic");
 
-        //
-    });
-    Effect::new(move || {
-        let Some(elm) = comment_edit_ref.get() else {
-            return;
-        };
-        comment_edit_event.add(elm);
-    });
+    //     //
+    // });
+    // Effect::new(move || {
+    //     let Some(elm) = comment_edit_ref.get() else {
+    //         return;
+    //     };
+    //     comment_edit_event.add(elm);
+    // });
 
     let spawner = Spawner::new();
     let kind = if current_depth < max_depth {
@@ -170,8 +176,10 @@ pub fn Comment(
         let Some(last) = comment.parent_id.last() else {
             break 'f None;
         };
-        parent_items.with(|v| v.iter().find(|v| v.id == *last).cloned())
+        parent_items.with_untracked(|v| v.iter().find(|v| v.id == *last).cloned())
     };
+
+    // let bubble_text = ;
 
     let on_bubble_click = {
         let bubble = bubble.clone();
@@ -203,46 +211,78 @@ pub fn Comment(
             }
         }
     };
-    let on_bubble_click_fn = move |_| {
+    let on_bubble_click_fn = move |_: MouseEvent| {
         (on_bubble_click.clone())();
     };
 
     // micro_to_str(ns)
 
-    let click_edit = move |_| {
-        // edit_enabled.update(|v| *v = !*v);
-        if comments_manual.edit_mode.get_untracked() {
-            let Some(text) = comment_edit_ref
-                .get_untracked()
-                .and_then(|v: HtmlDivElement| v.text_content())
-            else {
-                return;
-            };
-            spawner.spawn(async move {
-                let client = create_client();
-                comments_manual.update_comment(&client, text).await;
-            });
-        }
-
+    let click_comment_edit = move || {
         comments_manual.edit_mode.set(true);
     };
 
-    let click_cancel = move |_| {
-        let Some(elm) = comment_edit_ref.get_untracked() as Option<HtmlDivElement> else {
+    let click_comment_save = move || {
+        let Some(text) = comment_edit_ref
+            .get_untracked()
+            .map(|v: HtmlTextAreaElement| v.value())
+        else {
             return;
         };
-
-        let txt = comments_manual.text.get_untracked();
-
-        elm.set_text_content(Some(&txt));
-
-        comments_manual.err_update.update(|v| v.clear());
-        comments_manual.edit_mode.set(false);
+        spawner.spawn(async move {
+            let client = create_client();
+            comments_manual.update_comment(&client, text).await;
+        });
     };
+
+    let click_comment_cancel = move || {
+        comments_manual.edit_mode.set(false);
+
+        // let Some(elm) = comment_edit_ref.get_untracked() as Option<HtmlTextAreaElement> else {
+        //     return;
+        // };
+
+        // let txt = comments_manual.text.get_untracked();
+
+        // elm.set_text_content(Some(&txt));
+
+        // comments_manual.err_update.update(|v| v.clear());
+        // comments_manual.edit_mode.set(false);
+    };
+
+    // let when_is_owner = move || page.acc_username() == post_api.author_username.get();
+    // let comment_container_class = {
+    //     let is_owned_fn = is_owned_fn.clone();
+    //     move || {
+    //         format!(
+    //             " rounded flex flex-col {}",
+    //             if is_owned_fn() { "" } else { "" }
+    //         )
+    //     }
+    // };
+    // let style_max_width = format!("calc(100% - {:.2}rem)", parent_depth as f32 * 0.); style:max-width=style_max_width
+    let comment_bar_class = {
+        let is_owned_fn = is_owned_fn.clone();
+        move || {
+            format!(
+                "grid gap-2 items-center justify-between {}",
+                if is_owned_fn() {
+                    "grid-cols-[auto_auto_auto]"
+                } else {
+                    "grid-cols-[auto_auto]"
+                }
+            )
+        }
+    };
+
+    let comment_text = move || comments_manual.text.get();
+    let modal_text = move || format!("\"{}\"", comment_text());
+    let when_edit_mode = move || comments_manual.edit_mode.get();
+    let when_normal_mode = move || !when_edit_mode();
+    // let when_edit
 
     view! {
         <div class=" flex flex-col "  >
-            <div id=comment.id.clone() class=" rounded 0bg-base03 flex flex-col">
+            <div id=comment.id.clone() class="rounded flex flex-col" >
                 <Show when=move || is_bubble>
                     <button on:click=on_bubble_click_fn.clone() class="cursor-pointer flex gap-2 items-center">
                         <div class="flex place-items-end h-[1.5rem] w-[3.2rem] shrink-0">
@@ -262,53 +302,38 @@ pub fn Comment(
                         </Show>
                     </div>
                     <div  class="pl-4  flex flex-col w-full group">
-                        <div class="flex gap-2 place-items-center ">
-                            <div class="text-[1.2rem]"> {comment.user_username.clone()} </div>
-                            <div class="text-[1rem] text-base03"> {move || micro_to_str(global_state.get_time().saturating_sub(comment.created_at))}" ago"</div>
+                        <div class=comment_bar_class>
+                            <div class="text-[1.2rem] text-base0F overflow-hidden whitespace-nowrap text-ellipsis max-w-full "> {comment.user_username.clone()} </div>
+                            <div class="text-[1rem] overflow-hidden whitespace-nowrap text-ellipsis max-w-full text-base03"> {move || micro_to_str(global_state.get_time().saturating_sub(comment.created_at))}" ago"</div>
 
                             <Show when={move || is_owned_fn() || comments_manual.edit_mode.get()} >
                                 <div class="gap-2 ml-auto place-items-center flex">
-                                    <button on:click=click_edit class=move || format!("text-center   rounded-full font-semibold text-[0.8rem] font-medium px-[0.8rem] w-[4rem]  {}", if comments_manual.edit_mode.get() { " hover:bg-base05 bg-base0D text-base01" } else { " text-base05 bg-base01 hover:bg-base05 hover:text-base01" })>
-                                        <Show when={move || comments_manual.edit_mode.get() } fallback={move || "Edit" }>
-                                            "Save"
-                                        </Show>
-                                    </button>
-                                    <Show when=move || comments_manual.edit_mode.get() >
-                                        <button on:click=click_cancel class=move || format!("text-center  rounded-full font-semibold text-[0.8rem] font-medium px-[0.8rem] w-[4rem] text-base05 bg-base01 hover:bg-base05 hover:text-base01")>
-                                            "Cancel"
-                                        </button>
-                                    </Show>
-                                    <Show when=move || !comments_manual.edit_mode.get() >
-                                        <button on:click=delete_comment class="">
+                                    <EditSaveCancel
+                                        id="description"
+                                        when=when_edit_mode
+                                        size=BtnSize::Small
+                                        on_save=click_comment_save
+                                        on_cancel=click_comment_cancel
+                                        on_edit=click_comment_edit
+                                    />
+                                    <Show when=when_normal_mode >
+                                        <Btn
+                                            on_click=delete_comment
+                                            modal_enable=true
+                                            modal_title="delete comment"
+                                            modal_text=modal_text
+                                            class="">
                                             <SVGTrash class="size-[1.1rem] text-base08 "/>
-                                        </button>
+                                        </Btn>
                                     </Show>
                                 </div>
                             </Show>
                         </div>
 
+                        <CommentText textarea_input=comment_edit_ref comments_manual />
 
-                        <div contenteditable={move || comments_manual.edit_mode.get()}
-                             node_ref=comment_edit_ref
-                             class={move || format!(" text-[1.1rem] break-all focus:outline-none! appearance-none border-none resize w-full rounded {}", if comments_manual.edit_mode.get() { "bg-base01 px-4 py-2" } else { "" })} >
-                            {
-                                move || comments_manual.text.get()
-                            }
-                        </div>
-                        <Show when=move || comments_manual.err_update.with(|v| !v.is_empty()) >
-                            <ul class="ml-[1rem] text-base08 list-disc">
-                                {move || comments_manual.err_update.get().trim().split("\n").filter(|v| v.len() > 1).map(|v| v.to_string()).map(move |v: String| view! { <li>{v}</li> }).collect_view() }
-                            </ul>
-                        </Show>
-                        <Show when=move || comments_manual.err_delete.with(|v| !v.is_empty()) >
-                            <ul class="ml-[1rem] text-base08 list-disc">
-                                {move || comments_manual.err_delete.get().trim().split("\n").filter(|v| v.len() > 1).map(|v| v.to_string()).map(move |v: String| view! { <li>{v}</li> }).collect_view() }
-                            </ul>
-                        </Show>
-                        // <div class=" mb-2 text-[1.1rem] break-all"> {comment.text} </div>
                         <div class=" h-[1.6rem] flex gap-2 place-items-center">
                             <Show when=move || reply_render_comments >
-                                // <button on:click=toggle_replies type="submit" class=move || format!("group  gap-1 flex place-items-center rounded-full font-semibold text-[0.8rem] font-medium px-[0.8rem] py-[0.2rem]  {}", if replies_shown.get() { "text-base05 bg-base01 hover:bg-base03" } else { "text-base05 bg-base01 hover:bg-base05 hover:text-base01" })>
                                 <Show when=move || {comments_manual.replies_count.get() > 0} fallback=move || view!{
                                     <p class=move || format!("group text-base03 gap-1 flex place-items-center rounded-full font-semibold text-[0.8rem] font-medium ")>
                                         <div class="0group-hover:bg-base01 size-3 bg-base03 aspect-square rounded mx-auto"/>
@@ -340,9 +365,6 @@ pub fn Comment(
                         <Show when=move || comments_manual.show_editor.get()>
                             <div class=move || format!("flex bg-base01 rounded-xl flex-col gap-2 py-2 px-4 w-full {}", if global_state.is_logged_in().unwrap_or_default() || !global_state.acc_pending() { "" } else { "hidden" })  >
                                 <textarea placeholder="Comment" node_ref=comment_input_ref class="focus:outline-none! appearance-none border-none resize text-[1.1rem] w-full" rows="2" wrap="hard"  ></textarea>
-                                // <ul class="text-base08 list-disc ml-[1rem]">
-                                //     {move || post_comments.err_post.get().map(|v| v.trim().split("\n").filter(|v| v.len() > 1).map(|v| v.to_string()).map(move |v: String| view! { <li>{v}</li> }).collect_view()) }
-                                // </ul>on:submit=post_comment
                                 <ul class="text-base08 list-disc ml-[1rem]">
                                     {move || comments_manual.err_post.get().trim().split("\n").filter(|v| v.len() > 1).map(|v| v.to_string()).map(move |v: String| view! { <li>{v}</li> }).collect_view() }
                                 </ul>
@@ -366,10 +388,7 @@ pub fn Comment(
                         </Show>
                     </div>
                 </Show>
-                // <form class=move || format!("mb-4 flex bg-base01 rounded-xl flex-col gap-2 py-2 px-4 w-full {}", if global_state.is_logged_in().unwrap_or_default() || !global_state.acc_pending() { "" } else { "hidden" }) on:submit=post_comments.on_comment.to_fn() >
-
                 <div class="flex flex-col w-full">
-                    // <Show when=move || reply_render_comments && (replies_shown.get() || comments_manual.reply_editor_show.get())>
                     <Show when=move || reply_render_comments>
                         <div node_ref=comment_container_ref class=move || format!("flex flex-col gap-2 0h-[20rem] 0overflow-y-scroll {} ", if show_replies_fn() {""} else {"hidden"} )>
                             {
@@ -382,8 +401,6 @@ pub fn Comment(
                                         let(data)
                                     >
                                         {
-                                            // let key = data.key.clone();
-                                            // let is_last = comments_manual.items.with(|v| v.last().map(|v| v.key == key).unwrap_or_default());
                                             let comment_key = comment_key.clone();
                                             view!{
                                                 <Comment
@@ -408,7 +425,6 @@ pub fn Comment(
                                 </ul>
                             </Show>
                         </div>
-                        // { post_comment_views }
                     </Show>
                 </div>
 

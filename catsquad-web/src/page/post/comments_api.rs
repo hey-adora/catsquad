@@ -17,20 +17,20 @@ pub enum CommentKind {
     Root,
     Reply {
         parent_id: i64,
-        parent_items: RwSignal<Vec<CommentRes>, LocalStorage>,
-        parent_replies_count: RwSignal<u32, LocalStorage>,
+        parent_items: RwSignal<Vec<CommentRes>>,
+        parent_replies_count: RwSignal<u32>,
         comment: CommentRes,
     },
     Flat {
         parent_id: i64,
-        parent_items: RwSignal<Vec<CommentRes>, LocalStorage>,
-        parent_replies_count: RwSignal<u32, LocalStorage>,
+        parent_items: RwSignal<Vec<CommentRes>>,
+        parent_replies_count: RwSignal<u32>,
         comment: CommentRes,
     },
     None {
         parent_id: i64,
-        parent_items: RwSignal<Vec<CommentRes>, LocalStorage>,
-        parent_replies_count: RwSignal<u32, LocalStorage>,
+        parent_items: RwSignal<Vec<CommentRes>>,
+        parent_replies_count: RwSignal<u32>,
         comment: CommentRes,
     },
 }
@@ -38,16 +38,16 @@ pub enum CommentKind {
 #[derive(Clone, Copy)]
 pub struct CommentsApi {
     // ui
-    pub items: RwSignal<Vec<CommentRes>, LocalStorage>,
-    pub finished: RwSignal<bool, LocalStorage>,
-    pub replies_count: RwSignal<u32, LocalStorage>,
-    pub text: RwSignal<String, LocalStorage>,
-    pub show_editor: RwSignal<bool, LocalStorage>,
-    pub edit_mode: RwSignal<bool, LocalStorage>,
+    pub items: RwSignal<Vec<CommentRes>>,
+    pub finished: RwSignal<bool>,
+    pub replies_count: RwSignal<u32>,
+    pub text: RwSignal<String>,
+    pub show_editor: RwSignal<bool>,
+    pub edit_mode: RwSignal<bool>,
     pub err_post: RwSignal<String>,
-    pub err_fetch: RwSignal<String, LocalStorage>,
-    pub err_delete: RwSignal<String, LocalStorage>,
-    pub err_update: RwSignal<String, LocalStorage>,
+    pub err_fetch: RwSignal<String>,
+    pub err_delete: RwSignal<String>,
+    pub err_update: RwSignal<String>,
 
     // params
     pub post_key: StoredValue<i64, LocalStorage>,
@@ -67,18 +67,18 @@ impl CommentsApi {
         // let has_reply_bubble = kind.is_none() && com;
         Self {
             // ui
-            items: RwSignal::new_local(Vec::new()),
-            finished: RwSignal::new_local(false),
-            replies_count: RwSignal::new_local(replies_count),
-            text: RwSignal::new_local(text),
+            items: RwSignal::new(Vec::new()),
+            finished: RwSignal::new(false),
+            replies_count: RwSignal::new(replies_count),
+            text: RwSignal::new(text),
             // has_reply_bubble,
             // is_last: RwSignal::new_local(false),
-            show_editor: RwSignal::new_local(false),
-            edit_mode: RwSignal::new_local(false),
+            show_editor: RwSignal::new(false),
+            edit_mode: RwSignal::new(false),
             err_post: RwSignal::new(String::new()),
-            err_fetch: RwSignal::new_local(String::new()),
-            err_delete: RwSignal::new_local(String::new()),
-            err_update: RwSignal::new_local(String::new()),
+            err_fetch: RwSignal::new(String::new()),
+            err_delete: RwSignal::new(String::new()),
+            err_update: RwSignal::new(String::new()),
             // params
             post_key: StoredValue::new_local(0),
             kind: StoredValue::new_local(kind),
