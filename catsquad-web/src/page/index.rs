@@ -4,7 +4,7 @@ use component_gallery::Gallery;
 use leptos::prelude::*;
 
 mod api_gallery;
-mod component_gallery;
+pub mod component_gallery;
 
 #[component]
 pub fn Index() -> impl IntoView {

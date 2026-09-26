@@ -35,7 +35,7 @@ pub fn vec_img_to_string<IMG: ResizableImage + Display>(imgs: &[IMG]) -> String 
 #[component]
 pub fn Gallery(
     #[prop(default = 250)] row_height: u32,
-    #[prop(optional)] username: Option<RwSignal<Option<String>>>,
+    #[prop(optional, into)] username: Signal<String>,
 ) -> impl IntoView {
     let spawner = Spawner::new();
     let scroll_correction = ScrollCorrection::new();
@@ -76,7 +76,7 @@ pub fn Gallery(
     let set_gallery = move |width: u32, height: f64, bottom: bool, limit: usize, time: u64| {
         debug_data_push("set_gallery_param_limit", limit.to_string());
 
-        let user_username = username.get_untracked().flatten().unwrap_or_default();
+        let user_username = username.get_untracked();
 
         let tags = get_query_tags.get_untracked().unwrap_or_default();
         trace!("wheres my super suit?");

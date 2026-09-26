@@ -4,6 +4,7 @@ pub mod assets;
 pub mod index;
 pub mod login;
 pub mod post;
+pub mod profile;
 pub mod register;
 pub mod settings;
 pub mod upload;

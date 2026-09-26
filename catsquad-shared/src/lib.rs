@@ -69,6 +69,7 @@ pub use page::index::*;
 pub use page::login::*;
 pub use page::modal_query_params;
 pub use page::post::*;
+pub use page::profile::*;
 pub use page::register::*;
 pub use page::settings::*;
 pub use page::upload::*;

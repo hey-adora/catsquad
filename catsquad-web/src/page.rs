@@ -12,16 +12,18 @@ use leptos_router::StaticSegment;
 use leptos_router::components::*;
 use leptos_router::path;
 
-mod index;
-mod login;
-mod post;
-mod register;
-mod settings;
-mod upload;
+pub mod index;
+pub mod login;
+pub mod post;
+pub mod profile;
+pub mod register;
+pub mod settings;
+pub mod upload;
 
 use index::Index as PageIndex;
 use login::Login as PageLogin;
 use post::Post as PagePost;
+use profile::Profile as PageProfile;
 use register::Register as PageRegister;
 use settings::Settings as PageSettings;
 use upload::Upload as PageUpload;
@@ -62,6 +64,7 @@ pub fn App() -> impl IntoView {
         <Routes fallback=|| "not found">
             <Route path=path!("/") view=PageIndex />
             <Route path=path!("/p/:post") view=PagePost />
+            <Route path=path!("/u/:username") view=PageProfile />
             <ProtectedRoute path=path!("/login") condition=move||page.is_logged_in().map(|v|!v) redirect_path=move||"/" view=PageLogin />
             <ProtectedRoute path=path!("/register") condition=move||page.is_logged_in().map(|v|!v) redirect_path=move||"/" view=PageRegister />
             <ProtectedRoute path=path!("/upload") condition=move||page.is_logged_in().map(|v|v) redirect_path=move||"/login" view=PageUpload />

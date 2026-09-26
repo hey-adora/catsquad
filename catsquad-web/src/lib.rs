@@ -23,6 +23,7 @@ pub use component::modal::Modal;
 pub use component::modal_confirm::*;
 pub use component::nav::Nav;
 pub use component::svgs::*;
+pub use page::profile::ProfileParams;
 pub use page_state::PageState;
 
 #[wasm_bindgen::prelude::wasm_bindgen]

@@ -5,7 +5,7 @@ use catsquad_log::prelude::*;
 use catsquad_shared::{
     LINK_WEB_INDEX, PostGetByKeyErr, PostRemoveErr, PostState, PostUpdateDescriptionErr,
     PostUpdateTagsErr, PostUpdateTitleErr, i64_to_str, link_relative_post_image_bytes_get_by_hash,
-    proccess_tags,
+    link_relative_profile, proccess_tags,
 };
 use catsquad_web_utils::prelude::*;
 use leptos::prelude::*;
@@ -302,8 +302,8 @@ impl PostApi {
                 self.live_title_length.set(post.title.len());
                 self.title.set(post.title);
                 self.author_username.set(post.user_username.clone());
-                self.author_link.set("/404".to_string());
-                // self.author_link.set(link_user(post.user.username));
+                self.author_link
+                    .set(link_relative_profile(post.user_username.clone()));
                 self.live_tags_length.set(post.tags.len());
                 self.tags.set(post.tags);
                 self.live_description_length.set(post.description.len());

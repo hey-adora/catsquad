@@ -1,6 +1,7 @@
 use crate::{hook::Spawner, page::post::post_api::PostApi};
 
 use super::Favorite;
+use catsquad_shared::link_relative_profile;
 use leptos::prelude::*;
 
 #[component]
@@ -9,7 +10,7 @@ pub fn PostProfile(
     post_api: PostApi,
     #[prop(optional, into)] post_id: Signal<i64>,
 ) -> impl IntoView {
-    let post_user_username = move || post_api.author_username.get();
+    let author_username = move || post_api.author_username.get();
 
     view! {
         <div class="flex justify-between place-items-start">
@@ -18,12 +19,12 @@ pub fn PostProfile(
                 <div class="flex flex-col gap-1">
                     <div class="flex gap-1">
                         <p class="text-[1rem] text-base03">"by"</p>
-                        <a href=move || post_api.author_link.get() class="text-[1rem] font-bold text-base0B">{ move || post_api.author_username.get() }</a>
+                        <a href=move || post_api.author_link.get() class="text-[1rem] font-bold text-base0B">{ author_username }</a>
                     </div>
                     <p class="text-[1rem]">"9999 followers"</p>
                 </div>
             </div>
-            <Favorite post_user_username=post_user_username post_id=post_id />
+            <Favorite post_user_username=author_username post_id=post_id />
         </div>
     }
 }

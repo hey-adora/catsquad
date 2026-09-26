@@ -1,5 +1,5 @@
 use crate::{
-    Nav, PageState,
+    ModalConfirm, Nav, PageState,
     hook::{PostImagesState, Spawner},
     page::{
         create_client,
@@ -64,6 +64,7 @@ pub fn Upload() -> impl IntoView {
     view! {
         <main>
             <Nav/>
+            <ModalConfirm/>
             <div class="flex flex-col gap-4 max-w-[25rem] mx-auto" >
                 <Publish upload/>
                 <TitleEdit upload/>

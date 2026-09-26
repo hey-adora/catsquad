@@ -1,15 +1,22 @@
 use catsquad_log::prelude::*;
-use catsquad_shared::{SensitiveUserRes, SessionRemoveErr, UserGetBySessionKeyErr};
+use catsquad_shared::{MATCH_CONTAINS, SensitiveUserRes, SessionRemoveErr, UserGetBySessionKeyErr};
 use catsquad_web_utils::time::{time_now_micro, time_now_ns};
 use leptos::prelude::*;
+use leptos_router::{hooks::use_params, location::Location};
 
-use crate::page::create_client;
+use crate::{ProfileParams, page::create_client};
 
 #[derive(Clone, Copy, Default, Debug)]
 pub struct PageState {
     pub acc: RwSignal<Option<SensitiveUserRes>>,
     pub acc_pending: RwSignal<bool>,
     pub time: RwSignal<u64>,
+}
+
+#[derive(Clone, PartialEq, PartialOrd)]
+pub enum CurrentRoute {
+    Profile,
+    Other,
 }
 
 impl PageState {
@@ -20,6 +27,23 @@ impl PageState {
             time: RwSignal::new(time_now_micro()),
             ..Default::default()
         }
+    }
+
+    pub fn current_route(&self, location: Location) -> Memo<CurrentRoute> {
+        Memo::new(move |_| {
+            let pathname = location.pathname.get();
+
+            if pathname.contains(MATCH_CONTAINS) {
+                return CurrentRoute::Profile;
+            }
+
+            CurrentRoute::Other
+        })
+    }
+
+    pub fn create_page_profile_params_hook(&self) -> Memo<ProfileParams> {
+        let params = use_params::<ProfileParams>();
+        Memo::new(move |_| params.get().ok().unwrap_or_default())
     }
 
     pub fn set() {

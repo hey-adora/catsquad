@@ -74,6 +74,7 @@ pub async fn app(state: AppState) -> Router {
         .route(catsquad_shared::LINK_WEB_LOGIN, get(api::assets::index))
         .route(catsquad_shared::LINK_WEB_UPLOAD, get(api::assets::index))
         .route(catsquad_shared::LINK_WEB_SETTINGS, get(api::assets::index))
+        .route(catsquad_shared::LINK_WEB_PROFILE, get(api::assets::index))
         .route(catsquad_shared::LINK_WEB_POST, get(api::assets::index));
 
     let router_assets = Router::new()

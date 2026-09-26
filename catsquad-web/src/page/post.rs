@@ -47,7 +47,6 @@ use component_post_title::PostTitle;
 
 #[derive(Params, PartialEq, Clone)]
 pub struct PostParams {
-    pub username: Option<String>,
     pub post: Option<String>,
 }
 
@@ -109,16 +108,6 @@ pub fn Post() -> impl IntoView {
             </Show>
 
             <ModalConfirm/>
-
-            // <button on:click=modal_run >"TEST"</button>
-
-            // <Show when=when_post_confirm_delete >
-            //     <Modal>
-            //         <p class="text-[1.5rem] text-base08 text-center">"Post Deletion"</p>
-            //         <p>"wow"</p>
-            //         <LinkSecondary id=move||"close_modal_btn" link=link_back>"Cancel"</LinkSecondary>
-            //     </Modal>
-            // </Show>
 
             <Show when=when_post_show >
                 <div class="flex flex-col lg:grid grid-rows-[auto_1fr] grid-cols-[2fr_1fr] lg:max-h-[calc(100vh-3rem)] gap-2  md:gap-6">
