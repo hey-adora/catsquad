@@ -1,4 +1,4 @@
-pub const LINK_API_SESSION_GET_BY_SESSION_KEY: &str = "/api/profile";
+pub const LINK_API_USER_GET_BY_SESSION_KEY: &str = "/api/profile";
 
 #[derive(
     Default, Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq, thiserror::Error,

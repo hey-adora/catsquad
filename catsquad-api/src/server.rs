@@ -113,6 +113,7 @@ pub async fn app(state: AppState) -> Router {
             post(api::session_add),
         )
         .route(catsquad_shared::LINK_API_USER_ADD, post(api::user_add))
+        .route(catsquad_shared::LINK_API_USER_GET_BY_USERNAME, get(api::user_get_by_username))
         .route(catsquad_shared::LINK_API_INVITE_ADD, post(api::invite_add))
         .route(
             catsquad_shared::LINK_API_INVITE_GET_BY_KEY,
@@ -251,7 +252,7 @@ pub async fn app(state: AppState) -> Router {
             post(api::session_remove),
         )
         .route(
-            catsquad_shared::LINK_API_SESSION_GET_BY_SESSION_KEY,
+            catsquad_shared::LINK_API_USER_GET_BY_SESSION_KEY,
             get(api::user_get_by_session_token),
         )
         .route_layer(middleware::from_fn_with_state(

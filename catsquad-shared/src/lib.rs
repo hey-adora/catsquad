@@ -60,6 +60,7 @@ pub use api::session_remove::*;
 pub use api::test_backdoor_email_sent_get_all::*;
 pub use api::user_add::*;
 pub use api::user_get_by_session_key::*;
+pub use api::user_get_by_username::*;
 pub use api::user_update_username::*;
 
 pub use page::MODAL_QUERY_PARAM_NAME;

@@ -40,6 +40,7 @@ pub fn Gallery(
     let spawner = Spawner::new();
     let scroll_correction = ScrollCorrection::new();
     let gallery_api = GalleryApi::new(scroll_correction.clone());
+
     let test_id = RwSignal::new(0_usize);
 
     let gallery_ref = NodeRef::<Div>::new();

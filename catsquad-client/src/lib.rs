@@ -7,7 +7,7 @@ use catsquad_shared::{
 use http::{HeaderMap, HeaderName, StatusCode, header};
 use std::{
     cell::{Cell, RefCell},
-    fmt::Debug,
+    fmt::{Debug, Display},
     marker::PhantomData,
     rc::Rc,
     sync::Arc,
@@ -689,13 +689,20 @@ where
     ) -> Builder<TSender, catsquad_shared::SensitiveUserRes, catsquad_shared::UserGetBySessionKeyErr>
     {
         let params = SenderParams {
-            path: cs::LINK_API_SESSION_GET_BY_SESSION_KEY.to_string(),
+            path: cs::LINK_API_USER_GET_BY_SESSION_KEY.to_string(),
             method: Method::Get,
             body: Body::None,
             ..Default::default()
         };
         let sender = self.sender.clone();
         Builder::new(sender, params)
+    }
+
+    pub fn user_get_by_username(
+        &self,
+        username: impl Display,
+    ) -> Builder<TSender, cs::RedactedUserRes, cs::UserGetByUsernameErr> {
+        self.get(cs::link_relative_user_get_by_username(username))
     }
 
     pub fn session_add(
