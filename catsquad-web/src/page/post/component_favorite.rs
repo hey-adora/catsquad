@@ -33,24 +33,28 @@ pub fn Favorite(
         is_logged_in && !is_my_post
     };
     let is_post_loading_fn = move || post_like.state.get() == LikeState::Loading;
+    let is_post_loaded_fn = move || !is_post_loading_fn();
+
     let is_post_liked_fn = move || post_like.state.get() == LikeState::Liked;
-    let toggle_like_fn = move || {
+    let toggle_like_fn = move |_| {
         spawner.spawn(async move {
             post_like.toggle_like().await;
         });
     };
 
+    // TODO i think i can use Btn loading param instead of this Show bs
+
     view! {
         <Show when=is_visible_fn>
             <Show when=is_post_loading_fn>
-                <BtnSecondary class=move || "flex gap-2 place-items-center" id=move || "btn_favorite_loading">
+                <BtnSecondary class="flex gap-2 place-items-center" id="btn_favorite_loading">
                     <span class="mt-[0.1rem]">"Loading..."</span>
                 </BtnSecondary>
             </Show>
-            <Show when=move||!is_post_loading_fn()>
-                <BtnSecondary class=move || "flex gap-2 place-items-center" id=move || "btn_favorite" on_click=move|_|toggle_like_fn()>
+            <Show when=is_post_loaded_fn>
+                <BtnSecondary class="flex gap-2 place-items-center" id="btn_favorite" on_click=toggle_like_fn>
                     <span class="mt-[0.1rem]">"Favorite"</span>
-                    <SVGStar class=move||"shrink-0 w-[1.5rem] pb-[0.1rem]" fill=move||is_post_liked_fn() />
+                    <SVGStar class="shrink-0 w-[1.5rem] pb-[0.1rem]" fill=move||is_post_liked_fn() />
                 </BtnSecondary>
             </Show>
         </Show>

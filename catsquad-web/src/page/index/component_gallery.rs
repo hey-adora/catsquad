@@ -36,6 +36,7 @@ pub fn vec_img_to_string<IMG: ResizableImage + Display>(imgs: &[IMG]) -> String 
 pub fn Gallery(
     #[prop(default = 250)] row_height: u32,
     #[prop(optional, into)] username: Signal<String>,
+    #[prop(optional, into)] class: Signal<String>,
 ) -> impl IntoView {
     let spawner = Spawner::new();
     let scroll_correction = ScrollCorrection::new();
@@ -353,8 +354,10 @@ pub fn Gallery(
     let when_loading = move || spawner.is_busy.get();
     let when_empty = move || !when_loading() && gallery_api.items.with(|v| v.is_empty());
 
+    let class_fn = move || format!("relative overflow-hidden {}", class.get());
+
     view! {
-        <div class="relative overflow-hidden ">
+        <div class=class_fn>
             <div
                 id="gallery"
                 data-testid=test_id

@@ -10,6 +10,8 @@ use leptos_router::params::Params;
 pub mod author_state;
 pub mod component_author;
 
+use component_author::ProfileAuthor;
+
 #[derive(Params, PartialEq, Clone, Default)]
 pub struct ProfileParams {
     pub username: String,
@@ -28,9 +30,11 @@ pub fn Profile() -> impl IntoView {
 
     view! {
         <main class="grid grid-rows-[auto_1fr] h-screen">
-            <Nav/>
-            <Gallery username=username row_height=250 />
-
+            <Nav />
+            <div class="grid grid-rows-[auto_1fr] sm:grid-rows-[1fr] sm:grid-cols-[1fr_auto] ">
+                <ProfileAuthor user_username=username />
+                <Gallery class="sm:col-start-1 sm:col-row-1" username=username row_height=250 />
+            </div>
         </main>
     }
 }
