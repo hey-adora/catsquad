@@ -14,3 +14,4 @@ pub mod modal;
 pub mod modal_confirm;
 pub mod nav;
 pub mod svgs;
+pub mod text_editor;

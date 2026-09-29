@@ -63,8 +63,9 @@ pub async fn post_search(
     Query(req): Query<PostSearchParams>,
 ) -> impl IntoResponse {
     let tags = req.tags.unwrap_or_default();
-    let username = req.username.unwrap_or_default();
+    let username = req.author_username.unwrap_or_default();
     let search_time = req.time.unwrap_or_default();
+    let liked = req.liked_by_username.unwrap_or_default();
     // let time = req
     //     .time
     //     .map(|v| u128::from_str_radix(&v, 10).unwrap_or_default())
@@ -79,6 +80,7 @@ pub async fn post_search(
                 PostState::Active,
                 tags,
                 username,
+                liked,
                 search_time,
                 limit,
                 range,

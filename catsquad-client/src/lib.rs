@@ -868,7 +868,8 @@ where
     pub fn post_search(
         &self,
         tags: impl Into<String>,
-        username: impl Into<String>,
+        author_username: impl Into<String>,
+        liked_by_username: impl Into<String>,
         time: u64,
         limit: usize,
         range: TimeRange,
@@ -880,7 +881,8 @@ where
             order: Some(order),
             limit: Some(limit),
             tags: Some(tags.into()),
-            username: Some(username.into()),
+            liked_by_username: Some(liked_by_username.into()),
+            author_username: Some(author_username.into()),
         }))
     }
 

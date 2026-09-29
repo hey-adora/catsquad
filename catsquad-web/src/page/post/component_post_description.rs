@@ -1,6 +1,6 @@
 use super::{EditSaveCancel, LengthCounter};
 use crate::{
-    AutoTextArea, Errs, PageState,
+    AutoTextArea, Errs, PageState, TextEditor,
     hook::Spawner,
     page::{create_client, post::post_api::PostApi},
 };
@@ -18,14 +18,6 @@ pub fn PostDescription(
     let page = PageState::get();
     let description_input_editor = NodeRef::<html::Textarea>::new();
     let when_is_owner = move || page.acc_username() == post_api.author_username.get();
-    // let when_is_user = move || page.is_logged_in().unwrap_or_default();
-    let when_edit = move || post_api.update_description_mode.get();
-
-    let edit_description_mode_toggle = move || {
-        let description_len = post_api.description.with_untracked(|v| v.len());
-        post_api.live_description_length.set(description_len);
-        post_api.update_description_mode.update(|v| *v = !*v);
-    };
 
     let edit_description_save = move || {
         let (post_id, Some(new_description)) = (
@@ -44,67 +36,19 @@ pub fn PostDescription(
         });
     };
 
-    let description = move || post_api.description.get();
-    let on_input =
-        move |v: HtmlTextAreaElement| post_api.live_description_length.set(v.value().len());
-    let class_description = move || {
-        format!(
-            "whitespace-break-spaces break-all text-ellipsis overflow-hidden padding max-w-[calc(100vw-1rem)] rounded {}",
-            if post_api.description.with(|v| v.is_empty()) {
-                "text-base03"
-            } else {
-                ""
-            }
-        )
-    };
-    let when_description_full = move || post_api.description.with(|v| !v.is_empty());
-
     view! {
 
-        <div class="flex flex-col gap-2 md:gap-4 justify-between mt-4">
-            <div class="flex justify-between">
-                <h1 class="text-[1.3rem] text-base0F">"Description"</h1>
-                <div class="flex gap-2 items-center">
-
-                    <Show when=when_is_owner >
-                        <Show when=when_edit>
-                            <LengthCounter
-                                counter_current=move||post_api.live_description_length.get()
-                                counter_max=move||MAX_POST_DESCRIPTION_LENGTH
-                            />
-                        </Show>
-                        <EditSaveCancel
-                            id="description"
-                            when=when_edit
-                            on_save=move || edit_description_save()
-                            on_cancel=move || edit_description_mode_toggle()
-                            on_edit=move || edit_description_mode_toggle()
-                        />
-                    </Show>
-                </div>
-            </div>
-
-            <Errs id="description_errors" error=post_api.err_description />
-
-            <Show when=move || post_api.update_description_mode.get() fallback=move || view!{
-                <pre
-                    id="post_description"
-                    class=class_description>
-                    <Show when=when_description_full fallback={move || view!{<span class="text-base03">"No description."</span>} }>
-                        { description }
-                    </Show>
-                </pre>
-            }>
-
-            <AutoTextArea
-                id="post_description_editable"
-                node_ref=description_input_editor
-                on_input=on_input
-                class="bg-base01 text-base05 px-4 py-2 rounded"
-            >
-                { description }
-            </AutoTextArea>
-            </Show>
-        </div>
+        <TextEditor
+            id_prefix="decription"
+            title="Decription"
+            text=post_api.description
+            text_length=post_api.live_description_length
+            is_owned=when_is_owner
+            edit_mode_enabled=post_api.update_description_mode
+            max_length=MAX_POST_DESCRIPTION_LENGTH
+            errors=post_api.err_description
+            on_save=edit_description_save
+            node_ref=description_input_editor
+            />
     }
 }

@@ -1,4 +1,4 @@
-use crate::{Db, DbPost, XTimestamp, if_empty, join_str};
+use crate::{Db, DbPost, XTimestamp, join_str, run_if_not_empty};
 use catsquad_log::prelude::*;
 use catsquad_shared::{Order, PostState, TimeRange};
 use sqlx::AssertSqlSafe;
@@ -70,14 +70,16 @@ impl Db {
         &self,
         state: PostState,
         tags: impl Into<String>,
-        user: impl Into<String>,
+        author_user: impl Into<String>,
+        liked_by_username: impl Into<String>,
         search_time: u64,
         limit: usize,
         range: TimeRange,
         order: Order,
     ) -> Result<Vec<DbPostSearch>, DbPostSearchErr> {
         let pool = &self.db;
-        let user_username = user.into();
+        let author_username = author_user.into();
+        let liked_by_username = liked_by_username.into();
         let mut bind_index = 3_usize;
 
         let q_order = match order {
@@ -104,9 +106,16 @@ impl Db {
         });
 
         // TODO investigate, somehow works with field `user`
-        let q_user = if_empty(&user_username, || {
+        let q_user = run_if_not_empty(&author_username, || {
             bind_index += 1;
             format!("post_user_username = ${bind_index}")
+        });
+
+        let q_liked = run_if_not_empty(&liked_by_username, || {
+            bind_index += 1;
+            format!(
+                "INNER JOIN posts_likes ON post_id=post_like_post_id AND post_like_user_username = ${bind_index}"
+            )
         });
 
         let filters = [q_tags, q_time_after, q_user, q_state];
@@ -132,6 +141,7 @@ impl Db {
 
                 FROM posts
                 LEFT JOIN files_images ON post_images_hashes[1]=image_hash
+                {q_liked}
                 WHERE {q_where}
                 ORDER BY post_created_at {q_order}
                 LIMIT $3
@@ -149,8 +159,12 @@ impl Db {
             builder = builder.bind(tag);
         }
 
-        if !user_username.is_empty() {
-            builder = builder.bind(user_username);
+        if !author_username.is_empty() {
+            builder = builder.bind(author_username);
+        }
+
+        if !liked_by_username.is_empty() {
+            builder = builder.bind(liked_by_username);
         }
 
         let result = builder.fetch_all(pool).await;
@@ -179,8 +193,16 @@ async fn test_post_search() {
     let db = Db::test_db(0, "test_post_search").await;
 
     let invite1 = db.invite_add(0, "hey@heyadora.com", 1).await.unwrap();
-    let user = db
+    let invite2 = db.invite_add(0, "hey2@heyadora.com", 1).await.unwrap();
+    let invite3 = db.invite_add(0, "hey3@heyadora.com", 1).await.unwrap();
+    let user1 = db
         .user_add(0, "hey", "hey", invite1.token, 10, 10)
+        .await
+        .unwrap();
+    db.user_add(0, "hey2", "hey2", invite2.token, 10, 10)
+        .await
+        .unwrap();
+    db.user_add(0, "hey3", "hey3", invite3.token, 10, 10)
         .await
         .unwrap();
 
@@ -209,6 +231,7 @@ async fn test_post_search() {
                     PostState::Active,
                     tags,
                     user,
+                    "",
                     time,
                     limit,
                     TimeRange::from(time_range),
@@ -220,12 +243,15 @@ async fn test_post_search() {
             result
         };
 
-    let post0 = add_post_and_activate(1, &user, "1", "description", "one two three").await;
-    let post1 = add_post_and_activate(2, &user, "2", "description", "one two").await;
-    let post2 = add_post_and_activate(3, &user, "3", "description", "one").await;
-    let post9 = add_post(4, &user, "9", "description9", "one two three 9").await;
+    let post0 = add_post_and_activate(1, &user1, "1", "description", "one two three").await;
+    let post1 = add_post_and_activate(2, &user1, "2", "description", "one two").await;
+    let post2 = add_post_and_activate(3, &user1, "3", "description", "one").await;
+    let post9 = add_post(4, &user1, "9", "description9", "one two three 9").await;
 
-    db.post_update_image_add(0, user.username, post0.id, 10, 666, "jpg", 10, 15)
+    db.post_like_add(4, "hey2", post2.id).await.unwrap();
+    db.post_like_add(4, "hey3", post1.id).await.unwrap();
+
+    db.post_update_image_add(0, user1.username, post0.id, 10, 666, "jpg", 10, 15)
         .await
         .unwrap();
 
@@ -296,4 +322,20 @@ async fn test_post_search() {
     assert_eq!(result.len(), 2);
     assert_eq!(&result[0].title, "1");
     assert_eq!(&result[1].title, "2");
+
+    let result = db
+        .post_search(
+            PostState::Active,
+            "",
+            "",
+            "hey2",
+            0,
+            10,
+            TimeRange::MoreOrEqual,
+            Order::OneTwoThree,
+        )
+        .await
+        .unwrap();
+    assert_eq!(result.len(), 1);
+    assert_eq!(&result[0].title, "3");
 }

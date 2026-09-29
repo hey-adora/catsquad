@@ -16,7 +16,7 @@ mod comments_basic;
 mod component_comment;
 mod component_comment_text;
 mod component_comments;
-mod component_edit_btn;
+pub mod component_edit_btn;
 mod component_favorite;
 mod component_length_counter;
 mod component_post_controls;

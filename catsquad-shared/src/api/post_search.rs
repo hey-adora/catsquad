@@ -33,11 +33,12 @@ pub fn link_relative_post_search(params: PostSearchParams) -> String {
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
 pub struct PostSearchParams {
     pub tags: Option<String>,
-    pub username: Option<String>,
+    pub author_username: Option<String>,
     // #[serde(
     //     serialize_with = "serde_from_option_u128",
     //     deserialize_with = "serde_to_option_u128"
     // )]
+    pub liked_by_username: Option<String>,
     pub time: Option<u64>,
     pub range: Option<TimeRange>,
     pub order: Option<Order>,
@@ -51,8 +52,9 @@ impl Default for PostSearchParams {
             range: Some(TimeRange::MoreOrEqual),
             order: Some(Order::ThreeTwoOne),
             limit: Some(50),
+            liked_by_username: Some(String::new()),
             tags: Some(String::new()),
-            username: Some(String::new()),
+            author_username: Some(String::new()),
         }
     }
 }
