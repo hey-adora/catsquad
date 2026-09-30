@@ -1,7 +1,7 @@
 use catsquad_client::{Client, Response, Sender};
 use catsquad_log::prelude::*;
 use catsquad_shared::UserGetByUsernameErr;
-use leptos::prelude::{RwSignal, Set};
+use leptos::prelude::{RwSignal, Set, Update};
 use std::fmt::{Debug, Display};
 
 #[derive(Clone)]
@@ -12,6 +12,8 @@ where
 {
     pub stage: RwSignal<AuthorStage>,
     pub username: RwSignal<String>,
+    pub support: RwSignal<String>,
+    pub aboutme: RwSignal<String>,
     pub created_at: RwSignal<u64>,
     pub err_general: RwSignal<String>,
     client: Client<TSender>,
@@ -34,6 +36,8 @@ where
         Self {
             stage: RwSignal::new(AuthorStage::Loading),
             username: RwSignal::new(String::new()),
+            support: RwSignal::new(String::new()),
+            aboutme: RwSignal::new(String::new()),
             err_general: RwSignal::new(String::new()),
             created_at: RwSignal::new(0),
             client,
@@ -55,6 +59,8 @@ where
             Ok(user) => user,
             Err(UserGetByUsernameErr::NotFound) => {
                 self.username.set(username);
+                self.support.update(|v| v.clear());
+                self.aboutme.update(|v| v.clear());
                 self.err_general.set("not found".to_string());
                 self.stage.set(AuthorStage::NotFound);
                 return;
@@ -68,10 +74,25 @@ where
         };
 
         self.username.set(user.username);
+        self.support.set(user.support);
+        self.aboutme.set(user.aboutme);
         self.created_at.set(user.created_at);
         self.stage.set(AuthorStage::Normal);
     }
 }
+
+// <TextEditor
+//     id_prefix="decription"
+//     title="Decription"
+//     text=post_api.description
+//     text_length=post_api.live_description_length
+//     is_owned=when_is_owner
+//     edit_mode_enabled=post_api.update_description_mode
+//     max_length=MAX_POST_DESCRIPTION_LENGTH
+//     errors=post_api.err_description
+//     on_save=edit_description_save
+//     node_ref=description_input_editor
+//     />
 
 #[cfg(test)]
 #[tokio::test]

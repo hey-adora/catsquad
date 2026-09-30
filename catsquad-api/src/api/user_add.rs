@@ -20,6 +20,8 @@ pub fn from_db_user_redacted(value: DbUser) -> RedactedUserRes {
     RedactedUserRes {
         // key: value.id,
         username: value.username,
+        support: value.support,
+        aboutme: value.aboutme,
         created_at: value.created_at,
     }
 }

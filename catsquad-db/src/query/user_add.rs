@@ -9,6 +9,10 @@ pub struct DbUser {
     pub email: String,
     #[sqlx(rename = "user_password")]
     pub password: String,
+    #[sqlx(rename = "user_support")]
+    pub support: String,
+    #[sqlx(rename = "user_aboutme")]
+    pub aboutme: String,
     #[sqlx(rename = "user_used_storage_bytes")]
     #[sqlx(try_from = "i64")]
     pub used_storage_bytes: u32,
@@ -52,9 +56,11 @@ impl Db {
         let pool = &self.db;
         let query = "
             CREATE TABLE users (
-                user_username varchar(32) PRIMARY KEY,
-                user_email varchar(100) NOT NULL,
-                user_password varchar(255) NOT NULL,
+                user_username varchar PRIMARY KEY,
+                user_email varchar NOT NULL,
+                user_password varchar NOT NULL,
+                user_support text DEFAULT '',
+                user_aboutme text DEFAULT '',
                 user_used_storage_bytes int8 DEFAULT 0,
                 user_max_storage_per_file_bytes int8 NOT NULL,
                 user_max_storage_bytes int8 NOT NULL,
@@ -191,6 +197,8 @@ impl Db {
             username,
             email,
             password,
+            support: String::new(),
+            aboutme: String::new(),
             used_storage_bytes: 0,
             max_storage_bytes,
             max_storage_per_image_bytes: max_storage_per_file_bytes,

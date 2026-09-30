@@ -10,6 +10,8 @@ pub const LINK_API_USER_ADD: &str = "/api/register";
 pub struct RedactedUserRes {
     // pub key: i64,
     pub username: String,
+    pub support: String,
+    pub aboutme: String,
     pub created_at: u64,
 }
 

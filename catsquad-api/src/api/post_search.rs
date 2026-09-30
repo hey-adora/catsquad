@@ -107,14 +107,23 @@ mod test_utils {
         pub async fn post_search(
             &self,
             tags: impl Into<String>,
-            username: impl Into<String>,
+            author_username: impl Into<String>,
+            liked_by_username: impl Into<String>,
             time: u64,
             limit: usize,
             range: TimeRange,
             order: Order,
         ) -> Result<Vec<cs::PostSearchRes>, cs::PostSearchErr> {
             self.client
-                .post_search(tags, username, time, limit, range, order)
+                .post_search(
+                    tags,
+                    author_username,
+                    liked_by_username,
+                    time,
+                    limit,
+                    range,
+                    order,
+                )
                 .send()
                 .await
                 .into_json()
@@ -142,7 +151,15 @@ async fn test_api_post_search() {
         .unwrap();
 
     let posts = server
-        .post_search("", "", 0, 10, TimeRange::MoreOrEqual, Order::ThreeTwoOne)
+        .post_search(
+            "",
+            "",
+            "",
+            0,
+            10,
+            TimeRange::MoreOrEqual,
+            Order::ThreeTwoOne,
+        )
         .await
         .unwrap();
 
@@ -154,7 +171,15 @@ async fn test_api_post_search() {
         .unwrap();
 
     let posts = server
-        .post_search("", "", 0, 10, TimeRange::MoreOrEqual, Order::ThreeTwoOne)
+        .post_search(
+            "",
+            "",
+            "",
+            0,
+            10,
+            TimeRange::MoreOrEqual,
+            Order::ThreeTwoOne,
+        )
         .await
         .unwrap();
 

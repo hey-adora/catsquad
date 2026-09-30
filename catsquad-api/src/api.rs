@@ -37,6 +37,8 @@ mod session_remove;
 mod user_add;
 mod user_get_by_session_key;
 mod user_get_by_username;
+mod user_update_aboutme;
+mod user_update_support;
 mod user_update_username;
 
 pub mod assets;
@@ -79,6 +81,8 @@ pub use session_remove::session_remove;
 pub use user_add::user_add;
 pub use user_get_by_session_key::user_get_by_session_token;
 pub use user_get_by_username::user_get_by_username;
+pub use user_update_aboutme::user_update_aboutme;
+pub use user_update_support::user_update_support;
 pub use user_update_username::user_update_username;
 
 #[cfg(feature = "test_backdoors")]

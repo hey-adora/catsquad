@@ -1,7 +1,8 @@
 use crate::{PageState, SVGSearch, page_state::CurrentRoute};
 use catsquad_log::prelude::*;
 use catsquad_shared::{
-    LINK_WEB_INDEX, link_relative_index_search, link_relative_profile, link_relative_profile_search,
+    LINK_WEB_INDEX, link_relative_index_search, link_relative_profile_gallery,
+    link_relative_profile_paws, link_relative_profile_paws_search, link_relative_profile_search,
 };
 use leptos::{
     html::{self, Textarea},
@@ -36,24 +37,37 @@ pub fn SearchBar() -> impl IntoView {
 
         if search_text.is_empty() {
             match current_page {
-                CurrentRoute::Profile => {
+                CurrentRoute::ProfileGallery
+                | CurrentRoute::ProfileSupport
+                | CurrentRoute::ProfileAboutMe => {
                     let username = page_profile_params.get_untracked().username;
-                    navigate(&link_relative_profile(username), Default::default())
+                    navigate(&link_relative_profile_gallery(username), Default::default())
                 }
-                CurrentRoute::Other => navigate(LINK_WEB_INDEX, Default::default()),
+                CurrentRoute::ProfilePaws => {
+                    let username = page_profile_params.get_untracked().username;
+                    navigate(&link_relative_profile_paws(username), Default::default())
+                }
+                _ => navigate(LINK_WEB_INDEX, Default::default()),
             }
         } else {
             match current_page {
-                CurrentRoute::Profile => {
+                CurrentRoute::ProfileGallery
+                | CurrentRoute::ProfileSupport
+                | CurrentRoute::ProfileAboutMe => {
                     let username = page_profile_params.get_untracked().username;
                     navigate(
                         &link_relative_profile_search(username, search_text),
                         Default::default(),
                     )
                 }
-                CurrentRoute::Other => {
-                    navigate(&link_relative_index_search(search_text), Default::default())
+                CurrentRoute::ProfilePaws => {
+                    let username = page_profile_params.get_untracked().username;
+                    navigate(
+                        &link_relative_profile_paws_search(username, search_text),
+                        Default::default(),
+                    )
                 }
+                _ => navigate(&link_relative_index_search(search_text), Default::default()),
             }
             // link_relative_profile_search
             // Some(search_text)

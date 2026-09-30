@@ -55,7 +55,9 @@ pub mod user_get_all;
 pub mod user_get_by_email;
 pub mod user_get_by_username;
 pub mod user_get_password;
+pub mod user_update_aboutme;
 pub mod user_update_password_by_email;
 pub mod user_update_password_by_username;
 pub mod user_update_storage;
+pub mod user_update_support;
 pub mod user_update_username; // TODO cascade update, update foreign keys

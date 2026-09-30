@@ -65,6 +65,8 @@ pub use query::post_update_description::*;
 pub use query::post_update_file_add::*;
 pub use query::post_update_file_remove::*;
 pub use query::post_update_order::*;
+pub use query::user_update_aboutme::*;
+pub use query::user_update_support::*;
 // pub use query::post_update_proccesed::*;
 pub use query::post_update_state::*;
 pub use query::post_update_tags::*;

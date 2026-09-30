@@ -35,7 +35,8 @@ pub fn vec_img_to_string<IMG: ResizableImage + Display>(imgs: &[IMG]) -> String 
 #[component]
 pub fn Gallery(
     #[prop(default = 250)] row_height: u32,
-    #[prop(optional, into)] username: Signal<String>,
+    #[prop(optional, into)] author_username: Signal<String>,
+    #[prop(optional, into)] liked_by_username: Signal<String>,
     #[prop(optional, into)] class: Signal<String>,
 ) -> impl IntoView {
     let spawner = Spawner::new();
@@ -78,13 +79,15 @@ pub fn Gallery(
     let set_gallery = move |width: u32, height: f64, bottom: bool, limit: usize, time: u64| {
         debug_data_push("set_gallery_param_limit", limit.to_string());
 
-        let user_username = username.get_untracked();
+        let author_username = author_username.get_untracked();
+        let liked_by_username = liked_by_username.get_untracked();
 
         let tags = get_query_tags.get_untracked().unwrap_or_default();
         trace!("wheres my super suit?");
 
         spawner.spawn(async move {
             let client = create_client();
+
             let scroll = gallery_api
                 .fetch_btm_or_top(
                     &client,
@@ -97,7 +100,8 @@ pub fn Gallery(
                     },
                     time,
                     tags,
-                    user_username,
+                    author_username,
+                    liked_by_username,
                 )
                 .await;
 
@@ -278,7 +282,10 @@ pub fn Gallery(
             old_tags.set_value(new_tags);
         }
 
-        if (direction.is_some() || count.is_some() || scroll.is_some() || gallery_api.is_empty())
+        if (direction.is_some()
+            || count.is_some()
+            || scroll.is_some()
+            || !gallery_api.is_initialized())
             && tags_are_same
         {
             return;
@@ -287,6 +294,7 @@ pub fn Gallery(
         gallery_api.reset();
         scroll_correction.reset();
         set_query_scroll.set(None);
+        set_query_time(None);
         top_intersector_switch.reset();
         down_intersector_switch.reset();
 

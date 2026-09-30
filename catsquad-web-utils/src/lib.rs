@@ -17,8 +17,9 @@ pub mod prelude {
     pub use super::rem_to_px::rem_to_px;
     pub use super::resize_observer::{self, AddResizeObserver, GetContentBoxSize};
     pub use super::rw_signal_tree::RwSignalTree;
-    pub use super::time::{micro_to_str, time_now_ms, time_now_ns};
+    pub use super::time::{micro_to_str, time_now_micro, time_now_ms, time_now_ns};
     pub use super::timeout::{SetTimeoutError, set_timeout_fn};
+    pub use super::turnary::*;
 
     // #[cfg(feature = "testing")]
     pub use super::debugger::{StoreSignal, debug_data_push};
@@ -26,6 +27,18 @@ pub mod prelude {
 
 // TODO fx bs api, create struct abstraction over web api and let user freely use it anywhere
 // TODO edit: good luck wit that mate
+
+pub mod turnary {
+    pub trait Turnary<T> {
+        fn or(&self, value: T) -> T;
+    }
+
+    impl<'a> Turnary<&'a str> for bool {
+        fn or(&self, value: &'a str) -> &'a str {
+            if *self { value } else { "" }
+        }
+    }
+}
 
 // #[cfg(feature = "testing")]
 pub mod debugger {

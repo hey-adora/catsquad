@@ -1,4 +1,4 @@
-use crate::{MAX_POST_COMMENT_LENGTH, RedactedUserRes};
+use crate::MAX_POST_COMMENT_LENGTH;
 use catsquad_log::prelude::*;
 
 pub const LINK_API_COMMENT_ADD: &str = "/api/comment_add";

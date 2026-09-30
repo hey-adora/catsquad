@@ -1,7 +1,7 @@
 use crate::{hook::Spawner, page::post::post_api::PostApi};
 
 use super::Favorite;
-use catsquad_shared::link_relative_profile;
+use catsquad_shared::link_relative_profile_gallery;
 use leptos::prelude::*;
 
 #[component]

@@ -1,8 +1,6 @@
 use std::fmt::Display;
 
-use crate::{
-    MAX_POST_DESCRIPTION_LENGTH, MAX_POST_TAGS_LENGTH, MAX_POST_TITLE_LENGTH, RedactedUserRes,
-};
+use crate::{MAX_POST_DESCRIPTION_LENGTH, MAX_POST_TAGS_LENGTH, MAX_POST_TITLE_LENGTH};
 use catsquad_log::prelude::*;
 
 pub const LINK_API_POST_ADD: &str = "/api/post";

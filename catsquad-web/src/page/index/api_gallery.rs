@@ -3,6 +3,7 @@ use std::fmt::Debug;
 use crate::hook::ScrollCorrection;
 use catsquad_client::{Client, Response, Sender};
 use catsquad_shared::{Order, TimeRange};
+use leptos::prelude::{GetValue, SetValue, StoredValue};
 
 use super::component_gallery::{Img, add_imgs_to_bottom, add_imgs_to_top};
 use catsquad_log::prelude::*;
@@ -18,6 +19,7 @@ pub struct GalleryContainerSize {
 // display errs
 #[derive(Clone, Copy)]
 pub struct GalleryApi {
+    pub initialized: StoredValue<bool>,
     pub items: StoreSignal<Vec<Img>>,
     pub scroll_correction_handle: ScrollCorrection,
 }
@@ -28,6 +30,7 @@ impl GalleryApi {
             serde_json::to_string(v).unwrap_or_else(|e| e.to_string())
         });
         Self {
+            initialized: StoredValue::new(false),
             scroll_correction_handle,
             items,
         }
@@ -78,6 +81,8 @@ impl GalleryApi {
             .await
             .into_json()
             .await;
+
+        self.initialized.set_value(true);
 
         match result {
             Ok(mut posts) => {
@@ -226,6 +231,10 @@ impl GalleryApi {
 
     pub fn is_empty(&self) -> bool {
         self.items.with_untracked(|v| v.is_empty())
+    }
+
+    pub fn is_initialized(&self) -> bool {
+        self.initialized.get_value()
     }
 
     pub fn reset(&self) {

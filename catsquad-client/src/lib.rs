@@ -570,6 +570,30 @@ where
         )
     }
 
+    pub fn user_update_support(
+        &self,
+        new_support: impl Into<String>,
+    ) -> Builder<TSender, (), cs::UserUpdateSupportErr> {
+        self.post_form(
+            cs::LINK_API_USER_UPDATE_SUPPORT,
+            cs::UserUpdateSupportReq {
+                new_support: new_support.into(),
+            },
+        )
+    }
+
+    pub fn user_update_aboutme(
+        &self,
+        new_aboutme: impl Into<String>,
+    ) -> Builder<TSender, (), cs::UserUpdateAboutmeErr> {
+        self.post_form(
+            cs::LINK_API_USER_UPDATE_ABOUTME,
+            cs::UserUpdateAboutmeReq {
+                new_aboutme: new_aboutme.into(),
+            },
+        )
+    }
+
     pub fn post_add(
         &self,
         title: impl Into<String>,

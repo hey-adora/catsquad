@@ -1,8 +1,12 @@
 use catsquad_log::prelude::*;
-use catsquad_shared::{MATCH_CONTAINS, SensitiveUserRes, SessionRemoveErr, UserGetBySessionKeyErr};
+use catsquad_shared::{
+    MATCH_PROFILE, MATCH_PROFILE_ABOUTME, MATCH_PROFILE_PAWS, MATCH_PROFILE_SUPPORT,
+    SensitiveUserRes, SessionRemoveErr, UserGetBySessionKeyErr,
+};
 use catsquad_web_utils::time::{time_now_micro, time_now_ns};
 use leptos::prelude::*;
 use leptos_router::{hooks::use_params, location::Location};
+use strum::EnumIs;
 
 use crate::{ProfileParams, page::create_client};
 
@@ -13,9 +17,12 @@ pub struct PageState {
     pub time: RwSignal<u64>,
 }
 
-#[derive(Clone, PartialEq, PartialOrd)]
+#[derive(Clone, PartialEq, PartialOrd, EnumIs)]
 pub enum CurrentRoute {
-    Profile,
+    ProfileGallery,
+    ProfilePaws,
+    ProfileSupport,
+    ProfileAboutMe,
     Other,
 }
 
@@ -31,10 +38,20 @@ impl PageState {
 
     pub fn current_route(&self, location: Location) -> Memo<CurrentRoute> {
         Memo::new(move |_| {
+            let query = location.search.get();
             let pathname = location.pathname.get();
 
-            if pathname.contains(MATCH_CONTAINS) {
-                return CurrentRoute::Profile;
+            if pathname.contains(MATCH_PROFILE) {
+                if query.contains(MATCH_PROFILE_PAWS) {
+                    return CurrentRoute::ProfilePaws;
+                }
+                if query.contains(MATCH_PROFILE_ABOUTME) {
+                    return CurrentRoute::ProfileAboutMe;
+                }
+                if query.contains(MATCH_PROFILE_SUPPORT) {
+                    return CurrentRoute::ProfileSupport;
+                }
+                return CurrentRoute::ProfileGallery;
             }
 
             CurrentRoute::Other
