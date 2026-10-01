@@ -4,7 +4,7 @@ use leptos::prelude::*;
 #[component]
 pub fn EditSaveCancel(
     #[prop(optional, into)] when: Signal<bool>,
-    #[prop(optional, into)] disable_save_when: Signal<bool>,
+    #[prop(optional, into)] is_loading: Signal<bool>,
     #[prop(optional, into)] class_save: Signal<String>,
     #[prop(optional, into)] class_cancel: Signal<String>,
     #[prop(optional, into)] class_edit: Signal<String>,
@@ -44,11 +44,11 @@ pub fn EditSaveCancel(
     let id_save_fn = move || format!("btn_save_{}", id_fn());
     let id_cancel_fn = move || format!("btn_cancel_{}", id_fn());
     let id_edit_fn = move || format!("btn_edit_{}", id_fn());
-    let disable_save_when_fn = move || disable_save_when.get();
+    // let disable_save_when_fn = move || false;
 
     view! {
         <Show when=when_fn >
-            <BtnPrimary size disabled=disable_save_when_fn class=class_save id=id_save_fn on_click=on_save_fn>
+            <BtnPrimary size is_loading class=class_save id=id_save_fn on_click=on_save_fn>
                 "Save"
             </BtnPrimary>
             <BtnSecondary size class=class_cancel id=id_cancel_fn on_click=on_cancel_fn>

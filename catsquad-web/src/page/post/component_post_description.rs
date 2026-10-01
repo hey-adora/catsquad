@@ -49,6 +49,7 @@ pub fn PostDescription(
             errors=post_api.err_description
             on_save=edit_description_save
             node_ref=description_input_editor
+            spawner
             />
     }
 }

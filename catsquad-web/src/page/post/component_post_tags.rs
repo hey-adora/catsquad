@@ -63,6 +63,7 @@ pub fn PostTags(
             errors=post_api.err_tags
             on_save=edit_tags_save
             node_ref=edit_tags_input
+            spawner
             >
                 <div class="flex flex-wrap gap-1">
                     <Show when=when_tag_full fallback={move || view!{<span class="text-base03">"No tags."</span>} }>

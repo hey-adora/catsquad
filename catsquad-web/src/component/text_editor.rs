@@ -1,9 +1,13 @@
-use crate::{AutoTextArea, Errs, LengthCounter, page::post::component_edit_btn::EditSaveCancel};
+use crate::{
+    AutoTextArea, Errs, LengthCounter, hook::Spawner,
+    page::post::component_edit_btn::EditSaveCancel,
+};
 use leptos::{html, prelude::*};
 use web_sys::HtmlTextAreaElement;
 
 #[component]
 pub fn TextEditor(
+    #[prop(optional, into)] class: Signal<String>,
     #[prop(into)] id_prefix: Signal<String>,
     #[prop(into)] title: Signal<String>,
     #[prop(into)] text: RwSignal<String>,
@@ -14,8 +18,11 @@ pub fn TextEditor(
     #[prop(into)] errors: Signal<String>,
     #[prop(into)] on_save: Callback<()>,
     #[prop(into)] node_ref: NodeRef<html::Textarea>,
+    spawner: Spawner,
     #[prop(optional)] children: Option<ChildrenFn>,
 ) -> impl IntoView {
+    let is_loading = move || spawner.is_busy.get();
+
     let is_owned = move || is_owned.get();
     let on_save = move || {
         on_save.run(());
@@ -33,6 +40,8 @@ pub fn TextEditor(
     let id_textarea = move || format!("{}_editor_textarea", id_prefix.get());
     let id_errs = move || format!("{}_editor_errors", id_prefix.get());
 
+    let text_not_found = move || format!("No {}.", title().to_lowercase());
+
     let children = move || {
         if let Some(children) = &children {
             children()
@@ -41,7 +50,7 @@ pub fn TextEditor(
                 <pre
                     id=id_pre
                     class="whitespace-break-spaces break-all text-ellipsis overflow-hidden padding max-w-[calc(100vw-1rem)] rounded {}">
-                    <Show when=is_text_full fallback={move || view!{<span class="text-base03">"No description."</span>} }>
+                    <Show when=is_text_full fallback={move || view!{<span class="text-base03">{text_not_found}</span>} }>
                         { text }
                     </Show>
                 </pre>
@@ -49,9 +58,16 @@ pub fn TextEditor(
         }
     };
 
+    let class_container = move || {
+        format!(
+            "flex flex-col gap-2 md:gap-4 justify-between mt-4 {}",
+            class.get()
+        )
+    };
+
     view! {
-        <div class="flex flex-col gap-2 md:gap-4 justify-between mt-4">
-            <div class="flex justify-between">
+        <div class=class_container >
+            <div class="flex justify-between gap-2">
                 <h1 class="text-[1.3rem] text-base0F">{title}</h1>
                 <div class="flex gap-2 items-center">
 
@@ -65,6 +81,7 @@ pub fn TextEditor(
                         <EditSaveCancel
                             id=id_prefix
                             when=edit_mode_enabled
+                            is_loading
                             on_save=on_save
                             on_cancel=toggle_edit_mode
                             on_edit=toggle_edit_mode

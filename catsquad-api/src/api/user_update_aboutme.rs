@@ -1,8 +1,10 @@
 use axum::{Extension, Form, Json, extract::State, http::StatusCode, response::IntoResponse};
 use catsquad_db::{DbUser, DbUserUpdateAboutmeErr};
-use catsquad_shared::{UserUpdateAboutmeErr, UserUpdateAboutmeReq};
+use catsquad_shared::{
+    MAX_ABOUTME_LENGTH, UserUpdateAboutmeErr, UserUpdateAboutmeReq, validate_user_aboutme,
+};
 
-use crate::{auth::verify_password, state::AppState};
+use crate::{auth::verify_password, state::AppState, utils::rng_str};
 
 fn from_db_user_update_aboutme_err(value: DbUserUpdateAboutmeErr) -> UserUpdateAboutmeErr {
     match value {
@@ -32,6 +34,8 @@ pub async fn user_update_aboutme(
     let inner = async || -> Result<(), UserUpdateAboutmeErr> {
         let new_aboutme = req.new_aboutme;
         let user_username = db_user.username.clone();
+
+        validate_user_aboutme(&new_aboutme).map_err(UserUpdateAboutmeErr::Invalid)?;
 
         app.db
             .user_update_aboutme(time, user_username, new_aboutme.clone())
@@ -89,6 +93,10 @@ async fn test_api_user_update_aboutme() {
         .user_update_aboutme("woo3", 0_u128.to_be_bytes())
         .await;
     assert!(matches!(result, Err(UserUpdateAboutmeErr::Unauthorized(_))));
+
+    let invalid_aboutme = rng_str(MAX_ABOUTME_LENGTH + 1);
+    let result = server.user_update_aboutme(invalid_aboutme, token).await;
+    assert!(matches!(result, Err(UserUpdateAboutmeErr::Invalid(_))));
 
     let user = server
         .state

@@ -1,7 +1,9 @@
-use crate::state::AppState;
+use crate::{state::AppState, utils::rng_str};
 use axum::{Extension, Form, Json, extract::State, http::StatusCode, response::IntoResponse};
 use catsquad_db::{DbUser, DbUserUpdateSupportErr};
-use catsquad_shared::{UserUpdateSupportErr, UserUpdateSupportReq};
+use catsquad_shared::{
+    MAX_SUPPORT_LENGTH, UserUpdateSupportErr, UserUpdateSupportReq, validate_user_support,
+};
 
 fn from_db_user_update_support_err(value: DbUserUpdateSupportErr) -> UserUpdateSupportErr {
     match value {
@@ -29,6 +31,8 @@ pub async fn user_update_support(
     let inner = async || -> Result<(), UserUpdateSupportErr> {
         let new_support = req.new_support;
         let user_username = db_user.username.clone();
+
+        validate_user_support(&new_support).map_err(UserUpdateSupportErr::Invalid)?;
 
         app.db
             .user_update_support(time, user_username, new_support)
@@ -86,6 +90,10 @@ async fn test_api_user_update_support() {
         .user_update_support("woo3", 0_u128.to_be_bytes())
         .await;
     assert!(matches!(result, Err(UserUpdateSupportErr::Unauthorized(_))));
+
+    let invalid_support = rng_str(MAX_SUPPORT_LENGTH + 1);
+    let result = server.user_update_support(invalid_support, token).await;
+    assert!(matches!(result, Err(UserUpdateSupportErr::Invalid(_))));
 
     let user = server
         .state

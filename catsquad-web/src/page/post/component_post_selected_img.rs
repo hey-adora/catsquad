@@ -13,12 +13,15 @@ pub fn PostSelectedImg(#[prop(into)] post_id: Signal<i64>, post_api: PostApi) ->
         let hash = img_id.0;
         let img_id_str = img_id.to_id();
         let selected_file = post_api.imgs.with(|imgs| {
+            if hash == 0 {
+                return imgs.get(0).cloned();
+            }
             imgs.iter()
                 .find(|v| v.with_untracked(|v| v.hash == img_id.0))
                 .cloned()
         });
 
-        let Some(_) = selected_file else {
+        let Some(image) = selected_file else {
             return view! {
                 <p>
                     "No Image"
@@ -26,6 +29,7 @@ pub fn PostSelectedImg(#[prop(into)] post_id: Signal<i64>, post_api: PostApi) ->
             }
             .into_any();
         };
+        let hash = image.with_untracked(|v| v.hash);
 
         let url = link_relative_post_image_bytes_get_by_hash(post_id, hash);
 

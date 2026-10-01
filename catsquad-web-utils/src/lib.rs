@@ -31,11 +31,16 @@ pub mod prelude {
 pub mod turnary {
     pub trait Turnary<T> {
         fn or(&self, value: T) -> T;
+        fn either(&self, a: T, b: T) -> T;
     }
 
     impl<'a> Turnary<&'a str> for bool {
         fn or(&self, value: &'a str) -> &'a str {
             if *self { value } else { "" }
+        }
+
+        fn either(&self, a: &'a str, b: &'a str) -> &'a str {
+            if *self { a } else { b }
         }
     }
 }

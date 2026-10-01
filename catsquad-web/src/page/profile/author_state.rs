@@ -4,6 +4,8 @@ use catsquad_shared::UserGetByUsernameErr;
 use leptos::prelude::{RwSignal, Set, Update};
 use std::fmt::{Debug, Display};
 
+use crate::page::create_client;
+
 #[derive(Clone)]
 pub struct AuthorState<TSender>
 where
@@ -12,8 +14,17 @@ where
 {
     pub stage: RwSignal<AuthorStage>,
     pub username: RwSignal<String>,
+
     pub support: RwSignal<String>,
+    pub err_support: RwSignal<String>,
+    pub support_edit_mode: RwSignal<bool>,
+    pub live_support_length: RwSignal<usize>,
+
     pub aboutme: RwSignal<String>,
+    pub err_aboutme: RwSignal<String>,
+    pub aboutme_edit_mode: RwSignal<bool>,
+    pub live_aboutme_length: RwSignal<usize>,
+
     pub created_at: RwSignal<u64>,
     pub err_general: RwSignal<String>,
     client: Client<TSender>,
@@ -36,8 +47,17 @@ where
         Self {
             stage: RwSignal::new(AuthorStage::Loading),
             username: RwSignal::new(String::new()),
+
             support: RwSignal::new(String::new()),
+            err_support: RwSignal::new(String::new()),
+            support_edit_mode: RwSignal::new(false),
+            live_support_length: RwSignal::new(0),
+
             aboutme: RwSignal::new(String::new()),
+            err_aboutme: RwSignal::new(String::new()),
+            aboutme_edit_mode: RwSignal::new(false),
+            live_aboutme_length: RwSignal::new(0),
+
             err_general: RwSignal::new(String::new()),
             created_at: RwSignal::new(0),
             client,
@@ -74,29 +94,75 @@ where
         };
 
         self.username.set(user.username);
+        self.live_support_length.set(user.support.len());
         self.support.set(user.support);
+        self.live_aboutme_length.set(user.aboutme.len());
         self.aboutme.set(user.aboutme);
         self.created_at.set(user.created_at);
         self.stage.set(AuthorStage::Normal);
     }
-}
 
-// <TextEditor
-//     id_prefix="decription"
-//     title="Decription"
-//     text=post_api.description
-//     text_length=post_api.live_description_length
-//     is_owned=when_is_owner
-//     edit_mode_enabled=post_api.update_description_mode
-//     max_length=MAX_POST_DESCRIPTION_LENGTH
-//     errors=post_api.err_description
-//     on_save=edit_description_save
-//     node_ref=description_input_editor
-//     />
+    pub async fn update_support(&self, new_support: impl Into<String>) {
+        let new_support = new_support.into();
+        let new_support_len = new_support.len();
+        self.err_support.update(|v| v.clear());
+
+        let result = self
+            .client
+            .user_update_support(new_support.clone())
+            .send()
+            .await
+            .into_json()
+            .await;
+
+        match result {
+            Ok(_) => (),
+            Err(err) => {
+                error!("update_support error {err:#?}");
+                self.err_support.set(err.to_string());
+                return;
+            }
+        }
+
+        self.support.set(new_support);
+        self.live_support_length.set(new_support_len);
+        self.support_edit_mode.set(false);
+    }
+
+    pub async fn update_aboutme(&self, new_aboutme: impl Into<String>) {
+        let new_aboutme = new_aboutme.into();
+        let new_aboutme_len = new_aboutme.len();
+        self.err_aboutme.update(|v| v.clear());
+
+        let result = self
+            .client
+            .user_update_aboutme(new_aboutme.clone())
+            .send()
+            .await
+            .into_json()
+            .await;
+
+        match result {
+            Ok(_) => (),
+            Err(err) => {
+                error!("update_support error {err:#?}");
+                self.err_aboutme.set(err.to_string());
+                return;
+            }
+        }
+
+        self.aboutme.set(new_aboutme);
+        self.live_aboutme_length.set(new_aboutme_len);
+        self.aboutme_edit_mode.set(false);
+    }
+}
 
 #[cfg(test)]
 #[tokio::test]
 async fn test_author_state() {
+    use catsquad_api::auth::create_auth_cookie_str;
+    use catsquad_shared::uuid_to_str;
+    use http::header;
     use leptos::prelude::GetUntracked;
 
     catsquad_log::init_log();
@@ -131,4 +197,48 @@ async fn test_author_state() {
     assert_eq!(author_state.created_at.get_untracked(), 0);
     assert_eq!(author_state.err_general.get_untracked(), "not found");
     assert_eq!(author_state.stage.get_untracked(), AuthorStage::NotFound);
+
+    author_state.support_edit_mode.set(true);
+    author_state.aboutme_edit_mode.set(true);
+
+    author_state.update_support("support1").await;
+    author_state.update_aboutme("aboutme1").await;
+
+    assert_eq!(author_state.support.get_untracked(), "");
+    assert!(!author_state.err_support.get_untracked().is_empty());
+    assert!(author_state.support_edit_mode.get_untracked());
+    assert_eq!(author_state.live_support_length.get_untracked(), 0);
+
+    assert_eq!(author_state.aboutme.get_untracked(), "");
+    assert!(!author_state.err_aboutme.get_untracked().is_empty());
+    assert!(author_state.aboutme_edit_mode.get_untracked());
+    assert_eq!(author_state.live_aboutme_length.get_untracked(), 0);
+
+    // TODO figure out wtf is !0
+
+    server
+        .inject_header(
+            header::COOKIE,
+            create_auth_cookie_str(uuid_to_str(session1)),
+        )
+        .await;
+
+    author_state.update_support("support1").await;
+
+    assert_eq!(author_state.support.get_untracked(), "support1");
+    assert!(author_state.err_support.get_untracked().is_empty());
+    assert!(!author_state.support_edit_mode.get_untracked());
+    assert_eq!(
+        author_state.live_support_length.get_untracked(),
+        "support1".len()
+    );
+
+    author_state.update_aboutme("aboutme1").await;
+    assert_eq!(author_state.aboutme.get_untracked(), "aboutme1");
+    assert!(author_state.err_aboutme.get_untracked().is_empty());
+    assert!(!author_state.aboutme_edit_mode.get_untracked());
+    assert_eq!(
+        author_state.live_aboutme_length.get_untracked(),
+        "aboutme1".len()
+    )
 }
