@@ -29,7 +29,7 @@ mod component_post_stats;
 mod component_post_tags;
 mod component_post_title;
 pub mod post_api;
-mod post_like_state;
+pub mod post_like_state;
 
 use component_comments::Comments;
 use component_edit_btn::EditSaveCancel;

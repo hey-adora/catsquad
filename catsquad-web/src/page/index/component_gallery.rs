@@ -1,7 +1,12 @@
 use super::api_gallery::{GalleryApi, GalleryContainerSize};
+use crate::SVGPawHollow;
+use crate::hook::{Intersection, IntersectionSwitch, ScrollCorrection, Spawner};
+use crate::page::create_client;
+use crate::page::post::post_like_state::PostLikeState;
 use catsquad_log::prelude::*;
 use catsquad_shared::{
     PostImage, PostSearchRes, link_relative_post, link_relative_post_image_bytes_get_by_hash,
+    link_relative_profile_gallery,
 };
 use catsquad_web_utils::prelude::*;
 use catsquad_web_utils::time::time_now_micro;
@@ -12,9 +17,6 @@ use std::default::Default;
 use std::fmt::{Debug, Display};
 use std::time::Duration;
 use web_sys::HtmlDivElement;
-
-use crate::hook::{Intersection, IntersectionSwitch, ScrollCorrection, Spawner};
-use crate::page::create_client;
 
 mod component_loading;
 mod component_not_found;
@@ -410,20 +412,12 @@ pub fn elm_id_img_link(id: i64) -> String {
 // pub fn GalleryImg<FetchBtmFn, FetchTopFn, OnClickFn>(
 #[component]
 pub fn GalleryImg(img: Img) -> impl IntoView {
-    // let img_key = img.key;
     let view_left = img.view_pos_x;
     let view_top = img.view_pos_y;
     let view_width = img.view_width;
     let view_height = img.view_height;
-    let img_width = img.width;
-    let img_height = img.height;
-    let img_key = img.id.clone();
-    let img_key2 = img.id.clone();
-    let img_key3 = img.id.clone();
+    let img_post_id = img.post_id;
     let img_username = img.username.clone();
-    let post_link = img.get_post_link();
-    // let post_link_with_history = img.get_post_link_with_history(9999);
-    let img_link = img.get_img_link();
     let image_exists = img.image_exists;
 
     let value_left = format!("{view_left}px");
@@ -435,36 +429,47 @@ pub fn GalleryImg(img: Img) -> impl IntoView {
     let value_width3 = value_width.clone();
     let value_height3 = value_height.clone();
 
-    // let on_img_click = move |e: MouseEvent| {
-    //     run_on_click(e, img.clone());
-    // };
-    // node_ref=link_ref
-    // on:click=on_img_click
+    let link_post = img.get_post_link();
+    let link_author = link_relative_profile_gallery(img_username);
+    let link_img = img.get_img_link();
+
+    let post_like_state = PostLikeState::new(create_client());
 
     view! {
-        <a
-           id=elm_id_img_link(img_key)
-           href=post_link
-           class="absolute bg-base00 "
+        <div
+           class="absolute bg-base00 overflow-hidden"
            style:left=value_left
            style:top=value_top
            style:width=value_width
            style:height=value_height
         >
-            <div class="w-full h-full relative ">
+            <div class="w-full h-full relative group z-[13] ">
+                <a id=elm_id_img_link(img_post_id) href=link_post class="opacity-0 flex-col place-content-end absolute left-0 top-0 w-full h-full group-hover:opacity-100 group-hover:bg-linear-to-t from-base01 to-base01/0 z-[11]"></a>
+                <div class="opacity-0 group-hover:opacity-100 z-[12] absolute left-0 bottom-0 w-full grid grid-cols-[auto_1fr_auto] gap-2 px-2 pb-2">
+                    <a href=link_author.clone() class="text-[1rem] rounded-full size-10 shrink-0 bg-base05"></a>
+                    <div class="max-w-full flex flex-col place-items-start">
+                        <a href=link_author.clone() class="max-w-full text-[1.2rem] text-base0F overflow-hidden text-ellipsis">"hello"</a>
+                        <div class="grid grid-cols-[auto_auto_auto] gap-1 whitespace-nowrap place-items-center">
+                            <p class="overflow-hidden text-ellipsis text-[0.7rem]">"400 paws"</p>
+                            <div class="size-2 rounded-full bg-base05 "></div>
+                            <p class="overflow-hidden text-ellipsis text-[0.7rem]">"2w ago"</p>
+                        </div>
+                    </div>
+                    <SVGPawHollow class="size-6 self-center hover:fill-base05 " />
+                </div>
                 <Show when=move || image_exists>
                     <img
                         class="relative z-10"
-                        id=elm_id_img_thumbnail(img_key2.clone())
+                        id=elm_id_img_thumbnail(img_post_id)
                         style:width=value_width2.clone()
                         style:height=value_height2.clone()
-                        src=img_link.clone()
+                        src=link_img.clone()
                     />
                 </Show>
                 <Show when=move || !image_exists>
                     <div
                         class="relative z-10 border-2 border-base05 bg-base02 grid items-center text-center"
-                        id=elm_id_img_thumbnail(img_key3.clone())
+                        id=elm_id_img_thumbnail(img_post_id)
                         style:width=value_width3.clone()
                         style:height=value_height3.clone()
                     >
@@ -473,13 +478,13 @@ pub fn GalleryImg(img: Img) -> impl IntoView {
                 </Show>
                 <div class="w-[calc(100%-1rem)] h-[calc(100%-1rem)] bg-base02 animate-pulse absolute left-0 top-0 m-[0.5rem] " ></div>
             </div>
-        </a>
+        </div>
     }
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Img {
-    pub id: i64,
+    pub post_id: i64,
     pub username: String,
     pub hash: i64,
     pub extension: String,
@@ -518,7 +523,7 @@ impl From<PostSearchRes> for Img {
             (400, 400)
         };
         Self {
-            id: post.id,
+            post_id: post.id,
             username: post.user_username,
             width,
             height,
@@ -540,7 +545,7 @@ impl Display for Img {
             f,
             "Img::new_full({}, {}, {}, {:.64}, {:.64}, {:.64}, {:.64})",
             // "Img::new_full({}, {}, {}, {:.32}, {:.32}, {:.32}, {:.32})",
-            self.id,
+            self.post_id,
             self.width,
             self.height,
             self.view_width,
@@ -552,15 +557,15 @@ impl Display for Img {
 }
 
 impl ResizableImage for Img {
-    fn get_id(&self) -> i64 {
-        self.id
+    fn get_post_id(&self) -> i64 {
+        self.post_id
     }
     fn get_post_link(&self) -> String {
-        link_relative_post(self.id)
+        link_relative_post(self.post_id)
         // link_post(&self.username, &self.key)
     }
     fn get_img_link(&self) -> String {
-        link_relative_post_image_bytes_get_by_hash(self.id, self.hash)
+        link_relative_post_image_bytes_get_by_hash(self.post_id, self.hash)
         // link_img(&self.hash, &self.extension)
     }
     fn get_width(&self) -> u32 {
@@ -604,7 +609,7 @@ impl Img {
         let id = random_u32();
 
         Self {
-            id: id as i64,
+            post_id: id as i64,
             username: "bot".to_string(),
             hash: 0,
             extension: "webp".to_string(),
@@ -624,7 +629,7 @@ impl Img {
         let height = random_u32_ranged(500, 1000);
 
         Self {
-            id,
+            post_id: id,
             username: "bot".to_string(),
             hash: 0,
             extension: "webp".to_string(),
@@ -649,7 +654,7 @@ impl Img {
 }
 
 pub trait ResizableImage {
-    fn get_id(&self) -> i64;
+    fn get_post_id(&self) -> i64;
     fn get_post_link(&self) -> String;
     fn get_img_link(&self) -> String;
     fn get_width(&self) -> u32;
@@ -918,12 +923,12 @@ pub fn get_rows_to_bottom(
         .enumerate()
         .skip(offset)
         .inspect(|(i, img)| {
-            trace!("i={} img_id={}", i, img.get_id());
+            trace!("i={} img_id={}", i, img.get_post_id());
         })
         .map(|(i, img)| {
             (
                 i,
-                img.get_id(),
+                img.get_post_id(),
                 img.get_width(),
                 img.scaled_by_height(row_height),
             )
@@ -969,12 +974,16 @@ pub fn get_rows_to_top(
         .skip(imgs.len().saturating_sub(offset + 1))
         .enumerate()
         .inspect(|(i, img)| {
-            trace!("i={} img_id={}", offset.saturating_sub(*i), img.get_id());
+            trace!(
+                "i={} img_id={}",
+                offset.saturating_sub(*i),
+                img.get_post_id()
+            );
         })
         .map(|(i, img)| {
             (
                 offset.saturating_sub(i),
-                img.get_id(),
+                img.get_post_id(),
                 img.get_width(),
                 img.scaled_by_height(row_height),
             )
@@ -1233,7 +1242,7 @@ mod resize_tests {
     }
 
     impl ResizableImage for Img {
-        fn get_id(&self) -> i64 {
+        fn get_post_id(&self) -> i64 {
             self.id
         }
         fn get_post_link(&self) -> String {
