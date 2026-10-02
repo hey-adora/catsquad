@@ -132,6 +132,7 @@ pub fn Gallery(
     };
 
     let set_scroll_top = move |gallery_elm: &HtmlDivElement| {
+        trace!("running gallery set_scroll_top");
         let new_scroll_top = gallery_elm.scroll_top();
         let prev_scroll_top = get_query_scroll.get_untracked().unwrap_or_default();
         if new_scroll_top == prev_scroll_top {
@@ -149,7 +150,7 @@ pub fn Gallery(
     };
 
     gallery_ref.add_resize_observer(move |entry, _observer| {
-        trace!("RESIZINGGGGGG");
+        trace!("running gallery resize");
         let Some(entry) = entry.first() else {
             return;
         };
@@ -164,6 +165,7 @@ pub fn Gallery(
     });
 
     let intersection_top = Intersection::new(move |entries, b| {
+        trace!("running gallery intersection top");
         let (Some(entry), Some(gallery_elm)) = (entries.first(), gallery_ref.get_untracked())
         else {
             return;
@@ -189,6 +191,7 @@ pub fn Gallery(
     });
 
     let intersection_down = Intersection::new(move |entries, b| {
+        trace!("running gallery intersection btm");
         let (Some(entry), Some(gallery_elm)) = (entries.first(), gallery_ref.get_untracked())
         else {
             return;
@@ -288,8 +291,11 @@ pub fn Gallery(
             || !gallery_api.is_initialized())
             && tags_are_same
         {
+            trace!("running gallery BOUNCED");
             return;
         }
+
+        trace!("running gallery reset SUCCESS");
 
         gallery_api.reset();
         scroll_correction.reset();

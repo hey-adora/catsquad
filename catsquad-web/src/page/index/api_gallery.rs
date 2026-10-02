@@ -103,11 +103,6 @@ impl GalleryApi {
 
                 return scroll_by;
             }
-            Ok(err) => {
-                let err = format!("post comments basic: unexpected res: {err:?}");
-                error!(err);
-                // self.err_fetch.set(err);
-            }
             Err(err) => {
                 let err = format!("post comments basic: {err}");
                 error!(err);

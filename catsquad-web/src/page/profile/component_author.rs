@@ -1,19 +1,17 @@
-use super::author_state::{AuthorStage, AuthorState};
+use super::author_state::AuthorState;
+use super::{Aboutme, Support};
 use crate::{
-    Btn, BtnSecondary, BtnSize, LinkSecondary, PageState, SVGArrowDown, SVGBell, TextEditor,
-    hook::Spawner,
-    page::{create_client, index::api_gallery::GalleryApi},
+    Btn, BtnSecondary, BtnSize, PageState, SVGArrowDown, SVGBell, hook::Spawner,
     page_state::CurrentRoute,
 };
 use catsquad_client::XMLSender;
 use catsquad_shared::{
-    MAX_ABOUTME_LENGTH, MAX_SUPPORT_LENGTH, link_relative_profile_aboutme,
-    link_relative_profile_gallery, link_relative_profile_paws, link_relative_profile_support,
+    link_relative_profile_aboutme, link_relative_profile_gallery, link_relative_profile_paws,
+    link_relative_profile_support,
 };
 use catsquad_web_utils::prelude::*;
 use leptos::prelude::*;
 use leptos_router::hooks::use_location;
-use web_sys::HtmlTextAreaElement;
 
 #[component]
 pub fn ProfileAuthor(
@@ -22,52 +20,11 @@ pub fn ProfileAuthor(
     spawner: Spawner,
 ) -> impl IntoView {
     let is_open = RwSignal::new(true);
-    let support_text = author_state.support;
-    let support_edit_mode = author_state.support_edit_mode;
-    let support_err = author_state.err_support;
-    let support_length = author_state.live_support_length;
-    let support_input = NodeRef::new();
-    let support_save_fn = {
-        let author_state = author_state.clone();
-        move || {
-            let author_state = author_state.clone();
-            let Some(new_support) = support_input
-                .get_untracked()
-                .map(|v: HtmlTextAreaElement| v.value())
-            else {
-                return;
-            };
-            spawner.spawn(async move {
-                author_state.update_support(new_support).await;
-            });
-        }
-    };
-
-    let aboutme_text = author_state.aboutme;
-    let aboutme_edit_mode = author_state.aboutme_edit_mode;
-    let aboutme_err = author_state.err_aboutme;
-    let aboutme_length = author_state.live_aboutme_length;
-    let aboutme_input = NodeRef::new();
-    let aboutme_save_fn = {
-        let author_state = author_state.clone();
-        move || {
-            let author_state = author_state.clone();
-            let Some(new_aboutme) = aboutme_input
-                .get_untracked()
-                .map(|v: HtmlTextAreaElement| v.value())
-            else {
-                return;
-            };
-            spawner.spawn(async move {
-                author_state.update_aboutme(new_aboutme).await;
-            });
-        }
-    };
 
     let page = PageState::get();
     let location = use_location();
     let current_route = page.current_route(location);
-    let when_is_owner = move || page.acc_username() == user_username.get();
+
     let when_tab_gallery_mobile = move || match current_route.get() {
         CurrentRoute::ProfileGallery | CurrentRoute::Other => true,
         _ => false,
@@ -79,8 +36,6 @@ pub fn ProfileAuthor(
     let when_tab_paws = move || current_route.get().is_profile_paws();
     let when_tab_support = move || current_route.get().is_profile_support();
     let when_tab_aboutme = move || current_route.get().is_profile_about_me();
-
-    // let param_tab = RwQuery::<String>::new("tab");
 
     let author_username = author_state.username;
     let created_at = author_state.created_at;
@@ -177,34 +132,18 @@ pub fn ProfileAuthor(
                         </ul>
                     </div>
                 </div>
-                <TextEditor
+                <Support
                     class="max-w-[20rem]"
-                    id_prefix="support"
-                    title="Support"
-                    text=support_text
-                    text_length=support_length
-                    is_owned=when_is_owner
-                    edit_mode_enabled=support_edit_mode
-                    max_length=MAX_SUPPORT_LENGTH
-                    errors=support_err
-                    on_save=support_save_fn.clone()
-                    node_ref=support_input
+                    user_username
                     spawner
-                    />
-                <TextEditor
+                    author_state=author_state.clone()
+                />
+                <Aboutme
                     class="max-w-[20rem]"
-                    id_prefix="aboutme"
-                    title="Aboutme"
-                    text=aboutme_text
-                    text_length=aboutme_length
-                    is_owned=when_is_owner
-                    edit_mode_enabled=aboutme_edit_mode
-                    max_length=MAX_ABOUTME_LENGTH
-                    errors=aboutme_err
-                    on_save=aboutme_save_fn.clone()
-                    node_ref=aboutme_input
+                    user_username
                     spawner
-                    />
+                    author_state=author_state.clone()
+                />
             </div>
         </Show>
 
@@ -218,5 +157,3 @@ pub fn ProfileAuthor(
         </Show>
     }
 }
-
-// <Btn class="self-start bg-base02 "><SVGArrowDown stroke=2.5 class="size-6 rotate-90 "/></Btn>

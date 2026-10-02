@@ -71,6 +71,8 @@ pub async fn post_search(
     //     .map(|v| u128::from_str_radix(&v, 10).unwrap_or_default())
     //     .unwrap_or_default();
     let limit = req.limit.unwrap_or(50);
+    let limit = if limit == 0 { 50 } else { limit };
+
     let range = req.range.unwrap_or(TimeRange::MoreOrEqual);
     let order = req.order.unwrap_or(Order::ThreeTwoOne);
     let inner = async || -> Result<Vec<PostSearchRes>, PostSearchErr> {
