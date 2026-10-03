@@ -493,18 +493,34 @@ pub mod time {
             // (1000_u128, ("ns", "ns")),
             (1000, ("μs", "μs")),
             (1000, ("ms", "ms")),
-            (60, ("second", "seconds")),
-            (60, ("minute", "minutes")),
-            (24, ("hour", "hours")),
-            (7, ("day", "days")),
-            (4, ("week", "weeks")),
-            (12, ("month", "months")),
-            (10, ("year", "years")),
+            (60, ("s", "s")),
+            (60, ("min", "min")),
+            (24, ("h", "h")),
+            (7, ("d", "d")),
+            (4, ("w", "w")),
+            (12, ("mo", "mo")),
+            (10, ("y", "y")),
             (10, ("decade", "decades")),
             (10, ("century", "centuries")),
             (1000, ("millennium", "millenniums")),
             (1000, ("aeon", "aeons")),
         ];
+        // let table = [
+        //     // (1000_u128, ("ns", "ns")),
+        //     (1000, ("μs", "μs")),
+        //     (1000, ("ms", "ms")),
+        //     (60, ("second", "seconds")),
+        //     (60, ("minute", "minutes")),
+        //     (24, ("hour", "hours")),
+        //     (7, ("day", "days")),
+        //     (4, ("week", "weeks")),
+        //     (12, ("month", "months")),
+        //     (10, ("year", "years")),
+        //     (10, ("decade", "decades")),
+        //     (10, ("century", "centuries")),
+        //     (1000, ("millennium", "millenniums")),
+        //     (1000, ("aeon", "aeons")),
+        // ];
 
         let mut total_size = 1;
         for (size, label) in table {
@@ -550,25 +566,29 @@ pub mod time {
             assert_eq!(result, "1 ms");
 
             let result = micro_to_str(Duration::from_secs(1).as_micros() as u64);
-            assert_eq!(result, "1 second");
+            assert_eq!(result, "1 s");
+            // assert_eq!(result, "1 second");
 
             let result = micro_to_str(Duration::from_secs(59).as_micros() as u64);
-            assert_eq!(result, "59 seconds");
+            assert_eq!(result, "59 s");
+            // assert_eq!(result, "59 seconds");
 
             let result = micro_to_str(Duration::from_secs(60).as_micros() as u64);
-            assert_eq!(result, "1 minute");
+            assert_eq!(result, "1 min");
+            // assert_eq!(result, "1 minute");
 
             let result = micro_to_str(Duration::from_mins(1).as_micros() as u64);
-            assert_eq!(result, "1 minute");
+            assert_eq!(result, "1 min");
+            // assert_eq!(result, "1 minute");
 
             let result = micro_to_str(Duration::from_hours(1).as_micros() as u64);
-            assert_eq!(result, "1 hour");
+            assert_eq!(result, "1 h");
 
             let result = micro_to_str(Duration::from_hours(24).as_micros() as u64);
-            assert_eq!(result, "1 day");
+            assert_eq!(result, "1 d");
 
             let result = micro_to_str(Duration::from_hours(24 * 7).as_micros() as u64);
-            assert_eq!(result, "1 week");
+            assert_eq!(result, "1 w");
         }
     }
 }

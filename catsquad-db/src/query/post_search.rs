@@ -17,6 +17,8 @@ pub struct DbPostSearch {
     pub description: String,
     #[sqlx(rename = "post_tags")]
     pub tags: String,
+    #[sqlx(rename = "post_liked")]
+    pub liked: bool,
     #[sqlx(rename = "post_likes_count")]
     #[sqlx(try_from = "i64")]
     pub likes_count: u32,
@@ -70,7 +72,8 @@ impl Db {
         &self,
         state: PostState,
         tags: impl Into<String>,
-        author_user: impl Into<String>,
+        user_username: impl Into<String>,
+        author_username: impl Into<String>,
         liked_by_username: impl Into<String>,
         search_time: u64,
         limit: usize,
@@ -78,8 +81,13 @@ impl Db {
         order: Order,
     ) -> Result<Vec<DbPostSearch>, DbPostSearchErr> {
         let pool = &self.db;
-        let author_username = author_user.into();
+        let user_username = user_username.into();
+        let author_username = author_username.into();
         let liked_by_username = liked_by_username.into();
+
+        let is_liked_by_and_user_same =
+            !user_username.is_empty() && user_username == liked_by_username;
+
         let mut bind_index = 3_usize;
 
         let q_order = match order {
@@ -111,15 +119,45 @@ impl Db {
             format!("post_user_username = ${bind_index}")
         });
 
-        let q_liked = run_if_not_empty(&liked_by_username, || {
+        let q_liked_by_user = run_if_not_empty(&liked_by_username, || {
             bind_index += 1;
+            // format!("post_like_user_username = ${bind_index}")
+            // "INNER JOIN posts_likes ON post_id=post_like_post_id AND post_like_user_username = ${bind_index}"
             format!(
-                "INNER JOIN posts_likes ON post_id=post_like_post_id AND post_like_user_username = ${bind_index}"
+                "INNER JOIN posts_likes l1 ON post_id=l1.post_like_post_id AND l1.post_like_user_username = ${bind_index}"
             )
         });
 
+        let q_liked_by_me = if is_liked_by_and_user_same {
+            String::new()
+        } else {
+            run_if_not_empty(&user_username, || {
+                bind_index += 1;
+                format!(
+                    "LEFT JOIN posts_likes l2 ON post_id=l2.post_like_post_id AND l2.post_like_user_username = ${bind_index}"
+                )
+            })
+        };
+
+        let q_liked_by_me_field = 'a: {
+            if is_liked_by_and_user_same {
+                break 'a "true as post_liked";
+            }
+
+            if !user_username.is_empty() {
+                break 'a "coalesce(l2.post_like_post_id > 0, false) as post_liked";
+            }
+
+            "false as post_liked"
+        };
+
         let filters = [q_tags, q_time_after, q_user, q_state];
         let q_where = join_str(filters, " AND ", |v| v);
+        let q_where = if !q_where.is_empty() {
+            format!("WHERE {q_where}")
+        } else {
+            String::new()
+        };
 
         let query_str = format!(
             "
@@ -130,6 +168,7 @@ impl Db {
                 post_title,
                 post_description,
                 post_tags,
+                {q_liked_by_me_field},
                 post_likes_count,
                 post_size_bytes,
                 coalesce(image_width, 0) as post_image_width,
@@ -141,8 +180,9 @@ impl Db {
 
                 FROM posts
                 LEFT JOIN files_images ON post_images_hashes[1]=image_hash
-                {q_liked}
-                WHERE {q_where}
+                {q_liked_by_user}
+                {q_liked_by_me}
+                {q_where}
                 ORDER BY post_created_at {q_order}
                 LIMIT $3
         "
@@ -165,6 +205,10 @@ impl Db {
 
         if !liked_by_username.is_empty() {
             builder = builder.bind(liked_by_username);
+        }
+
+        if !user_username.is_empty() {
+            builder = builder.bind(user_username);
         }
 
         let result = builder.fetch_all(pool).await;
@@ -224,24 +268,29 @@ async fn test_post_search() {
             post0
         };
 
-    let search =
-        async |tags: &str, user: &str, time: u64, limit: usize, time_range: u8, order: bool| {
-            let result = db
-                .post_search(
-                    PostState::Active,
-                    tags,
-                    user,
-                    "",
-                    time,
-                    limit,
-                    TimeRange::from(time_range),
-                    Order::from(order),
-                )
-                .await
-                .unwrap();
+    let search = async |tags: &str,
+                        author_user: &str,
+                        time: u64,
+                        limit: usize,
+                        time_range: u8,
+                        order: bool| {
+        let result = db
+            .post_search(
+                PostState::Active,
+                tags,
+                "",
+                author_user,
+                "",
+                time,
+                limit,
+                TimeRange::from(time_range),
+                Order::from(order),
+            )
+            .await
+            .unwrap();
 
-            result
-        };
+        result
+    };
 
     let post0 = add_post_and_activate(1, &user1, "1", "description", "one two three").await;
     let post1 = add_post_and_activate(2, &user1, "2", "description", "one two").await;
@@ -249,6 +298,7 @@ async fn test_post_search() {
     let post9 = add_post(4, &user1, "9", "description9", "one two three 9").await;
 
     db.post_like_add(4, "hey2", post2.id).await.unwrap();
+    db.post_like_add(4, "hey3", post2.id).await.unwrap();
     db.post_like_add(4, "hey3", post1.id).await.unwrap();
 
     db.post_update_image_add(0, user1.username, post0.id, 10, 666, "jpg", 10, 15)
@@ -328,6 +378,7 @@ async fn test_post_search() {
             PostState::Active,
             "",
             "",
+            "",
             "hey2",
             0,
             10,
@@ -338,4 +389,82 @@ async fn test_post_search() {
         .unwrap();
     assert_eq!(result.len(), 1);
     assert_eq!(&result[0].title, "3");
+    assert_eq!(result[0].liked, false);
+
+    let result = db
+        .post_search(
+            PostState::Active,
+            "",
+            "hey2",
+            "",
+            "hey2",
+            0,
+            10,
+            TimeRange::MoreOrEqual,
+            Order::OneTwoThree,
+        )
+        .await
+        .unwrap();
+    assert_eq!(result.len(), 1);
+    assert_eq!(&result[0].title, "3");
+    assert_eq!(result[0].liked, true);
+
+    let result = db
+        .post_search(
+            PostState::Active,
+            "",
+            "hey3",
+            "",
+            "hey2",
+            0,
+            10,
+            TimeRange::MoreOrEqual,
+            Order::OneTwoThree,
+        )
+        .await
+        .unwrap();
+    assert_eq!(result.len(), 1);
+    assert_eq!(&result[0].title, "3");
+    assert_eq!(result[0].liked, true);
+
+    let result = db
+        .post_search(
+            PostState::Active,
+            "",
+            "hey",
+            "",
+            "hey2",
+            0,
+            10,
+            TimeRange::MoreOrEqual,
+            Order::OneTwoThree,
+        )
+        .await
+        .unwrap();
+    assert_eq!(result.len(), 1);
+    assert_eq!(&result[0].title, "3");
+    assert_eq!(result[0].liked, false);
+
+    let result = db
+        .post_search(
+            PostState::Active,
+            "",
+            "hey2",
+            "",
+            "",
+            0,
+            10,
+            TimeRange::MoreOrEqual,
+            Order::OneTwoThree,
+        )
+        .await
+        .unwrap();
+    assert_eq!(result.len(), 3);
+    assert_eq!(&result[0].title, "1");
+    assert_eq!(result[0].liked, false);
+    assert_eq!(&result[1].title, "2");
+    assert_eq!(result[1].liked, false);
+    assert_eq!(&result[2].title, "3");
+    assert_eq!(result[2].liked, true);
+    // assert_eq!(result[0].liked, false);
 }

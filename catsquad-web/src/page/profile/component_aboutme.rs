@@ -47,6 +47,7 @@ pub fn Aboutme(
             errors=aboutme_err
             on_save=aboutme_save_fn.clone()
             node_ref=aboutme_input
+            min_height=200.0
             spawner
             />
     }

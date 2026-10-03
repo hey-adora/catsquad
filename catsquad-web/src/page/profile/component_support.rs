@@ -47,6 +47,7 @@ pub fn Support(
             errors=support_err
             on_save=support_save_fn.clone()
             node_ref=support_input
+            min_height=200.0
             spawner
             />
     }

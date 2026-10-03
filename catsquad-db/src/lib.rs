@@ -412,33 +412,31 @@ pub fn join_str<TInput, TInputItem, TCallbackOutput>(
     mut callback: impl FnMut(TInputItem) -> TCallbackOutput,
 ) -> String
 where
+    TInputItem: Clone,
     TCallbackOutput: AsRef<str>,
     TInput: IntoIterator<Item = TInputItem>,
 {
     let mut output = String::new();
+    let mut iter = input.into_iter();
 
-    let mut iter = input.into_iter().peekable();
-
-    loop {
-        let Some(item) = iter.next() else {
-            break;
-        };
+    for item in &mut iter {
         let result = callback(item);
         let result = result.as_ref();
-
         if result.is_empty() {
             continue;
         }
-
         output.push_str(&result);
+        break;
+    }
 
-        let next_is_empty = iter.peek();
-
-        if next_is_empty.is_none() {
-            break;
+    for item in iter {
+        let result = callback(item);
+        let result = result.as_ref();
+        if result.is_empty() {
+            continue;
         }
-
         output.push_str(between);
+        output.push_str(&result);
     }
 
     output
@@ -454,6 +452,17 @@ pub fn run_if_not_empty(input: impl AsRef<str>, callback: impl FnOnce() -> Strin
     };
 
     result
+}
+
+#[test]
+pub fn test_join_str() {
+    let filters = ["a", "", "b", ""];
+    let result = join_str(filters, " AND ", |v| v);
+    assert_eq!(result, "a AND b");
+
+    let filters = ["", "a", "b", ""];
+    let result = join_str(filters, " AND ", |v| v);
+    assert_eq!(result, "a AND b");
 }
 
 // #[derive(Clone, Debug)]

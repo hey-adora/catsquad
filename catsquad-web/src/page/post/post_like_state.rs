@@ -57,6 +57,18 @@ where
         }
     }
 
+    pub fn new_with_data(client: Client<TSender>, post_id: i64, liked: bool) -> Self {
+        Self {
+            client: StoredValue::new_local(client),
+            post_id: StoredValue::new(post_id),
+            state: RwSignal::new(if liked {
+                LikeState::Liked
+            } else {
+                LikeState::Unliked
+            }),
+        }
+    }
+
     pub async fn init(&self, post_id: i64) {
         let client = self.client.get_value();
         let state = self.state;
@@ -85,8 +97,8 @@ where
     pub async fn toggle_like(&self) {
         let state = self.state;
         let client = self.client.get_value();
-        let post_key = self.post_id.get_value();
-        if post_key == 0 {
+        let post_id = self.post_id.get_value();
+        if post_id == 0 {
             return;
         }
         match state.get_untracked() {
@@ -95,7 +107,7 @@ where
             }
             LikeState::Liked => {
                 let result = client
-                    .post_like_remove(post_key)
+                    .post_like_remove(post_id)
                     .send()
                     .await
                     .into_json()
@@ -111,12 +123,7 @@ where
                 };
             }
             LikeState::Unliked => {
-                let result = client
-                    .post_like_add(post_key)
-                    .send()
-                    .await
-                    .into_json()
-                    .await;
+                let result = client.post_like_add(post_id).send().await.into_json().await;
                 match result {
                     Ok(_result) => {
                         state.set(LikeState::Liked);

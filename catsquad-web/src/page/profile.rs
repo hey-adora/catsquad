@@ -43,6 +43,13 @@ pub fn Profile() -> impl IntoView {
             String::new()
         }
     };
+    let author_username = move || {
+        if when_tab_paws() {
+            String::new()
+        } else {
+            username()
+        }
+    };
 
     let author_state = AuthorState::new(create_client());
     let author_state_clone1 = author_state.clone();
@@ -89,7 +96,7 @@ pub fn Profile() -> impl IntoView {
                         author_state=author_state_clone1.clone()
                     />
                 </Show>
-                <Gallery class=class_gallery liked_by_username author_username=username row_height=250 />
+                <Gallery class=class_gallery liked_by_username author_username row_height=250 />
             </div>
         </main>
     }

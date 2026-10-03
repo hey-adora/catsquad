@@ -20,6 +20,7 @@ pub fn TextEditor(
     #[prop(into)] node_ref: NodeRef<html::Textarea>,
     spawner: Spawner,
     #[prop(optional)] children: Option<ChildrenFn>,
+    #[prop(default = 500.0)] min_height: f64,
 ) -> impl IntoView {
     let is_loading = move || spawner.is_busy.get();
 
@@ -96,6 +97,7 @@ pub fn TextEditor(
                     node_ref=node_ref
                     on_input=on_input
                     class="bg-base01 text-base05 px-4 py-2 rounded"
+                    min_height
                 >
                     { text }
                 </AutoTextArea>

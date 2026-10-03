@@ -1,10 +1,10 @@
 use axum::{
-    Json,
+    Extension, Json,
     extract::{Query, State},
     http::{StatusCode, header},
     response::IntoResponse,
 };
-use catsquad_db::{DbPost, DbPostSearch, DbPostSearchErr};
+use catsquad_db::{DbPost, DbPostSearch, DbPostSearchErr, DbUser};
 use catsquad_shared::{
     Order, PostSearchErr, PostSearchParams, PostSearchRes, PostState, TimeRange,
 };
@@ -22,7 +22,8 @@ pub fn from_db_post_search(value: DbPostSearch) -> PostSearchRes {
         state: PostState::from(value.state),
         title: value.title,
         tags: value.tags,
-        favorites: value.likes_count,
+        liked: value.liked,
+        likes: value.likes_count,
         description: value.description,
         image_width: value.image_width,
         image_height: value.image_height,
@@ -59,13 +60,18 @@ pub fn status_code(result: &Result<Vec<PostSearchRes>, PostSearchErr>) -> Status
 }
 
 pub async fn post_search(
+    db_user: Extension<Option<DbUser>>,
     State(app): State<AppState>,
     Query(req): Query<PostSearchParams>,
 ) -> impl IntoResponse {
     let tags = req.tags.unwrap_or_default();
-    let username = req.author_username.unwrap_or_default();
+    let user_username = db_user
+        .as_ref()
+        .map(|v| v.username.clone())
+        .unwrap_or_default();
+    let author_username = req.author_username.unwrap_or_default();
     let search_time = req.time.unwrap_or_default();
-    let liked = req.liked_by_username.unwrap_or_default();
+    let liked_by_username = req.liked_by_username.unwrap_or_default();
     // let time = req
     //     .time
     //     .map(|v| u128::from_str_radix(&v, 10).unwrap_or_default())
@@ -81,8 +87,9 @@ pub async fn post_search(
             .post_search(
                 PostState::Active,
                 tags,
-                username,
-                liked,
+                user_username,
+                author_username,
+                liked_by_username,
                 search_time,
                 limit,
                 range,
@@ -102,8 +109,9 @@ pub async fn post_search(
 
 #[cfg(test)]
 mod test_utils {
-    use crate::TestServer;
-    use catsquad_shared::{self as cs, Order, TimeRange};
+    use crate::{TestServer, auth::create_auth_cookie_str};
+    use axum::http::header;
+    use catsquad_shared::{self as cs, Order, TimeRange, Uuid, uuid_to_str};
 
     impl TestServer {
         pub async fn post_search(
@@ -115,6 +123,7 @@ mod test_utils {
             limit: usize,
             range: TimeRange,
             order: Order,
+            session_token: Uuid,
         ) -> Result<Vec<cs::PostSearchRes>, cs::PostSearchErr> {
             self.client
                 .post_search(
@@ -125,6 +134,10 @@ mod test_utils {
                     limit,
                     range,
                     order,
+                )
+                .header_add(
+                    header::COOKIE,
+                    create_auth_cookie_str(uuid_to_str(session_token)),
                 )
                 .send()
                 .await
@@ -161,6 +174,7 @@ async fn test_api_post_search() {
             10,
             TimeRange::MoreOrEqual,
             Order::ThreeTwoOne,
+            0_u128.to_be_bytes(),
         )
         .await
         .unwrap();
@@ -181,6 +195,7 @@ async fn test_api_post_search() {
             10,
             TimeRange::MoreOrEqual,
             Order::ThreeTwoOne,
+            0_u128.to_be_bytes(),
         )
         .await
         .unwrap();

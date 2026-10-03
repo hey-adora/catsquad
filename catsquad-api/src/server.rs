@@ -107,7 +107,6 @@ pub async fn app(state: AppState) -> Router {
             catsquad_shared::LINK_API_POST_FILE_STATUS_GET_BY_HASH,
             get(api::post_file_status_get_by_hash),
         )
-        .route(catsquad_shared::LINK_API_POST_SEARCH, get(api::post_search))
         .route(
             catsquad_shared::LINK_API_SESSION_ADD,
             post(api::session_add),
@@ -135,6 +134,7 @@ pub async fn app(state: AppState) -> Router {
         ));
 
     let router_optionanl_auth = Router::new()
+        .route(catsquad_shared::LINK_API_POST_SEARCH, get(api::post_search))
         .route(
             catsquad_shared::LINK_API_PASSWORD_CHANGE_ADD,
             post(api::password_change_add),
