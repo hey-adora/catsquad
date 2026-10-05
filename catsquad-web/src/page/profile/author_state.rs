@@ -167,7 +167,7 @@ async fn test_author_state() {
 
     catsquad_log::init_log();
     let _owner = crate::init_owner();
-    let server = catsquad_api::TestServer::new(0, "test_post_like_state").await;
+    let server = catsquad_api::TestServer::new(0, "test_author_state").await;
 
     let (_user1, session1) = server
         .user_add_full(

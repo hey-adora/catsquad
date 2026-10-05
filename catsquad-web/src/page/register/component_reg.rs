@@ -1,6 +1,6 @@
 use std::fmt::Debug;
 
-use crate::{Errs, PageState, hook::Spawner, page::create_client};
+use crate::{BtnPrimary, Errs, PageState, hook::Spawner, page::create_client};
 use catsquad_client::{Client, Response, Sender};
 use catsquad_shared::{UserAddErr, Uuid, str_to_uuid, validate_password, validate_username};
 use catsquad_web_utils::prelude::RwQuery;
@@ -222,9 +222,8 @@ pub fn RegisterForm() -> impl IntoView {
     // let email = Memo::new()
     let input_password = NodeRef::new();
     let input_password_confirmation = NodeRef::new();
-    let on_register = move |e: web_sys::SubmitEvent| {
-        e.prevent_default();
-
+    let on_register = move |e: web_sys::MouseEvent| {
+        // e.prevent_default();
         // , Some(invite_key)
 
         let (Some(username), Some(password), Some(password_confirmation)) = (
@@ -271,33 +270,35 @@ pub fn RegisterForm() -> impl IntoView {
     };
 
     view! {
-        <form method="POST" action="" on:submit=on_register class=move || format!("flex flex-col px-[4rem] max-w-[30rem] mx-auto w-full ")>
-            <h1 class="text-[1.5rem]  text-center my-[4rem]">"FINISH REGISTRATION"</h1>
+        <form class="flex gap-4 flex-col px-[4rem] max-w-[25rem] mx-auto w-full ">
+            <h1 class="text-[1.5rem]  text-center mt-[4rem]">"Register"</h1>
             <Errs error=move||reg.err_general.get()/>
-            <div class="flex flex-col justify-center gap-[3rem]">
+            <div class="flex flex-col justify-center gap-2">
                 <div class="flex flex-col gap-0">
                     <label for="username" class="text-[1.2rem] ">"Username"</label>
-                    <Errs error=move||reg.err_username.get()/>
-                    <input placeholder="Alice" id="username" node_ref=input_username type="text" class="border-b-2 border-base05 w-full mt-1 " />
+                    <Errs error=reg.err_username />
+                    <input placeholder="Alice" id="username" node_ref=input_username type="text" class="w-full rounded-xl bg-base01 px-2 py-1 text-base05" />
                 </div>
                 <div class="fex flex-col gap-0">
                     <label for="email_reg" class="text-[1.2rem] ">"Email"</label>
-                    <Errs error=move||reg.err_invite_key.get()/>
-                    <input value=move|| email.get() readonly placeholder=email_placeholder id="email_reg" type="text" class="border-b-2 border-base05 w-full mt-1 " />
+                    <Errs error=reg.err_invite_key />
+                    <input value=move|| email.get() readonly placeholder=email_placeholder id="email_reg" type="text" class="w-full rounded-xl bg-base01 px-2 py-1 text-base05" />
                 </div>
                 <div class="flex flex-col gap-0">
                     <label for="password" class="text-[1.2rem] ">"Password"</label>
-                    <Errs error=move||reg.err_password.get()/>
-                    <input id="password" node_ref=input_password type="password" class="border-b-2 border-base05 w-full mt-1 " />
+                    <Errs error=reg.err_password />
+                    <input id="password" node_ref=input_password type="password" class="w-full rounded-xl bg-base01 px-2 py-1 text-base05" />
                 </div>
                 <div class="flex flex-col gap-0">
                     <label for="password_confirmation" class="text-[1.3rem] ">"Password Confirmation"</label>
-                    <input id="password_confirmation" node_ref=input_password_confirmation type="password" class="border-b-2 border-base05 w-full mt-1 " />
+                    <input id="password_confirmation" node_ref=input_password_confirmation type="password" class="w-full rounded-xl bg-base01 px-2 py-1 text-base05" />
                 </div>
             </div>
-            <div class="flex flex-col gap-[1.3rem] mx-auto my-[4rem] text-center">
-                <input type="submit" value="Register" class="border-2 border-base05 text-[1.3rem] font-bold px-4 py-1 hover:bg-base05 hover:text-gray-950"/>
+            <div class="flex flex-col gap-[1.3rem] mx-auto text-center">
+                <BtnPrimary on_click=on_register >"Register"</BtnPrimary>
             </div>
         </form>
     }
 }
+
+// <input type="submit" value="Register" class="border-2 border-base05 text-[1.3rem] font-bold px-4 py-1 hover:bg-base05 hover:text-gray-950"/>

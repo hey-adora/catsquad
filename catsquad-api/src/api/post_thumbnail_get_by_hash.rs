@@ -61,7 +61,7 @@ async fn test_api_post_thumbnail_bytes_by_hash() {
     use tokio::fs::set_permissions;
 
     init_log();
-    let server = crate::TestServer::new(0, "test_api_post_file_by_hash").await;
+    let server = crate::TestServer::new(0, "test_api_post_thumbnail_bytes_by_hash").await;
 
     let (_user1, session_key1) = server
         .user_add_full("prime", "prime@heyadora.com", "1234567890111GGd11$")

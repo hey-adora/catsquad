@@ -24,9 +24,8 @@ pub enum PostUpdateStateErr {
     #[error("post not found")]
     PostNotFound,
 
-    #[error("user not found")]
-    UserNotFound,
-
+    // #[error("user not found")]
+    // UserNotFound,
     #[error("unauthorized {0}")]
     Unauthorized(String),
 

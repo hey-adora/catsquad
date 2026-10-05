@@ -57,17 +57,6 @@ pub fn link_absolute_settings_password_change_confirm(
     host.join(&relative)
 }
 
-// pub fn link_relative_settings_password_change_finished() -> String {
-//     format!(
-//         "/settings?{}={}&{}={}",
-//         SettingsPageParams::Stage,
-//         SettingsPageStage::PasswordChange,
-//         //
-//         SettingsPageParams::PasswordChangeStage,
-//         PasswordCangeStage::PasswordChangeFinished,
-//     )
-// }
-
 pub fn link_relative_settings_email_change_current_add() -> String {
     format!(
         "/settings?{}={}&{}={}",

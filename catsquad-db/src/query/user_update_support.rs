@@ -57,7 +57,7 @@ impl Db {
 async fn test_user_update_support() {
     init_log();
 
-    let db = Db::test_db(0, "test_user_update_storage").await;
+    let db = Db::test_db(0, "test_user_update_support").await;
 
     let invite1 = db.invite_add(0, "hey@heyadora.com", 1).await.unwrap();
     let user = db

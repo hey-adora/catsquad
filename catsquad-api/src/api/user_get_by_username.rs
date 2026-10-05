@@ -75,7 +75,7 @@ mod test_utils {
 async fn test_api_user_get_by_username() {
     use catsquad_log::prelude::*;
     init_log();
-    let server = crate::TestServer::new(0, "test_api_user_get_by_sessino_key").await;
+    let server = crate::TestServer::new(0, "test_api_user_get_by_username").await;
 
     let (user_add, _session_key) = server
         .user_add_full("hey", "prime@heyadora.com", "PAss$ord11111")

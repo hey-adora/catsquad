@@ -27,7 +27,7 @@ fn status_code(result: &Result<(), PostUpdateStateErr>) -> StatusCode {
         Err(PostUpdateStateErr::PostNotActive) => StatusCode::BAD_REQUEST,
         Err(PostUpdateStateErr::Unauthorized(_)) => StatusCode::UNAUTHORIZED,
         Err(PostUpdateStateErr::PostNotFound) => StatusCode::NOT_FOUND,
-        Err(PostUpdateStateErr::UserNotFound) => StatusCode::INTERNAL_SERVER_ERROR,
+        // Err(PostUpdateStateErr::UserNotFound) => StatusCode::INTERNAL_SERVER_ERROR,
         Err(PostUpdateStateErr::InternalServer) => StatusCode::INTERNAL_SERVER_ERROR,
     }
 }

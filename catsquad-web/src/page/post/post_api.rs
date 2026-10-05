@@ -4,8 +4,8 @@ use catsquad_client::{Client, Response, Sender};
 use catsquad_log::prelude::*;
 use catsquad_shared::{
     LINK_WEB_INDEX, PostGetByKeyErr, PostRemoveErr, PostState, PostUpdateDescriptionErr,
-    PostUpdateTagsErr, PostUpdateTitleErr, i64_to_str, link_relative_post_image_bytes_get_by_hash,
-    link_relative_profile_gallery, proccess_tags,
+    PostUpdateStateErr, PostUpdateTagsErr, PostUpdateTitleErr, i64_to_str,
+    link_relative_post_image_bytes_get_by_hash, link_relative_profile_gallery, proccess_tags,
 };
 use catsquad_web_utils::prelude::*;
 use leptos::prelude::*;
@@ -247,6 +247,7 @@ impl PostApi {
         TSender: Sender + Debug + Clone,
         TSender::TResponse: Response + Debug,
     {
+        self.err_general.update(|v| v.clear());
         let result = client.post_remove(post_id).send().await.into_json().await;
 
         match result {
@@ -258,7 +259,58 @@ impl PostApi {
                 self.api_state.set(PostApiState::NotFound);
             }
             Err(err) => {
-                error!("unexpected err {:#?}", { err });
+                let err = format!("unexpected err {:#?}", { err });
+                error!(err);
+                self.err_general.set(err);
+            }
+        }
+
+        None
+    }
+
+    pub async fn toggle_state<TSender>(&self, client: &Client<TSender>, post_id: i64) -> Option<()>
+    where
+        TSender: Sender + Debug + Clone,
+        TSender::TResponse: Response + Debug,
+    {
+        let state = match self.post_state.get_untracked()? {
+            PostState::Draft => return None,
+            PostState::Active => PostState::Hidden,
+            PostState::Hidden => PostState::Active,
+        };
+        self.update_state(client, post_id, state).await
+    }
+
+    pub async fn update_state<TSender>(
+        &self,
+        client: &Client<TSender>,
+        post_id: i64,
+        state: PostState,
+    ) -> Option<()>
+    where
+        TSender: Sender + Debug + Clone,
+        TSender::TResponse: Response + Debug,
+    {
+        self.err_general.update(|v| v.clear());
+        let result = client
+            .post_update_state(post_id, state)
+            .send()
+            .await
+            .into_json()
+            .await;
+
+        match result {
+            Ok(_) => {
+                let _ = self.post_state.try_set(Some(state));
+                return Some(());
+            }
+            Err(PostUpdateStateErr::PostNotFound) => {
+                self.api_state.set(PostApiState::NotFound);
+            }
+            Err(err) => {
+                let err = format!("unexpected err {:#?}", { err });
+                error!(err);
+                self.err_general.set(err);
             }
         }
 
@@ -547,5 +599,34 @@ pub mod tests {
         post_api.init(&app.client, post_id).await;
         assert_eq!(post_api.title.get_untracked(), "title");
         assert_ne!(post_api.author_username.get_untracked(), "");
+    }
+
+    #[tokio::test]
+    pub async fn hook_post_api_state() {
+        let (_owner, app, post_id) = post_setup("hook_post_api_state", "title", "", "").await;
+
+        let post_api = PostApi::new();
+        post_api.init(&app.client, post_id).await;
+
+        assert_eq!(post_api.post_state.get_untracked(), Some(PostState::Active));
+
+        post_api.toggle_state(&app.client, post_id).await.unwrap();
+
+        assert_eq!(post_api.post_state.get_untracked(), Some(PostState::Hidden));
+
+        assert!(post_api.err_general.get_untracked().is_empty());
+
+        let result = post_api
+            .update_state(&app.client, post_id, PostState::Hidden)
+            .await;
+
+        assert!(result.is_none());
+        assert!(!post_api.err_general.get_untracked().is_empty());
+        assert_eq!(post_api.post_state.get_untracked(), Some(PostState::Hidden));
+
+        post_api.toggle_state(&app.client, post_id).await.unwrap();
+
+        assert!(post_api.err_general.get_untracked().is_empty());
+        assert_eq!(post_api.post_state.get_untracked(), Some(PostState::Active));
     }
 }

@@ -34,28 +34,16 @@ pub fn Register() -> impl IntoView {
                     </div>
                 </Show>
                 <Show when=move || !register_spawner.is_busy.get() && stage().is_check_email()>
-                    <div class=move||"mx-auto flex flex-col gap-2 text-center">
-                        <h1 class="text-[1.5rem] my-[4rem]">"VERIFY EMAIL"</h1>
-                        <p class="max-w-[30rem]">"Verification email was sent to \""{ move || email.get() }"\" click the confirmtion link in the email."</p>
+                    <div class="mx-auto flex flex-col gap-4 text-center">
+                        <h1 class="text-[1.5rem] mt-[4rem]">"Verify Email"</h1>
+                        <p class="max-w-[25rem]">"Verification email was sent to \""{ move || email.get() }"\" click the confirmtion link in the email."</p>
                     </div>
                 </Show>
                 <Show when=move|| !register_spawner.is_busy.get() && stage().is_invite()>
                     <InviteForm/>
-                    // <form method="POST" action="" on:submit=reg.on_invite.to_fn() class=move || format!("flex flex-col px-[4rem] max-w-[30rem] mx-auto w-full {}", if reg.stage.get_or_default().is_none() && !api.is_pending_tracked() {""} else {"hidden"})>
-                    //     <h1 class="text-[1.5rem]  text-center my-[4rem]">"REGISTRATION"</h1>
-                    //     <div class=move||format!("text-red-600 text-center {}", if reg.err_general.is_some() {""} else {"hidden"})>{move || { reg.err_general.get_or_default() }}</div>
-                    //     <div class="flex flex-col gap-0">
-                    //         <label for="email_invite" class="text-[1.2rem] ">"Email"</label>
-                    //         <input placeholder="alice@mail.com" id="email_invite" node_ref=register_email type="text" class="border-b-2 border-base05 w-full mt-1 " />
-                    //     </div>
-                    //     <div class="flex flex-col gap-[1.3rem] mx-auto my-[4rem] text-center">
-                    //         <input type="submit" value="Register" class="border-2 border-base05 text-[1.3rem] font-bold px-4 py-1 hover:bg-base05 hover:text-gray-950"/>
-                    //     </div>
-                    // </form>
                 </Show>
                 <Show when=move|| !register_spawner.is_busy.get() && stage().is_register()>
                     <RegisterForm/>
-                    //
                 </Show>
             </div>
         </main>
