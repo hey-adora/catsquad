@@ -11,7 +11,7 @@ pub mod utils;
 // pub mod validation;
 // pub mod web;
 
-#[cfg(test)]
+#[cfg(any(test, feature = "test_server"))]
 use std::os::unix::fs::MetadataExt;
 
 pub use server::server;
@@ -21,19 +21,22 @@ mod test_server;
 #[cfg(any(test, feature = "test_server"))]
 pub use test_server::TestServer;
 
-#[cfg(test)]
+#[cfg(any(test, feature = "test_server"))]
 pub async fn get_file_size(file_path: impl AsRef<std::path::Path>) -> u32 {
     let file = tokio::fs::metadata(file_path).await.unwrap();
     file.size() as u32
 }
 
-#[cfg(test)]
+#[cfg(any(test, feature = "test_server"))]
 pub async fn get_file_hash_for_testing_by_path(file_path: impl AsRef<std::path::Path>) -> i64 {
+    use catsquad_log::prelude::*;
+    let file_path = file_path.as_ref();
+    trace!("get_file_hash_for_testing_by_path {file_path:?}");
     let file = tokio::fs::read(file_path).await.unwrap();
     get_file_hash_for_testing(&file)
 }
 
-#[cfg(test)]
+#[cfg(any(test, feature = "test_server"))]
 pub fn get_file_hash_for_testing(file: &[u8]) -> i64 {
     use std::hash::Hasher;
     // let file = tokio::fs::read(file_path.as_ref()).await.unwrap();

@@ -3,7 +3,7 @@ use std::fmt::Debug;
 use catsquad_client::{Client, Response, SchrodingersImage, Sender};
 use catsquad_log::prelude::*;
 use catsquad_shared::{
-    PostAddErr, PostImage, PostState, i64_to_str, link_relative_post, validate_post_description,
+    PostAddErr, FileImage, PostState, i64_to_str, link_relative_post, validate_post_description,
     validate_post_tags, validate_post_title,
 };
 use leptos::prelude::*;

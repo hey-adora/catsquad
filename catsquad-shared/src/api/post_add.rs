@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use crate::{MAX_POST_DESCRIPTION_LENGTH, MAX_POST_TAGS_LENGTH, MAX_POST_TITLE_LENGTH};
+use crate::{FileImage, MAX_POST_DESCRIPTION_LENGTH, MAX_POST_TAGS_LENGTH, MAX_POST_TITLE_LENGTH};
 use catsquad_log::prelude::*;
 
 pub const LINK_API_POST_ADD: &str = "/api/post";
@@ -14,7 +14,7 @@ pub struct PostRes {
     pub description: String,
     pub tags: String,
     pub favorites: u32,
-    pub images: Vec<PostImage>,
+    pub images: Vec<FileImage>,
     pub modified_at: u64,
     pub created_at: u64,
 }
@@ -100,16 +100,6 @@ impl Display for PostState {
         };
         write!(f, "{}", s)
     }
-}
-
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
-pub struct PostImage {
-    pub extension: String,
-    pub hash: i64,
-    pub proccesed: bool,
-    pub size_bytes: u32,
-    pub width: u32,
-    pub height: u32,
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]

@@ -1,23 +1,10 @@
-use std::{fmt::Debug, marker::PhantomData, sync::Arc};
-
-use axum::{
-    Router,
-    body::Body,
-    http::{self, HeaderName, Request, Response, StatusCode, header},
-};
-use axum_test::Transport;
-use catsquad_client::{AxumTestSender, Client, Error, Sender};
+use crate::{proccess_images::storage_file_path, server::app, state::AppState};
+use axum::http::HeaderName;
+use catsquad_client::{AxumTestSender, Client};
 use catsquad_db::{DbEmailSent, DbEmailSentReason};
-use catsquad_shared::ToForm;
+use catsquad_shared::i64_to_str;
+use std::{path::PathBuf, sync::Arc};
 use tokio::sync::RwLock;
-use tower::{Service, ServiceExt};
-
-use crate::{
-    auth::{auth_token_get, create_auth_cookie_str},
-    server::app,
-    state::AppState,
-};
-use catsquad_log::prelude::*;
 
 #[derive(Clone)]
 pub struct TestServer {
@@ -28,187 +15,29 @@ pub struct TestServer {
     pub state: AppState,
 }
 
-// #[derive(Clone)]
-// pub struct TestClient {
-//     // app: Router,
-//     server: Arc<axum_test::TestServer>,
-//     pub session_key: Arc<RwLock<String>>,
-// }
-
-// #[derive(Debug)]
-// pub struct HttpTestRes<R, E>
-// where
-//     R: for<'a> serde::Deserialize<'a> + Debug,
-//     E: for<'a> serde::Deserialize<'a> + Debug + Default,
-// {
-//     response: Result<Response<Body>, SendErr>,
-//     debug_data: Option<HttpTestResDebug>,
-//     phantom: PhantomData<(R, E)>,
-// }
-
-// #[derive(Clone, Debug)]
-// pub struct HttpTestResDebug {
-//     method: catsquad_client::Method,
-//     status: http::StatusCode,
-//     path: String,
-// }
-
-// impl<R, E> HttpTestRes<R, E>
-// where
-//     R: for<'a> serde::Deserialize<'a> + Debug,
-//     E: for<'a> serde::Deserialize<'a> + Debug + Default,
-// {
-//     pub fn new(res: Result<Response<Body>, SendErr>) -> Self {
-//         Self {
-//             response: res,
-//             debug_data: None,
-//             phantom: PhantomData,
-//         }
-//     }
-
-//     pub fn get_auth_token(&self) -> Option<String> {
-//         let headers = self.response.as_ref().ok()?.headers().clone();
-//         let token = auth_token_get(&headers, header::SET_COOKIE);
-//         token
-//     }
-
-//     pub async fn into_res(self) -> Result<R, E> {
-//         let body = self.response.map_err(|_err| E::default())?.into_body();
-//         let debug_method = self
-//             .debug_data
-//             .as_ref()
-//             .map(|v| v.method.to_string())
-//             .unwrap_or_default();
-//         let debug_status = self
-//             .debug_data
-//             .as_ref()
-//             .map(|v| v.status.to_string())
-//             .unwrap_or_default();
-//         let debug_path = self
-//             .debug_data
-//             .as_ref()
-//             .map(|v| v.path.to_string())
-//             .unwrap_or_default();
-
-//         let bytes = axum::body::to_bytes(body, usize::MAX)
-//             .await
-//             .map_err(|_err| E::default())?;
-//         let result = serde_json::from_slice(&bytes).map_err(|_err| E::default())?;
-//         let debug_lossy = String::from_utf8_lossy(&bytes);
-//         debug!(
-//             "CLIENT RECV {} {} {}\n{}\n{:#?}",
-//             debug_method, debug_status, debug_path, debug_lossy, result
-//         );
-//         result
-//     }
-// }
-
-// impl HttpClient for TestClient {
-//     type Res<
-//         R: for<'a> serde::Deserialize<'a> + Debug,
-//         E: for<'a> serde::Deserialize<'a> + Debug + Default,
-//     > = HttpTestRes<R, E>;
-
-//     async fn req<R, E, Req>(
-//         &self,
-//         method: catsquad_client::Method,
-//         path: impl AsRef<str>,
-//         body_type: BodyType,
-//         body: Option<Req>,
-//     ) -> Self::Res<R, E>
-//     where
-//         R: for<'a> serde::Deserialize<'a> + Debug,
-//         E: for<'a> serde::Deserialize<'a> + Debug + Default,
-//         Req: serde::Serialize + Debug,
-//     {
-//         let path = path.as_ref();
-//         debug!("CLIENT SEND {} {}\n{:#?}", method, path, &body);
-//         let inner = async || -> Result<(HttpTestResDebug, Response<Body>), SendErr> {
-//             let body = match body {
-//                 Some(v) => Body::from(
-//                     v.to_form()
-//                         .map_err(|err| SendErr::Serialize(err.to_string()))?,
-//                 ),
-//                 None => Body::empty(),
-//             };
-//             let req = match method {
-//                 catsquad_client::Method::Post => Request::post(path),
-//                 catsquad_client::Method::Get => Request::get(path),
-//             };
-//             let req = match body_type {
-//                 BodyType::None => req,
-//                 BodyType::Form => req.header(
-//                     http::header::CONTENT_TYPE,
-//                     "application/x-www-form-urlencoded",
-//                 ),
-//             };
-
-//             let session_key = self.session_key.read().await;
-//             let req = if !session_key.is_empty() {
-//                 req.header(header::COOKIE, create_auth_cookie_str(&*session_key))
-//             } else {
-//                 req
-//             };
-
-//             let req = req.body(body).unwrap();
-//             let res = self.app.clone().oneshot(req).await.unwrap();
-//             let status = res.status();
-
-//             let debug = HttpTestResDebug {
-//                 method,
-//                 status,
-//                 path: path.to_string(),
-//             };
-
-//             Ok((debug, res))
-//         };
-
-//         let res = inner().await;
-//         let res = match res {
-//             Ok((debug, res)) => {
-//                 let res = Ok(res);
-//                 let mut res = Self::Res::new(res);
-//                 res.debug_data = Some(debug);
-//                 res
-//             }
-//             Err(err) => {
-//                 let res = Err(err);
-//                 let res = Self::Res::new(res);
-//                 res
-//             }
-//         };
-
-//         res
-//     }
-// }
+#[derive(Clone, Debug)]
+pub struct TestImg {
+    pub hash: i64,
+    pub saved_path: PathBuf,
+    pub storage_path: PathBuf,
+    pub thumbnail_path: PathBuf,
+}
 
 impl TestServer {
     pub async fn new(time: u64, test_db: &str) -> Self {
         let state = AppState::mem(time, test_db).await;
         let router = app(state.clone()).await;
-        // let config = axum_test::TestServerConfig {
-        //     transport: Some(Transport::HttpRandomPort),
-        //     ..Default::default()
-        // };
-        // let server = axum_test::TestServer::new_with_config(router, config);
+
         let server = axum_test::TestServer::new(router);
         let server = Arc::new(server);
         let inject_headers = Arc::new(RwLock::new(Vec::new()));
-        // let origin = server.server_address().map(|v| v.to_string()).unwrap();
-        // trace!("origin {origin}");
+
         let client = Client::new(AxumTestSender::new(server.clone(), inject_headers.clone()));
-        // let client = Client::new(TestClient {
-        //     // app: router.clone(),
-        //     server: server.clone(),
-        //     session_key: Arc::new(RwLock::new(String::new())),
-        // });
         Self {
-            // app: router,
             server,
             state,
             client,
             inject_headers,
-            // client,
         }
     }
 
@@ -244,208 +73,34 @@ impl TestServer {
             .collect::<Vec<DbEmailSent>>()
     }
 
-    // pub async fn get_raw(&self, path: impl AsRef<str>) -> Response<Body> {
-    //     let path = path.as_ref();
-    //     debug!("CLIENT SEND GET {}", path);
+    pub async fn create_img_input(&self, i: usize) -> TestImg {
+        use crate::get_file_hash_for_testing_by_path;
+        use crate::proccess_images::thumbnail_file_path;
+        use catsquad_log::prelude::*;
+        use catsquad_seed::create_img;
 
-    //     let req = Request::get(path).body(Body::empty()).unwrap();
-    //     let res = self.app.clone().oneshot(req).await.unwrap();
+        let tmp_path = self.state.get_tmp_path().await;
+        let storage_path = self.state.get_storage_path().await;
+        let saved_path = tmp_path.join(format!("input{i}.png"));
 
-    //     debug!("CLIENT RECV GET {} {} {}", res.status(), path, "uwknown");
+        create_img(saved_path.clone(), i.to_string());
 
-    //     res
-    // }
+        let hash = get_file_hash_for_testing_by_path(saved_path.clone()).await;
+        let hash_str = i64_to_str(hash);
+        let input_storage_path = storage_file_path(storage_path.clone(), &hash_str, "png");
+        let input_thumbnail_path = thumbnail_file_path(storage_path.clone(), hash_str);
 
-    // pub async fn get_str(&self, path: impl AsRef<str>) -> (Option<String>, StatusCode) {
-    //     let path = path.as_ref();
-    //     debug!("CLIENT SEND GET {}", path);
+        trace!("{saved_path:?}");
 
-    //     let req = Request::get(path).body(Body::empty()).unwrap();
-    //     let res = self.app.clone().oneshot(req).await.unwrap();
-    //     let status = res.status();
-    //     let body = res.into_body();
-    //     let bytes = axum::body::to_bytes(body, usize::MAX).await.unwrap();
-    //     let s = String::from_utf8(bytes.to_vec()).ok();
+        assert!(saved_path.exists());
+        assert!(!input_storage_path.exists());
+        assert!(!input_thumbnail_path.exists());
 
-    //     debug!("CLIENT RECV GET {} {} {:?}", status, path, s);
-
-    //     (s, status)
-    // }
-
-    // pub async fn get<T: for<'a> serde::Deserialize<'a>>(&self, path: impl AsRef<str>) -> T {
-    //     let path = path.as_ref();
-    //     debug!("CLIENT SEND GET {}", path);
-
-    //     let req = Request::get(path).body(Body::empty()).unwrap();
-
-    //     let res = self.app.clone().oneshot(req).await.unwrap();
-    //     let status = res.status();
-    //     let body = res.into_body();
-    //     let bytes = axum::body::to_bytes(body, usize::MAX).await.unwrap();
-
-    //     debug!(
-    //         "CLIENT RECV GET {} {} {}",
-    //         status,
-    //         path,
-    //         String::from_utf8_lossy(&bytes)
-    //     );
-
-    //     serde_json::from_slice(&bytes).unwrap()
-    // }
-
-    // pub async fn post<T: for<'a> serde::Deserialize<'a>>(
-    //     &self,
-    //     path: impl AsRef<str>,
-    //     data: impl Into<String>,
-    // ) -> T {
-    //     let path = path.as_ref();
-    //     let data = data.into();
-    //     debug!("CLIENT SEND POST {} {}", path, &data);
-
-    //     let req = Request::post(path)
-    //         .header(
-    //             http::header::CONTENT_TYPE,
-    //             "application/x-www-form-urlencoded",
-    //         )
-    //         .body(Body::from(data))
-    //         .unwrap();
-    //     let res = self.app.clone().oneshot(req).await.unwrap();
-    //     let status = res.status();
-    //     let body = res.into_body();
-    //     let bytes = axum::body::to_bytes(body, usize::MAX).await.unwrap();
-
-    //     debug!(
-    //         "CLIENT RECV POST {} {} {}",
-    //         status,
-    //         path,
-    //         String::from_utf8_lossy(&bytes)
-    //     );
-
-    //     serde_json::from_slice(&bytes).unwrap()
-    // }
-
-    // pub async fn post_auth_empty<T: for<'a> serde::Deserialize<'a>>(
-    //     &self,
-    //     path: impl AsRef<str>,
-    //     session_key: impl AsRef<str>,
-    // ) -> (T, StatusCode) {
-    //     let session_key = session_key.as_ref();
-    //     let path = path.as_ref();
-    //     debug!("CLIENT SEND POST AUTH {} Body::empty()", path);
-
-    //     let req = Request::post(path)
-    //         .header(header::COOKIE, create_auth_cookie_str(session_key))
-    //         .body(Body::empty())
-    //         .unwrap();
-    //     let res = self.app.clone().oneshot(req).await.unwrap();
-    //     let status = res.status();
-    //     let body = res.into_body();
-    //     let bytes = axum::body::to_bytes(body, usize::MAX).await.unwrap();
-
-    //     debug!(
-    //         "CLIENT RECV POST AUTH {} {} {}",
-    //         status,
-    //         path,
-    //         String::from_utf8_lossy(&bytes)
-    //     );
-
-    //     (serde_json::from_slice(&bytes).unwrap(), status)
-    // }
-
-    // pub async fn post_auth<T: for<'a> serde::Deserialize<'a>>(
-    //     &self,
-    //     path: impl AsRef<str>,
-    //     data: impl Into<String>,
-    //     session_key: impl AsRef<str>,
-    // ) -> (T, StatusCode) {
-    //     let session_key = session_key.as_ref();
-    //     let path = path.as_ref();
-    //     let data = data.into();
-    //     debug!("CLIENT SEND POST AUTH {} {}", path, &data);
-
-    //     let req = Request::post(path)
-    //         .header(header::CONTENT_TYPE, "application/x-www-form-urlencoded")
-    //         .header(header::COOKIE, create_auth_cookie_str(session_key))
-    //         .body(Body::from(data))
-    //         .unwrap();
-    //     let res = self.app.clone().oneshot(req).await.unwrap();
-    //     let status = res.status();
-    //     let body = res.into_body();
-    //     let bytes = axum::body::to_bytes(body, usize::MAX).await.unwrap();
-
-    //     debug!(
-    //         "CLIENT RECV POST AUTH {} {} {}",
-    //         status,
-    //         path,
-    //         String::from_utf8_lossy(&bytes)
-    //     );
-
-    //     (serde_json::from_slice(&bytes).unwrap(), status)
-    // }
-
-    // pub async fn get_auth<T: for<'a> serde::Deserialize<'a>>(
-    //     &self,
-    //     path: impl AsRef<str>,
-    //     session_key: impl AsRef<str>,
-    //     // data: impl Into<String>,
-    // ) -> (T, StatusCode) {
-    //     let session_key = session_key.as_ref();
-    //     let path = path.as_ref();
-    //     // let data = data.into();
-    //     debug!("CLIENT SEND GET AUTH {}", path);
-
-    //     let req = Request::get(path)
-    //         // .header(header::CONTENT_TYPE, "application/x-www-form-urlencoded")
-    //         .header(header::COOKIE, create_auth_cookie_str(session_key))
-    //         .body(Body::empty())
-    //         .unwrap();
-    //     let res = self.app.clone().oneshot(req).await.unwrap();
-    //     let status = res.status();
-    //     let body = res.into_body();
-    //     let bytes = axum::body::to_bytes(body, usize::MAX).await.unwrap();
-
-    //     debug!(
-    //         "CLIENT RECV GET AUTH {} {} {}",
-    //         status,
-    //         path,
-    //         String::from_utf8_lossy(&bytes)
-    //     );
-
-    //     (serde_json::from_slice(&bytes).unwrap(), status)
-    // }
-
-    // pub async fn post_and_get_auth_token<T: for<'a> serde::Deserialize<'a>>(
-    //     &self,
-    //     path: impl AsRef<str>,
-    //     data: impl Into<String>,
-    // ) -> (T, Option<String>) {
-    //     let path = path.as_ref();
-    //     let data = data.into();
-    //     debug!("CLIENT SEND POST {} {}", path, &data);
-
-    //     let req = Request::post(path)
-    //         .header(
-    //             http::header::CONTENT_TYPE,
-    //             "application/x-www-form-urlencoded",
-    //         )
-    //         .body(Body::from(data))
-    //         .unwrap();
-    //     let res = self.app.clone().oneshot(req).await.unwrap();
-    //     let headers = res.headers().clone();
-    //     let token = auth_token_get(&headers, header::SET_COOKIE);
-    //     let status = res.status();
-    //     let body = res.into_body();
-    //     let bytes = axum::body::to_bytes(body, usize::MAX).await.unwrap();
-
-    //     debug!(
-    //         "CLIENT RECV POST {} {} {:?} {}",
-    //         status,
-    //         path,
-    //         headers,
-    //         String::from_utf8_lossy(&bytes)
-    //     );
-    //     let result = serde_json::from_slice(&bytes).unwrap();
-
-    //     (result, token)
-    // }
+        TestImg {
+            hash,
+            saved_path,
+            storage_path: input_storage_path,
+            thumbnail_path: input_thumbnail_path,
+        }
+    }
 }

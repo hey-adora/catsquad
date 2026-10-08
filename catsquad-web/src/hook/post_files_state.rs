@@ -3,7 +3,7 @@ use catsquad_client::{Client, Response, SchrodingersImage, Sender};
 use catsquad_log::prelude::*;
 #[cfg(test)]
 use catsquad_shared::PostRes;
-use catsquad_shared::{PostImage, i64_to_str, str_to_i64};
+use catsquad_shared::{FileImage, i64_to_str, str_to_i64};
 use leptos::prelude::*;
 use std::fmt::{Debug, Display};
 // TODO add test for REMOVE when error
@@ -160,8 +160,8 @@ impl From<&str> for ParsedPostImage {
     }
 }
 
-impl From<PostImage> for ParsedPostImage {
-    fn from(value: PostImage) -> Self {
+impl From<FileImage> for ParsedPostImage {
+    fn from(value: FileImage) -> Self {
         Self {
             name: value.hash.to_string(),
             hash: value.hash,

@@ -6,9 +6,6 @@ pub enum DbUserUpdateUsernameErr {
     #[error("username already used")]
     UsernameAlreadyUsed,
 
-    #[error("user not found")]
-    UserNotFound,
-
     #[error("DB error {0}")]
     Db(#[from] sqlx::Error),
 }
@@ -42,9 +39,6 @@ impl Db {
                 if err.is_unique_violation() && err.constraint() == Some("users_pkey") =>
             {
                 return Err(DbUserUpdateUsernameErr::UsernameAlreadyUsed);
-            }
-            Err(sqlx::Error::RowNotFound) => {
-                return Err(DbUserUpdateUsernameErr::UserNotFound);
             }
             Err(err) => {
                 error!("unexpected db error {err}");

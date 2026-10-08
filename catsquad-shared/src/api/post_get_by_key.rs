@@ -1,4 +1,4 @@
-use crate::{PostImage, PostState};
+use crate::{FileImage, PostState};
 
 pub const LINK_API_POST_GET_BY_ID: &str = "/api/post/{post_id}";
 

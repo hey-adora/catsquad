@@ -9,7 +9,6 @@ use crate::{auth::verify_password, state::AppState};
 
 fn from_db_user_update_username_err(value: DbUserUpdateUsernameErr) -> UserUpdateUsernameErr {
     match value {
-        DbUserUpdateUsernameErr::UserNotFound => UserUpdateUsernameErr::UserNotFound,
         DbUserUpdateUsernameErr::UsernameAlreadyUsed => UserUpdateUsernameErr::UsernameAlreadyUsed,
         DbUserUpdateUsernameErr::Db(_) => UserUpdateUsernameErr::InternalServer,
     }

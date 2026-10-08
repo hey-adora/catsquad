@@ -6,7 +6,7 @@ use axum::{
 };
 use catsquad_db::{DbFileImage, DbPostGet, DbPostGetByKeyErr, DbUser};
 use catsquad_log::prelude::*;
-use catsquad_shared::{PostGetByKeyErr, PostGetByKeyParams, PostImage, PostRes, PostState};
+use catsquad_shared::{PostGetByKeyErr, PostGetByKeyParams, FileImage, PostRes, PostState};
 
 use crate::state::AppState;
 
@@ -35,8 +35,8 @@ pub fn from_db_post_get(value: DbPostGet) -> PostRes {
     }
 }
 
-pub fn from_db_post_file(value: DbFileImage) -> PostImage {
-    PostImage {
+pub fn from_db_post_file(value: DbFileImage) -> FileImage {
+    FileImage {
         extension: value.extension,
         hash: value.hash,
         proccesed: value.processed,

@@ -15,8 +15,9 @@ use bytes::Bytes;
 use catsquad_db::{DbPostUpdateImageAddErr, DbUser};
 use catsquad_log::prelude::*;
 use catsquad_shared::{
-    POST_UPDATE_IMAGE_ADD_PARAMS_FIELD_POST_ID, PostImage, PostUpdateImageAddErr,
-    PostUpdateImageAddParams, SUPPORTED_IMAGE_EXTENSIONS, u128_to_str, uuid_to_str,
+    FileImage, FileImageAddErr, POST_UPDATE_IMAGE_ADD_PARAMS_FIELD_POST_ID, PostUpdateImageAddErr,
+    PostUpdateImageAddParams, PostUpdateImageAddRes, SUPPORTED_IMAGE_EXTENSIONS, i64_to_str,
+    u128_to_str, uuid_to_str,
 };
 use futures::{Stream, TryStreamExt};
 use futures_util::StreamExt;
@@ -33,16 +34,20 @@ use crate::{
 
 fn from_db_post_update_image_add(value: DbPostUpdateImageAddErr) -> PostUpdateImageAddErr {
     match value {
-        DbPostUpdateImageAddErr::OutOfStorage => PostUpdateImageAddErr::ImageTooBig {
-            image_name: "uwnkown".to_string(),
-            max: 0,
-            got: 0,
-        },
-        DbPostUpdateImageAddErr::ImageTooBig => PostUpdateImageAddErr::ImageTooBig {
-            image_name: "uwnkown".to_string(),
-            max: 0,
-            got: 0,
-        },
+        DbPostUpdateImageAddErr::OutOfStorage => {
+            PostUpdateImageAddErr::Image(FileImageAddErr::ImageTooBig {
+                image_name: "uwnkown".to_string(),
+                max: 0,
+                got: 0,
+            })
+        }
+        DbPostUpdateImageAddErr::ImageTooBig => {
+            PostUpdateImageAddErr::Image(FileImageAddErr::ImageTooBig {
+                image_name: "uwnkown".to_string(),
+                max: 0,
+                got: 0,
+            })
+        }
         DbPostUpdateImageAddErr::PostNotFound => PostUpdateImageAddErr::PostNotFound,
         DbPostUpdateImageAddErr::ImageAlreadyExists => PostUpdateImageAddErr::Duplicate,
         DbPostUpdateImageAddErr::Unauthorized => {
@@ -53,19 +58,33 @@ fn from_db_post_update_image_add(value: DbPostUpdateImageAddErr) -> PostUpdateIm
     }
 }
 
-fn status_code(result: &Result<Vec<PostImage>, PostUpdateImageAddErr>) -> StatusCode {
+fn status_code(result: &Result<PostUpdateImageAddRes, PostUpdateImageAddErr>) -> StatusCode {
     match result {
         Ok(_) => StatusCode::OK,
         Err(PostUpdateImageAddErr::NotImagesFound) => StatusCode::BAD_REQUEST,
         Err(PostUpdateImageAddErr::Duplicate) => StatusCode::BAD_REQUEST,
         Err(PostUpdateImageAddErr::ParamNotFoundPostId) => StatusCode::BAD_REQUEST,
-        Err(PostUpdateImageAddErr::ReadingResolutionErr(..)) => StatusCode::BAD_REQUEST,
-        Err(PostUpdateImageAddErr::InvalidResolution { .. }) => StatusCode::BAD_REQUEST,
-        Err(PostUpdateImageAddErr::IoErr(_)) => StatusCode::INTERNAL_SERVER_ERROR,
-        Err(PostUpdateImageAddErr::StreamErr(_)) => StatusCode::INTERNAL_SERVER_ERROR,
-        Err(PostUpdateImageAddErr::ImageTooBig { .. }) => StatusCode::BAD_REQUEST,
-        Err(PostUpdateImageAddErr::ImageHasNoExtension(_)) => StatusCode::BAD_REQUEST,
-        Err(PostUpdateImageAddErr::UnsupportedExtension(_)) => StatusCode::BAD_REQUEST,
+        Err(PostUpdateImageAddErr::Image(FileImageAddErr::ReadingResolutionErr(..))) => {
+            StatusCode::BAD_REQUEST
+        }
+        Err(PostUpdateImageAddErr::Image(FileImageAddErr::InvalidResolution { .. })) => {
+            StatusCode::BAD_REQUEST
+        }
+        Err(PostUpdateImageAddErr::Image(FileImageAddErr::IoErr(_))) => {
+            StatusCode::INTERNAL_SERVER_ERROR
+        }
+        Err(PostUpdateImageAddErr::Image(FileImageAddErr::StreamErr(_))) => {
+            StatusCode::INTERNAL_SERVER_ERROR
+        }
+        Err(PostUpdateImageAddErr::Image(FileImageAddErr::ImageTooBig { .. })) => {
+            StatusCode::BAD_REQUEST
+        }
+        Err(PostUpdateImageAddErr::Image(FileImageAddErr::ImageHasNoExtension(_))) => {
+            StatusCode::BAD_REQUEST
+        }
+        Err(PostUpdateImageAddErr::Image(FileImageAddErr::UnsupportedExtension(_))) => {
+            StatusCode::BAD_REQUEST
+        }
         Err(PostUpdateImageAddErr::PostNotFound) => StatusCode::NOT_FOUND,
         Err(PostUpdateImageAddErr::Unauthorized(_)) => StatusCode::UNAUTHORIZED,
         Err(PostUpdateImageAddErr::InternalServer) => StatusCode::INTERNAL_SERVER_ERROR,
@@ -82,6 +101,7 @@ fn params_req(value: RawPathParams) -> Result<PostUpdateImageAddParams, PostUpda
         })
 }
 
+#[derive(Clone, Debug)]
 pub struct Image {
     pub saved_image: SavedImage,
     pub extension: String,
@@ -98,12 +118,12 @@ pub async fn parse_multipart(
     max_storage: u32,
     max_storage_per_image: u32,
     mut used_storage: u32,
-) -> Result<Vec<Image>, PostUpdateImageAddErr> {
+) -> Result<Vec<Image>, FileImageAddErr> {
     let mut images = Vec::new();
     let storage_path = storage_path.as_ref();
     let tmp_path = tmp_path.as_ref();
 
-    let mut inner = async || -> Result<(), PostUpdateImageAddErr> {
+    let mut inner = async || -> Result<(), FileImageAddErr> {
         while let Ok(Some(field)) = multipart.next_field().await {
             let image_name = if let Some(image_name) = field.file_name() {
                 image_name.to_owned()
@@ -113,17 +133,13 @@ pub async fn parse_multipart(
 
             let Some(extension) = Path::new(&image_name).extension().and_then(|v| v.to_str())
             else {
-                return Err(PostUpdateImageAddErr::ImageHasNoExtension(
-                    image_name.to_string(),
-                ));
+                return Err(FileImageAddErr::ImageHasNoExtension(image_name.to_string()));
             };
             let is_supported = SUPPORTED_IMAGE_EXTENSIONS
                 .into_iter()
                 .any(|v| *v == extension);
             if !is_supported {
-                return Err(PostUpdateImageAddErr::UnsupportedExtension(
-                    extension.to_string(),
-                ));
+                return Err(FileImageAddErr::UnsupportedExtension(extension.to_string()));
             }
 
             let storage_left = max_storage.saturating_sub(used_storage);
@@ -141,15 +157,13 @@ pub async fn parse_multipart(
                         SaveImageErr::ImageTooBig {
                             got_bytes,
                             max_bytes,
-                        } => PostUpdateImageAddErr::ImageTooBig {
+                        } => FileImageAddErr::ImageTooBig {
                             image_name: image_name.to_string(),
                             max: max_bytes,
                             got: got_bytes,
                         },
-                        SaveImageErr::IoErr(err) => PostUpdateImageAddErr::IoErr(err.to_string()),
-                        SaveImageErr::StreamErr(err) => {
-                            PostUpdateImageAddErr::StreamErr(err.to_string())
-                        }
+                        SaveImageErr::IoErr(err) => FileImageAddErr::IoErr(err.to_string()),
+                        SaveImageErr::StreamErr(err) => FileImageAddErr::StreamErr(err.to_string()),
                     })?;
 
             let result = get_img_resolution(image.saved_path.to_str().unwrap()).await;
@@ -158,16 +172,16 @@ pub async fn parse_multipart(
                 Err(err) => {
                     tokio::fs::remove_file(&image.saved_path)
                         .await
-                        .map_err(|err| PostUpdateImageAddErr::IoErr(err.to_string()))?;
-                    return Err(PostUpdateImageAddErr::ReadingResolutionErr(err.to_string()));
+                        .map_err(|err| FileImageAddErr::IoErr(err.to_string()))?;
+                    return Err(FileImageAddErr::ReadingResolutionErr(err.to_string()));
                 }
             };
 
             if width == 0 || height == 0 {
                 tokio::fs::remove_file(&image.saved_path)
                     .await
-                    .map_err(|err| PostUpdateImageAddErr::IoErr(err.to_string()))?;
-                return Err(PostUpdateImageAddErr::InvalidResolution { width, height });
+                    .map_err(|err| FileImageAddErr::IoErr(err.to_string()))?;
+                return Err(FileImageAddErr::InvalidResolution { width, height });
             }
 
             used_storage += image.size_bytes;
@@ -189,7 +203,7 @@ pub async fn parse_multipart(
             let path = image.saved_image.saved_path;
             fs::remove_file(&path)
                 .await
-                .map_err(|err| PostUpdateImageAddErr::IoErr(err.to_string()))?;
+                .map_err(|err| FileImageAddErr::IoErr(err.to_string()))?;
         }
         return Err(err);
     };
@@ -199,6 +213,7 @@ pub async fn parse_multipart(
     Ok(images)
 }
 
+#[derive(Clone, Debug)]
 pub struct SavedImage {
     pub hash: i64,
     pub saved_path: PathBuf,
@@ -266,8 +281,8 @@ where
     }
 
     image.flush().await?;
-    let hash = hasher.finish();
-    let hash_str = u128_to_str(hash as u128);
+    let hash = hasher.finish() as i64;
+    let hash_str = i64_to_str(hash);
     trace!("hashing in prod {image_path_tmp:?} = {hash}");
 
     // uuid_to_str(uuid)
@@ -371,11 +386,12 @@ pub async fn post_update_image_add(
     let storage_path = app.get_storage_path().await;
     let tmp_path = app.get_tmp_path().await;
 
-    let inner = async || -> Result<Vec<PostImage>, PostUpdateImageAddErr> {
+    let inner = async || -> Result<PostUpdateImageAddRes, PostUpdateImageAddErr> {
         let req = params_req(params)?;
 
         let post_id = req.post_id;
 
+        // TODO allow only 1 image per request
         let images = parse_multipart(
             multipart,
             storage_path,
@@ -405,7 +421,7 @@ pub async fn post_update_image_add(
                 .map_err(from_db_post_update_image_add)?;
 
             // post = Some(result);
-            post_images.push(PostImage {
+            post_images.push(FileImage {
                 extension: image.extension,
                 hash: image.saved_image.hash,
                 proccesed: false,
@@ -440,7 +456,10 @@ mod test_utils {
         proccess_images::storage_file_path,
     };
     use axum::http::header;
-    use catsquad_shared::{self as cs, PostImage, PostState, Uuid, u128_to_str, uuid_to_str};
+    use catsquad_shared::{
+        self as cs, FileImage, PostState, PostUpdateImageAddRes, Uuid, i64_to_str, u128_to_str,
+        uuid_to_str,
+    };
 
     impl TestServer {
         pub async fn post_update_image_add(
@@ -450,7 +469,7 @@ mod test_utils {
             post_id: i64,
             images: &[&str],
             session_token: Uuid,
-        ) -> Result<Vec<PostImage>, cs::PostUpdateImageAddErr> {
+        ) -> Result<PostUpdateImageAddRes, cs::PostUpdateImageAddErr> {
             self.client
                 .post_update_image_add(post_id, images.into_iter().map(|v| v.to_string()).collect())
                 .header_add(
@@ -482,7 +501,7 @@ mod test_utils {
             let image_path = image_path.as_ref();
             let image_extension = image_path.extension().unwrap();
             let hash = get_file_hash_for_testing_by_path(image_path).await;
-            let hash_str = u128_to_str((hash as u64) as u128);
+            let hash_str = i64_to_str(hash);
             let image_path = storage_file_path(storage_path, hash_str, image_extension);
             // let storage_path = storage_path.join(&hash_str).with_extension(file_extension);
             (hash, image_path)
@@ -551,7 +570,9 @@ async fn test_api_post_update_image_add() {
         .await;
     assert!(matches!(
         result,
-        Err(PostUpdateImageAddErr::UnsupportedExtension(_))
+        Err(PostUpdateImageAddErr::Image(
+            FileImageAddErr::UnsupportedExtension(_)
+        ))
     ));
 
     let result = server
@@ -565,7 +586,9 @@ async fn test_api_post_update_image_add() {
     assert!(!favicon_storage_path.exists());
     assert!(matches!(
         result,
-        Err(PostUpdateImageAddErr::UnsupportedExtension(_))
+        Err(PostUpdateImageAddErr::Image(
+            FileImageAddErr::UnsupportedExtension(_)
+        ))
     ));
 
     let favicon_size = get_file_size(favicon_path).await;
@@ -587,7 +610,9 @@ async fn test_api_post_update_image_add() {
             .await;
         assert!(matches!(
             result,
-            Err(PostUpdateImageAddErr::ImageTooBig { .. })
+            Err(PostUpdateImageAddErr::Image(
+                FileImageAddErr::ImageTooBig { .. }
+            ))
         ));
     }
 

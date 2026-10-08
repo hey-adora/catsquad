@@ -1,5 +1,7 @@
 // use catsquad_log::prelude::*;
 
+use crate::{FileImage, FileImageAddErr};
+
 pub const LINK_API_POST_UPDATE_FILE_ADD: &str = "/api/post/{post_id}/image";
 
 pub fn link_relative_post_update_file_add(post_id: i64) -> String {
@@ -19,43 +21,22 @@ pub enum PostUpdateImageAddErr {
     #[error("post id param not found")]
     ParamNotFoundPostId,
 
-    #[error("ffmpeg err {0}")]
-    ReadingResolutionErr(String),
-
-    #[error("invalid resolution {width}x{height}")]
-    InvalidResolution { width: u32, height: u32 },
-
-    #[error("io error {0}")]
-    IoErr(String),
-
-    #[error("stream error {0}")]
-    StreamErr(String),
-
-    #[error("file {image_name} is too big, max file size {max}, stopped upload at: {got}")]
-    ImageTooBig {
-        image_name: String,
-        max: u32,
-        got: u32,
-    },
-
     #[error("post not found")]
     PostNotFound,
 
-    #[error("file \"{0}\" must have extension in their name, such as .png")]
-    ImageHasNoExtension(String),
-
-    #[error("file extension {0} is not supported")]
-    UnsupportedExtension(String),
-
     #[error("unauthorized {0}")]
     Unauthorized(String),
+
+    #[error(transparent)]
+    Image(#[from] FileImageAddErr),
 
     #[default]
     #[error("internal server err")]
     InternalServer,
 }
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
-pub struct PostUpdateFileAddReq {}
+// #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
+// pub struct PostUpdateFileAddReq {}
+pub type PostUpdateImageAddRes = Vec<FileImage>;
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
 pub struct PostUpdateImageAddParams {

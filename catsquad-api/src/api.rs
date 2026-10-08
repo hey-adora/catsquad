@@ -38,6 +38,7 @@ mod user_add;
 mod user_get_by_session_key;
 mod user_get_by_username;
 mod user_update_aboutme;
+mod user_update_pfp;
 mod user_update_support;
 mod user_update_username;
 
@@ -72,7 +73,7 @@ pub use post_thumbnail_get_by_hash::post_thumbnail_bytes_get_by_hash;
 pub use post_update_description::post_update_description;
 pub use post_update_image_add::post_update_image_add;
 pub use post_update_image_ord::post_update_image_ord;
-pub use post_update_image_remove::post_update_file_remove;
+pub use post_update_image_remove::post_update_Image_remove;
 pub use post_update_state::post_update_state;
 pub use post_update_tags::post_update_tags;
 pub use post_update_title::post_update_title;
@@ -82,6 +83,7 @@ pub use user_add::user_add;
 pub use user_get_by_session_key::user_get_by_session_token;
 pub use user_get_by_username::user_get_by_username;
 pub use user_update_aboutme::user_update_aboutme;
+pub use user_update_pfp::user_update_pfp;
 pub use user_update_support::user_update_support;
 pub use user_update_username::user_update_username;
 

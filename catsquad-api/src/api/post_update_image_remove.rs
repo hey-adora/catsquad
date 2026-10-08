@@ -1,22 +1,23 @@
 use crate::state::AppState;
 use axum::{Extension, Form, Json, extract::State, http::StatusCode, response::IntoResponse};
-use catsquad_db::{DbPostUpdateFileRemoveErr, DbUser};
+use catsquad_db::{DbPostUpdateImageRemoveErr, DbUser};
 use catsquad_log::prelude::*;
 use catsquad_shared::{
-    PostImage, PostRes, PostState, PostUpdateImageRemoveErr, PostUpdateImageRemoveReq,
+    FileImage, PostRes, PostState, PostUpdateImageRemoveErr, PostUpdateImageRemoveReq,
 };
 
-fn from_db_post_update_file_remove_err(
-    value: DbPostUpdateFileRemoveErr,
+fn from_db_post_update_image_remove_err(
+    value: DbPostUpdateImageRemoveErr,
 ) -> PostUpdateImageRemoveErr {
     match value {
-        DbPostUpdateFileRemoveErr::PostNotFound => PostUpdateImageRemoveErr::PostNotFound,
-        DbPostUpdateFileRemoveErr::Unauthorized => {
+        DbPostUpdateImageRemoveErr::PostNotFound => PostUpdateImageRemoveErr::PostNotFound,
+        DbPostUpdateImageRemoveErr::Unauthorized => {
             PostUpdateImageRemoveErr::Unauthorized("unauthorized".to_string())
         }
-        DbPostUpdateFileRemoveErr::FileNotFound => PostUpdateImageRemoveErr::FileNotFound,
-        DbPostUpdateFileRemoveErr::Db(_) => PostUpdateImageRemoveErr::InternalServer,
-        DbPostUpdateFileRemoveErr::InternalError(_) => PostUpdateImageRemoveErr::InternalServer,
+        DbPostUpdateImageRemoveErr::FileNotFound => PostUpdateImageRemoveErr::FileNotFound,
+        DbPostUpdateImageRemoveErr::Db(_) => PostUpdateImageRemoveErr::InternalServer,
+        DbPostUpdateImageRemoveErr::InternalError(_) => PostUpdateImageRemoveErr::InternalServer,
+        DbPostUpdateImageRemoveErr::ImageRemove(_) => PostUpdateImageRemoveErr::InternalServer,
     }
 }
 
@@ -30,7 +31,7 @@ fn status_code(result: &Result<(), PostUpdateImageRemoveErr>) -> StatusCode {
     }
 }
 
-pub async fn post_update_file_remove(
+pub async fn post_update_Image_remove(
     db_user: Extension<DbUser>,
     State(app): State<AppState>,
     Form(req): Form<PostUpdateImageRemoveReq>,
@@ -46,7 +47,7 @@ pub async fn post_update_file_remove(
             .db
             .post_update_file_remove(time, user_username, post_id, hash)
             .await
-            .map_err(from_db_post_update_file_remove_err)?;
+            .map_err(from_db_post_update_image_remove_err)?;
 
         // TODO remove file on used count zero // do it in commit somehow
 
@@ -75,7 +76,7 @@ pub async fn post_update_file_remove(
 mod test_utils {
     use crate::{TestServer, auth::create_auth_cookie_str};
     use axum::http::header;
-    use catsquad_shared::{self as cs, PostImage, PostState, Uuid, uuid_to_str};
+    use catsquad_shared::{self as cs, FileImage, PostState, Uuid, uuid_to_str};
 
     impl TestServer {
         pub async fn post_update_file_remove(

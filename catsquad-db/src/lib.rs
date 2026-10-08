@@ -68,6 +68,8 @@ pub use query::post_update_order::*;
 pub use query::user_update_aboutme::*;
 pub use query::user_update_support::*;
 // pub use query::post_update_proccesed::*;
+pub use query::file_image_add_tx::*;
+pub use query::file_image_remove_tx::*;
 pub use query::post_update_state::*;
 pub use query::post_update_tags::*;
 pub use query::post_update_title::*;
@@ -81,6 +83,7 @@ pub use query::user_get_by_username::*;
 pub use query::user_get_password::*;
 pub use query::user_update_password_by_email::*;
 pub use query::user_update_password_by_username::*;
+pub use query::user_update_pfp::*;
 pub use query::user_update_username::*;
 
 // pub fn id_to_string(v: RecordId) -> String {

@@ -1,6 +1,7 @@
 use crate::{Db, XTimestamp};
 use catsquad_log::prelude::*;
 use catsquad_shared::i64_to_str;
+use sqlx::PgConnection;
 
 #[derive(Debug, thiserror::Error)]
 pub enum DbFileImageRemoveErr {
@@ -53,6 +54,31 @@ impl Db {
             return Err(DbFileImageRemoveErr::InternalError("image_used_count is less than 0 = {image_used_count} for file_image {file_hash}. it should have been deleted when it was at 0".to_string()));
         }
 
+        // get pfps
+        let pfp_count = {
+            let query = "UPDATE users SET
+                                    user_pfp_image_hash = 0,
+                                    user_modified_at = $1
+                                    WHERE user_pfp_image_hash = $2
+                                    ";
+
+            let result = sqlx::query(query)
+                .bind(XTimestamp(time as i64))
+                .bind(file_hash)
+                .execute(&mut *tx)
+                .await;
+
+            let rows_affected = match result {
+                Ok(v) => v.rows_affected(),
+                Err(err) => {
+                    error!("unexpected db error {err}");
+                    return Err(DbFileImageRemoveErr::Db(err));
+                }
+            };
+
+            rows_affected
+        };
+
         // update posts
         let usernames_and_sizes: Vec<(String, i64)> = {
             let query = "UPDATE posts SET
@@ -82,11 +108,14 @@ impl Db {
                     return Err(DbFileImageRemoveErr::Db(err));
                 }
             };
+            let posts_count = result.len();
 
-            if result.len() as i64 != image_used_count {
+            if (posts_count as i64 + pfp_count as i64) != image_used_count {
                 error!(
-                    "image magically dissapeared from posts without updating image_used_count hash={file_hash} hash_str={}",
-                    i64_to_str(file_hash)
+                    "image magically dissapeared from posts or pfps without updating image_used_count hash={file_hash} hash_str={} posts_count: {}, pfps_count: {}",
+                    i64_to_str(file_hash),
+                    posts_count,
+                    pfp_count
                 );
             }
 

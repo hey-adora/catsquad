@@ -1,6 +1,6 @@
 use catsquad_log::prelude::*;
 use catsquad_shared::{
-    self as cs, Order, PostImage, PostSearchParams, PostState, TimeRange, ToForm, Uuid,
+    self as cs, FileImage, Order, PostSearchParams, PostState, TimeRange, ToForm, Uuid,
     link_relative_invite_get_by_key, link_relative_post_get_by_key, link_relative_post_remove,
     link_relative_post_search, uuid_to_str,
 };
@@ -556,6 +556,26 @@ where
         // Builder::new(sender, params)
     }
 
+    pub fn user_update_pfp<F: Into<SchrodingersImage>>(
+        &self,
+        files: Vec<F>,
+    ) -> Builder<TSender, cs::FileImage, cs::UserUpdatePfpErr> {
+        let body = files
+            .into_iter()
+            .enumerate()
+            .map(|(i, file)| (format!("file{i}"), BodyField::File(file.into())))
+            .collect::<Vec<(String, BodyField)>>();
+
+        let params = SenderParams {
+            path: cs::link_relative_user_update_pfp().to_string(),
+            method: Method::Post,
+            body: Body::MultipartForm(body),
+            ..Default::default()
+        };
+        let sender = self.sender.clone();
+        Builder::new(sender, params)
+    }
+
     pub fn user_update_username(
         &self,
         password: impl Into<String>,
@@ -653,7 +673,7 @@ where
         &self,
         post_id: i64,
         files: Vec<F>,
-    ) -> Builder<TSender, Vec<PostImage>, catsquad_shared::PostUpdateImageAddErr> {
+    ) -> Builder<TSender, cs::PostUpdateImageAddRes, catsquad_shared::PostUpdateImageAddErr> {
         let body = files
             .into_iter()
             .enumerate()

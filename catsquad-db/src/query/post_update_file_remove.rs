@@ -1,8 +1,8 @@
-use crate::{Db, XTimestamp};
+use crate::{Db, XTimestamp, query::file_image_remove_tx::DbFileImageRemoveTxErr};
 use catsquad_log::prelude::*;
 
 #[derive(Debug, thiserror::Error)]
-pub enum DbPostUpdateFileRemoveErr {
+pub enum DbPostUpdateImageRemoveErr {
     #[error("post not found")]
     PostNotFound,
 
@@ -17,6 +17,9 @@ pub enum DbPostUpdateFileRemoveErr {
 
     #[error("internal error {0}")]
     InternalError(String),
+
+    #[error("image remove error {0}")]
+    ImageRemove(#[from] DbFileImageRemoveTxErr),
 }
 
 impl Db {
@@ -26,9 +29,13 @@ impl Db {
         user_username: impl Into<String>,
         post_id: i64,
         file_hash: i64,
-    ) -> Result<u32, DbPostUpdateFileRemoveErr> {
+    ) -> Result<u32, DbPostUpdateImageRemoveErr> {
         let user_username = user_username.into();
-        let mut tx = self.db.begin().await?;
+        let mut tx = self
+            .db
+            .begin()
+            .await
+            .inspect_err(|err| error!("post_update_file_remove {err}"))?;
 
         // get post
         let (post_img_pos, post_images_hashes, post_size_bytes) = {
@@ -44,109 +51,34 @@ impl Db {
             let result = match result {
                 Ok(v) => v,
                 Err(sqlx::Error::RowNotFound) => {
-                    return Err(DbPostUpdateFileRemoveErr::PostNotFound);
+                    return Err(DbPostUpdateImageRemoveErr::PostNotFound);
                 }
                 Err(err) => {
                     error!("unexpected db error {err}");
-                    return Err(DbPostUpdateFileRemoveErr::Db(err));
+                    return Err(DbPostUpdateImageRemoveErr::Db(err));
                 }
             };
             let (post_user_username, post_images_hashes, post_size_bytes): (String, Vec<i64>, i64) =
                 result;
 
             if post_user_username != user_username {
-                return Err(DbPostUpdateFileRemoveErr::Unauthorized);
+                return Err(DbPostUpdateImageRemoveErr::Unauthorized);
             }
 
             let Some(post_img_pos) = post_images_hashes.iter().position(|v| *v == file_hash) else {
-                return Err(DbPostUpdateFileRemoveErr::FileNotFound);
+                return Err(DbPostUpdateImageRemoveErr::FileNotFound);
             };
 
             (post_img_pos, post_images_hashes, post_size_bytes as u32)
         };
 
-        // get img
-        let (mut img_used_count, img_size_bytes) = {
-            // let query = "SELECT user_used_storage_bytes, user_max_storage_per_file_bytes, user_max_storage_bytes FROM users WHERE user_username = $1";
-            let query =
-                "SELECT image_used_count, image_size_bytes FROM files_images WHERE image_hash=$1";
-            let result = sqlx::query_as(query)
-                .bind(file_hash)
-                .fetch_one(&mut *tx)
-                .await;
-
-            debug!("query {query}, result: {result:#?}");
-
-            let result = match result {
-                Ok(v) => {
-                    let (image_used_count, image_size_bytes): (i64, i64) = v;
-                    if image_used_count < 1 {
-                        return Err(DbPostUpdateFileRemoveErr::InternalError(format!(
-                            "{image_used_count}(image_used_count) < 1 for post {post_id}"
-                        )));
-                    }
-                    (image_used_count as u32, image_size_bytes as u32)
-                }
-                Err(err) => {
-                    error!("unexpected db error {err}");
-                    return Err(DbPostUpdateFileRemoveErr::Db(err));
-                }
-            };
-
-            result
-        };
-
-        if img_used_count == 1 {
-            // remove image
-            let query = "DELETE FROM files_images WHERE image_hash = $1";
-            let result = sqlx::query(query).bind(file_hash).execute(&mut *tx).await;
-
-            let result = match result {
-                Ok(v) => v,
-                Err(err) => {
-                    error!("unexpected db error {err}");
-                    return Err(DbPostUpdateFileRemoveErr::Db(err));
-                }
-            };
-
-            if result.rows_affected() != 1 {
-                return Err(DbPostUpdateFileRemoveErr::InternalError(
-                    "rows affected != 1".to_string(),
-                ));
-            }
-        } else {
-            // decrement used_count
-            let query = "UPDATE files_images SET
-                            image_used_count =  image_used_count - 1,
-                            image_modified_at = $1
-                            WHERE image_hash = $2";
-
-            let result = sqlx::query(query)
-                .bind(XTimestamp(time as i64))
-                .bind(file_hash)
-                .execute(&mut *tx)
-                .await;
-
-            let result = match result {
-                Ok(v) => v,
-                Err(err) => {
-                    error!("unexpected db error {err}");
-                    return Err(DbPostUpdateFileRemoveErr::Db(err));
-                }
-            };
-
-            if result.rows_affected() != 1 {
-                return Err(DbPostUpdateFileRemoveErr::InternalError(
-                    "rows affected != 1".to_string(),
-                ));
-            }
-        }
-
-        img_used_count -= 1; // because we removed it from the post
+        // remove image
+        let (img_used_count, img_size_bytes) =
+            self.file_image_remove_tx(&mut *tx, time, file_hash).await?;
 
         // update post
         {
-            let new_post_size_bytes = post_size_bytes.checked_sub(img_size_bytes).ok_or_else(|| DbPostUpdateFileRemoveErr::InternalError(format!("{post_size_bytes} - {img_size_bytes} < 0 = post_size_bytes - img_size_bytes = post_id {post_id}"))).inspect_err(|err| error!("{err}"))?;
+            let new_post_size_bytes = post_size_bytes.checked_sub(img_size_bytes).ok_or_else(|| DbPostUpdateImageRemoveErr::InternalError(format!("{post_size_bytes} - {img_size_bytes} < 0 = post_size_bytes - img_size_bytes = post_id {post_id}"))).inspect_err(|err| error!("{err}"))?;
             let mut new_post_images_hashes = post_images_hashes;
             new_post_images_hashes.remove(post_img_pos);
 
@@ -170,12 +102,12 @@ impl Db {
                 Ok(v) => v,
                 Err(err) => {
                     error!("unexpected db error {err}");
-                    return Err(DbPostUpdateFileRemoveErr::Db(err));
+                    return Err(DbPostUpdateImageRemoveErr::Db(err));
                 }
             };
 
             if result.rows_affected() != 1 {
-                return Err(DbPostUpdateFileRemoveErr::InternalError(
+                return Err(DbPostUpdateImageRemoveErr::InternalError(
                     "rows affected != 1".to_string(),
                 ));
             }
@@ -203,18 +135,20 @@ impl Db {
                 Ok(v) => v,
                 Err(err) => {
                     error!("unexpected db error {err}");
-                    return Err(DbPostUpdateFileRemoveErr::Db(err));
+                    return Err(DbPostUpdateImageRemoveErr::Db(err));
                 }
             };
 
             if result.rows_affected() != 1 {
-                return Err(DbPostUpdateFileRemoveErr::InternalError(
+                return Err(DbPostUpdateImageRemoveErr::InternalError(
                     "rows affected != 1".to_string(),
                 ));
             }
         }
 
-        tx.commit().await?;
+        tx.commit()
+            .await
+            .inspect_err(|err| error!("post_update_file_remove {err}"))?;
 
         Ok(img_used_count)
     }
@@ -304,7 +238,7 @@ async fn test_post_update_file_remove() {
             .await;
         assert!(matches!(
             result,
-            Err(DbPostUpdateFileRemoveErr::PostNotFound)
+            Err(DbPostUpdateImageRemoveErr::PostNotFound)
         ));
 
         let result = db
@@ -312,7 +246,7 @@ async fn test_post_update_file_remove() {
             .await;
         assert!(matches!(
             result,
-            Err(DbPostUpdateFileRemoveErr::Unauthorized)
+            Err(DbPostUpdateImageRemoveErr::Unauthorized)
         ));
 
         let result = db
@@ -320,7 +254,7 @@ async fn test_post_update_file_remove() {
             .await;
         assert!(matches!(
             result,
-            Err(DbPostUpdateFileRemoveErr::FileNotFound)
+            Err(DbPostUpdateImageRemoveErr::FileNotFound)
         ));
     }
 

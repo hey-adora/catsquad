@@ -8,6 +8,7 @@ test_server = [
     "dep:tower",
     "dep:axum-test",
     "dep:catsquad-client",
+    "dep:catsquad-seed",
 ]
 test_backdoors = []
 
@@ -26,6 +27,7 @@ argon2 = { workspace = true }
 bytes = { workspace = true }
 futures = { workspace = true }
 futures-util = { workspace = true }
+catsquad-seed = { workspace = true , optional = true}
 tower= { workspace = true, features = ["util"], optional = true }
 axum-test = { workspace = true , optional = true } 
 catsquad-client = { workspace = true, features = ["axum_test"], optional = true }

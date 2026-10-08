@@ -5,7 +5,7 @@ use crate::page::post::post_like_state::{LikeState, PostLikeState};
 use crate::{PageState, SVGPawHollow};
 use catsquad_log::prelude::*;
 use catsquad_shared::{
-    PostImage, PostSearchRes, link_relative_post, link_relative_post_image_bytes_get_by_hash,
+    FileImage, PostSearchRes, link_relative_post, link_relative_post_image_bytes_get_by_hash,
     link_relative_profile_gallery,
 };
 use catsquad_web_utils::prelude::*;

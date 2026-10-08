@@ -11,7 +11,7 @@ use catsquad_db::{DbPostGetByKeyErr, DbPostImageGetByHashErr, DbUser};
 use catsquad_log::prelude::*;
 use catsquad_shared::{
     FILE_IMAGE_THUMBNAIL_EXTENSION, PostImageBytesGetByHashErr, PostImageBytesGetByHashParams,
-    u128_to_str,
+    i64_to_str, u128_to_str,
 };
 use tokio::fs;
 
@@ -61,19 +61,19 @@ pub async fn get_file_image(
         // TODO OPTIMIZE THIS BULLSH*T
 
         let storage_path = app.get_storage_path().await;
-        let file_name = u128_to_str((image.hash as u64) as u128);
+        let hash_str = i64_to_str(image.hash);
 
         let (file_extension, path) = if thumbnail {
             if !image.processed {
                 return Err(PostImageBytesGetByHashErr::FileNotFound);
             }
             let extension = FILE_IMAGE_THUMBNAIL_EXTENSION.to_string();
-            let path = thumbnail_file_path(storage_path, file_name);
+            let path = thumbnail_file_path(storage_path, hash_str);
 
             (extension, path)
         } else {
             let extension = image.extension;
-            let path = storage_file_path(storage_path, file_name, &extension);
+            let path = storage_file_path(storage_path, hash_str, &extension);
             (extension, path)
         };
 

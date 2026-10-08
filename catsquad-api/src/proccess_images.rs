@@ -1,7 +1,7 @@
 use anyhow::anyhow;
 use catsquad_db::Db;
 use catsquad_log::prelude::*;
-use catsquad_shared::i64_to_str;
+use catsquad_shared::{Hash, Uuid, i64_to_str};
 use std::{
     ffi::OsStr,
     path::{Path, PathBuf},
@@ -58,6 +58,7 @@ fn test_scale_resolution() {
     assert_eq!(result, (1280, 720));
 }
 
+/// i keep param name as str to avoid duplicate i64_to_str calls
 pub fn storage_file_path(
     storage_path: impl AsRef<Path>,
     name: impl AsRef<str>,
@@ -81,25 +82,24 @@ pub fn tmp_file_path(
 }
 
 pub fn thumbnail_file_path(storage_path: impl AsRef<Path>, name: impl AsRef<str>) -> PathBuf {
-    let name = name.as_ref();
     storage_path
         .as_ref()
-        .join(format!("{}_thumbnail.webp", name))
+        .join(format!("{}_thumbnail.webp", name.as_ref()))
 }
 
 #[test]
 fn test_paths() {
     assert_eq!(
-        storage_file_path("/tmp", "one", "webp").to_str().unwrap(),
-        "/tmp/one.webp"
+        storage_file_path("/tmp", "0", "webp").to_str().unwrap(),
+        "/tmp/0.webp"
     );
     assert_eq!(
-        tmp_file_path("/tmp", "one", "webp").to_str().unwrap(),
-        "/tmp/one.webp"
+        tmp_file_path("/tmp", "0", "webp").to_str().unwrap(),
+        "/tmp/0.webp"
     );
     assert_eq!(
-        thumbnail_file_path("/tmp", "one").to_str().unwrap(),
-        "/tmp/one_thumbnail.webp"
+        thumbnail_file_path("/tmp", "").to_str().unwrap(),
+        "/tmp/0_thumbnail.webp"
     );
 }
 
@@ -122,7 +122,7 @@ pub enum ProccessFileErr {
 
 pub async fn proccess_post_image(
     storage_path: impl AsRef<Path>,
-    file_hash: i64,
+    file_hash: Hash,
     file_extension: impl AsRef<OsStr>,
     width: u32,
     height: u32,
@@ -130,8 +130,8 @@ pub async fn proccess_post_image(
 ) -> Result<ProccesedFileResult, ProccessFileErr> {
     // TODO fix performance, strings and format and Path are bad
 
-    let file_hash_str = i64_to_str(file_hash);
     let storage_path = storage_path.as_ref();
+    let file_hash_str = i64_to_str(file_hash);
 
     // thumbnail path
     let thumbnail_path = {
@@ -209,7 +209,8 @@ async fn test_proccess_post_image_() {
 
     let storage_file_path = storage_file_path(storage_path.clone(), "0", "svg");
 
-    let result = proccess_post_image(storage_path.clone(), 0, "jpg", 10, 10, 10).await;
+    // expect not found
+    let result = proccess_post_image(storage_path.clone(), 0, "svg", 10, 10, 10).await;
     assert!(matches!(result, Err(_)));
 
     fs::copy(img_path, storage_file_path).await.unwrap();
@@ -231,14 +232,23 @@ pub async fn proccess_post_images(
         let result = proccess_post_image(
             storage_path,
             image.hash,
-            image.extension,
+            image.extension.as_str(),
             image.width,
             image.height,
             resolution_limit,
         )
         .await;
 
-        if let Err(ProccessFileErr::ImageNotFound { .. }) = result {
+        // try remove from database if its missing in storage
+        if let Err(ProccessFileErr::ImageNotFound {
+            input_path,
+            output_path,
+        }) = result
+        {
+            error!(
+                "missing image \n{:?}\n{:?}\n{:#?}",
+                input_path, output_path, image
+            );
             db.file_image_remove(time, image.hash).await?;
             continue;
         }
@@ -283,7 +293,7 @@ async fn test_proccess_post_files() {
     let file_path = {
         let file_path = storage_file_path(
             storage_path.clone(),
-            file_hash_str.clone(),
+            file_hash_str.as_str(),
             file.extension.clone(),
         );
         file_path

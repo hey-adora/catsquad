@@ -20,6 +20,8 @@ pub const MIN_USERNAME_LENGTH: usize = 3;
 pub const MIN_PASSWORD_LENGTH: usize = 12;
 pub const MAX_PASSWORD_LENGTH: usize = 100;
 pub const FILE_IMAGE_THUMBNAIL_EXTENSION: &'static str = "webp";
+pub const MAX_PFP_SIZE_BYTES: u32 = 1024 * 1000 * 2; // 2MB probably
+pub type Hash = i64;
 
 pub use api::Order;
 pub use api::TimeRange;
@@ -36,6 +38,7 @@ pub use api::email_change_update_current_confirm::*;
 pub use api::email_change_update_finish::*;
 pub use api::email_change_update_new_add::*;
 pub use api::email_change_update_new_confirm::*;
+pub use api::file_image::*;
 pub use api::invite_add::*;
 pub use api::invite_get_by_key::*;
 pub use api::password_change_add::*;
@@ -64,6 +67,7 @@ pub use api::user_add::*;
 pub use api::user_get_by_session_key::*;
 pub use api::user_get_by_username::*;
 pub use api::user_update_aboutme::*;
+pub use api::user_update_pfp::*;
 pub use api::user_update_support::*;
 pub use api::user_update_username::*;
 
