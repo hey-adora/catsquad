@@ -196,7 +196,7 @@ pub async fn app(state: AppState) -> Router {
         )
         .route(
             catsquad_shared::LINK_API_POST_UPDATE_IMAGE_REMOVE,
-            post(api::post_update_Image_remove),
+            post(api::post_update_image_remove),
         )
         .route(
             catsquad_shared::LINK_API_POST_UPDATE_TAGS,

@@ -140,7 +140,7 @@ async fn test_api_post_add() {
         .post_update_state(post1.id, PostState::Active, session_key)
         .await
         .unwrap();
-    let post1 = server.post_get_by_key(post1.id, session_key).await.unwrap();
+    let post1 = server.post_get_by_id(post1.id, session_key).await.unwrap();
     assert_eq!(post1.created_at, 1);
 
     server.state.set_time(2);
@@ -156,7 +156,7 @@ async fn test_api_post_add() {
         .post_update_state(post2.id, PostState::Active, session_key)
         .await
         .unwrap();
-    let post1 = server.post_get_by_key(post1.id, session_key).await.unwrap();
+    let post1 = server.post_get_by_id(post1.id, session_key).await.unwrap();
 
     assert_eq!(post2.created_at, 2);
 }

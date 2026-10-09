@@ -1,12 +1,11 @@
-use std::{
-    hash::DefaultHasher,
-    io,
-    path::{Path, PathBuf},
+use crate::{
+    api::user_update_pfp::remove_images,
+    proccess_images::{storage_file_path, tmp_file_path},
+    state::AppState,
 };
-
 use anyhow::anyhow;
 use axum::{
-    Extension, Form, Json,
+    Extension, Json,
     extract::{Multipart, RawPathParams, State},
     http::StatusCode,
     response::IntoResponse,
@@ -15,21 +14,20 @@ use bytes::Bytes;
 use catsquad_db::{DbPostUpdateImageAddErr, DbUser};
 use catsquad_log::prelude::*;
 use catsquad_shared::{
-    FileImage, FileImageAddErr, POST_UPDATE_IMAGE_ADD_PARAMS_FIELD_POST_ID, PostUpdateImageAddErr,
-    PostUpdateImageAddParams, PostUpdateImageAddRes, SUPPORTED_IMAGE_EXTENSIONS, i64_to_str,
-    u128_to_str, uuid_to_str,
+    FileImage, FileImageAddErr, POST_UPDATE_IMAGE_ADD_PARAMS_FIELD_POST_ID, PostState,
+    PostUpdateImageAddErr, PostUpdateImageAddParams, PostUpdateImageAddRes,
+    SUPPORTED_IMAGE_EXTENSIONS, i64_to_str,
 };
 use futures::{Stream, TryStreamExt};
 use futures_util::StreamExt;
+use std::{
+    hash::DefaultHasher,
+    io,
+    path::{Path, PathBuf},
+};
 use tokio::{
-    // fs::File,
     fs,
     io::{AsyncWriteExt, BufWriter},
-};
-
-use crate::{
-    proccess_images::{storage_file_path, tmp_file_path},
-    state::AppState,
 };
 
 fn from_db_post_update_image_add(value: DbPostUpdateImageAddErr) -> PostUpdateImageAddErr {
@@ -115,6 +113,7 @@ pub async fn parse_multipart(
     mut multipart: Multipart,
     storage_path: impl AsRef<Path>,
     tmp_path: impl AsRef<Path>,
+    max_imgs: usize,
     max_storage: u32,
     max_storage_per_image: u32,
     mut used_storage: u32,
@@ -122,9 +121,13 @@ pub async fn parse_multipart(
     let mut images = Vec::new();
     let storage_path = storage_path.as_ref();
     let tmp_path = tmp_path.as_ref();
+    let mut index = 0;
 
     let mut inner = async || -> Result<(), FileImageAddErr> {
         while let Ok(Some(field)) = multipart.next_field().await {
+            if index >= max_imgs {
+                break;
+            }
             let image_name = if let Some(image_name) = field.file_name() {
                 image_name.to_owned()
             } else {
@@ -192,6 +195,8 @@ pub async fn parse_multipart(
                 width,
                 height,
             });
+
+            index += 1;
         }
         Ok(())
     };
@@ -218,6 +223,7 @@ pub struct SavedImage {
     pub hash: i64,
     pub saved_path: PathBuf,
     pub size_bytes: u32,
+    pub already_existed: bool,
 }
 
 #[derive(thiserror::Error, Debug)]
@@ -284,6 +290,7 @@ where
     let hash = hasher.finish() as i64;
     let hash_str = i64_to_str(hash);
     trace!("hashing in prod {image_path_tmp:?} = {hash}");
+    let mut already_existed = false;
 
     // uuid_to_str(uuid)
 
@@ -292,6 +299,7 @@ where
         // let file_path = storage_path.join(&hash_str).with_extension(extension);
         if image_path.exists() {
             trace!("image removed");
+            already_existed = true;
             tokio::fs::remove_file(image_path_tmp).await?;
         } else {
             trace!("image moved");
@@ -313,6 +321,7 @@ where
         hash: hash as i64,
         size_bytes: size,
         saved_path: image_path,
+        already_existed,
     })
 }
 
@@ -374,7 +383,6 @@ pub fn resolution_from_str(res: impl AsRef<str>) -> anyhow::Result<(u32, u32)> {
 pub async fn post_update_image_add(
     db_user: Extension<DbUser>,
     State(app): State<AppState>,
-    // Form(req): Form<EmailChangeUpdateNewAddReq>,
     params: axum::extract::RawPathParams,
     multipart: Multipart,
 ) -> impl IntoResponse {
@@ -391,53 +399,108 @@ pub async fn post_update_image_add(
 
         let post_id = req.post_id;
 
-        // TODO allow only 1 image per request
-        let images = parse_multipart(
+        let Some(image) = parse_multipart(
             multipart,
-            storage_path,
+            storage_path.as_path(),
             tmp_path,
+            1,
             max_storage,
             max_storage_per_image,
             used_storage,
         )
-        .await?;
-
-        let mut post_images = Vec::new();
-        // let mut post = None;
-        for image in images {
-            let _result = app
-                .db
-                .post_update_image_add(
-                    time,
-                    user_username.clone(),
-                    post_id,
-                    image.saved_image.size_bytes,
-                    image.saved_image.hash.clone(),
-                    image.extension.clone(),
-                    image.width,
-                    image.height,
-                )
-                .await
-                .map_err(from_db_post_update_image_add)?;
-
-            // post = Some(result);
-            post_images.push(FileImage {
-                extension: image.extension,
-                hash: image.saved_image.hash,
-                proccesed: false,
-                size_bytes: image.saved_image.size_bytes,
-                width: image.width,
-                height: image.height,
-            });
-        }
-
-        // let post = post.ok_or_else(|| PostUpdateFileAddErr::NotFilesFound)?;
-
-        if post_images.is_empty() {
+        .await?
+        .first()
+        .cloned() else {
             return Err(PostUpdateImageAddErr::NotImagesFound);
+        };
+
+        let result = app
+            .db
+            .post_update_image_add(
+                time,
+                user_username.clone(),
+                post_id,
+                image.saved_image.size_bytes,
+                image.saved_image.hash.clone(),
+                image.extension.clone(),
+                image.width,
+                image.height,
+            )
+            .await
+            .map_err(from_db_post_update_image_add);
+
+        // TODO should this be inside db transaction?
+        // this would have to error at the exact same time as someone else adding same image and succeeding
+        if result.is_err() && !image.saved_image.already_existed {
+            // thumbnail shouldnt exist if its new
+            // so only remove the original file
+            let _ = fs::remove_file(image.saved_image.saved_path.as_path())
+                .await
+                .inspect_err(|err| error!("error removing image {err} {image:#?}"));
         }
 
-        Ok(post_images)
+        result?;
+
+        let image = FileImage {
+            extension: image.extension,
+            hash: image.saved_image.hash,
+            proccesed: false, // TODO this might not be true, if image already existed
+            size_bytes: image.saved_image.size_bytes,
+            width: image.width,
+            height: image.height,
+        };
+
+        // let mut post_images = Vec::new();
+        // let mut latest_err = None;
+        // let mut post = None;
+        // for image in images {
+        //     let result = app
+        //         .db
+        //         .post_update_image_add(
+        //             time,
+        //             user_username.clone(),
+        //             post_id,
+        //             image.saved_image.size_bytes,
+        //             image.saved_image.hash.clone(),
+        //             image.extension.clone(),
+        //             image.width,
+        //             image.height,
+        //         )
+        //         .await;
+
+        //     // match result {
+        //     //     Err(DbPost)
+
+        //     //     _=>(),
+        //     // }
+        //     if let Err(err) = result {
+        //         latest_err = Some(from_db_post_update_image_add(err));
+        //         let _ = fs::remove_file(image.saved_image.saved_path.as_path())
+        //             .await
+        //             .inspect_err(|err| error!("error removing image {err} {image:#?}"));
+        //     }
+
+        //     post_images.push(FileImage {
+        //         extension: image.extension,
+        //         hash: image.saved_image.hash,
+        //         proccesed: false,
+        //         size_bytes: image.saved_image.size_bytes,
+        //         width: image.width,
+        //         height: image.height,
+        //     });
+        // }
+
+        // if let Some(latest_err) = latest_err
+        //     && post_images.is_empty()
+        // {
+        //     return Err(latest_err);
+        // }
+
+        // if post_images.is_empty() {
+        //     return Err(PostUpdateImageAddErr::NotImagesFound);
+        // }
+
+        Ok(image)
         // Ok(from_db_post(post))
     };
 
@@ -456,16 +519,11 @@ mod test_utils {
         proccess_images::storage_file_path,
     };
     use axum::http::header;
-    use catsquad_shared::{
-        self as cs, FileImage, PostState, PostUpdateImageAddRes, Uuid, i64_to_str, u128_to_str,
-        uuid_to_str,
-    };
+    use catsquad_shared::{self as cs, PostUpdateImageAddRes, Uuid, i64_to_str, uuid_to_str};
 
     impl TestServer {
         pub async fn post_update_image_add(
             &self,
-            // post_id: i64,
-            // new_tags: impl Into<String>,
             post_id: i64,
             images: &[&str],
             session_token: Uuid,
@@ -480,16 +538,6 @@ mod test_utils {
                 .await
                 .into_json()
                 .await
-            // self.client
-            //     .post_update_tags(post_id, new_tags)
-            //     .header_add(
-            //         header::COOKIE,
-            //         create_auth_cookie_str(uuid_to_str(session_token)),
-            //     )
-            //     .send()
-            //     .await
-            //     .into_json()
-            //     .await
         }
 
         pub async fn get_image_from_storage_path(
@@ -511,133 +559,163 @@ mod test_utils {
 
 #[tokio::test]
 async fn test_api_post_update_image_add() {
-    use crate::auth::create_auth_cookie_str;
-    use crate::{get_file_hash_for_testing_by_path, get_file_size};
-    use axum::http::header;
-
     init_log();
 
     let server = crate::TestServer::new(0, "test_api_post_update_file_add").await;
+    let input1_img = server.create_img_input(0).await;
+    let input2_img = server.create_img_input(1).await;
+    let input3_txt = "../flake.nix";
 
     let (user1, session_key1) = server
         .user_add_full("prime", "prime@heyadora.com", "1234567890111GGd11$")
         .await;
 
-    let tmp_path = server.state.get_tmp_path().await;
-    let storage_path = server.state.get_storage_path().await;
-
-    // let get_storage_path = async |file_path_str: &str| {
-    //     let file_path = Path::new(file_path_str);
-    //     let file_extension = file_path.extension().unwrap();
-    //     let hash = get_file_hash_for_testing_by_path(file_path_str).await;
-    //     let hash_str = u128_to_str(hash as u128);
-    //     let storage_path = storage_path.join(&hash_str).with_extension(file_extension);
-    //     let file_path = storage_path.to_str().unwrap().to_string();
-    //     (hash, PathBuf::from(file_path))
-    // };
-
-    // let txt_file = "/tmp/test.txt";
-    let txt_file = "../flake.nix";
-    let favicon_path = "../assets/favicon.ico";
-    let favicon_size = get_file_size(favicon_path).await;
-    // let tmp_path = Path::new(&tmp_path);
-    // let path_org = path_org.join("test.txt");
-    // fs::write(&path_org, "hello").await.unwrap();
-    // let path_org = path_org.to_string_lossy().to_string();
-    // let test_txt_path_org = server.state.get_tmp_path().await;
-
-    // /tmp/test.txt
     let post1 = server
         .post_add("title", "description1", "tags1", session_key1)
         .await
         .unwrap();
+    server
+        .post_update_state(post1.id, PostState::Active, session_key1)
+        .await
+        .unwrap();
 
-    // let add_file = async |post_id: i64, files: &[&str]| {
-    //     server
-    //         .client
-    //         .post_update_file_add(post_id, files.into_iter().map(|v| v.to_string()).collect())
-    //         .header_add(
-    //             header::COOKIE,
-    //             create_auth_cookie_str(uuid_to_str(session_key1)),
-    //         )
-    //         .send()
-    //         .await
-    //         .into_json()
-    //         .await
-    // };
-    let result = server
-        .post_update_image_add(post1.id, &[txt_file], session_key1)
-        .await;
-    assert!(matches!(
-        result,
-        Err(PostUpdateImageAddErr::Image(
-            FileImageAddErr::UnsupportedExtension(_)
-        ))
-    ));
+    let post2 = server
+        .post_add("title2", "description2", "tags2", session_key1)
+        .await
+        .unwrap();
+    server
+        .post_update_state(post2.id, PostState::Active, session_key1)
+        .await
+        .unwrap();
 
-    let result = server
-        .post_update_image_add(post1.id, &[favicon_path, txt_file], session_key1)
-        .await;
-
-    let (favicon_hash, favicon_storage_path) = server
-        .get_image_from_storage_path(storage_path, favicon_path)
-        .await;
-
-    assert!(!favicon_storage_path.exists());
-    assert!(matches!(
-        result,
-        Err(PostUpdateImageAddErr::Image(
-            FileImageAddErr::UnsupportedExtension(_)
-        ))
-    ));
-
-    let favicon_size = get_file_size(favicon_path).await;
-    let sizes = [
-        (favicon_size - 1, favicon_size - 1),
-        (favicon_size - 1, favicon_size),
-        (favicon_size, favicon_size - 1),
-    ];
-    for (max, max_per_file) in sizes {
+    // assert invalid input
+    {
         let result = server
-            .state
-            .db
-            .user_update_storage(0, user1.username.clone(), max, max_per_file)
-            .await
-            .unwrap();
-
-        let result = server
-            .post_update_image_add(post1.id, &[favicon_path, txt_file], session_key1)
+            .post_update_image_add(post1.id, &[input3_txt], session_key1)
             .await;
         assert!(matches!(
             result,
             Err(PostUpdateImageAddErr::Image(
-                FileImageAddErr::ImageTooBig { .. }
+                FileImageAddErr::UnsupportedExtension(_)
             ))
         ));
     }
 
-    let user = server.state.db.user_get_by_username("prime").await.unwrap();
-    assert_eq!(user.used_storage_bytes, 0);
+    // assert half invalid input
+    {
+        let result = server
+            .post_update_image_add(
+                post1.id,
+                &[input3_txt, input1_img.saved_path.to_str().unwrap()],
+                session_key1,
+            )
+            .await;
+        assert!(matches!(
+            result,
+            Err(PostUpdateImageAddErr::Image(
+                FileImageAddErr::UnsupportedExtension(_)
+            ))
+        ));
 
-    let result = server
-        .state
-        .db
-        .user_update_storage(0, user1.username.clone(), favicon_size, favicon_size)
-        .await
-        .unwrap();
+        assert!(!input1_img.storage_path.exists());
+        assert!(!input1_img.thumbnail_path.exists());
+        assert!(!input2_img.storage_path.exists());
+        assert!(!input2_img.thumbnail_path.exists());
+    }
 
-    let files = server
-        .post_update_image_add(post1.id, &[favicon_path], session_key1)
-        .await
-        .unwrap();
-    assert_eq!(files.len(), 1);
-    assert_eq!(files[0].extension, "ico");
-    assert_eq!(files[0].size_bytes, favicon_size);
-    assert_eq!(files[0].hash, favicon_hash);
-    assert_eq!(files[0].proccesed, false);
+    // try different combinations of user storage limits when uploading image
+    {
+        let sizes = [
+            (input1_img.size - 1, input1_img.size - 1),
+            (input1_img.size - 1, input1_img.size),
+            (input1_img.size, input1_img.size - 1),
+        ];
+        for (max, max_per_file) in sizes {
+            server
+                .state
+                .db
+                .user_update_storage(0, user1.username.clone(), max, max_per_file)
+                .await
+                .unwrap();
 
-    // assert_eq!(post1.file[0].width, favicon_size);
+            let result = server
+                .post_update_image_add(
+                    post1.id,
+                    &[input1_img.saved_path.to_str().unwrap(), input3_txt],
+                    session_key1,
+                )
+                .await;
+            assert!(matches!(
+                result,
+                Err(PostUpdateImageAddErr::Image(
+                    FileImageAddErr::ImageTooBig { .. }
+                ))
+            ));
+        }
+    }
 
-    let user = server.state.db.user_get_by_username("prime").await.unwrap();
-    assert_eq!(user.used_storage_bytes, favicon_size);
+    // upload image successfully
+    {
+        server
+            .state
+            .db
+            .user_update_storage(
+                0,
+                user1.username.clone(),
+                input1_img.size * 3,
+                input1_img.size * 3,
+            )
+            .await
+            .unwrap();
+
+        let image = server
+            .post_update_image_add(
+                post1.id,
+                &[input1_img.saved_path.to_str().unwrap()],
+                session_key1,
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(image.extension, "png");
+        assert_eq!(image.size_bytes, input1_img.size);
+        assert_eq!(image.hash, input1_img.hash);
+        assert_eq!(image.proccesed, false);
+        assert!(input1_img.storage_path.exists());
+        assert!(!input1_img.thumbnail_path.exists());
+        assert!(!input2_img.storage_path.exists());
+        assert!(!input2_img.thumbnail_path.exists());
+    }
+
+    // assert duplicate
+    {
+        let result1 = server
+            .post_update_image_add(
+                post1.id,
+                &[input1_img.saved_path.to_str().unwrap()],
+                session_key1,
+            )
+            .await;
+        let result2 = server
+            .post_update_image_add(
+                post1.id,
+                &[
+                    input1_img.saved_path.to_str().unwrap(),
+                    input2_img.saved_path.to_str().unwrap(),
+                ],
+                session_key1,
+            )
+            .await;
+
+        let post1 = server.post_get_by_id(post1.id, session_key1).await.unwrap();
+
+        assert!(matches!(result1, Err(PostUpdateImageAddErr::Duplicate)));
+        assert!(matches!(result2, Err(PostUpdateImageAddErr::Duplicate)));
+        assert!(input1_img.storage_path.exists());
+        assert!(!input1_img.thumbnail_path.exists());
+        assert!(!input2_img.storage_path.exists()); // second img still gets saved
+        assert!(!input2_img.thumbnail_path.exists());
+        assert_eq!(post1.images.len(), 1);
+        assert_eq!(post1.images[0].hash, input1_img.hash);
+    }
 }

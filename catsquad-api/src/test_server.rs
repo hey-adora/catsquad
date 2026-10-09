@@ -17,6 +17,7 @@ pub struct TestServer {
 
 #[derive(Clone, Debug)]
 pub struct TestImg {
+    pub size: u32,
     pub hash: i64,
     pub saved_path: PathBuf,
     pub storage_path: PathBuf,
@@ -75,6 +76,7 @@ impl TestServer {
 
     pub async fn create_img_input(&self, i: usize) -> TestImg {
         use crate::get_file_hash_for_testing_by_path;
+        use crate::get_file_size;
         use crate::proccess_images::thumbnail_file_path;
         use catsquad_log::prelude::*;
         use catsquad_seed::create_img;
@@ -85,10 +87,11 @@ impl TestServer {
 
         create_img(saved_path.clone(), i.to_string());
 
-        let hash = get_file_hash_for_testing_by_path(saved_path.clone()).await;
+        let size = get_file_size(saved_path.as_path()).await;
+        let hash = get_file_hash_for_testing_by_path(saved_path.as_path()).await;
         let hash_str = i64_to_str(hash);
-        let input_storage_path = storage_file_path(storage_path.clone(), &hash_str, "png");
-        let input_thumbnail_path = thumbnail_file_path(storage_path.clone(), hash_str);
+        let input_storage_path = storage_file_path(storage_path.as_path(), &hash_str, "png");
+        let input_thumbnail_path = thumbnail_file_path(storage_path.as_path(), hash_str);
 
         trace!("{saved_path:?}");
 
@@ -97,6 +100,7 @@ impl TestServer {
         assert!(!input_thumbnail_path.exists());
 
         TestImg {
+            size,
             hash,
             saved_path,
             storage_path: input_storage_path,

@@ -102,7 +102,7 @@ mod test_utils {
     use catsquad_shared::{self as cs, Uuid, uuid_to_str};
 
     impl TestServer {
-        pub async fn post_get_by_key(
+        pub async fn post_get_by_id(
             &self,
             post_id: i64,
             session_token: Uuid,
@@ -140,16 +140,16 @@ async fn test_api_post_get_by_key() {
         .unwrap();
 
     {
-        let result = server.post_get_by_key(0, 0_u128.to_be_bytes()).await;
+        let result = server.post_get_by_id(0, 0_u128.to_be_bytes()).await;
         assert_eq!(result, Err(PostGetByKeyErr::PostNotFound));
 
-        let result = server.post_get_by_key(post1.id, 0_u128.to_be_bytes()).await;
+        let result = server.post_get_by_id(post1.id, 0_u128.to_be_bytes()).await;
         assert!(matches!(result, Err(PostGetByKeyErr::PostNotFound)));
 
-        let result = server.post_get_by_key(post1.id, session_key1).await;
+        let result = server.post_get_by_id(post1.id, session_key1).await;
         assert!(matches!(result, Err(PostGetByKeyErr::PostNotFound)));
 
-        let result = server.post_get_by_key(post1.id, session_key2).await;
+        let result = server.post_get_by_id(post1.id, session_key2).await;
         assert!(matches!(result, Err(PostGetByKeyErr::PostNotFound)));
     }
 
@@ -160,7 +160,7 @@ async fn test_api_post_get_by_key() {
 
     {
         let result = server
-            .post_get_by_key(post1.id, 0_u128.to_be_bytes())
+            .post_get_by_id(post1.id, 0_u128.to_be_bytes())
             .await
             .unwrap();
         assert_eq!(result.id, post1.id);
@@ -176,10 +176,10 @@ async fn test_api_post_get_by_key() {
         .unwrap();
 
     {
-        let result = server.post_get_by_key(post1.id.clone(), session_key1).await;
+        let result = server.post_get_by_id(post1.id.clone(), session_key1).await;
         assert!(matches!(result, Ok(_)));
 
-        let result = server.post_get_by_key(post1.id, session_key2).await;
+        let result = server.post_get_by_id(post1.id, session_key2).await;
         assert!(matches!(result, Err(PostGetByKeyErr::Unauthorized(_))));
     }
 }

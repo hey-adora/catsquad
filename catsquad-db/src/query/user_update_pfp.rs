@@ -37,36 +37,27 @@ impl Db {
             .inspect_err(|err| error!("user_update_pfp {err}"))?;
 
         // get user
-        let (current_pfp_hash, current_pfp_img_extension) = {
-            let query = "SELECT user_pfp_image_hash, image_extension FROM users JOIN files_images ON user_pfp_image_hash=image_hash WHERE user_username = $1";
+        let (current_pfp_hash,) = {
+            let query = "SELECT user_pfp_image_hash FROM users JOIN files_images ON user_pfp_image_hash=image_hash WHERE user_username = $1";
 
             let result = sqlx::query_as(query)
                 .bind(&user_username)
                 .fetch_one(&mut *tx)
                 .await;
 
-            let (current_pfp_hash, current_pfp_img_extension): (i64, String) = match result {
+            let (current_pfp_hash,): (i64,) = match result {
                 Ok(v) => v,
-                Err(sqlx::Error::RowNotFound) => (0, String::new()),
+                Err(sqlx::Error::RowNotFound) => (0,),
                 Err(err) => {
                     error!("unexpected db error (post_update_file_add) {err}");
                     return Err(DbUserUpdatePfpErr::Db(err));
                 }
             };
-            (current_pfp_hash, current_pfp_img_extension)
+            (current_pfp_hash,)
         };
 
         if file_hash == current_pfp_hash {
             return Err(DbUserUpdatePfpErr::IsSame);
-        }
-
-        if current_pfp_hash != 0 {
-            let (img_used_count, _) = self
-                .file_image_remove_tx(&mut *tx, time, current_pfp_hash)
-                .await?;
-            if img_used_count == 0 {
-                callback_remove_image(current_pfp_hash, current_pfp_img_extension.as_str()).await;
-            }
         }
 
         let _ = self
@@ -102,6 +93,15 @@ impl Db {
                 return Err(DbUserUpdatePfpErr::Db(err));
             }
         };
+
+        if current_pfp_hash != 0 {
+            let (img_used_count, _, extension) = self
+                .file_image_remove_tx(&mut *tx, time, current_pfp_hash)
+                .await?;
+            if img_used_count == 0 {
+                callback_remove_image(current_pfp_hash, extension.as_str()).await;
+            }
+        }
 
         tx.commit()
             .await

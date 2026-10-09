@@ -104,12 +104,12 @@ async fn test_api_post_file_status_by_hash() {
         .await
         .unwrap();
 
-    let result = server
+    let image = server
         .post_update_image_add(post1.id, &["../assets/favicon.ico"], session_token1)
         .await
         .unwrap();
 
-    let file_hash = result[0].hash;
+    let file_hash = image.hash;
 
     let result = server
         .post_file_status_get_by_hash(file_hash)

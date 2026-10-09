@@ -101,11 +101,11 @@ pub async fn user_update_pfp(
     let tmp_path = app.get_tmp_path().await;
 
     let inner = async || -> Result<FileImage, UserUpdatePfpErr> {
-        // TODO make parse_multipart only accept single image
         let Some(image) = parse_multipart(
             multipart,
             storage_path.clone(),
             tmp_path,
+            1,
             MAX_PFP_SIZE_BYTES,
             MAX_PFP_SIZE_BYTES,
             0,
@@ -323,42 +323,4 @@ async fn test_api_user_update_pfp() {
         index += 1;
     }
     assert_eq!(index, 2);
-
-    // server.user_update_pfp(new_pfp_image, session_token);
-
-    // let result = server.user_update_username("", "one", token).await;
-    // assert!(matches!(
-    //     result,
-    //     Err(UserUpdateUsernameErr::Unauthorized(_))
-    // ));
-
-    // let result = server.user_update_username("hey2", "one", token).await;
-    // assert!(matches!(
-    //     result,
-    //     Err(UserUpdateUsernameErr::Unauthorized(_))
-    // ));
-
-    // let result = server.user_update_username(pss, "he", token).await;
-    // assert!(matches!(
-    //     result,
-    //     Err(UserUpdateUsernameErr::InvalidUsername(_))
-    // ));
-
-    // let result = server.user_update_username(pss, "hey2", token).await;
-    // assert!(matches!(
-    //     result,
-    //     Err(UserUpdateUsernameErr::UsernameAlreadyUsed)
-    // ));
-
-    // server
-    //     .user_update_username(pss, "hey3", token)
-    //     .await
-    //     .unwrap();
-    // let user = server
-    //     .state
-    //     .db
-    //     .user_get_by_email("hey@heyadora.com")
-    //     .await
-    //     .unwrap();
-    // assert_eq!(user.username, "hey3");
 }

@@ -36,7 +36,8 @@ pub enum PostUpdateImageAddErr {
 }
 // #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
 // pub struct PostUpdateFileAddReq {}
-pub type PostUpdateImageAddRes = Vec<FileImage>;
+pub type PostUpdateImageAddRes = FileImage;
+// pub type PostUpdateImageAddRes = Vec<FileImage>;
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
 pub struct PostUpdateImageAddParams {

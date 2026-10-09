@@ -73,7 +73,7 @@ pub use post_thumbnail_get_by_hash::post_thumbnail_bytes_get_by_hash;
 pub use post_update_description::post_update_description;
 pub use post_update_image_add::post_update_image_add;
 pub use post_update_image_ord::post_update_image_ord;
-pub use post_update_image_remove::post_update_Image_remove;
+pub use post_update_image_remove::post_update_image_remove;
 pub use post_update_state::post_update_state;
 pub use post_update_tags::post_update_tags;
 pub use post_update_title::post_update_title;

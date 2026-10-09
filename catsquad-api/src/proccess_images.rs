@@ -266,78 +266,159 @@ async fn test_proccess_post_files() {
     init_log();
 
     let server = crate::TestServer::new(0, "test_proccess_post_files").await;
+    let storage_path = server.state.get_storage_path().await;
+    let input1_img = server.create_img_input(0).await;
+    let input2_img = server.create_img_input(1).await;
 
-    let (_user1, session_key1) = server
+    let (user1, session_key1) = server
         .user_add_full("prime", "prime@heyadora.com", "1234567890111GGd11$")
         .await;
 
-    let post1 = server
-        .post_add("title", "description1", "tags1", session_key1)
-        .await
-        .unwrap();
+    // add post
+    let post1 = {
+        let post1 = server
+            .post_add("title", "description1", "tags1", session_key1)
+            .await
+            .unwrap();
 
-    assert_eq!(post1.images.len(), 0);
+        assert_eq!(post1.images.len(), 0);
 
-    let files = server
-        .post_update_image_add(post1.id, &["../assets/favicon.ico"], session_key1)
-        .await
-        .unwrap();
+        let image = server
+            .post_update_image_add(
+                post1.id,
+                &[input1_img.saved_path.to_str().unwrap()],
+                session_key1,
+            )
+            .await
+            .unwrap();
 
-    // get updated one
-    let post1 = server.post_add("", "", "", session_key1).await.unwrap();
+        assert_eq!(image.proccesed, false);
 
-    let file = files[0].clone();
-    let file_hash_str = i64_to_str(file.hash);
-    let storage_path = server.state.get_storage_path().await;
-
-    let file_path = {
-        let file_path = storage_file_path(
-            storage_path.clone(),
-            file_hash_str.as_str(),
-            file.extension.clone(),
-        );
-        file_path
+        post1
     };
-    let file_thumbnail_path = thumbnail_file_path(storage_path.clone(), file_hash_str);
-    let is_proccesed = server
-        .post_file_status_get_by_hash(file.hash)
-        .await
-        .unwrap()
-        .is_proccesed;
 
-    trace!("{file_path:?}");
-    trace!("{file_thumbnail_path:?}");
+    // get post
+    {
+        let post1 = server.post_add("", "", "", session_key1).await.unwrap();
 
-    assert_eq!(post1.images.len(), 1);
-    assert_eq!(post1.images[0].proccesed, false);
-    assert!(file_path.exists());
-    assert!(!file_thumbnail_path.exists());
-    assert!(!is_proccesed);
+        assert_eq!(post1.images.len(), 1);
+        assert_eq!(post1.images[0].proccesed, false);
+    }
 
-    proccess_post_images(0, server.state.db.clone(), storage_path.clone(), 1280)
-        .await
-        .unwrap();
+    // get status
+    {
+        let img1 = server
+            .post_file_status_get_by_hash(input1_img.hash)
+            .await
+            .unwrap();
 
-    // get updated one
-    let post1 = server.post_add("", "", "", session_key1).await.unwrap();
+        assert!(!img1.is_proccesed);
+    }
 
-    assert_eq!(post1.images.len(), 1);
-    assert_eq!(post1.images[0].proccesed, true);
+    // proccess
+    {
+        assert!(input1_img.storage_path.exists());
+        assert!(!input1_img.thumbnail_path.exists());
 
-    let is_proccesed = server
-        .post_file_status_get_by_hash(file.hash)
-        .await
-        .unwrap()
-        .is_proccesed;
+        proccess_post_images(0, server.state.db.clone(), storage_path.clone(), 1280)
+            .await
+            .unwrap();
 
-    assert!(file_path.exists());
-    assert!(file_thumbnail_path.exists());
-    assert!(is_proccesed);
+        assert!(input1_img.storage_path.exists());
+        assert!(input1_img.thumbnail_path.exists());
+    }
 
-    proccess_post_images(0, server.state.db.clone(), storage_path, 1280)
-        .await
-        .unwrap();
+    // get post
+    {
+        // gets the same post
+        let post1 = server.post_add("", "", "", session_key1).await.unwrap();
 
-    assert!(file_path.exists());
-    assert!(file_thumbnail_path.exists());
+        assert_eq!(post1.images.len(), 1);
+        assert_eq!(post1.images[0].proccesed, true);
+    }
+
+    // get status
+    {
+        let img1 = server
+            .post_file_status_get_by_hash(input1_img.hash)
+            .await
+            .unwrap();
+
+        assert!(img1.is_proccesed);
+    }
+
+    // proccess
+    {
+        proccess_post_images(0, server.state.db.clone(), storage_path.clone(), 1280)
+            .await
+            .unwrap();
+
+        assert!(input1_img.storage_path.exists());
+        assert!(input1_img.thumbnail_path.exists());
+    }
+
+    // assert remove file unexpected:
+    // if unproccesed file is missing when running proccess_images,
+    // it should be removed from the database
+    // removed from posts imgs
+    // removed from users pfp's
+    {
+        use catsquad_db::DbFileImageGetByHashErr;
+        use tokio::fs;
+
+        let _files = server
+            .post_update_image_add(
+                post1.id,
+                &[input2_img.saved_path.to_str().unwrap()],
+                session_key1,
+            )
+            .await
+            .unwrap();
+
+        let _result = server
+            .user_update_pfp(&[input2_img.saved_path.to_str().unwrap()], session_key1)
+            .await
+            .unwrap();
+
+        let img2 = server
+            .state
+            .db
+            .file_image_get_by_hash(input2_img.hash)
+            .await
+            .unwrap();
+
+        assert!(input2_img.storage_path.exists());
+        assert!(!input2_img.thumbnail_path.exists());
+        assert!(!img2.processed);
+        assert_eq!(img2.used_count, 2);
+
+        fs::remove_file(input2_img.storage_path.as_path())
+            .await
+            .unwrap();
+
+        proccess_post_images(0, server.state.db.clone(), storage_path.clone(), 1280)
+            .await
+            .unwrap();
+
+        let result = server
+            .state
+            .db
+            .file_image_get_by_hash(input2_img.hash)
+            .await;
+
+        // gets the same post
+        let post1 = server.post_add("", "", "", session_key1).await.unwrap();
+        let user1 = server
+            .state
+            .db
+            .user_get_by_username(user1.username.clone())
+            .await
+            .unwrap();
+        // let post1 = server.post_get_by_id(post1.id, session_key1).await.unwrap();
+
+        assert!(matches!(result, Err(DbFileImageGetByHashErr::NotFound)));
+        assert_eq!(post1.images.len(), 1);
+        assert_eq!(post1.images[0].hash, input1_img.hash);
+        assert_eq!(user1.pfp_image_hash, 0);
+    }
 }

@@ -26,6 +26,7 @@ impl Db {
     pub async fn post_update_file_remove(
         &self,
         time: u64,
+        callback_remove_image: impl AsyncFnOnce(i64, &str),
         user_username: impl Into<String>,
         post_id: i64,
         file_hash: i64,
@@ -73,7 +74,7 @@ impl Db {
         };
 
         // remove image
-        let (img_used_count, img_size_bytes) =
+        let (img_used_count, img_size_bytes, extension) =
             self.file_image_remove_tx(&mut *tx, time, file_hash).await?;
 
         // update post
@@ -146,6 +147,10 @@ impl Db {
             }
         }
 
+        if img_used_count == 0 {
+            callback_remove_image(file_hash, extension.as_str()).await;
+        }
+
         tx.commit()
             .await
             .inspect_err(|err| error!("post_update_file_remove {err}"))?;
@@ -160,6 +165,10 @@ async fn test_post_update_file_remove() {
     init_log();
 
     let db = Db::test_db(0, "test_post_update_file_remove").await;
+
+    let callback_remove_file = async move |hash: i64, extension: &str| {
+        //
+    };
 
     let (user, user2) = {
         let invite1 = db.invite_add(0, "hey@heyadora.com", 1).await.unwrap();
@@ -234,7 +243,7 @@ async fn test_post_update_file_remove() {
     // assert errors
     {
         let result = db
-            .post_update_file_remove(0, user.username.clone(), 0, 0)
+            .post_update_file_remove(0, callback_remove_file, user.username.clone(), 0, 0)
             .await;
         assert!(matches!(
             result,
@@ -242,7 +251,7 @@ async fn test_post_update_file_remove() {
         ));
 
         let result = db
-            .post_update_file_remove(0, user2.username.clone(), post1.id, 0)
+            .post_update_file_remove(0, callback_remove_file, user2.username.clone(), post1.id, 0)
             .await;
         assert!(matches!(
             result,
@@ -250,7 +259,7 @@ async fn test_post_update_file_remove() {
         ));
 
         let result = db
-            .post_update_file_remove(0, user.username.clone(), post1.id, 0)
+            .post_update_file_remove(0, callback_remove_file, user.username.clone(), post1.id, 0)
             .await;
         assert!(matches!(
             result,
@@ -263,7 +272,7 @@ async fn test_post_update_file_remove() {
         use crate::DbFileImageGetByHashErr;
 
         let post1_file = db
-            .post_update_file_remove(0, user.username.clone(), post1.id, 11)
+            .post_update_file_remove(0, callback_remove_file, user.username.clone(), post1.id, 11)
             .await
             .unwrap();
 
@@ -292,7 +301,7 @@ async fn test_post_update_file_remove() {
         use crate::DbFileImageGetByHashErr;
 
         let post1_file = db
-            .post_update_file_remove(0, user.username.clone(), post1.id, 12)
+            .post_update_file_remove(0, callback_remove_file, user.username.clone(), post1.id, 12)
             .await
             .unwrap();
 

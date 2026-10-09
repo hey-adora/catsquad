@@ -115,7 +115,7 @@ async fn test_api_post_update_state() {
         .await
         .unwrap();
     let post1 = server
-        .post_get_by_key(post1.id, session_key1)
+        .post_get_by_id(post1.id, session_key1)
         .await
         .unwrap();
 

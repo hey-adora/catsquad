@@ -20,11 +20,10 @@ impl Db {
         tx: &mut PgConnection,
         time: u64,
         file_hash: i64,
-    ) -> Result<(u32, u32), DbFileImageRemoveTxErr> {
+    ) -> Result<(u32, u32, String), DbFileImageRemoveTxErr> {
         // get img
-        let (mut img_used_count, file_size) = {
-            let query =
-                "SELECT image_used_count, image_size_bytes FROM files_images WHERE image_hash=$1";
+        let (mut img_used_count, file_size, extension) = {
+            let query = "SELECT image_used_count, image_size_bytes, image_extension FROM files_images WHERE image_hash=$1";
             let result = sqlx::query_as(query)
                 .bind(file_hash)
                 .fetch_one(&mut *tx)
@@ -34,13 +33,13 @@ impl Db {
 
             let result = match result {
                 Ok(v) => {
-                    let (image_used_count, image_size_bytes): (i64, i64) = v;
+                    let (image_used_count, image_size_bytes, extension): (i64, i64, String) = v;
                     if image_used_count < 1 {
                         return Err(DbFileImageRemoveTxErr::InternalError(format!(
                             "{image_used_count}(image_used_count) < 1 for image {file_hash}"
                         )));
                     }
-                    (image_used_count as u32, image_size_bytes as u32)
+                    (image_used_count as u32, image_size_bytes as u32, extension)
                 }
                 Err(err) => {
                     error!("unexpected db error {err}");
@@ -99,6 +98,6 @@ impl Db {
 
         img_used_count -= 1; // because we removed it
 
-        Ok((img_used_count, file_size))
+        Ok((img_used_count, file_size, extension))
     }
 }
