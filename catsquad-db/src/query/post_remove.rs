@@ -1,4 +1,4 @@
-use crate::Db;
+use crate::{Db, DbFileImageRemoveTxErr, XTimestamp};
 use catsquad_log::prelude::*;
 use catsquad_shared::PostState;
 
@@ -14,11 +14,16 @@ pub enum DbPostRemoveErr {
     // UserNotFound(String),
     #[error("unauthorized")]
     Unauthorized,
+
+    #[error(transparent)]
+    Image(#[from] DbFileImageRemoveTxErr),
 }
 
 impl Db {
     pub async fn post_remove(
         &self,
+        time: u64,
+        mut callback_remove_image: impl AsyncFnMut(i64, &str),
         user_username: impl Into<String>,
         post_id: i64,
     ) -> Result<(), DbPostRemoveErr> {
@@ -31,8 +36,8 @@ impl Db {
             .inspect_err(|err| error!("post_like_add {err}"))?;
 
         // get post
-        {
-            let query = "SELECT post_user_username, post_state FROM posts WHERE post_id = $1";
+        let images = {
+            let query = "SELECT post_user_username, post_state, post_images_hashes FROM posts WHERE post_id = $1";
 
             let result = sqlx::query_as(query)
                 .bind(post_id)
@@ -41,7 +46,8 @@ impl Db {
 
             debug!("query: {query}\nresult: {result:#?}");
 
-            let (post_user_username, post_state): (String, String) = match result {
+            let (post_user_username, post_state, images): (String, String, Vec<i64>) = match result
+            {
                 Ok(v) => v,
                 Err(sqlx::Error::RowNotFound) => {
                     return Err(DbPostRemoveErr::NotFound(post_id));
@@ -62,6 +68,45 @@ impl Db {
                 PostState::Hidden => (),
                 PostState::Active => (),
             }
+
+            images
+        };
+
+        let mut total_removed_imgs_size = 0;
+        for hash in images {
+            let (img_used_count, img_size, extension) =
+                self.file_image_remove_tx(&mut *tx, time, hash).await?;
+            if img_used_count == 0 {
+                callback_remove_image(hash, extension.as_str()).await;
+            }
+            total_removed_imgs_size += img_size;
+        }
+
+        // update user
+        {
+            let query = "UPDATE users SET
+                            user_used_storage_bytes = user_used_storage_bytes - $1,
+                            user_modified_at = $2
+                            WHERE user_username = $3";
+
+            let result = sqlx::query(query)
+                .bind(total_removed_imgs_size as i64)
+                .bind(XTimestamp(time as i64))
+                .bind(&user_username)
+                .execute(&mut *tx)
+                .await;
+
+            debug!(
+                "query {query}, $1={total_removed_imgs_size } $2={time} $3={user_username:?}, result: {result:#?}"
+            );
+
+            let _result = match result {
+                Ok(v) => v,
+                Err(err) => {
+                    error!("unexpected db error {err}");
+                    return Err(DbPostRemoveErr::Db(err));
+                }
+            };
         }
 
         // delete post like
@@ -105,8 +150,6 @@ impl Db {
 #[cfg(test)]
 #[tokio::test]
 async fn test_post_remove() {
-    // use crate::create_user_id;
-
     init_log();
     let db = Db::test_db(0, "test_post_remove").await;
 
@@ -125,7 +168,13 @@ async fn test_post_remove() {
         (user, user2)
     };
 
-    let result = db.post_remove(user.username.clone(), 0).await;
+    let callback_remove = async move |hash: i64, extension: &str| {
+        //
+    };
+
+    let result = db
+        .post_remove(0, callback_remove, user.username.clone(), 0)
+        .await;
     assert!(matches!(result, Err(DbPostRemoveErr::NotFound(_))));
 
     let post1_key = {
@@ -135,6 +184,14 @@ async fn test_post_remove() {
             .unwrap();
 
         db.post_update_state(0, user.username.clone(), post1.id, PostState::Active)
+            .await
+            .unwrap();
+
+        db.post_update_image_add(0, user.username.clone(), post1.id, 1, 666, "png", 15, 15)
+            .await
+            .unwrap();
+
+        db.post_update_image_add(0, user.username.clone(), post1.id, 1, 667, "png", 15, 15)
             .await
             .unwrap();
 
@@ -169,6 +226,10 @@ async fn test_post_remove() {
             .await
             .unwrap();
 
+        db.post_update_image_add(0, user.username.clone(), post2.id, 1, 667, "png", 15, 15)
+            .await
+            .unwrap();
+
         db.post_like_add(0, user2.username.clone(), post2.id)
             .await
             .unwrap();
@@ -182,7 +243,12 @@ async fn test_post_remove() {
     // assert errors
     {
         let result = db
-            .post_remove(user2.username.clone(), post1_key.clone())
+            .post_remove(
+                0,
+                callback_remove,
+                user2.username.clone(),
+                post1_key.clone(),
+            )
             .await;
         assert!(matches!(result, Err(DbPostRemoveErr::Unauthorized)));
 
@@ -200,13 +266,35 @@ async fn test_post_remove() {
 
     // assert success
     {
-        db.post_remove(user.username.clone(), post1_key.clone())
+        use crate::DbFileImageGetByHashErr;
+
+        let user1 = db.user_get_by_username("hey").await.unwrap();
+        let user2 = db.user_get_by_username("hey2").await.unwrap();
+        let img1 = db.file_image_get_by_hash(666).await.unwrap();
+        let img2 = db.file_image_get_by_hash(667).await.unwrap();
+
+        assert_eq!(user1.used_storage_bytes, 3);
+        assert_eq!(user2.used_storage_bytes, 0);
+        assert_eq!(img1.used_count, 1);
+        assert_eq!(img2.used_count, 2);
+
+        db.post_remove(0, callback_remove, user.username.clone(), post1_key.clone())
             .await
             .unwrap();
+
+        let user1 = db.user_get_by_username("hey").await.unwrap();
+        let user2 = db.user_get_by_username("hey2").await.unwrap();
+        let img1 = db.file_image_get_by_hash(666).await;
+        let img2 = db.file_image_get_by_hash(667).await.unwrap();
 
         let posts = db.post_get_all().await.unwrap();
         let comments = db.comment_get_all().await.unwrap();
         let likes = db.post_like_get_all().await.unwrap();
+
+        assert_eq!(user1.used_storage_bytes, 1);
+        assert_eq!(user2.used_storage_bytes, 0);
+        assert!(matches!(img1, Err(DbFileImageGetByHashErr::NotFound)));
+        assert_eq!(img2.used_count, 1);
 
         assert_eq!(posts.len(), 1);
         assert_eq!(comments.len(), 1);

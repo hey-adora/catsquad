@@ -1,4 +1,4 @@
-use crate::state::AppState;
+use crate::{api::user_update_pfp::remove_images, state::AppState};
 use axum::{
     Extension, Json,
     extract::{Path, State},
@@ -12,8 +12,8 @@ fn from_db_post_remove_err(value: DbPostRemoveErr) -> PostRemoveErr {
     match value {
         DbPostRemoveErr::NotFound(_) => PostRemoveErr::PostNotFound,
         DbPostRemoveErr::Unauthorized => PostRemoveErr::Unauthorized("unauthorized".to_string()),
-        // DbPostRemoveErr::UserNotFound(_) => PostRemoveErr::Unauthorized("unauthorized".to_string()),
         DbPostRemoveErr::Db(_) => PostRemoveErr::InternalServer,
+        DbPostRemoveErr::Image(_) => PostRemoveErr::InternalServer,
     }
 }
 
@@ -34,9 +34,15 @@ pub async fn post_remove(
     let inner = async || -> Result<(), PostRemoveErr> {
         let user_username = db_user.username.clone();
         let post_id = req.post_id;
+        let time = app.get_time_micro();
+        let storage_path = app.get_storage_path().await;
+
+        let callback_remove_image = async move |hash: i64, extension: &str| {
+            remove_images(storage_path.as_path(), hash, extension).await;
+        };
 
         app.db
-            .post_remove(user_username, post_id)
+            .post_remove(time, callback_remove_image, user_username, post_id)
             .await
             .map_err(from_db_post_remove_err)?;
 
@@ -78,19 +84,23 @@ mod test_utils {
 
 #[cfg(test)]
 #[tokio::test]
-async fn test_post_remove() {
+async fn test_api_post_remove() {
     use catsquad_log::prelude::*;
     use catsquad_shared::{PostGetByKeyErr, PostState};
 
     init_log();
 
-    let server = crate::TestServer::new(0, "test_post_remove").await;
+    let server = crate::TestServer::new(0, "test_api_post_remove").await;
+    let storage_path = server.state.get_storage_path().await;
 
-    let (user1, session_key1) = server
+    let input1_img = server.create_img_input(0).await;
+    let input2_img = server.create_img_input(1).await;
+
+    let (_user1, session_key1) = server
         .user_add_full("prime", "prime@heyadora.com", "1234567890111GGd11$")
         .await;
 
-    let (user2, session_key2) = server
+    let (_user2, session_key2) = server
         .user_add_full("prime2", "prime2@heyadora.com", "1234567890111GGd11$")
         .await;
 
@@ -105,6 +115,24 @@ async fn test_post_remove() {
             .await
             .unwrap();
 
+        server
+            .post_update_image_add(
+                post1.id,
+                &[input1_img.saved_path.to_str().unwrap()],
+                session_key1,
+            )
+            .await
+            .unwrap();
+
+        server
+            .post_update_image_add(
+                post1.id,
+                &[input2_img.saved_path.to_str().unwrap()],
+                session_key1,
+            )
+            .await
+            .unwrap();
+
         let post2 = server
             .post_add("title", "description1", "tags1", session_key1)
             .await
@@ -112,6 +140,15 @@ async fn test_post_remove() {
 
         server
             .post_update_state(post2.id, PostState::Active, session_key1)
+            .await
+            .unwrap();
+
+        server
+            .post_update_image_add(
+                post2.id,
+                &[input2_img.saved_path.to_str().unwrap()],
+                session_key1,
+            )
             .await
             .unwrap();
 
@@ -129,9 +166,67 @@ async fn test_post_remove() {
         assert!(matches!(result, Err(PostGetByKeyErr::PostNotFound)));
     }
 
-    // let result = server.post_remove(post1.id, session_key1).await;
-    // assert!(matches!(result, Ok(_)));
+    // assert success
+    {
+        use catsquad_db::DbFileImageGetByHashErr;
 
-    // let result = server.post_remove(post2.id, session_key1).await;
-    // assert!(matches!(result, Ok(_)));
+        use crate::proccess_images::proccess_post_images;
+
+        let img1 = server
+            .state
+            .db
+            .file_image_get_by_hash(input1_img.hash)
+            .await
+            .unwrap();
+        let img2 = server
+            .state
+            .db
+            .file_image_get_by_hash(input2_img.hash)
+            .await
+            .unwrap();
+
+        assert_eq!(img1.used_count, 1);
+        assert_eq!(img2.used_count, 2);
+        assert!(input1_img.storage_path.exists());
+        assert!(!input1_img.thumbnail_path.exists());
+        assert!(input2_img.storage_path.exists());
+        assert!(!input2_img.thumbnail_path.exists());
+
+        proccess_post_images(0, server.state.db.clone(), storage_path, 1280)
+            .await
+            .unwrap();
+
+        assert!(input1_img.storage_path.exists());
+        assert!(input1_img.thumbnail_path.exists());
+        assert!(input2_img.storage_path.exists());
+        assert!(input2_img.thumbnail_path.exists());
+
+        server.post_remove(post1.id, session_key1).await.unwrap();
+
+        let img1 = server
+            .state
+            .db
+            .file_image_get_by_hash(input1_img.hash)
+            .await;
+        let img2 = server
+            .state
+            .db
+            .file_image_get_by_hash(input2_img.hash)
+            .await
+            .unwrap();
+        let post1 = server.post_get_by_id(post1.id, session_key1).await;
+        let post2 = server.post_get_by_id(post2.id, session_key1).await.unwrap();
+
+        assert!(matches!(post1, Err(PostGetByKeyErr::PostNotFound)));
+        assert_eq!(post2.images.len(), 1);
+        assert_eq!(post2.images[0].hash, input2_img.hash);
+
+        assert!(matches!(img1, Err(DbFileImageGetByHashErr::NotFound)));
+        assert_eq!(img2.used_count, 1);
+
+        assert!(!input1_img.storage_path.exists());
+        assert!(!input1_img.thumbnail_path.exists());
+        assert!(input2_img.storage_path.exists());
+        assert!(input2_img.thumbnail_path.exists());
+    }
 }
