@@ -98,7 +98,7 @@ fn test_paths() {
         "/tmp/0.webp"
     );
     assert_eq!(
-        thumbnail_file_path("/tmp", "").to_str().unwrap(),
+        thumbnail_file_path("/tmp", "0").to_str().unwrap(),
         "/tmp/0_thumbnail.webp"
     );
 }
@@ -120,7 +120,7 @@ pub enum ProccessFileErr {
     Other(#[from] anyhow::Error),
 }
 
-pub async fn proccess_post_image(
+pub async fn proccess_image(
     storage_path: impl AsRef<Path>,
     file_hash: Hash,
     file_extension: impl AsRef<OsStr>,
@@ -197,30 +197,30 @@ pub async fn proccess_post_image(
 
 #[cfg(test)]
 #[tokio::test]
-async fn test_proccess_post_image_() {
+async fn test_proccess_image_() {
     use tokio::fs;
 
     init_log();
 
     let img_path = "../assets/upload.svg";
 
-    let server = crate::TestServer::new(0, "test_proccess_post_file").await;
+    let server = crate::TestServer::new(0, "test_proccess_image_").await;
     let storage_path = server.state.get_storage_path().await;
 
     let storage_file_path = storage_file_path(storage_path.clone(), "0", "svg");
 
     // expect not found
-    let result = proccess_post_image(storage_path.clone(), 0, "svg", 10, 10, 10).await;
+    let result = proccess_image(storage_path.clone(), 0, "svg", 10, 10, 10).await;
     assert!(matches!(result, Err(_)));
 
     fs::copy(img_path, storage_file_path).await.unwrap();
 
-    let result = proccess_post_image(storage_path.clone(), 0, "svg", 10, 10, 10).await;
+    let result = proccess_image(storage_path.clone(), 0, "svg", 10, 10, 10).await;
     trace!("{result:#?}");
     assert!(matches!(result, Ok(_)));
 }
 
-pub async fn proccess_post_images(
+pub async fn proccess_images_all(
     time: u64,
     db: Db,
     storage_path: impl AsRef<Path>,
@@ -229,7 +229,7 @@ pub async fn proccess_post_images(
     let storage_path = storage_path.as_ref();
     let images = db.file_image_get_unproccesed().await?;
     for image in images {
-        let result = proccess_post_image(
+        let result = proccess_image(
             storage_path,
             image.hash,
             image.extension.as_str(),
@@ -262,10 +262,10 @@ pub async fn proccess_post_images(
 
 #[cfg(test)]
 #[tokio::test]
-async fn test_proccess_post_files() {
+async fn test_proccess_images_all() {
     init_log();
 
-    let server = crate::TestServer::new(0, "test_proccess_post_files").await;
+    let server = crate::TestServer::new(0, "test_proccess_images_all").await;
     let storage_path = server.state.get_storage_path().await;
     let input1_img = server.create_img_input(0).await;
     let input2_img = server.create_img_input(1).await;
@@ -320,7 +320,7 @@ async fn test_proccess_post_files() {
         assert!(input1_img.storage_path.exists());
         assert!(!input1_img.thumbnail_path.exists());
 
-        proccess_post_images(0, server.state.db.clone(), storage_path.clone(), 1280)
+        proccess_images_all(0, server.state.db.clone(), storage_path.clone(), 1280)
             .await
             .unwrap();
 
@@ -349,7 +349,7 @@ async fn test_proccess_post_files() {
 
     // proccess
     {
-        proccess_post_images(0, server.state.db.clone(), storage_path.clone(), 1280)
+        proccess_images_all(0, server.state.db.clone(), storage_path.clone(), 1280)
             .await
             .unwrap();
 
@@ -396,7 +396,7 @@ async fn test_proccess_post_files() {
             .await
             .unwrap();
 
-        proccess_post_images(0, server.state.db.clone(), storage_path.clone(), 1280)
+        proccess_images_all(0, server.state.db.clone(), storage_path.clone(), 1280)
             .await
             .unwrap();
 

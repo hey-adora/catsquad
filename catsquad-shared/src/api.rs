@@ -38,6 +38,7 @@ pub mod test_backdoor_email_sent_get_all;
 pub mod user_add;
 pub mod user_get_by_session_key;
 pub mod user_get_by_username;
+pub mod user_pfp_get_bytes;
 pub mod user_update_aboutme;
 pub mod user_update_pfp;
 pub mod user_update_support;

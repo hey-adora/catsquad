@@ -6,7 +6,7 @@ use axum::{
 use catsquad_db::DbUser;
 use catsquad_shared::PostImageBytesGetByHashParams;
 
-use crate::{api::post_file_bytes_get_by_hash::get_file_image, state::AppState};
+use crate::{api::post_image_bytes_get_by_hash::get_file_image, state::AppState};
 
 pub async fn post_thumbnail_bytes_get_by_hash(
     db_user: Extension<Option<DbUser>>,
@@ -55,7 +55,7 @@ mod test_utils {
 #[cfg(test)]
 #[tokio::test]
 async fn test_api_post_thumbnail_bytes_by_hash() {
-    use crate::{get_file_hash_for_testing_by_path, proccess_images::proccess_post_images};
+    use crate::{get_file_hash_for_testing_by_path, proccess_images::proccess_images_all};
     use catsquad_log::prelude::*;
     use catsquad_shared::{PostImageBytesGetByHashErr, PostState};
     use tokio::fs::set_permissions;
@@ -109,7 +109,7 @@ async fn test_api_post_thumbnail_bytes_by_hash() {
         Err(PostImageBytesGetByHashErr::FileNotFound)
     ));
 
-    proccess_post_images(
+    proccess_images_all(
         0,
         server.state.db.clone(),
         server.state.get_storage_path().await,

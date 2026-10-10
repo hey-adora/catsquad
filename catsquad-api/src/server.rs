@@ -16,7 +16,7 @@ use tokio::fs;
 use crate::{
     api::{self, assets::index_404},
     auth::{auth_middleware, auth_optional_middleware},
-    proccess_images::proccess_post_images,
+    proccess_images::proccess_images_all,
     state::AppState,
 };
 pub async fn server() {
@@ -46,7 +46,7 @@ pub async fn server() {
                     _ = interval.tick() => {},
                 };
 
-                let result = proccess_post_images(0, db.clone(), storage_path.clone(), 1280).await;
+                let result = proccess_images_all(0, db.clone(), storage_path.clone(), 1280).await;
                 if let Err(err) = result {
                     error!("{err}");
                 }
@@ -99,6 +99,10 @@ pub async fn app(state: AppState) -> Router {
     }
 
     let router_public = Router::new()
+        .route(
+            catsquad_shared::LINK_API_USER_PFP_GET_BYTES,
+            get(api::user_pfp_get_bytes),
+        )
         .route(
             catsquad_shared::LINK_API_COMMENT_SEARCH,
             get(api::comment_search),

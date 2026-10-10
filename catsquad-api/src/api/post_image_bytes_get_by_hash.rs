@@ -1,24 +1,21 @@
-use axum::{
-    Extension,
-    extract::{Path, State},
-    http::{
-        StatusCode,
-        header::{self, CACHE_STATUS},
-    },
-    response::IntoResponse,
-};
-use catsquad_db::{DbPostGetByKeyErr, DbPostImageGetByHashErr, DbUser};
-use catsquad_log::prelude::*;
-use catsquad_shared::{
-    FILE_IMAGE_THUMBNAIL_EXTENSION, PostImageBytesGetByHashErr, PostImageBytesGetByHashParams,
-    i64_to_str, u128_to_str,
-};
-use tokio::fs;
-
 use crate::{
+    api::user_pfp_get_bytes::img_or_json_result,
     proccess_images::{storage_file_path, thumbnail_file_path},
     state::AppState,
 };
+use axum::{
+    Extension,
+    extract::{Path, State},
+    http::StatusCode,
+    response::IntoResponse,
+};
+use catsquad_db::{DbPostImageGetByHashErr, DbUser};
+use catsquad_log::prelude::*;
+use catsquad_shared::{
+    FILE_IMAGE_THUMBNAIL_EXTENSION, PostImageBytesGetByHashErr, PostImageBytesGetByHashParams,
+    i64_to_str,
+};
+use tokio::fs;
 
 fn from_post_image_get_by_hash_err(value: DbPostImageGetByHashErr) -> PostImageBytesGetByHashErr {
     match value {
@@ -30,14 +27,13 @@ fn from_post_image_get_by_hash_err(value: DbPostImageGetByHashErr) -> PostImageB
     }
 }
 
-fn from_io_err(_value: std::io::Error) -> PostImageBytesGetByHashErr {
+fn from_io_err_original(_value: std::io::Error) -> PostImageBytesGetByHashErr {
     PostImageBytesGetByHashErr::InternalServerErr
 }
 
-fn status_code(result: &Result<Vec<u8>, PostImageBytesGetByHashErr>) -> StatusCode {
+fn status_code(result: &Result<(Vec<u8>, String), PostImageBytesGetByHashErr>) -> StatusCode {
     match result {
         Ok(_) => StatusCode::OK,
-        // Err(PostFileGetByHashErr::PostNotFound) => StatusCode::NOT_FOUND,
         Err(PostImageBytesGetByHashErr::FileNotFound) => StatusCode::NOT_FOUND,
         Err(PostImageBytesGetByHashErr::Unauthorized(_)) => StatusCode::UNAUTHORIZED,
         Err(PostImageBytesGetByHashErr::InternalServerErr) => StatusCode::INTERNAL_SERVER_ERROR,
@@ -80,37 +76,13 @@ pub async fn get_file_image(
         let bytes = fs::read(&path)
             .await
             .inspect_err(|err| error!("{path:?} {err}"))
-            .map_err(from_io_err)?;
+            .map_err(from_io_err_original)?;
         Ok((bytes, file_extension))
     };
 
     let result = inner().await;
-    match result {
-        Ok((bytes, extension)) => {
-            let extension = format!("image/{extension}");
-            (StatusCode::OK, [(header::CONTENT_TYPE, extension)], bytes)
-        }
-        Err(err) => {
-            let result = Err(err);
-            let status_code = status_code(&result);
-            let Ok(bytes) = serde_json::to_vec(&result) else {
-                let bytes = format!("failed to serialize {result:#?}")
-                    .as_bytes()
-                    .to_vec();
-                return (
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    [(header::CONTENT_TYPE, "application/json".to_string())],
-                    bytes,
-                );
-            };
-
-            (
-                status_code,
-                [(header::CONTENT_TYPE, "application/json".to_string())],
-                bytes,
-            )
-        }
-    }
+    let status_code = status_code(&result);
+    img_or_json_result(result, status_code)
 }
 
 pub async fn post_file_bytes_get_by_hash(
@@ -161,12 +133,11 @@ mod test_utils {
 #[cfg(test)]
 #[tokio::test]
 async fn test_api_post_image_bytes_by_hash() {
+    use crate::get_file_hash_for_testing_by_path;
     use catsquad_shared::PostState;
 
-    use crate::{auth::create_auth_cookie_str, get_file_hash_for_testing_by_path};
-
     init_log();
-    let server = crate::TestServer::new(0, "test_api_post_file_by_hash").await;
+    let server = crate::TestServer::new(0, "test_api_post_image_bytes_by_hash").await;
 
     let (_user1, session_key1) = server
         .user_add_full("prime", "prime@heyadora.com", "1234567890111GGd11$")
@@ -200,17 +171,13 @@ async fn test_api_post_image_bytes_by_hash() {
         Err(PostImageBytesGetByHashErr::FileNotFound)
     ));
 
-    let result = server
+    let _result = server
         .post_update_image_add(post1.id, &["../assets/favicon.ico"], session_key1)
         .await
         .unwrap();
 
-    // let file_hash = result.file[0].hash.clone();
-
-    let result = server
+    let _result = server
         .post_image_bytes_get_by_hash(post1.id, file_hash, session_key1)
         .await
         .unwrap();
-
-    // result.
 }

@@ -742,6 +742,13 @@ where
         Builder::new(sender, params)
     }
 
+    pub fn user_pfp_get_bytes(
+        &self,
+        username: impl Display,
+    ) -> Builder<TSender, Vec<u8>, cs::UserPfpGetBytesErr> {
+        self.get(cs::link_relative_user_pfp_get_bytes(username))
+    }
+
     pub fn user_get_by_username(
         &self,
         username: impl Display,

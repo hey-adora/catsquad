@@ -185,12 +185,12 @@ mod test_utils {
 #[cfg(test)]
 #[tokio::test]
 async fn test_api_user_update_pfp() {
-    use crate::proccess_images::proccess_post_images;
+    use crate::proccess_images::proccess_images_all;
     use catsquad_db::DbFileImageGetByHashErr;
     use tokio::fs;
 
     init_log();
-    let server = crate::TestServer::new(0, "test_api_user_update_username").await;
+    let server = crate::TestServer::new(0, "test_api_user_update_pfp").await;
 
     let pss = "a1234567890111GG11$";
     let (user1, token) = server.user_add_full("hey", "hey@heyadora.com", pss).await;
@@ -237,7 +237,7 @@ async fn test_api_user_update_pfp() {
         assert!(!input2_img.storage_path.exists());
         assert!(!input2_img.thumbnail_path.exists());
 
-        proccess_post_images(0, server.state.db.clone(), storage_path.clone(), 1024)
+        proccess_images_all(0, server.state.db.clone(), storage_path.clone(), 1024)
             .await
             .unwrap();
 
@@ -308,7 +308,7 @@ async fn test_api_user_update_pfp() {
         assert!(input2_img.storage_path.exists());
         assert!(!input2_img.thumbnail_path.exists());
 
-        proccess_post_images(0, server.state.db.clone(), storage_path.clone(), 1024)
+        proccess_images_all(0, server.state.db.clone(), storage_path.clone(), 1024)
             .await
             .unwrap();
 

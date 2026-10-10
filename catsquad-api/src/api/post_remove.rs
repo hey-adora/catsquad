@@ -170,7 +170,7 @@ async fn test_api_post_remove() {
     {
         use catsquad_db::DbFileImageGetByHashErr;
 
-        use crate::proccess_images::proccess_post_images;
+        use crate::proccess_images::proccess_images_all;
 
         let img1 = server
             .state
@@ -192,7 +192,7 @@ async fn test_api_post_remove() {
         assert!(input2_img.storage_path.exists());
         assert!(!input2_img.thumbnail_path.exists());
 
-        proccess_post_images(0, server.state.db.clone(), storage_path, 1280)
+        proccess_images_all(0, server.state.db.clone(), storage_path, 1280)
             .await
             .unwrap();
 
