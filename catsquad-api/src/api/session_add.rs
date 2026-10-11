@@ -184,6 +184,6 @@ async fn test_api_session_add() {
     let (user, session_key) = server.user_add_full("hey", email, password).await;
     let (session, session_key2) = server.session_add_with_key(email, password).await;
     assert_ne!(session_key, session_key2);
-    let user = server.user_get_by_session_key(session_key2).await.unwrap();
+    let user = server.user_get_by_session_id(session_key2).await.unwrap();
     assert_eq!(user.email, email);
 }

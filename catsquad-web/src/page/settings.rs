@@ -13,12 +13,16 @@ mod email_change_component;
 mod email_change_state;
 mod password_change_component;
 mod password_change_state;
+mod pfp_editor_component;
+mod user_pfp_state;
 mod username_change_component;
 mod username_change_state;
 
 use email_change_component::EmailChange;
 use password_change_component::PasswordChange;
 pub use password_change_state::PasswordChangeState;
+use pfp_editor_component::PfpEditor;
+// pub use password_change_state::PasswordChangeState;
 use username_change_component::UsernameChange;
 
 #[component]
@@ -79,30 +83,35 @@ pub fn Settings() -> impl IntoView {
                 <div class="grid grid-cols-[1fr] gap-2  ">
                     <div class="flex flex-col gap-2">
                         <p class="text-[1.3rem] text-base0A">"User"</p>
-                        <div class="flex flex-col gap-4">
-                            <div class="flex flex-col gap-2">
-                                <div class="flex justify-between place-items-center">
-                                    <p class="text-[1.1rem]">"Username"</p>
-                                    <LinkSecondary id=move||"username_change_btn" link=link_username_change>"Edit"</LinkSecondary>
+                        <div class="grid grid-cols-[1fr_auto] gap-2">
+                            <div class="flex flex-col gap-4">
+                                <div class="flex flex-col gap-2">
+                                    <div class="flex justify-between place-items-center">
+                                        <p class="text-[1.1rem]">"Username"</p>
+                                        <LinkSecondary id=move||"username_change_btn" link=link_username_change>"Edit"</LinkSecondary>
+                                    </div>
+                                    <input id="current_user_username" class="rounded-xl bg-base01 px-2 py-1 text-base0B" value=username />
                                 </div>
-                                <input id="current_user_username" class="rounded-xl bg-base01 px-2 py-1 text-base0B" value=username />
-                            </div>
-                            <div class="flex flex-col gap-2">
-                                <div class="flex justify-between place-items-center">
-                                    <p class="text-[1.1rem]">"Email"</p>
-                                    <LinkSecondary id=move||"email_change_btn" link=link_email_change>"Edit"</LinkSecondary>
+                                <div class="flex flex-col gap-2">
+                                    <div class="flex justify-between place-items-center">
+                                        <p class="text-[1.1rem]">"Email"</p>
+                                        <LinkSecondary id=move||"email_change_btn" link=link_email_change>"Edit"</LinkSecondary>
+                                    </div>
+                                    <input id="current_user_email" type="email" class="rounded-xl bg-base01 px-2 py-1 text-base0B" value=email/>
                                 </div>
-                                <input id="current_user_email" type="email" class="rounded-xl bg-base01 px-2 py-1 text-base0B" value=email/>
-                            </div>
-                            <div class="flex flex-col gap-2">
-                                <div class="flex justify-between place-items-center">
-                                    <p class="text-[1.1rem]">"Password"</p>
-                                    <LinkSecondary id=move||"password_change_btn" link=link_password_change>"Edit"</LinkSecondary>
+                                <div class="flex flex-col gap-2">
+                                    <div class="flex justify-between place-items-center">
+                                        <p class="text-[1.1rem]">"Password"</p>
+                                        <LinkSecondary id=move||"password_change_btn" link=link_password_change>"Edit"</LinkSecondary>
+                                    </div>
+                                    <input type="password" class="rounded-xl bg-base01 px-2 py-1 text-base0B" value="***********"/>
                                 </div>
-                                <input type="password" class="rounded-xl bg-base01 px-2 py-1 text-base0B" value="***********"/>
                             </div>
+                            <PfpEditor/>
                         </div>
+
                     </div>
+
                 </div>
 
             </div>

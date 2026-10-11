@@ -10,7 +10,9 @@ use axum::{
 };
 use catsquad_db::DbUser;
 use catsquad_log::prelude::*;
-use catsquad_shared::{DEFAULT_GLOBAL_MAX_UPLOAD_SIZE, MAX_STORAGE_PER_FILE};
+use catsquad_shared::{
+    DEFAULT_GLOBAL_MAX_UPLOAD_SIZE, FILE_IMAGE_THUMBNAIL_SIZE, MAX_STORAGE_PER_FILE,
+};
 use tokio::fs;
 
 use crate::{
@@ -46,7 +48,13 @@ pub async fn server() {
                     _ = interval.tick() => {},
                 };
 
-                let result = proccess_images_all(0, db.clone(), storage_path.clone(), 1280).await;
+                let result = proccess_images_all(
+                    0,
+                    db.clone(),
+                    storage_path.clone(),
+                    FILE_IMAGE_THUMBNAIL_SIZE,
+                )
+                .await;
                 if let Err(err) = result {
                     error!("{err}");
                 }
@@ -109,7 +117,7 @@ pub async fn app(state: AppState) -> Router {
         )
         .route(
             catsquad_shared::LINK_API_POST_FILE_STATUS_GET_BY_HASH,
-            get(api::post_file_status_get_by_hash),
+            get(api::file_image_status_get_by_hash),
         )
         .route(
             catsquad_shared::LINK_API_SESSION_ADD,

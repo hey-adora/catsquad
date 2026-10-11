@@ -76,11 +76,11 @@ async fn test_api_session_remove() {
 
     let (user, session_key) = server.user_add_full("hey", email, password).await;
 
-    let result = server.user_get_by_session_key(session_key).await;
+    let result = server.user_get_by_session_id(session_key).await;
     assert!(result.is_ok());
 
     let _result = server.session_remove(session_key).await.unwrap();
 
-    let result = server.user_get_by_session_key(session_key).await;
+    let result = server.user_get_by_session_id(session_key).await;
     assert!(result.is_err());
 }

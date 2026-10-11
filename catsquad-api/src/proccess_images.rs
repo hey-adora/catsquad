@@ -308,7 +308,7 @@ async fn test_proccess_images_all() {
     // get status
     {
         let img1 = server
-            .post_file_status_get_by_hash(input1_img.hash)
+            .file_image_status_get_by_hash(input1_img.hash)
             .await
             .unwrap();
 
@@ -340,7 +340,7 @@ async fn test_proccess_images_all() {
     // get status
     {
         let img1 = server
-            .post_file_status_get_by_hash(input1_img.hash)
+            .file_image_status_get_by_hash(input1_img.hash)
             .await
             .unwrap();
 

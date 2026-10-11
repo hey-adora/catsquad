@@ -20,6 +20,8 @@ pub fn from_db_user_redacted(value: DbUser) -> RedactedUserRes {
     RedactedUserRes {
         // key: value.id,
         username: value.username,
+        pfp_hash: value.pfp_image_hash,
+        pfp_proccesed: value.pfp_image_proccesed,
         support: value.support,
         aboutme: value.aboutme,
         created_at: value.created_at,
@@ -30,6 +32,8 @@ pub fn from_db_user_sensitive(value: DbUser) -> SensitiveUserRes {
     SensitiveUserRes {
         // key: id_to_string(value.id),
         username: value.username,
+        pfp_hash: value.pfp_image_hash,
+        pfp_proccesed: value.pfp_image_proccesed,
         max_storage_bytes: value.max_storage_bytes,
         email: value.email,
         created_at: value.created_at,

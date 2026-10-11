@@ -1,4 +1,4 @@
-use crate::{BtnPrimary, PageState, SVGGear, SVGProfile, SVGTriangle, hook::Spawner};
+use crate::{BtnPrimary, PageState, Pfp, SVGGear, SVGTriangle, hook::Spawner};
 use catsquad_shared::{LINK_WEB_INDEX, LINK_WEB_SETTINGS, link_relative_profile_gallery};
 use leptos::prelude::*;
 
@@ -30,7 +30,7 @@ pub fn Profile(spawner: Spawner) -> impl IntoView {
                 <SVGTriangle class="z-[100] size-4 text-base05 absolute left-[100%] top-[100%] transform -translate-x-1/2 -translate-y-1/2"/>
                 <div class="flex flex-col gap-2 text-left z-[100] px-4 py-2 rounded-md bg-base03 absolute right-0 bottom-0 transform translate-y-[calc(100%+0.5rem)] " >
                     <a class="flex gap-2 place-items-center px-1 " href=link_profile>
-                        <SVGProfile class="size-6"/>
+                        <Pfp class="bg-base05 size-6"/>
                         {username}
                     </a>
                     <a class="flex gap-2 place-items-center px-1 " href=LINK_WEB_SETTINGS>

@@ -334,7 +334,7 @@ impl ProccessingState {
         let client = create_client();
 
         let result = client
-            .post_file_status_get_by_hash(file_hash)
+            .file_image_status_get_by_hash(file_hash)
             .send()
             .await
             .into_json()

@@ -15,6 +15,8 @@ pub struct DbUser {
     pub aboutme: String,
     #[sqlx(rename = "user_pfp_image_hash")]
     pub pfp_image_hash: i64,
+    #[sqlx(default, rename = "user_pfp_image_proccesed")]
+    pub pfp_image_proccesed: bool,
     #[sqlx(rename = "user_used_storage_bytes")]
     #[sqlx(try_from = "i64")]
     pub used_storage_bytes: u32,
@@ -203,6 +205,7 @@ impl Db {
             support: String::new(),
             aboutme: String::new(),
             pfp_image_hash: 0,
+            pfp_image_proccesed: false,
             used_storage_bytes: 0,
             max_storage_bytes,
             max_storage_per_image_bytes: max_storage_per_file_bytes,

@@ -3,10 +3,10 @@ mod server;
 mod api;
 mod api_config;
 mod assets;
-mod proccess_images;
 mod state;
 
 pub mod auth;
+pub mod proccess_images;
 pub mod utils;
 // pub mod validation;
 // pub mod web;

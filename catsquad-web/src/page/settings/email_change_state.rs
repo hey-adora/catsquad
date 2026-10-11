@@ -309,6 +309,6 @@ async fn test_email_change_state() {
     email_change.new_confirm(new_token).await.unwrap();
     email_change.finish().await.unwrap();
 
-    let result = server.user_get_by_session_key(session1).await.unwrap();
+    let result = server.user_get_by_session_id(session1).await.unwrap();
     assert_eq!(result.email, "prime2@heyadora.com");
 }

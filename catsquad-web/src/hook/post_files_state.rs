@@ -272,16 +272,16 @@ impl PostImagesState {
 
         match result {
             Ok(received_post) => {
-                if received_post.len() != 1 {
-                    warn!("received wrong data\n{received_post:#?}");
-                    parsed_image.update(|image| {
-                        image.state = ParsedPostImageState::Error;
-                        image.err = "received wrong response".to_string();
-                    });
-                    return;
-                }
+                // if received_post.len() != 1 {
+                //     warn!("received wrong data\n{received_post:#?}");
+                //     parsed_image.update(|image| {
+                //         image.state = ParsedPostImageState::Error;
+                //         image.err = "received wrong response".to_string();
+                //     });
+                //     return;
+                // }
 
-                let hash = received_post[0].hash.clone();
+                let hash = received_post.hash;
 
                 parsed_image.update(|image| {
                     image.name = hash.to_string();

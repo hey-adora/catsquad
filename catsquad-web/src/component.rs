@@ -13,5 +13,6 @@ pub mod link_secondary;
 pub mod modal;
 pub mod modal_confirm;
 pub mod nav;
+pub mod pfp;
 pub mod svgs;
 pub mod text_editor;

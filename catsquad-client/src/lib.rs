@@ -728,7 +728,7 @@ where
         )
     }
 
-    pub fn user_get_by_session_key(
+    pub fn user_get_by_session_id(
         &self,
     ) -> Builder<TSender, catsquad_shared::SensitiveUserRes, catsquad_shared::UserGetBySessionKeyErr>
     {
@@ -888,12 +888,14 @@ where
         Builder::new(sender, params)
     }
 
-    pub fn post_file_status_get_by_hash(
+    pub fn file_image_status_get_by_hash(
         &self,
         // post_id: i64,
         file_hash: i64,
-    ) -> Builder<TSender, cs::PostFileGetStatusByHashRes, cs::PostFileStatusGetByHashErr> {
-        self.get(cs::link_relative_post_get_file_status_by_hash(file_hash))
+    ) -> Builder<TSender, cs::FileImageGetStatusByHashRes, cs::FileImageStatusGetByHashErr> {
+        self.get(cs::link_relative_file_image_get_file_status_by_hash(
+            file_hash,
+        ))
     }
 
     pub fn post_file_bytes_get_by_hash(

@@ -17,8 +17,27 @@ impl Db {
     ) -> Result<DbUser, DbUserGetByUsernameErr> {
         let pool = &self.db;
         let username = username.into();
+        // TODO can combine get by username/email
 
-        let query = "SELECT * FROM users WHERE user_username = $1";
+        let query = "SELECT
+                            user_username,
+                            user_email,
+                            user_password,
+                            user_support,
+                            user_aboutme,
+                            user_pfp_image_hash,
+                            coalesce(image_processed, false) as user_pfp_image_proccesed,
+                            user_used_storage_bytes,
+                            user_max_storage_per_file_bytes,
+                            user_max_storage_bytes,
+                            user_max_storage_bytes,
+                            user_modified_at,
+                            user_created_at
+                                FROM users
+                            LEFT JOIN files_images
+                                ON user_pfp_image_hash = image_hash
+                            WHERE
+                                user_username = $1";
 
         debug!("about to run {query}");
 

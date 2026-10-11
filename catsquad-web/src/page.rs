@@ -1,16 +1,11 @@
-use std::time::Duration;
-
 use catsquad_client::Client;
 use catsquad_client::XMLSender;
-use catsquad_log::prelude::*;
-use catsquad_shared::UserGetBySessionKeyErr;
 use catsquad_web_utils::interval;
 use catsquad_web_utils::time::time_now_micro;
-use catsquad_web_utils::time::time_now_ns;
 use leptos::prelude::*;
-use leptos_router::StaticSegment;
 use leptos_router::components::*;
 use leptos_router::path;
+use std::time::Duration;
 
 pub mod index;
 pub mod login;
@@ -38,7 +33,7 @@ pub fn create_client() -> Client<XMLSender> {
 
 #[component]
 pub fn App() -> impl IntoView {
-    PageState::set();
+    PageState::set(create_client());
     ModalConfirmDto::set();
 
     let page = PageState::get();
@@ -58,6 +53,15 @@ pub fn App() -> impl IntoView {
         Duration::from_secs(1),
     )
     .unwrap();
+
+    // interval::new(
+    //     move |_handle| {
+    //         let time = time_now_micro();
+    //         page.time.set(time);
+    //     },
+    //     Duration::from_secs(1),
+    // )
+    // .unwrap();
 
     view! {
      <Router>

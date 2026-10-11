@@ -270,7 +270,7 @@ pub fn RegisterForm() -> impl IntoView {
     };
 
     view! {
-        <form class="flex gap-4 flex-col px-[4rem] max-w-[25rem] mx-auto w-full ">
+        <div class="flex gap-4 flex-col px-[4rem] max-w-[25rem] mx-auto w-full ">
             <h1 class="text-[1.5rem]  text-center mt-[4rem]">"Register"</h1>
             <Errs error=move||reg.err_general.get()/>
             <div class="flex flex-col justify-center gap-2">
@@ -297,7 +297,7 @@ pub fn RegisterForm() -> impl IntoView {
             <div class="flex flex-col gap-[1.3rem] mx-auto text-center">
                 <BtnPrimary on_click=on_register >"Register"</BtnPrimary>
             </div>
-        </form>
+        </div>
     }
 }
 

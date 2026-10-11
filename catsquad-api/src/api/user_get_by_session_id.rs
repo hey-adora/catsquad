@@ -27,12 +27,12 @@ mod test_utils {
     use crate::{TestServer, auth::create_auth_cookie_str};
 
     impl TestServer {
-        pub async fn user_get_by_session_key(
+        pub async fn user_get_by_session_id(
             &self,
             session_token: Uuid,
         ) -> Result<cs::SensitiveUserRes, cs::UserGetBySessionKeyErr> {
             self.client
-                .user_get_by_session_key()
+                .user_get_by_session_id()
                 .header_add(
                     header::COOKIE,
                     create_auth_cookie_str(uuid_to_str(session_token)),
@@ -47,7 +47,7 @@ mod test_utils {
 
 #[cfg(test)]
 #[tokio::test]
-async fn test_api_user_get_by_sessino_key() {
+async fn test_api_user_get_by_sessino_id() {
     use catsquad_log::prelude::*;
     init_log();
     let server = crate::TestServer::new(0, "test_api_user_get_by_sessino_key").await;
@@ -55,24 +55,24 @@ async fn test_api_user_get_by_sessino_key() {
     let (user_add, session_key) = server
         .user_add_full("hey", "prime@heyadora.com", "PAss$ord11111")
         .await;
-    let user_get = server.user_get_by_session_key(session_key).await.unwrap();
+    let user_get = server.user_get_by_session_id(session_key).await.unwrap();
     assert_eq!(user_add.username, user_get.username);
 }
 
 #[cfg(test)]
 #[tokio::test]
-async fn test_api_security_test_user_get_by_sessino_key() {
+async fn test_api_security_test_user_get_by_sessino_id() {
     use axum::http::header;
     use catsquad_log::prelude::*;
 
     use crate::auth::{ERR_MSG_COOKIE, ERR_MSG_SESSION, create_auth_cookie_str};
 
     init_log();
-    let server = crate::TestServer::new(0, "test_api_security_test_user_get_by_sessino_key").await;
+    let server = crate::TestServer::new(0, "test_api_security_test_user_get_by_sessino_id").await;
 
     let user_get = server
         .client
-        .user_get_by_session_key()
+        .user_get_by_session_id()
         .header_add(header::COOKIE, create_auth_cookie_str(""))
         .send()
         .await
@@ -86,9 +86,7 @@ async fn test_api_security_test_user_get_by_sessino_key() {
         ))
     );
 
-    let user_get = server
-        .user_get_by_session_key(u128::MAX.to_be_bytes())
-        .await;
+    let user_get = server.user_get_by_session_id(u128::MAX.to_be_bytes()).await;
     assert_eq!(
         user_get,
         Err(UserGetBySessionKeyErr::Unauthorized(

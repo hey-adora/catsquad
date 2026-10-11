@@ -22,6 +22,7 @@ pub use component::link_secondary::LinkSecondary;
 pub use component::modal::Modal;
 pub use component::modal_confirm::*;
 pub use component::nav::Nav;
+pub use component::pfp::*;
 pub use component::svgs::*;
 pub use component::text_editor::TextEditor;
 pub use page::profile::ProfileParams;

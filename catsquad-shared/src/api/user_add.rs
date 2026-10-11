@@ -10,6 +10,8 @@ pub const LINK_API_USER_ADD: &str = "/api/register";
 pub struct RedactedUserRes {
     // pub key: i64,
     pub username: String,
+    pub pfp_hash: i64,
+    pub pfp_proccesed: bool,
     pub support: String,
     pub aboutme: String,
     pub created_at: u64,
@@ -19,6 +21,8 @@ pub struct RedactedUserRes {
 pub struct SensitiveUserRes {
     // pub key: i64,
     pub username: String,
+    pub pfp_hash: i64,
+    pub pfp_proccesed: bool,
     pub max_storage_bytes: u32, // TODO add max per image and add that to UI
     pub email: String,
     pub created_at: u64,

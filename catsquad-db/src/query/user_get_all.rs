@@ -11,7 +11,25 @@ pub enum DbUserGetAllErr {
 impl Db {
     pub async fn user_get_all(&self) -> Result<Vec<DbUser>, DbUserGetAllErr> {
         let pool = &self.db;
-        let query = "SELECT * FROM users ORDER BY user_created_at DESC";
+        let query = "SELECT
+                            user_username,
+                            user_email,
+                            user_password,
+                            user_support,
+                            user_aboutme,
+                            user_pfp_image_hash,
+                            coalesce(image_processed, false) as user_pfp_image_proccesed,
+                            user_used_storage_bytes,
+                            user_max_storage_per_file_bytes,
+                            user_max_storage_bytes,
+                            user_max_storage_bytes,
+                            user_modified_at,
+                            user_created_at
+                                FROM users
+                            LEFT JOIN files_images
+                                ON user_pfp_image_hash = image_hash
+                            ORDER BY user_created_at DESC
+                            ";
 
         trace!("about to run {query}");
 

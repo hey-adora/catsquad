@@ -20,6 +20,7 @@ pub const MIN_USERNAME_LENGTH: usize = 3;
 pub const MIN_PASSWORD_LENGTH: usize = 12;
 pub const MAX_PASSWORD_LENGTH: usize = 100;
 pub const FILE_IMAGE_THUMBNAIL_EXTENSION: &'static str = "webp";
+pub const FILE_IMAGE_THUMBNAIL_SIZE: u32 = 1280;
 pub const MAX_PFP_SIZE_BYTES: u32 = 1024 * 1000 * 2; // 2MB probably
 pub type Hash = i64;
 

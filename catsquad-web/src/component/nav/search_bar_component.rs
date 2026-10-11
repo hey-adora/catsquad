@@ -14,7 +14,7 @@ use web_sys::{HtmlInputElement, HtmlTextAreaElement, KeyboardEvent};
 
 #[component]
 pub fn SearchBar() -> impl IntoView {
-    let page = PageState::new();
+    let page = PageState::get();
     let search_input = NodeRef::<html::Input>::new();
     let navigate = use_navigate();
     let location = use_location();

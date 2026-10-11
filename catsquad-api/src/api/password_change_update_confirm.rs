@@ -156,7 +156,7 @@ async fn test_api_user_password_change_confirm() {
         .user_add_full("hey2", "hey2@heyadora.com", "hello1111111@1P")
         .await;
 
-    let result = server.user_get_by_session_key(session_key.clone()).await;
+    let result = server.user_get_by_session_id(session_key.clone()).await;
     assert!(result.is_ok());
 
     // password change
@@ -194,7 +194,7 @@ async fn test_api_user_password_change_confirm() {
     );
 
     // password change should invalidate old sessions
-    let result = server.user_get_by_session_key(session_key.clone()).await;
+    let result = server.user_get_by_session_id(session_key.clone()).await;
     assert!(result.is_err());
 
     // password reset
@@ -227,9 +227,9 @@ async fn test_api_user_password_change_confirm() {
         DbEmailSentReason::UserPasswordResetConfirm.to_string()
     );
 
-    let result = server.user_get_by_session_key(session_key.clone()).await;
+    let result = server.user_get_by_session_id(session_key.clone()).await;
     assert!(result.is_err());
 
-    let result = server.user_get_by_session_key(session_key2.clone()).await;
+    let result = server.user_get_by_session_id(session_key2.clone()).await;
     assert!(result.is_ok());
 }

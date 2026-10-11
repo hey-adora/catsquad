@@ -155,7 +155,7 @@ pub async fn user_update_pfp(
     (status_code, Json(result))
 }
 
-#[cfg(test)]
+#[cfg(any(test, feature = "test_server"))]
 mod test_utils {
     use axum::http::header;
     use catsquad_shared::{self as cs, Uuid, uuid_to_str};
@@ -225,6 +225,10 @@ async fn test_api_user_update_pfp() {
             .db
             .file_image_get_by_hash(input2_img.hash)
             .await;
+
+        let user1 = server.user_get_by_username("hey").await.unwrap();
+
+        assert_eq!(user1.pfp_hash, input1_img.hash);
 
         assert_eq!(img1.used_count, 1);
         assert!(matches!(img2, Err(DbFileImageGetByHashErr::NotFound)));
