@@ -185,7 +185,7 @@ async fn test_email_change_update_finish() {
         .unwrap();
 
     {
-        use crate::query::email_change_get_by_key::DbEmailChangeGetByIdErr;
+        use crate::query::email_change_get_by_id::DbEmailChangeGetByIdErr;
 
         let email_change = db
             .email_change_add(0, user.username.clone(), 10)

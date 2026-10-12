@@ -1,4 +1,4 @@
-use crate::{Db, DbPost, XTimestamp};
+use crate::{Db, XTimestamp};
 use catsquad_log::prelude::*;
 use sqlx::AssertSqlSafe;
 

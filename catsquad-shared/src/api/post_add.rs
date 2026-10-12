@@ -9,6 +9,8 @@ pub const LINK_API_POST_ADD: &str = "/api/post";
 pub struct PostRes {
     pub id: i64,
     pub user_username: String,
+    pub user_pfp_hash: i64,
+    pub user_pfp_proccesed: bool,
     pub state: PostState,
     pub title: String,
     pub description: String,

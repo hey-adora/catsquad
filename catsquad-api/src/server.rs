@@ -131,7 +131,7 @@ pub async fn app(state: AppState) -> Router {
         .route(catsquad_shared::LINK_API_INVITE_ADD, post(api::invite_add))
         .route(
             catsquad_shared::LINK_API_INVITE_GET_BY_KEY,
-            get(api::invite_get_by_key),
+            get(api::invite_get_by_id),
         );
 
     let api_router_upload = Router::new()

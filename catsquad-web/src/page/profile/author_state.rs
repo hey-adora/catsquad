@@ -2,9 +2,7 @@ use catsquad_client::{Client, Response, Sender};
 use catsquad_log::prelude::*;
 use catsquad_shared::UserGetByUsernameErr;
 use leptos::prelude::{RwSignal, Set, Update};
-use std::fmt::{Debug, Display};
-
-use crate::page::create_client;
+use std::fmt::Debug;
 
 #[derive(Clone)]
 pub struct AuthorState<TSender>
@@ -14,6 +12,8 @@ where
 {
     pub stage: RwSignal<AuthorStage>,
     pub username: RwSignal<String>,
+    pub pfp_hash: RwSignal<i64>,
+    pub pfp_proccesed: RwSignal<bool>,
 
     pub support: RwSignal<String>,
     pub err_support: RwSignal<String>,
@@ -47,6 +47,8 @@ where
         Self {
             stage: RwSignal::new(AuthorStage::Loading),
             username: RwSignal::new(String::new()),
+            pfp_hash: RwSignal::new(0),
+            pfp_proccesed: RwSignal::new(false),
 
             support: RwSignal::new(String::new()),
             err_support: RwSignal::new(String::new()),
@@ -94,6 +96,8 @@ where
         };
 
         self.username.set(user.username);
+        self.pfp_hash.set(user.pfp_hash);
+        self.pfp_proccesed.set(user.pfp_proccesed);
         self.live_support_length.set(user.support.len());
         self.support.set(user.support);
         self.live_aboutme_length.set(user.aboutme.len());

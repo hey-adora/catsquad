@@ -1,5 +1,6 @@
 use catsquad_client::Client;
 use catsquad_client::XMLSender;
+use catsquad_log::prelude::*;
 use catsquad_web_utils::interval;
 use catsquad_web_utils::time::time_now_micro;
 use leptos::prelude::*;
@@ -26,6 +27,7 @@ use upload::Upload as PageUpload;
 use crate::ModalConfirmDto;
 use crate::PageState;
 use crate::hook::Spawner;
+use crate::page::settings::user_pfp_state::UserPfpState;
 
 pub fn create_client() -> Client<XMLSender> {
     Client::new(XMLSender::new())
@@ -37,10 +39,13 @@ pub fn App() -> impl IntoView {
     ModalConfirmDto::set();
 
     let page = PageState::get();
-    let spawner = Spawner::new();
+    let spawner_page = Spawner::new();
+    let pfp_state =
+        UserPfpState::new_with_state(create_client(), page.acc_pfp_hash, page.acc_pfp_proccesed);
+    let spawner_pfp = Spawner::new();
 
     Effect::new(move || {
-        spawner.spawn(async move {
+        spawner_page.spawn(async move {
             page.update_auth().await;
         });
     });
@@ -49,6 +54,12 @@ pub fn App() -> impl IntoView {
         move |_handle| {
             let time = time_now_micro();
             page.time.set(time);
+            if !pfp_state.is_pfp_proccesed() {
+                spawner_pfp.spawn(async move {
+                    trace!("checking if pfp is proccesed");
+                    pfp_state.update_pfp_proccesed_status().await;
+                });
+            }
         },
         Duration::from_secs(1),
     )

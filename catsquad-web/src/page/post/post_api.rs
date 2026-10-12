@@ -36,6 +36,8 @@ pub struct PostApi {
     // pub imgs_links: RwSignal<Vec<(String, f64)>>,
     pub title: RwSignal<String>,
     pub author_username: RwSignal<String>,
+    pub author_pfp_hash: RwSignal<i64>,
+    pub author_pfp_proccesed: RwSignal<bool>,
     // pub author_key: RwSignal<String, LocalStorage>,
     pub author_link: RwSignal<String>,
     pub tags: RwSignal<String>,
@@ -82,6 +84,8 @@ impl PostApi {
             // imgs_links: RwSignal::new(Vec::<(String, f64)>::new()),
             title: RwSignal::new(String::new()),
             author_username: RwSignal::new(String::new()),
+            author_pfp_hash: RwSignal::new(0),
+            author_pfp_proccesed: RwSignal::new(false),
             // author_key: RwSignal::new_local(String::new()),
             author_link: RwSignal::new(LINK_WEB_INDEX.to_string()),
             tags: RwSignal::new(String::new()),
@@ -354,6 +358,8 @@ impl PostApi {
                 self.live_title_length.set(post.title.len());
                 self.title.set(post.title);
                 self.author_username.set(post.user_username.clone());
+                self.author_pfp_hash.set(post.user_pfp_hash);
+                self.author_pfp_proccesed.set(post.user_pfp_proccesed);
                 self.author_link
                     .set(link_relative_profile_gallery(post.user_username.clone()));
                 self.live_tags_length.set(post.tags.len());

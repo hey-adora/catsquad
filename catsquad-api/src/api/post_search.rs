@@ -4,7 +4,7 @@ use axum::{
     http::{StatusCode, header},
     response::IntoResponse,
 };
-use catsquad_db::{DbPost, DbPostSearch, DbPostSearchErr, DbUser};
+use catsquad_db::{DbPostSearch, DbPostSearchErr, DbUser};
 use catsquad_shared::{
     Order, PostSearchErr, PostSearchParams, PostSearchRes, PostState, TimeRange,
 };
@@ -19,6 +19,8 @@ pub fn from_db_post_search(value: DbPostSearch) -> PostSearchRes {
     PostSearchRes {
         id: value.id,
         user_username: value.user_username,
+        pfp_hash: value.user_pfp_hash,
+        pfp_proccesed: value.user_pfp_proccesed,
         state: PostState::from(value.state),
         title: value.title,
         tags: value.tags,

@@ -2,7 +2,7 @@ use super::api_gallery::{GalleryApi, GalleryContainerSize};
 use crate::hook::{Intersection, IntersectionSwitch, ScrollCorrection, Spawner};
 use crate::page::create_client;
 use crate::page::post::post_like_state::{LikeState, PostLikeState};
-use crate::{PageState, SVGPawHollow};
+use crate::{PageState, Pfp, SVGPawHollow};
 use catsquad_log::prelude::*;
 use catsquad_shared::{
     FileImage, PostSearchRes, link_relative_post, link_relative_post_image_bytes_get_by_hash,
@@ -420,7 +420,9 @@ pub fn GalleryImg(img: Img) -> impl IntoView {
     let view_width = img.view_width;
     let view_height = img.view_height;
     let img_post_id = img.post_id;
-    let img_username = img.username.clone();
+    let author_username = img.username.clone();
+    let author_pfp_hash = img.pfp_hash;
+    let author_pfp_proccesed = img.pfp_proccesed;
     let image_exists = img.image_exists;
     let likes = img.likes;
     let liked = img.liked;
@@ -440,12 +442,12 @@ pub fn GalleryImg(img: Img) -> impl IntoView {
 
     let link_post = link_relative_post(img.post_id);
     let link_img = link_relative_post_image_bytes_get_by_hash(img.post_id, img.hash);
-    let link_author = link_relative_profile_gallery(img_username.clone());
+    let link_author = link_relative_profile_gallery(author_username.clone());
 
     let is_logged_in = move || page.is_logged_in().unwrap_or_default();
     let is_not_my_post = {
-        let img_username = img_username.clone();
-        move || img_username != page.acc_username()
+        let author_username = author_username.clone();
+        move || author_username != page.acc_username()
     };
     let when_show_like_btn = move || is_logged_in() && is_not_my_post();
     // let link_post = img.get_post_link();
@@ -480,10 +482,12 @@ pub fn GalleryImg(img: Img) -> impl IntoView {
             <div class="w-full h-full relative group z-[13] ">
                 <a id=elm_id_img_link(img_post_id) href=link_post class="opacity-0 flex-col place-content-end absolute left-0 top-0 w-full h-full group-hover:opacity-100 group-hover:bg-linear-to-t from-base01 to-base01/0 z-[11]"></a>
                 <div class="opacity-0 group-hover:opacity-100 z-[12] absolute left-0 bottom-0 w-full grid grid-cols-[auto_1fr_auto] gap-2 px-2 pb-2">
-                    <a href=link_author.clone() class="text-[1rem] rounded-full size-10 shrink-0 bg-base05"></a>
+                    <a href=link_author.clone() class="">
+                        <Pfp username=author_username.clone() proccesed=author_pfp_proccesed hash=author_pfp_hash class="size-10 shrink-0"/>
+                    </a>
                     <div class="grid grid-rows-[auto_auto] justify-start ">
                         <div class="grid grid-cols-[1fr_auto]">
-                            <a href=link_author.clone() class="max-w-full text-[1.2rem] text-base0F overflow-hidden text-ellipsis">{img_username}</a>
+                            <a href=link_author.clone() class="max-w-full text-[1.2rem] text-base0F overflow-hidden text-ellipsis">{author_username}</a>
                             <Show when=when_show_like_btn>
                                 <button on:click=on_like >
                                     <SVGPawHollow class=class_like />
@@ -526,6 +530,8 @@ pub fn GalleryImg(img: Img) -> impl IntoView {
 pub struct Img {
     pub post_id: i64,
     pub username: String,
+    pub pfp_hash: i64,
+    pub pfp_proccesed: bool,
     pub hash: i64,
     pub extension: String,
     pub width: u32,
@@ -567,6 +573,8 @@ impl From<PostSearchRes> for Img {
         Self {
             post_id: post.id,
             username: post.user_username,
+            pfp_hash: post.pfp_hash,
+            pfp_proccesed: post.pfp_proccesed,
             width,
             height,
             liked: post.liked,
@@ -655,6 +663,8 @@ impl Img {
         Self {
             post_id: id as i64,
             username: "bot".to_string(),
+            pfp_hash: 0,
+            pfp_proccesed: false,
             hash: 0,
             extension: "webp".to_string(),
             image_exists: false,
@@ -678,6 +688,8 @@ impl Img {
             post_id: id,
             username: "bot".to_string(),
             hash: 0,
+            pfp_hash: 0,
+            pfp_proccesed: false,
             extension: "webp".to_string(),
             image_exists: true,
             liked: false,

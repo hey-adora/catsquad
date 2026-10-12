@@ -14,7 +14,7 @@ mod email_change_state;
 mod password_change_component;
 mod password_change_state;
 mod pfp_editor_component;
-mod user_pfp_state;
+pub mod user_pfp_state;
 mod username_change_component;
 mod username_change_state;
 
@@ -83,7 +83,7 @@ pub fn Settings() -> impl IntoView {
                 <div class="grid grid-cols-[1fr] gap-2  ">
                     <div class="flex flex-col gap-2">
                         <p class="text-[1.3rem] text-base0A">"User"</p>
-                        <div class="grid grid-cols-[1fr_auto] gap-2">
+                        <div class="grid grid-cols-[1fr_auto] gap-8">
                             <div class="flex flex-col gap-4">
                                 <div class="flex flex-col gap-2">
                                     <div class="flex justify-between place-items-center">

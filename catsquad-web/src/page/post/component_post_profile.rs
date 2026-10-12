@@ -1,7 +1,5 @@
-use crate::{hook::Spawner, page::post::post_api::PostApi};
-
 use super::Favorite;
-use catsquad_shared::link_relative_profile_gallery;
+use crate::{Pfp, hook::Spawner, page::post::post_api::PostApi};
 use leptos::prelude::*;
 
 #[component]
@@ -11,15 +9,22 @@ pub fn PostProfile(
     #[prop(optional, into)] post_id: Signal<i64>,
 ) -> impl IntoView {
     let author_username = move || post_api.author_username.get();
+    let author_link = move || post_api.author_link.get();
+    let pfp_hash = move || post_api.author_pfp_hash.get();
+    let pfp_proccesed = move || post_api.author_pfp_proccesed.get();
 
     view! {
         <div class="flex justify-between place-items-start">
             <div class="flex gap-2">
-                <p class="text-[1rem] rounded-full h-[3rem] w-[3rem] bg-base05"></p>
+                <a href=author_link>
+                    <Pfp username=author_username.clone() proccesed=pfp_proccesed hash=pfp_hash class="h-[3rem] w-[3rem] shrink-0"/>
+                </a>
                 <div class="flex flex-col gap-1">
                     <div class="flex gap-1">
-                        <p class="text-[1rem] text-base03">"by"</p>
-                        <a href=move || post_api.author_link.get() class="text-[1rem] font-bold text-base0B">{ author_username }</a>
+                        <a href=author_link class="">
+                            <span class="text-base03">"by"</span>
+                            <span class="text-base0B font-bold">{ author_username }</span>
+                        </a>
                     </div>
                     <p class="text-[1rem]">"9999 followers"</p>
                 </div>

@@ -63,12 +63,17 @@ where
         }
     }
 
+    pub fn is_pfp_proccesed(&self) -> bool {
+        let hash = self.pfp_hash.get_untracked();
+        let is_proccesed = self.pfp_proccesed_status.get_untracked();
+        is_proccesed || hash == 0
+    }
+
     pub async fn update_pfp_proccesed_status(&self) {
         let client = self.client.get_value();
         let hash = self.pfp_hash.get_untracked();
-        let is_proccesed = self.pfp_proccesed_status.get_untracked();
 
-        if is_proccesed || hash == 0 {
+        if self.is_pfp_proccesed() {
             warn!("pfp is already updated");
             return;
         }

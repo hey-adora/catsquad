@@ -52,7 +52,7 @@ pub fn status_code(result: &Result<InviteGetByKeyRes, InviteGetByKeyErr>) -> Sta
     }
 }
 
-pub async fn invite_get_by_key(
+pub async fn invite_get_by_id(
     State(app): State<AppState>,
     params: axum::extract::RawPathParams,
 ) -> impl IntoResponse {

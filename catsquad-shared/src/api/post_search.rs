@@ -7,6 +7,8 @@ pub const LINK_API_POST_SEARCH: &str = "/api/posts";
 pub struct PostSearchRes {
     pub id: i64,
     pub user_username: String,
+    pub pfp_hash: i64,
+    pub pfp_proccesed: bool,
     pub state: PostState,
     pub title: String,
     pub description: String,

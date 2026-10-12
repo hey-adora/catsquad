@@ -1,5 +1,5 @@
 use super::user_pfp_state::UserPfpState;
-use crate::{PageState, Pfp, hook::Spawner, page::create_client};
+use crate::{PageState, Pfp, PfpAcc, hook::Spawner, page::create_client};
 use catsquad_log::prelude::*;
 use catsquad_web_utils::file::GetFiles;
 use leptos::prelude::*;
@@ -43,13 +43,9 @@ pub fn PfpEditor() -> impl IntoView {
         )
     };
 
-    let username = move || page.acc_username.get();
-    let hash = move || page.acc_pfp_hash.get();
-    let proccesed = move || page.acc_pfp_proccesed.get();
-
     view! {
         <div class="flex flex-col gap-4 place-items-center">
-            <Pfp username is_loading proccesed cache_breaker=hash class="bg-base05 size-[10rem]"/>
+            <PfpAcc is_loading class="size-[10rem]"/>
             <label
                 for="pfp_upload_input"
                 class=class

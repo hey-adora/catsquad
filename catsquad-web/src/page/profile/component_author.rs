@@ -1,7 +1,7 @@
 use super::author_state::AuthorState;
 use super::{Aboutme, Support};
 use crate::{
-    Btn, BtnSecondary, BtnSize, PageState, SVGArrowDown, SVGBell, hook::Spawner,
+    Btn, BtnSecondary, BtnSize, PageState, Pfp, SVGArrowDown, SVGBell, hook::Spawner,
     page_state::CurrentRoute,
 };
 use catsquad_client::XMLSender;
@@ -38,6 +38,8 @@ pub fn ProfileAuthor(
     let when_tab_aboutme = move || current_route.get().is_profile_about_me();
 
     let author_username = author_state.username;
+    let author_pfp_hash = author_state.pfp_hash;
+    let author_pfp_proccesed = author_state.pfp_proccesed;
     let created_at = author_state.created_at;
 
     let author_username = move || author_username.get();
@@ -121,7 +123,7 @@ pub fn ProfileAuthor(
                     </div>
                 </div>
                 <div class="place-items-center grid grid-cols-[auto_auto] gap-4 ">
-                    <p class="self-start text-[1rem] rounded-full size-[5rem] shrink-0 bg-base05"></p>
+                    <Pfp username=author_username proccesed=author_pfp_proccesed hash=author_pfp_hash class="self-start size-[5rem] shrink-0"/>
                     <div class="grid grid-rows-[auto_auto_auto] gap-2 place-items-start" >
                         <p class="text-[1.2rem] leading-[1.2rem] font-medium text-base0F max-w-[10rem] break-all ">{ author_username }</p>
                         <BtnSecondary size=BtnSize::Normal class="grid grid-cols-[auto_auto] gap-2 place-items-center ">"Follow"<SVGBell class="size-4"/></BtnSecondary>

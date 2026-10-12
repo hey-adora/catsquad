@@ -1,11 +1,8 @@
+use crate::Db;
 use crate::{DbFileImage, DbPostGet, XTimestamp};
 use catsquad_log::prelude::*;
-use catsquad_shared::{
-    POST_STATE_ACTIVE, POST_STATE_DRAFT, POST_STATE_HIDDEN, PostState, proccess_tags,
-};
-use sqlx::{AssertSqlSafe, SqlSafeStr};
-
-use crate::{Db, DbUser};
+use catsquad_shared::{POST_STATE_DRAFT, proccess_tags};
+use sqlx::{AssertSqlSafe, FromRow};
 
 #[derive(Debug, Clone, PartialEq, sqlx::FromRow)]
 pub struct DbPost {
@@ -95,41 +92,116 @@ impl Db {
         let mut tx = pool.begin().await?;
 
         // get post draft if one exists
-        let post: Option<DbPost> = {
-            let query =
-                "SELECT * FROM posts WHERE post_user_username=$1 AND post_state='draft' LIMIT 1";
+        let post_and_imgs: Option<(DbPostGet, Vec<i64>)> = 'a: {
+            // this will crash
+            let query = "SELECT
+                        post_images_hashes,
+
+                        false as post_liked,
+                        user_pfp_image_hash as post_user_pfp_hash,
+                        coalesce(f1.image_processed, false) as post_user_pfp_proccesed,
+
+                        post_id,
+                        post_user_username,
+                        post_state,
+                        post_title,
+                        post_description,
+                        post_tags,
+                        post_likes_count,
+                        post_size_bytes,
+                        post_modified_at,
+                        post_created_at
+
+                    FROM posts
+                    JOIN users ON post_user_username=user_username
+                    LEFT JOIN files_images f1 ON user_pfp_image_hash=f1.image_hash
+                    WHERE
+                        post_user_username=$1 AND post_state='draft'
+                    LIMIT 1";
 
             debug!("about to run {query}");
+
+            let result = sqlx::query(query)
+                .bind(&input_user_username)
+                .fetch_one(&mut *tx)
+                .await;
+
+            let pg_row = match result {
+                Ok(row) => Some(row),
+                Err(sqlx::Error::RowNotFound) => None,
+                Err(err) => {
+                    error!("unexpected db error {err}");
+                    return Err(DbPostAddErr::Db(err));
+                }
+            };
+
+            let Some(pg_row) = pg_row else {
+                break 'a None;
+            };
+
+            let post = DbPostGet::from_row(&pg_row);
+            let post = match post {
+                Ok(v) => v,
+                Err(err) => {
+                    error!("unexpected db error {err}");
+                    return Err(DbPostAddErr::Db(err));
+                }
+            };
+
+            let images_hashes = <(Vec<i64>,)>::from_row(&pg_row);
+            let images_hashes = match images_hashes {
+                Ok((images_hashes,)) => images_hashes,
+                Err(err) => {
+                    error!("unexpected db error {err}");
+                    return Err(DbPostAddErr::Db(err));
+                }
+            };
+
+            Some((post, images_hashes))
+        };
+
+        let Some((post, images_hashes)) = post_and_imgs else {
+            // get user
+            let query = "
+                SELECT
+                    user_pfp_image_hash,
+                    coalesce(image_processed, false) as user_pfp_image_proccesed
+                FROM users
+                LEFT JOIN files_images ON user_pfp_image_hash=image_hash
+                WHERE user_username = $1
+            ";
 
             let result = sqlx::query_as(query)
                 .bind(&input_user_username)
                 .fetch_one(&mut *tx)
                 .await;
 
-            match result {
-                Ok(post) => Some(post),
-                Err(sqlx::Error::RowNotFound) => None,
+            debug!("query: {query}\n$1={input_user_username}\nresult: {result:#?}");
+
+            let (pfp_hash, pfp_proccesed): (i64, bool) = match result {
+                Ok(v) => v,
+                Err(sqlx::Error::RowNotFound) => {
+                    return Err(DbPostAddErr::UserNotFound);
+                }
                 Err(err) => {
                     error!("unexpected db error {err}");
                     return Err(DbPostAddErr::Db(err));
                 }
-            }
-        };
+            };
 
-        let Some(post) = post else {
             // add post
             let query = "
-            INSERT INTO posts (
-                    post_user_username,
-                    post_title,
-                    post_tags,
-                    post_description,
-                    post_modified_at,
-                    post_created_at
-                )
-                VALUES ( $1, $2, $3, $4, $5, $5 )
-                RETURNING post_id
-        ";
+                INSERT INTO posts (
+                        post_user_username,
+                        post_title,
+                        post_tags,
+                        post_description,
+                        post_modified_at,
+                        post_created_at
+                    )
+                    VALUES ( $1, $2, $3, $4, $5, $5 )
+                    RETURNING post_id
+            ";
             debug!("about to run {query}");
             let result = sqlx::query_as(query)
                 .bind(&input_user_username)
@@ -157,7 +229,11 @@ impl Db {
 
             let (post_id,): (i64,) = post;
 
-            let post = DbPost {
+            let post = DbPostGet {
+                user_pfp_hash: pfp_hash,
+                user_pfp_proccesed: pfp_proccesed,
+                liked: false,
+
                 id: post_id,
                 user_username: input_user_username,
                 state: POST_STATE_DRAFT.to_string(),
@@ -166,7 +242,7 @@ impl Db {
                 description: input_description,
                 likes_count: 0,
                 size_bytes: 0,
-                images_hashes: Vec::new(),
+                images: Vec::new(),
                 // images_status: Vec::new(),
                 modified_at: time,
                 created_at: time,
@@ -174,7 +250,7 @@ impl Db {
 
             tx.commit().await?;
 
-            return Ok(post.into());
+            return Ok(post);
         };
 
         // get images
@@ -196,7 +272,7 @@ impl Db {
 
             let result = sqlx::query_as(query)
                 .bind(post.id)
-                .bind(&post.images_hashes)
+                .bind(&images_hashes)
                 .fetch_all(pool)
                 .await;
 
@@ -208,8 +284,7 @@ impl Db {
                 }
             };
 
-            let images_sorted = post
-                .images_hashes
+            let images_sorted = images_hashes
                 .clone()
                 .into_iter()
                 .map(|hash| images.iter().find(|img| img.hash == hash).cloned())
@@ -218,11 +293,11 @@ impl Db {
                 .inspect_err(|_| {
                     error!(
                         " image status didnt match result expected {:#?}, got {:#?}",
-                        &post.images_hashes, images
+                        &images_hashes, images
                     )
                 })?;
 
-            let mut post: DbPostGet = post.into();
+            let mut post = post;
 
             post.images = images_sorted;
 
@@ -369,6 +444,8 @@ impl Db {
 #[cfg(test)]
 #[tokio::test]
 async fn test_post_add() {
+    use catsquad_shared::PostState;
+
     init_log();
     let db = Db::test_db(0, "test_post_add").await;
 
@@ -382,6 +459,10 @@ async fn test_post_add() {
         .post_add(0, user.username.clone(), "title", "description", "tags")
         .await
         .unwrap();
+
+    assert_eq!(post1.user_pfp_hash, 0);
+    assert_eq!(post1.user_pfp_proccesed, false);
+    assert_eq!(post1.liked, false);
 
     assert_eq!(post1.id, 1);
     assert_eq!(post1.user_username, "hey");
@@ -439,4 +520,57 @@ async fn test_post_add() {
     assert_eq!(post1.title, "title");
     assert_eq!(post1.description, "description");
     assert_eq!(post1.tags, " tags two ");
+
+    // pfp
+    {
+        assert_eq!(post1.user_pfp_hash, 0);
+        assert_eq!(post1.user_pfp_proccesed, false);
+        assert_eq!(post1.liked, false);
+
+        db.user_update_pfp(
+            0,
+            user.username.clone(),
+            async move |_, _| (),
+            10,
+            666,
+            "webp",
+            10,
+            10,
+        )
+        .await
+        .unwrap();
+
+        let post1 = db
+            .post_add(0, user.username.clone(), "", "", "")
+            .await
+            .unwrap();
+
+        assert_eq!(post1.user_pfp_hash, 666);
+        assert_eq!(post1.user_pfp_proccesed, false);
+        assert_eq!(post1.liked, false);
+
+        db.file_image_update_proccsed(0, 666).await.unwrap();
+
+        let post1 = db
+            .post_add(0, user.username.clone(), "", "", "")
+            .await
+            .unwrap();
+
+        assert_eq!(post1.user_pfp_hash, 666);
+        assert_eq!(post1.user_pfp_proccesed, true);
+        assert_eq!(post1.liked, false);
+
+        db.post_update_state(0, user.username.clone(), post1.id, PostState::Active)
+            .await
+            .unwrap();
+
+        let post2 = db
+            .post_add(0, user.username.clone(), "title", "description", "tags")
+            .await
+            .unwrap();
+
+        assert_eq!(post2.user_pfp_hash, 666);
+        assert_eq!(post2.user_pfp_proccesed, true);
+        assert_eq!(post2.liked, false);
+    }
 }

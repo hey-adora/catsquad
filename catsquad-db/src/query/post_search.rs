@@ -1,4 +1,4 @@
-use crate::{Db, DbPost, XTimestamp, join_str, run_if_not_empty};
+use crate::{Db, XTimestamp, join_str, run_if_not_empty};
 use catsquad_log::prelude::*;
 use catsquad_shared::{Order, PostState, TimeRange};
 use sqlx::AssertSqlSafe;
@@ -9,6 +9,10 @@ pub struct DbPostSearch {
     pub id: i64,
     #[sqlx(rename = "post_user_username")]
     pub user_username: String,
+    #[sqlx(rename = "post_user_pfp_hash")]
+    pub user_pfp_hash: i64,
+    #[sqlx(rename = "post_user_pfp_proccesed")]
+    pub user_pfp_proccesed: bool,
     #[sqlx(rename = "post_state")]
     pub state: String, // TODO optimize to be enum
     #[sqlx(rename = "post_title")]
@@ -128,15 +132,13 @@ impl Db {
             )
         });
 
-        let q_liked_by_me = if is_liked_by_and_user_same {
+        let q_liked_by_me = if is_liked_by_and_user_same || user_username.is_empty() {
             String::new()
         } else {
-            run_if_not_empty(&user_username, || {
-                bind_index += 1;
-                format!(
-                    "LEFT JOIN posts_likes l2 ON post_id=l2.post_like_post_id AND l2.post_like_user_username = ${bind_index}"
-                )
-            })
+            bind_index += 1;
+            format!(
+                "LEFT JOIN posts_likes l2 ON post_id=l2.post_like_post_id AND l2.post_like_user_username = ${bind_index}"
+            )
         };
 
         let q_liked_by_me_field = 'a: {
@@ -159,11 +161,14 @@ impl Db {
             String::new()
         };
 
+        // post_user_pfp_proccesed
         let query_str = format!(
             "
             SELECT
                 post_id,
                 post_user_username,
+                user_pfp_image_hash as post_user_pfp_hash,
+                coalesce(f2.image_processed, false) as post_user_pfp_proccesed,
                 post_state,
                 post_title,
                 post_description,
@@ -171,15 +176,17 @@ impl Db {
                 {q_liked_by_me_field},
                 post_likes_count,
                 post_size_bytes,
-                coalesce(image_width, 0) as post_image_width,
-                coalesce(image_height, 0) as post_image_height,
-                coalesce(image_extension, '') as post_image_extension,
-                coalesce(image_hash, 0) as post_image_hash,
+                coalesce(f1.image_width, 0) as post_image_width,
+                coalesce(f1.image_height, 0) as post_image_height,
+                coalesce(f1.image_extension, '') as post_image_extension,
+                coalesce(f1.image_hash, 0) as post_image_hash,
                 post_modified_at,
                 post_created_at
 
                 FROM posts
-                LEFT JOIN files_images ON post_images_hashes[1]=image_hash
+                JOIN users ON post_user_username=user_username
+                LEFT JOIN files_images f1 ON post_images_hashes[1]=f1.image_hash
+                LEFT JOIN files_images f2 ON user_pfp_image_hash=f2.image_hash
                 {q_liked_by_user}
                 {q_liked_by_me}
                 {q_where}
@@ -426,6 +433,12 @@ async fn test_post_search() {
     assert_eq!(result.len(), 1);
     assert_eq!(&result[0].title, "3");
     assert_eq!(result[0].liked, true);
+    assert_eq!(result[0].user_pfp_hash, 0);
+    assert_eq!(result[0].user_pfp_proccesed, false);
+
+    db.user_update_pfp(0, "hey", async move |_, _| (), 10, 666, "webp", 10, 12)
+        .await
+        .unwrap();
 
     let result = db
         .post_search(
@@ -444,6 +457,10 @@ async fn test_post_search() {
     assert_eq!(result.len(), 1);
     assert_eq!(&result[0].title, "3");
     assert_eq!(result[0].liked, false);
+    assert_eq!(result[0].user_pfp_hash, 666);
+    assert_eq!(result[0].user_pfp_proccesed, false);
+
+    db.file_image_update_proccsed(0, 666).await.unwrap();
 
     let result = db
         .post_search(
@@ -462,6 +479,8 @@ async fn test_post_search() {
     assert_eq!(result.len(), 3);
     assert_eq!(&result[0].title, "1");
     assert_eq!(result[0].liked, false);
+    assert_eq!(result[0].user_pfp_hash, 666);
+    assert_eq!(result[0].user_pfp_proccesed, true);
     assert_eq!(&result[1].title, "2");
     assert_eq!(result[1].liked, false);
     assert_eq!(&result[2].title, "3");

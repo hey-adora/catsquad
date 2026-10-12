@@ -1,5 +1,3 @@
-use crate::{FileImage, PostState};
-
 pub const LINK_API_POST_GET_BY_ID: &str = "/api/post/{post_id}";
 
 pub fn link_relative_post_get_by_key(post_id: i64) -> String {
