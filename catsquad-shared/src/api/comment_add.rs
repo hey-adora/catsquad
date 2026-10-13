@@ -7,6 +7,8 @@ pub const LINK_API_COMMENT_ADD: &str = "/api/comment_add";
 pub struct CommentRes {
     pub id: i64,
     pub user_username: String,
+    pub user_pfp_hash: i64,
+    pub user_pfp_proccesed: bool,
     // pub user_username: RedactedUserRes,
     pub post_id: i64,
     pub parent_id: Vec<i64>,

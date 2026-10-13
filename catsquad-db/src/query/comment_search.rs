@@ -77,11 +77,25 @@ impl Db {
 
             let query_str = format!(
                 "
-            SELECT * FROM comments
+                SELECT
+                    comment_id,
+                    comment_user_username,
+                    user_pfp_image_hash as comment_user_pfp_hash,
+                    coalesce(image_processed, false) as comment_user_pfp_proccesed,
+                    comment_post_id,
+                    comment_replies_count,
+                    comment_user_username,
+                    comment_parents,
+                    comment_text,
+                    comment_modified_at,
+                    comment_created_at
+                FROM comments
+                LEFT JOIN users ON comment_user_username=user_username
+                LEFT JOIN files_images ON user_pfp_image_hash=image_hash
                 WHERE comment_post_id = $4 {q_time_after} {q_parent}
                 ORDER BY comment_created_at {q_order}
                 LIMIT $3
-        "
+                "
             );
 
             let query = AssertSqlSafe(query_str.clone());

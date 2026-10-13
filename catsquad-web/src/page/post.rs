@@ -1,13 +1,9 @@
 use crate::hook::Spawner;
 use crate::page::create_client;
-use crate::page::post::post_like_state::PostLikeState;
-use crate::{Modal, ModalConfirm, ModalConfirmDto, ModalConfirmLevel, Nav};
-use catsquad_log::prelude::*;
-use catsquad_shared::MODAL_QUERY_PARAM_NAME;
-use catsquad_web_utils::prelude::RwQuery;
+use crate::{ModalConfirm, Nav};
 use leptos::Params;
 use leptos::prelude::*;
-use leptos_router::hooks::{use_location, use_params};
+use leptos_router::hooks::use_params;
 use leptos_router::params::Params;
 use post_api::PostApi;
 

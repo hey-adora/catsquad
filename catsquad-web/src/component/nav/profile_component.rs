@@ -25,7 +25,7 @@ pub fn Profile(spawner: Spawner) -> impl IntoView {
     view! {
         <div class="flex relative">
             <button id="profile_btn" on:click=on_open >
-                <PfpAcc class="size-8"/>
+                <PfpAcc class="size-8" no_link=true />
             </button>
             <Show when=when_dropdown >
                 <SVGTriangle class="z-[100] size-4 text-base05 absolute left-[100%] top-[100%] transform -translate-x-1/2 -translate-y-1/2"/>

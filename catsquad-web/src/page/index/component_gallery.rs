@@ -482,9 +482,7 @@ pub fn GalleryImg(img: Img) -> impl IntoView {
             <div class="w-full h-full relative group z-[13] ">
                 <a id=elm_id_img_link(img_post_id) href=link_post class="opacity-0 flex-col place-content-end absolute left-0 top-0 w-full h-full group-hover:opacity-100 group-hover:bg-linear-to-t from-base01 to-base01/0 z-[11]"></a>
                 <div class="opacity-0 group-hover:opacity-100 z-[12] absolute left-0 bottom-0 w-full grid grid-cols-[auto_1fr_auto] gap-2 px-2 pb-2">
-                    <a href=link_author.clone() class="">
-                        <Pfp username=author_username.clone() proccesed=author_pfp_proccesed hash=author_pfp_hash class="size-10 shrink-0"/>
-                    </a>
+                    <Pfp username=author_username.clone() proccesed=author_pfp_proccesed hash=author_pfp_hash class="size-10 shrink-0"/>
                     <div class="grid grid-rows-[auto_auto] justify-start ">
                         <div class="grid grid-cols-[1fr_auto]">
                             <a href=link_author.clone() class="max-w-full text-[1.2rem] text-base0F overflow-hidden text-ellipsis">{author_username}</a>

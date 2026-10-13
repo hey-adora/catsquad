@@ -1,4 +1,4 @@
-use crate::{Db, DbComment, XTimestamp};
+use crate::{Db, XTimestamp};
 use catsquad_log::prelude::*;
 use catsquad_shared::PostState;
 

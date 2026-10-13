@@ -11,6 +11,8 @@ pub fn from_db_comment(value: DbComment) -> CommentRes {
     CommentRes {
         id: value.id,
         user_username: value.user_username,
+        user_pfp_hash: value.user_pfp_hash,
+        user_pfp_proccesed: value.user_pfp_proccesed,
         post_id: value.post_id,
         parent_id: value.parents,
         replies_count: value.replies_count,

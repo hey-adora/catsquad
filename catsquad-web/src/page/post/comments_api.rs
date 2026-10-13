@@ -42,6 +42,9 @@ pub struct CommentsApi {
     pub finished: RwSignal<bool>,
     pub replies_count: RwSignal<u32>,
     pub text: RwSignal<String>,
+    pub user_username: RwSignal<String>,
+    pub user_pfp_hash: RwSignal<i64>,
+    pub user_pfp_proccesed: RwSignal<bool>,
     pub show_editor: RwSignal<bool>,
     pub edit_mode: RwSignal<bool>,
     pub err_post: RwSignal<String>,
@@ -57,11 +60,17 @@ pub struct CommentsApi {
 
 impl CommentsApi {
     pub fn new(fetch_count: u32, kind: CommentKind) -> Self {
-        let (replies_count, text) = match &kind {
-            CommentKind::Root => (0, String::new()),
+        let (replies_count, text, pfp_hash, pfp_proccesed, user_username) = match &kind {
+            CommentKind::Root => (0, String::new(), 0, false, String::new()),
             CommentKind::Flat { comment, .. }
             | CommentKind::None { comment, .. }
-            | CommentKind::Reply { comment, .. } => (comment.replies_count, comment.text.clone()),
+            | CommentKind::Reply { comment, .. } => (
+                comment.replies_count,
+                comment.text.clone(),
+                comment.user_pfp_hash,
+                comment.user_pfp_proccesed,
+                comment.user_username.clone(),
+            ),
         };
 
         // let has_reply_bubble = kind.is_none() && com;
@@ -71,6 +80,9 @@ impl CommentsApi {
             finished: RwSignal::new(false),
             replies_count: RwSignal::new(replies_count),
             text: RwSignal::new(text),
+            user_username: RwSignal::new(user_username),
+            user_pfp_hash: RwSignal::new(pfp_hash),
+            user_pfp_proccesed: RwSignal::new(pfp_proccesed),
             // has_reply_bubble,
             // is_last: RwSignal::new_local(false),
             show_editor: RwSignal::new(false),

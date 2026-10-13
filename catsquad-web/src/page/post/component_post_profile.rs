@@ -16,9 +16,7 @@ pub fn PostProfile(
     view! {
         <div class="flex justify-between place-items-start">
             <div class="flex gap-2">
-                <a href=author_link>
-                    <Pfp username=author_username.clone() proccesed=pfp_proccesed hash=pfp_hash class="h-[3rem] w-[3rem] shrink-0"/>
-                </a>
+                <Pfp username=author_username.clone() proccesed=pfp_proccesed hash=pfp_hash class="h-[3rem] w-[3rem] shrink-0"/>
                 <div class="flex flex-col gap-1">
                     <div class="flex gap-1">
                         <a href=author_link class="">

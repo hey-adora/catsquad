@@ -1,4 +1,4 @@
-use crate::{Db, DbUser, XTimestamp};
+use crate::{Db, XTimestamp};
 use catsquad_log::prelude::*;
 use catsquad_shared::PostState;
 
@@ -8,6 +8,10 @@ pub struct DbComment {
     pub id: i64,
     #[sqlx(rename = "comment_user_username")]
     pub user_username: String,
+    #[sqlx(rename = "comment_user_pfp_hash")]
+    pub user_pfp_hash: i64,
+    #[sqlx(rename = "comment_user_pfp_proccesed")]
+    pub user_pfp_proccesed: bool,
     #[sqlx(rename = "comment_post_id")]
     pub post_id: i64,
     #[sqlx(rename = "comment_replies_count")]
@@ -82,7 +86,13 @@ impl Db {
 
         // get post
         {
-            let query = "SELECT post_user_username, post_state FROM posts WHERE post_id = $1";
+            let query = "
+                SELECT
+                       post_user_username,
+                       post_state
+                FROM posts
+                WHERE
+                    post_id = $1";
 
             let result = sqlx::query_as(query)
                 .bind(post_id)
@@ -187,6 +197,31 @@ impl Db {
 
             comment_id
         };
+        // comment_user_pfp_proccesed
+        // get user
+        let query = "
+                SELECT
+                    user_pfp_image_hash,
+                    coalesce(image_processed, false) as user_pfp_image_proccesed
+                FROM users
+                LEFT JOIN files_images ON user_pfp_image_hash=image_hash
+                WHERE user_username = $1
+            ";
+
+        let result = sqlx::query_as(query)
+            .bind(&user_username)
+            .fetch_one(&mut *tx)
+            .await;
+
+        debug!("query: {query}\n$1={user_username}\nresult: {result:#?}");
+
+        let (pfp_hash, pfp_proccesed): (i64, bool) = match result {
+            Ok(v) => v,
+            Err(err) => {
+                error!("unexpected db error {err}");
+                return Err(DbCommentAddErr::Db(err));
+            }
+        };
 
         tx.commit()
             .await
@@ -195,6 +230,8 @@ impl Db {
         let comment = DbComment {
             id: comment_id,
             user_username,
+            user_pfp_hash: pfp_hash,
+            user_pfp_proccesed: pfp_proccesed,
             post_id,
             replies_count: 0,
             parents: parent_ids,
@@ -247,6 +284,19 @@ async fn test_comment_add() {
         .await;
     assert!(matches!(result, Err(DbCommentAddErr::ParentNotFound(_))));
 
+    db.user_update_pfp(
+        0,
+        user.username.clone(),
+        async move |_, _| (),
+        10,
+        666,
+        "webp",
+        10,
+        10,
+    )
+    .await
+    .unwrap();
+
     let comment2 = db
         .comment_add(
             1,
@@ -258,7 +308,9 @@ async fn test_comment_add() {
         .await
         .unwrap();
 
-    let _comment3 = db
+    db.file_image_update_proccsed(0, 666).await.unwrap();
+
+    let comment3 = db
         .comment_add(
             2,
             user.username.clone(),
@@ -271,8 +323,19 @@ async fn test_comment_add() {
 
     let comments = db.comment_get_all().await.unwrap();
 
+    assert_eq!(comment1.user_pfp_hash, 0);
+    assert_eq!(comment1.user_pfp_proccesed, false);
+
+    assert_eq!(comment2.user_pfp_hash, 666);
+    assert_eq!(comment2.user_pfp_proccesed, false);
+
+    assert_eq!(comment3.user_pfp_hash, 666);
+    assert_eq!(comment3.user_pfp_proccesed, true);
+
     assert_eq!(comments.len(), 3);
     assert_eq!(comments[0].parents.len(), 2);
+    assert_eq!(comments[0].user_pfp_hash, 666);
+    assert_eq!(comments[0].user_pfp_proccesed, true);
     assert_eq!(comments[0].parents[0], comment1.id.clone());
     assert_eq!(comments[0].parents[1], comment2.id.clone());
     assert_eq!(comments[0].text, "one4");

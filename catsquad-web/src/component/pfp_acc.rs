@@ -4,6 +4,7 @@ use leptos::prelude::*;
 #[component]
 pub fn PfpAcc(
     #[prop(optional, into)] is_loading: Signal<bool>,
+    #[prop(optional, into)] no_link: Signal<bool>,
     #[prop(optional, into)] class: Signal<String>,
 ) -> impl IntoView {
     let page = PageState::get();
@@ -12,6 +13,6 @@ pub fn PfpAcc(
     let proccesed = move || page.acc_pfp_proccesed.get();
 
     view! {
-        <Pfp username proccesed hash=hash class=class/>
+        <Pfp is_loading username proccesed no_link hash=hash class=class/>
     }
 }

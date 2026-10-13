@@ -4,7 +4,7 @@ use crate::hook::Spawner;
 use crate::page::create_client;
 use crate::page::post::comments_api::{CommentKind, CommentsApi};
 use crate::page::post::component_edit_btn::EditSaveCancel;
-use crate::{Btn, Errs, PageState, SVGArrowDown, SVGTrash, SVGTriangle, hook::EventListener};
+use crate::{Btn, Errs, PageState, Pfp, SVGArrowDown, SVGTrash, SVGTriangle, hook::EventListener};
 use catsquad_log::prelude::*;
 use catsquad_shared::CommentRes;
 use catsquad_web_utils::time::{micro_to_str, time_now_micro};
@@ -275,9 +275,16 @@ pub fn Comment(
     };
 
     let comment_text = move || comments_manual.text.get();
+    let comment_user_username = move || comments_manual.user_username.get();
+    let comment_user_pfp_hash = move || comments_manual.user_pfp_hash.get();
+    let comment_user_pfp_proccesed = move || comments_manual.user_pfp_proccesed.get();
+
     let modal_text = move || format!("\"{}\"", comment_text());
     let when_edit_mode = move || comments_manual.edit_mode.get();
     let when_normal_mode = move || !when_edit_mode();
+
+    // let author_link = move || post_api.author_link.get();
+
     // let when_edit
 
     view! {
@@ -296,7 +303,7 @@ pub fn Comment(
                 </Show>
                 <div class="grid grid-cols-[auto_1fr] grid-rows-[100%] ">
                     <div class=" mb-[0.5rem] w-[3.2rem] h-full grid grid-rows-[auto_100%] items-start place-items-center shrink-0">
-                        <p class="text-[1rem] rounded-full h-[3.2rem] w-[3.2rem] shrink-0 bg-base05"></p>
+                        <Pfp username=comment_user_username.clone() proccesed=comment_user_pfp_proccesed hash=comment_user_pfp_hash class="h-[3.2rem] w-[3.2rem] shrink-0"/>
                         <Show when={move || { !comments_manual.is_last() } || show_replies_fn() }>
                             <div class="rounded w-[0.2rem] mt-[0.5rem] h-[calc(100%-3.2rem-0.5rem)] bg-base05 shrink-0"></div>
                         </Show>

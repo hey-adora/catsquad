@@ -93,7 +93,6 @@ impl Db {
 
         // get post draft if one exists
         let post_and_imgs: Option<(DbPostGet, Vec<i64>)> = 'a: {
-            // this will crash
             let query = "SELECT
                         post_images_hashes,
 
