@@ -425,7 +425,6 @@ pub fn GalleryImg(img: Img) -> impl IntoView {
     let author_pfp_proccesed = img.pfp_proccesed;
     let image_exists = img.image_exists;
     let likes = img.likes;
-    let liked = img.liked;
 
     let value_left = format!("{view_left}px");
     let value_top = format!("{view_top}px");
@@ -453,14 +452,15 @@ pub fn GalleryImg(img: Img) -> impl IntoView {
     // let link_post = img.get_post_link();
     // let link_img = img.get_img_link();
 
-    let post_like_state = PostLikeState::new_with_data(create_client(), img_post_id, liked);
+    let liked = RwSignal::new(img.liked);
+    let post_like_state = PostLikeState::new_with_data(create_client(), img_post_id.into(), liked);
     let class_like = move || {
         format!(
             "size-6 self-center {}",
-            match post_like_state.state.get() {
-                LikeState::Loading => "text-base00",
-                LikeState::Unliked => "hover:fill-base05",
-                LikeState::Liked => "fill-base05",
+            match liked.get() {
+                // LikeState::Loading => "text-base00",
+                false => "hover:fill-base05",
+                true => "fill-base05",
             }
         )
     };

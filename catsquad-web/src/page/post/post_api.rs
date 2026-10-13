@@ -50,6 +50,7 @@ pub struct PostApi {
     pub description: RwSignal<String>,
     pub post_state: RwSignal<Option<PostState>>,
     // pub description_is_empty: RwSignal<bool, LocalStorage>,
+    pub liked: RwSignal<bool>,
     pub likes: RwSignal<u32>,
     pub created_at: RwSignal<u64>,
     pub api_state: RwSignal<PostApiState>,
@@ -102,6 +103,7 @@ impl PostApi {
             update_description_mode: RwSignal::new(false),
             description: RwSignal::new(String::new()),
             // description_is_empty: RwSignal::new_local(true),
+            liked: RwSignal::new(false),
             likes: RwSignal::new(0),
             created_at: RwSignal::new(0),
             post_state: RwSignal::new(None),
@@ -366,7 +368,8 @@ impl PostApi {
                 self.tags.set(post.tags);
                 self.live_description_length.set(post.description.len());
                 self.description.set(post.description);
-                self.likes.set(post.favorites);
+                self.liked.set(post.liked);
+                self.likes.set(post.likes_count);
                 self.created_at.set(post.created_at); // TODO maybe check in test
                 self.imgs.set(
                     post.images

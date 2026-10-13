@@ -1,4 +1,4 @@
-use super::Favorite;
+use super::LikeBtn;
 use crate::{Pfp, hook::Spawner, page::post::post_api::PostApi};
 use leptos::prelude::*;
 
@@ -12,6 +12,7 @@ pub fn PostProfile(
     let author_link = move || post_api.author_link.get();
     let pfp_hash = move || post_api.author_pfp_hash.get();
     let pfp_proccesed = move || post_api.author_pfp_proccesed.get();
+    let liked = post_api.liked;
 
     view! {
         <div class="flex justify-between place-items-start">
@@ -27,7 +28,7 @@ pub fn PostProfile(
                     <p class="text-[1rem]">"9999 followers"</p>
                 </div>
             </div>
-            <Favorite post_user_username=author_username post_id=post_id />
+            <LikeBtn liked post_user_username=author_username post_id=post_id />
         </div>
     }
 }

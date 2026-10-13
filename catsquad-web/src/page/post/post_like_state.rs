@@ -11,8 +11,8 @@ where
     TSender::TResponse: Response + Debug,
 {
     pub client: StoredValue<Client<TSender>, LocalStorage>,
-    pub post_id: StoredValue<i64>,
-    pub state: RwSignal<LikeState>,
+    pub post_id: Signal<i64>,
+    pub liked: RwSignal<bool>,
 }
 
 impl<TSender> Clone for PostLikeState<TSender>
@@ -24,7 +24,7 @@ where
         Self {
             client: self.client.clone(),
             post_id: self.post_id.clone(),
-            state: self.state.clone(),
+            liked: self.liked.clone(),
         }
     }
 }
@@ -49,63 +49,27 @@ where
     TSender: Sender + Debug + Clone + 'static,
     TSender::TResponse: Response + Debug,
 {
-    pub fn new(client: Client<TSender>) -> Self {
+    pub fn new_with_data(
+        client: Client<TSender>,
+        post_id: Signal<i64>,
+        liked: RwSignal<bool>,
+    ) -> Self {
         Self {
             client: StoredValue::new_local(client),
-            post_id: StoredValue::new(0),
-            state: RwSignal::new(LikeState::default()),
+            post_id,
+            liked,
         }
-    }
-
-    pub fn new_with_data(client: Client<TSender>, post_id: i64, liked: bool) -> Self {
-        Self {
-            client: StoredValue::new_local(client),
-            post_id: StoredValue::new(post_id),
-            state: RwSignal::new(if liked {
-                LikeState::Liked
-            } else {
-                LikeState::Unliked
-            }),
-        }
-    }
-
-    pub async fn init(&self, post_id: i64) {
-        let client = self.client.get_value();
-        let state = self.state;
-        let result = client
-            .post_like_get_by_post(post_id)
-            .send()
-            .await
-            .into_json()
-            .await;
-        match result {
-            Ok(liked) => {
-                self.post_id.set_value(post_id);
-                if liked {
-                    state.set(LikeState::Liked);
-                } else {
-                    state.set(LikeState::Unliked);
-                }
-            }
-            Err(err) => {
-                error!("use_post_like: {err}");
-                state.set(LikeState::Unliked);
-            }
-        };
     }
 
     pub async fn toggle_like(&self) {
-        let state = self.state;
+        // let state = self.state;
         let client = self.client.get_value();
-        let post_id = self.post_id.get_value();
+        let post_id = self.post_id.get_untracked();
         if post_id == 0 {
             return;
         }
-        match state.get_untracked() {
-            LikeState::Loading => {
-                //
-            }
-            LikeState::Liked => {
+        match self.liked.get_untracked() {
+            true => {
                 let result = client
                     .post_like_remove(post_id)
                     .send()
@@ -113,24 +77,22 @@ where
                     .into_json()
                     .await;
                 match result {
-                    Ok(_result) => {
-                        state.set(LikeState::Unliked);
-                    }
+                    Ok(_result) => (),
                     Err(err) => {
                         error!("use_post_like: {err}");
-                        state.set(LikeState::Unliked);
                     }
                 };
+                self.liked.set(false);
             }
-            LikeState::Unliked => {
+            false => {
                 let result = client.post_like_add(post_id).send().await.into_json().await;
                 match result {
                     Ok(_result) => {
-                        state.set(LikeState::Liked);
+                        self.liked.set(true);
                     }
                     Err(err) => {
                         error!("use_post_like: {err}");
-                        state.set(LikeState::Unliked);
+                        self.liked.set(false);
                     }
                 };
             }
@@ -199,113 +161,12 @@ async fn test_post_like_state() {
         )
         .await;
 
-    let post_like_state = PostLikeState::new(server.client.clone());
-    assert_eq!(post_like_state.state.get_untracked(), LikeState::Loading);
-    post_like_state.init(post1.id).await;
-    assert_eq!(post_like_state.state.get_untracked(), LikeState::Unliked);
+    let liked = RwSignal::new(false);
+    let post_like_state =
+        PostLikeState::new_with_data(server.client.clone(), post1.id.into(), liked);
+    assert_eq!(post_like_state.liked.get_untracked(), false);
     post_like_state.toggle_like().await;
-    assert_eq!(post_like_state.state.get_untracked(), LikeState::Liked);
+    assert_eq!(post_like_state.liked.get_untracked(), true);
     post_like_state.toggle_like().await;
-    assert_eq!(post_like_state.state.get_untracked(), LikeState::Unliked);
+    assert_eq!(post_like_state.liked.get_untracked(), false);
 }
-
-// #[derive(Clone, Copy)]
-// pub struct PostLike {
-//     pub stage: StoredValue<Box<dyn Fn() -> LikeState + Sync + Send + 'static>>,
-//     pub on_like: StoredValue<Box<dyn Fn() + Sync + Send + 'static>>,
-// }
-
-// pub fn use_post_like(post_key: Memo<Option<String>>) -> PostLike {
-//     // let api = ApiWeb::new();
-//     let spawner = Spawner::new();
-//     let stage = RwSignal::new(LikeState::Loading);
-//     let stage_view = move || {
-//         if spawner.is_busy.get() {
-//             LikeState::Loading
-//         } else {
-//             stage.get()
-//         }
-//     };
-
-//     Effect::new({
-//         let post_key = post_key.clone();
-//         move || {
-//             let Some(post_key) = post_key.get() else {
-//                 return;
-//             };
-//             let client = create_client();
-//             spawner.spawn(async move {
-//                 let result = client
-//                     .post_like_get_by_post(post_key)
-//                     .send()
-//                     .await
-//                     .into_json()
-//                     .await;
-//                 match result {
-//                     Ok(liked) => {
-//                         if liked {
-//                             stage.set(LikeState::Liked);
-//                         } else {
-//                             stage.set(LikeState::Unliked);
-//                         }
-//                     }
-//                     Err(err) => {
-//                         error!("use_post_like: {err}");
-//                         stage.set(LikeState::Unliked);
-//                     }
-//                 };
-//             });
-//         }
-//     });
-
-//     let on_like = move || {
-//         let Some(post_id) = post_key.get() else {
-//             return;
-//         };
-//         match stage.get_untracked() {
-//             LikeState::Loading => {
-//                 //
-//             }
-//             LikeState::Liked => {
-//                 spawner.spawn(async move {
-//                     let client = create_client();
-//                     let result = client
-//                         .post_like_remove(post_id)
-//                         .send()
-//                         .await
-//                         .into_json()
-//                         .await;
-//                     match result {
-//                         Ok(_result) => {
-//                             stage.set(LikeState::Unliked);
-//                         }
-//                         Err(err) => {
-//                             error!("use_post_like: {err}");
-//                             stage.set(LikeState::Unliked);
-//                         }
-//                     };
-//                 });
-//             }
-//             LikeState::Unliked => {
-//                 spawner.spawn(async move {
-//                     let client = create_client();
-//                     let result = client.post_like_add(post_id).send().await.into_json().await;
-//                     match result {
-//                         Ok(_result) => {
-//                             stage.set(LikeState::Liked);
-//                         }
-//                         Err(err) => {
-//                             error!("use_post_like: {err}");
-//                             stage.set(LikeState::Unliked);
-//                         }
-//                     };
-//                 });
-//             }
-//         }
-//     };
-
-//     PostLike {
-//         stage: StoredValue::new(Box::new(stage_view)),
-//         on_like: StoredValue::new(Box::new(on_like)),
-//     }
-// }

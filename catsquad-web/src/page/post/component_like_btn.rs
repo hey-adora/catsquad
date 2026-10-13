@@ -7,23 +7,14 @@ use crate::{
 use leptos::prelude::*;
 
 #[component]
-pub fn Favorite(
-    #[prop(optional, into)] post_id: Signal<i64>,
-    #[prop(optional, into)] post_user_username: Signal<String>,
+pub fn LikeBtn(
+    liked: RwSignal<bool>,
+    #[prop(into)] post_id: Signal<i64>,
+    #[prop(into)] post_user_username: Signal<String>,
 ) -> impl IntoView {
     let page = PageState::get();
-    let post_like = PostLikeState::new(create_client());
+    let post_like = PostLikeState::new_with_data(create_client(), post_id, liked);
     let spawner = Spawner::new();
-
-    Effect::new(move || {
-        let post_id = post_id.get();
-        if post_id == 0 {
-            return;
-        }
-        spawner.spawn(async move {
-            post_like.init(post_id).await;
-        });
-    });
 
     let is_visible_fn = move || -> bool {
         let post_user_username = post_user_username.get();
@@ -32,10 +23,10 @@ pub fn Favorite(
         let is_logged_in = page.is_logged_in().unwrap_or_default();
         is_logged_in && !is_my_post
     };
-    let is_post_loading_fn = move || post_like.state.get() == LikeState::Loading;
+    let is_post_loading_fn = move || post_id.get() == 0;
     let is_post_loaded_fn = move || !is_post_loading_fn();
 
-    let is_post_liked_fn = move || post_like.state.get() == LikeState::Liked;
+    let is_post_liked_fn = move || post_like.liked.get();
     let toggle_like_fn = move |_| {
         spawner.spawn(async move {
             post_like.toggle_like().await;
