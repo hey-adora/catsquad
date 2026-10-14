@@ -21,6 +21,7 @@ impl Db {
                 self.file_image_define().await;
                 self.post_like_define().await;
                 self.comment_define().await;
+                self.follow_define().await;
 
                 self.migration_add(time, 0).await.unwrap();
                 info!("database migration successful");

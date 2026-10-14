@@ -17,6 +17,12 @@ pub struct DbUser {
     pub pfp_image_hash: i64,
     #[sqlx(default, rename = "user_pfp_image_proccesed")]
     pub pfp_image_proccesed: bool,
+    #[sqlx(rename = "user_followers_count")]
+    #[sqlx(try_from = "i64")]
+    pub followers_count: u32,
+    #[sqlx(rename = "user_following_count")]
+    #[sqlx(try_from = "i64")]
+    pub following_count: u32,
     #[sqlx(rename = "user_used_storage_bytes")]
     #[sqlx(try_from = "i64")]
     pub used_storage_bytes: u32,
@@ -66,6 +72,8 @@ impl Db {
                 user_support text DEFAULT '',
                 user_aboutme text DEFAULT '',
                 user_pfp_image_hash int8 DEFAULT 0,
+                user_followers_count int8 DEFAULT 0,
+                user_following_count int8 DEFAULT 0,
                 user_used_storage_bytes int8 DEFAULT 0,
                 user_max_storage_per_file_bytes int8 NOT NULL,
                 user_max_storage_bytes int8 NOT NULL,
@@ -206,6 +214,8 @@ impl Db {
             aboutme: String::new(),
             pfp_image_hash: 0,
             pfp_image_proccesed: false,
+            followers_count: 0,
+            following_count: 0,
             used_storage_bytes: 0,
             max_storage_bytes,
             max_storage_per_image_bytes: max_storage_per_file_bytes,
