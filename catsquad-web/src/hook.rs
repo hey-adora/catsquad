@@ -1,4 +1,5 @@
 mod event_listener;
+mod follow_state;
 mod infinite_scroll_fn;
 mod intersection;
 mod intersection_switch;
@@ -13,6 +14,7 @@ mod spawn;
 
 // pub use current_page::CurrentPage;
 pub use event_listener::EventListener;
+pub use follow_state::FollowState;
 pub use infinite_scroll_fn::InfiniteScrollFn;
 pub use intersection::Intersection;
 pub use intersection_switch::IntersectionSwitch;

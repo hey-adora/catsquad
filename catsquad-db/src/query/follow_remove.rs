@@ -3,7 +3,7 @@ use catsquad_log::prelude::*;
 use catsquad_shared::PostState;
 
 #[derive(Debug, thiserror::Error)]
-pub enum DbFollowErr {
+pub enum DbFollowRemoveErr {
     #[error("post not found")]
     NotFound,
 
@@ -17,7 +17,7 @@ impl Db {
         time: u64,
         follower_user_username: impl Into<String>,
         following_user_username: impl Into<String>,
-    ) -> Result<(), DbFollowErr> {
+    ) -> Result<(), DbFollowRemoveErr> {
         let pool = &self.db;
 
         let follower_user_username = follower_user_username.into();
@@ -48,14 +48,14 @@ impl Db {
                 Ok(v) => v,
                 Err(err) => {
                     error!("unexpected db error {err}");
-                    return Err(DbFollowErr::Db(err));
+                    return Err(DbFollowRemoveErr::Db(err));
                 }
             };
 
             let affected = result.rows_affected();
 
             match affected {
-                0 => return Err(DbFollowErr::NotFound),
+                0 => return Err(DbFollowRemoveErr::NotFound),
                 1 => (),
                 _ => panic!("query is wrong, it must only delete 1 row max"),
             }
@@ -80,7 +80,7 @@ impl Db {
                 Ok(v) => v,
                 Err(err) => {
                     error!("unexpected db error {err}");
-                    return Err(DbFollowErr::Db(err));
+                    return Err(DbFollowRemoveErr::Db(err));
                 }
             };
 
@@ -106,7 +106,7 @@ impl Db {
                 Ok(v) => v,
                 Err(err) => {
                     error!("unexpected db error {err}");
-                    return Err(DbFollowErr::Db(err));
+                    return Err(DbFollowRemoveErr::Db(err));
                 }
             };
 

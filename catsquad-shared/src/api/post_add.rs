@@ -15,6 +15,7 @@ pub struct PostRes {
     pub title: String,
     pub description: String,
     pub tags: String,
+    pub followed: bool,
     pub liked: bool,
     pub likes_count: u32,
     pub images: Vec<FileImage>,

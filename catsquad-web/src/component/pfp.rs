@@ -37,9 +37,9 @@ pub fn Pfp(
     let when_pfp_is_unproccesed = move || !is_proccesed();
     let when_no_link = move || no_link.get();
     let when_yes_link = move || !when_no_link();
-    let text = move || match (is_loading.get(), proccesed.get()) {
-        (false, false) => "proccessing...",
-        (true, _) => "uploading...",
+    let text = move || match (is_loading.get(), proccesed.get(), hash.get() != 0) {
+        (false, false, true) => "proccessing...",
+        (true, _, _) => "uploading...",
         _ => "",
     };
 

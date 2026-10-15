@@ -77,12 +77,13 @@ where
                     .into_json()
                     .await;
                 match result {
-                    Ok(_result) => (),
+                    Ok(_result) => {
+                        self.liked.set(false);
+                    }
                     Err(err) => {
                         error!("use_post_like: {err}");
                     }
                 };
-                self.liked.set(false);
             }
             false => {
                 let result = client.post_like_add(post_id).send().await.into_json().await;
@@ -92,7 +93,6 @@ where
                     }
                     Err(err) => {
                         error!("use_post_like: {err}");
-                        self.liked.set(false);
                     }
                 };
             }

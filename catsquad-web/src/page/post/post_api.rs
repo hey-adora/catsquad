@@ -50,6 +50,7 @@ pub struct PostApi {
     pub description: RwSignal<String>,
     pub post_state: RwSignal<Option<PostState>>,
     // pub description_is_empty: RwSignal<bool, LocalStorage>,
+    pub followed: RwSignal<bool>,
     pub liked: RwSignal<bool>,
     pub likes: RwSignal<u32>,
     pub created_at: RwSignal<u64>,
@@ -103,6 +104,7 @@ impl PostApi {
             update_description_mode: RwSignal::new(false),
             description: RwSignal::new(String::new()),
             // description_is_empty: RwSignal::new_local(true),
+            followed: RwSignal::new(false),
             liked: RwSignal::new(false),
             likes: RwSignal::new(0),
             created_at: RwSignal::new(0),
@@ -344,9 +346,6 @@ impl PostApi {
         TSender::TResponse: Response + Debug,
     {
         let post_id = post_id.into();
-        // let (Some(username), Some(post_id)) = (param_username(), param_post.get_untracked()) else {
-        //     return;
-        // };
 
         let result = client
             .post_get_by_key(post_id)
@@ -368,6 +367,7 @@ impl PostApi {
                 self.tags.set(post.tags);
                 self.live_description_length.set(post.description.len());
                 self.description.set(post.description);
+                self.followed.set(post.followed);
                 self.liked.set(post.liked);
                 self.likes.set(post.likes_count);
                 self.created_at.set(post.created_at); // TODO maybe check in test
@@ -410,36 +410,12 @@ impl PostApi {
 
 #[cfg(test)]
 pub mod tests {
+    use crate::{init_owner, page::post::post_api::PostApi};
     use catsquad_api::{TestServer, auth::create_auth_cookie_str};
+    use catsquad_log::prelude::*;
     use catsquad_shared::{PostState, uuid_to_str};
     use http::header;
-    // use crate::{
-    //     api::{
-    //         Order, ServerReqImg, TimeRange, shared::post_comment::UserPostComment,
-    //         tests::ApiTestApp,
-    //     },
-    //     view::{
-    //         app::hook::{
-    //             api_gallery::{GalleryApi, GalleryContainerSize},
-    //             api_post::PostApi,
-    //             api_post_comments::{CommentKind, CommentKind2, CommentsApi, CommentsApi2},
-    //             use_scroll_correction::ScrollCorrection,
-    //         },
-    //         logger,
-    //         toolbox::prelude::*,
-    //     },
-    // };
-    // use hydration_context::HydrateSharedContext;
     use leptos::prelude::*;
-    use std::sync::Arc;
-    // use surrealdb::types::ToSql;
-    use catsquad_log::prelude::*;
-    use tokio::process::Command;
-
-    use crate::{init_owner, page::post::post_api::PostApi};
-    // use tracing::{debug, trace};
-
-    // use crate::init_test_log;
 
     #[tokio::test]
     pub async fn hook_post_api_update_description() {
@@ -472,9 +448,6 @@ pub mod tests {
         post_api.update_description(&app.client, post_id, "2").await;
         assert_eq!(post_api.live_description_length.get_untracked(), 2);
         assert!(!post_api.err_general.get_untracked().is_empty());
-
-        // let items = gallery_api.items.get_untracked();
-        // assert_eq!(items.len(), 1);
     }
 
     pub async fn post_setup(
@@ -519,17 +492,20 @@ pub mod tests {
     }
 
     #[tokio::test]
-    pub async fn hook_post_api_update_title() {
-        // let _owner = Owner::new_root(Some(Arc::new(HydrateSharedContext::new())));
-        let (_owner, app, post_id) =
-            post_setup("hook_post_api_update_title", "title", "", "").await;
-        // testing err
+    pub async fn hook_post_api_error() {
+        let (_owner, app, _post_id) =
+            post_setup("hook_post_api_error", "title", "one", "two").await;
 
         let post_api = PostApi::new();
         post_api.init(&app.client, 0).await;
         assert!(!post_api.err_general.get_untracked().is_empty());
         assert_eq!(post_api.title.get_untracked(), "");
-        assert_eq!(post_api.live_title_length.get_untracked(), 0);
+    }
+
+    #[tokio::test]
+    pub async fn hook_post_api_update_title() {
+        let (_owner, app, post_id) =
+            post_setup("hook_post_api_update_title", "title", "", "").await;
 
         // testing normal
         let post_api = PostApi::new();
@@ -548,23 +524,12 @@ pub mod tests {
         post_api.init(&app.client, post_id).await;
         assert_eq!(post_api.title.get_untracked(), "one");
         assert_eq!(post_api.live_title_length.get_untracked(), 3);
-
-        // let items = gallery_api.items.get_untracked();
-        // assert_eq!(items.len(), 1);
     }
 
     #[tokio::test]
     pub async fn hook_post_api_update_tags() {
         let (_owner, app, post_id) = post_setup("hook_post_api_update_tags", "title", "", "").await;
 
-        // testing err
-        let post_api = PostApi::new();
-        post_api.init(&app.client, 0).await;
-        assert!(!post_api.err_general.get_untracked().is_empty());
-        assert_eq!(post_api.tags.get_untracked(), "");
-        assert_eq!(post_api.live_tags_length.get_untracked(), 0);
-
-        // testing normal
         let post_api = PostApi::new();
         post_api.init(&app.client, post_id).await;
         assert_eq!(post_api.tags.get_untracked(), "");
@@ -581,9 +546,6 @@ pub mod tests {
         post_api.init(&app.client, post_id).await;
         assert_eq!(post_api.tags.get_untracked(), " one ");
         assert_eq!(post_api.live_tags_length.get_untracked(), 5);
-
-        // let items = gallery_api.items.get_untracked();
-        // assert_eq!(items.len(), 1);
     }
 
     #[tokio::test]
@@ -637,5 +599,17 @@ pub mod tests {
 
         assert!(post_api.err_general.get_untracked().is_empty());
         assert_eq!(post_api.post_state.get_untracked(), Some(PostState::Active));
+    }
+
+    #[tokio::test]
+    pub async fn hook_post_api_followed() {
+        let (_owner, app, post_id) = post_setup("hook_post_api_error", "title", "one", "two").await;
+
+        let post_api = PostApi::new();
+        post_api.init(&app.client, post_id).await;
+        assert!(!post_api.err_general.get_untracked().is_empty());
+        assert_eq!(post_api.followed.get_untracked(), false);
+
+        // app.
     }
 }

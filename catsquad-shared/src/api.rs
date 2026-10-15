@@ -11,6 +11,8 @@ pub mod email_change_update_finish;
 pub mod email_change_update_new_add;
 pub mod email_change_update_new_confirm;
 pub mod file_image;
+pub mod follow_add;
+pub mod follow_remove;
 pub mod invite_add;
 pub mod invite_get_by_key;
 pub mod password_change_add;

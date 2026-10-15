@@ -40,6 +40,8 @@ pub use api::email_change_update_finish::*;
 pub use api::email_change_update_new_add::*;
 pub use api::email_change_update_new_confirm::*;
 pub use api::file_image::*;
+pub use api::follow_add::*;
+pub use api::follow_remove::*;
 pub use api::invite_add::*;
 pub use api::invite_get_by_key::*;
 pub use api::password_change_add::*;

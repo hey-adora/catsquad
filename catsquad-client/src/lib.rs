@@ -645,6 +645,20 @@ where
         self.delete(link_relative_post_remove(post_id))
     }
 
+    pub fn follow_add(
+        &self,
+        user_username: impl Display,
+    ) -> Builder<TSender, cs::FollowRes, cs::FollowAddErr> {
+        self.post_form_empty(cs::link_relative_follow_add(user_username))
+    }
+
+    pub fn follow_remove(
+        &self,
+        user_username: impl Display,
+    ) -> Builder<TSender, (), cs::FollowRemoveErr> {
+        self.delete(cs::link_relative_follow_remove(user_username))
+    }
+
     pub fn post_like_add(
         &self,
         post_id: i64,

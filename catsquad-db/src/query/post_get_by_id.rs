@@ -33,6 +33,8 @@ pub struct DbPostGet {
     pub description: String,
     #[sqlx(rename = "post_tags")]
     pub tags: String,
+    #[sqlx(rename = "post_user_followed")]
+    pub followed: bool,
     #[sqlx(rename = "post_liked")]
     pub liked: bool,
     #[sqlx(rename = "post_likes_count")]
@@ -97,7 +99,6 @@ impl Db {
             if !user_username.is_empty() {
                 break 'a "LEFT JOIN posts_likes ON post_id=post_like_post_id AND post_like_user_username = $2";
             }
-
             ""
         };
 
@@ -105,12 +106,25 @@ impl Db {
             if !user_username.is_empty() {
                 break 'a "coalesce(post_like_post_id > 0, false) as post_liked";
             }
-
             "false as post_liked"
         };
 
+        let q_followed_by_me = 'a: {
+            if !user_username.is_empty() {
+                break 'a "LEFT JOIN follow ON follower_user_username=$2 AND following_user_username=post_user_username";
+            }
+            ""
+        };
+
+        let q_followed_by_me_field = 'a: {
+            if !user_username.is_empty() {
+                break 'a "coalesce(follow_id > 0, false) as post_user_followed";
+            }
+            "false as post_user_followed"
+        };
+
         // get post
-        let (images_hashes, post) = {
+        let (images_hashes, mut post) = {
             let query_str = format!(
                 "
                             SELECT
@@ -120,6 +134,8 @@ impl Db {
                                     coalesce(image_processed, false) as post_user_pfp_proccesed,
 
                                     {q_liked_by_me_field},
+
+                                    {q_followed_by_me_field},
 
                                     post_id,
                                     post_user_username,
@@ -137,6 +153,9 @@ impl Db {
                                 LEFT JOIN files_images ON user_pfp_image_hash=image_hash
 
                                 {q_liked_by_me}
+
+                                {q_followed_by_me}
+
 
                                 WHERE post_id = $1 AND post_state != 'draft'"
             );
@@ -189,7 +208,7 @@ impl Db {
         };
 
         // get images
-        let post = {
+        {
             let query = "SELECT
                                     image_hash,
                                     image_extension,
@@ -229,12 +248,8 @@ impl Db {
                 .collect::<Option<Vec<DbFileImage>>>()
                 .ok_or(DbPostGetByKeyErr::PostNotFound)?;
 
-            let mut post: DbPostGet = post.into();
-
             post.images = images_sorted;
-
-            post
-        };
+        }
 
         Ok(post)
     }
@@ -249,27 +264,38 @@ async fn test_post_get_by_id() {
 
     let db = Db::test_db(0, "test_post_get_by_key").await;
 
-    let invite1 = db.invite_add(0, "hey@heyadora.com", 1).await.unwrap();
-    let user1 = db
-        .user_add(0, "hey", "hey", invite1.token.clone(), 10, 10)
-        .await
-        .unwrap();
+    // register user1 and user2
+    let (user1, user2) = {
+        let invite1 = db.invite_add(0, "hey@heyadora.com", 1).await.unwrap();
+        let user1 = db
+            .user_add(0, "hey", "hey", invite1.token.clone(), 10, 10)
+            .await
+            .unwrap();
 
-    let invite2 = db.invite_add(0, "hey2@heyadora.com", 1).await.unwrap();
-    let user2 = db
-        .user_add(0, "hey2", "hey", invite2.token.clone(), 10, 10)
-        .await
-        .unwrap();
+        let invite2 = db.invite_add(0, "hey2@heyadora.com", 1).await.unwrap();
+        let user2 = db
+            .user_add(0, "hey2", "hey", invite2.token.clone(), 10, 10)
+            .await
+            .unwrap();
 
-    let post1 = db
-        .post_add(0, user1.username.clone(), "title1", "description1", "tags")
-        .await
-        .unwrap();
+        (user1, user2)
+    };
 
-    db.post_update_image_add(0, user1.username.clone(), post1.id, 10, 555, "jpg", 10, 15)
-        .await
-        .unwrap();
+    // create post
+    let post1 = {
+        let post1 = db
+            .post_add(0, user1.username.clone(), "title1", "description1", "tags")
+            .await
+            .unwrap();
 
+        db.post_update_image_add(0, user1.username.clone(), post1.id, 10, 555, "jpg", 10, 15)
+            .await
+            .unwrap();
+
+        post1
+    };
+
+    // asssert error
     {
         let result = db
             .post_get_by_id(user1.username.clone(), post1.id.clone())
@@ -282,16 +308,17 @@ async fn test_post_get_by_id() {
         assert!(matches!(result, Err(DbPostGetByKeyErr::PostNotFound)));
     }
 
-    db.post_update_state(
-        0,
-        user1.username.clone(),
-        post1.id.clone(),
-        PostState::Active,
-    )
-    .await
-    .unwrap();
-
+    // assert success when post is active
     {
+        db.post_update_state(
+            0,
+            user1.username.clone(),
+            post1.id.clone(),
+            PostState::Active,
+        )
+        .await
+        .unwrap();
+
         let result = db
             .post_get_by_id(user1.username.clone(), post1.id.clone())
             .await;
@@ -303,16 +330,17 @@ async fn test_post_get_by_id() {
         assert!(matches!(result, Ok(_)));
     }
 
-    db.post_update_state(
-        0,
-        user1.username.clone(),
-        post1.id.clone(),
-        PostState::Hidden,
-    )
-    .await
-    .unwrap();
-
+    // asssert succuess/error when post is hidden
     {
+        db.post_update_state(
+            0,
+            user1.username.clone(),
+            post1.id.clone(),
+            PostState::Hidden,
+        )
+        .await
+        .unwrap();
+
         let post1 = db
             .post_get_by_id(user1.username.clone(), post1.id.clone())
             .await
@@ -326,7 +354,7 @@ async fn test_post_get_by_id() {
         assert!(matches!(result, Err(DbPostGetByKeyErr::Unauthorized)));
     }
 
-    // pfp
+    // assert pfp state of post author
     {
         db.post_update_state(
             0,
@@ -372,7 +400,7 @@ async fn test_post_get_by_id() {
         assert_eq!(post1.user_pfp_proccesed, true);
     }
 
-    // like
+    // assert post like state
     {
         let post1 = db
             .post_get_by_id(user2.username.clone(), post1.id.clone())
@@ -405,5 +433,40 @@ async fn test_post_get_by_id() {
             .unwrap();
 
         assert_eq!(post1.liked, false);
+    }
+
+    // assert follow state
+    {
+        let post1 = db
+            .post_get_by_id(user2.username.clone(), post1.id.clone())
+            .await
+            .unwrap();
+
+        assert_eq!(post1.followed, false);
+
+        db.follow_add(0, user2.username.clone(), user1.username.clone())
+            .await
+            .unwrap();
+
+        let post1 = db
+            .post_get_by_id(user2.username.clone(), post1.id.clone())
+            .await
+            .unwrap();
+
+        assert_eq!(post1.followed, true);
+
+        let post1 = db
+            .post_get_by_id(user1.username.clone(), post1.id.clone())
+            .await
+            .unwrap();
+
+        assert_eq!(post1.followed, false);
+
+        let post1 = db
+            .post_get_by_id("".to_string(), post1.id.clone())
+            .await
+            .unwrap();
+
+        assert_eq!(post1.followed, false);
     }
 }

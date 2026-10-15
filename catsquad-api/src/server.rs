@@ -173,6 +173,11 @@ pub async fn app(state: AppState) -> Router {
         ));
 
     let router_auth = Router::new()
+        .route(catsquad_shared::LINK_API_FOLLOW_ADD, post(api::follow_add))
+        .route(
+            catsquad_shared::LINK_API_FOLLOW_REMOVE,
+            delete(api::follow_remove),
+        )
         .route(
             catsquad_shared::LINK_API_COMMENT_ADD,
             post(api::comment_add),

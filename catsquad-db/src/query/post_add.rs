@@ -81,7 +81,6 @@ impl Db {
         description: impl Into<String>,
         tags: impl Into<String>,
     ) -> Result<DbPostGet, DbPostAddErr> {
-        // let user_id = create_user_id(user_key);
         let pool = &self.db;
 
         let input_user_username = user_username.into();
@@ -97,8 +96,10 @@ impl Db {
                         post_images_hashes,
 
                         false as post_liked,
+                        false as post_user_followed,
+
                         user_pfp_image_hash as post_user_pfp_hash,
-                        coalesce(f1.image_processed, false) as post_user_pfp_proccesed,
+                        coalesce(image_processed, false) as post_user_pfp_proccesed,
 
                         post_id,
                         post_user_username,
@@ -113,7 +114,7 @@ impl Db {
 
                     FROM posts
                     JOIN users ON post_user_username=user_username
-                    LEFT JOIN files_images f1 ON user_pfp_image_hash=f1.image_hash
+                    LEFT JOIN files_images ON user_pfp_image_hash=image_hash
                     WHERE
                         post_user_username=$1 AND post_state='draft'
                     LIMIT 1";
@@ -231,6 +232,7 @@ impl Db {
             let post = DbPostGet {
                 user_pfp_hash: pfp_hash,
                 user_pfp_proccesed: pfp_proccesed,
+                followed: false, // here
                 liked: false,
 
                 id: post_id,
@@ -302,65 +304,6 @@ impl Db {
 
             post
         };
-        // // get files status
-        // {
-        //     let query = "SELECT
-        //                             hash, image_processed
-        //                             FROM unnest($1) hash
-        //                             INNER JOIN files_images
-        //                             ON hash=image_hash
-        //                             ORDER BY hash DESC";
-
-        //     let result = sqlx::query_as(query)
-        //         .bind(&post.images_hashes)
-        //         .fetch_all(&mut *tx)
-        //         .await;
-
-        //     debug!(
-        //         "query {query} $1={:?} result {result:#?}",
-        //         post.images_hashes
-        //     );
-
-        //     let images_status: Vec<(i64, bool)> = match result {
-        //         Ok(post) => post,
-        //         Err(err) => {
-        //             error!("unexpected db error {err}");
-        //             return Err(DbPostAddErr::Db(err));
-        //         }
-        //     };
-
-        //     let sorted_imagus_status = post
-        //         .images_hashes
-        //         .clone()
-        //         .into_iter()
-        //         .map(|hash| {
-        //             let item = images_status
-        //                 .iter()
-        //                 .find(|(q_hash, _status)| *q_hash == hash)
-        //                 .map(|v| v.1);
-
-        //             item
-        //         })
-        //         .collect::<Option<Vec<bool>>>()
-        //         .ok_or(DbPostAddErr::InternalError)
-        //         .inspect_err(|_| {
-        //             error!(
-        //                 " image status didnt match result expected {:?}, got {:?}",
-        //                 &post.images_hashes, images_status
-        //             )
-        //         })?;
-
-        //     if sorted_imagus_status.len() != post.images_hashes.len() {
-        //         error!(
-        //             "invalid image_status length, got {} expected {}",
-        //             sorted_imagus_status.len(),
-        //             post.images_hashes.len()
-        //         );
-        //         return Err(DbPostAddErr::InternalError);
-        //     }
-
-        //     post.images_status = sorted_imagus_status;
-        // }
 
         // update post
         {
@@ -448,77 +391,95 @@ async fn test_post_add() {
     init_log();
     let db = Db::test_db(0, "test_post_add").await;
 
-    let invite1 = db.invite_add(0, "hey@heyadora.com", 1).await.unwrap();
-    let user = db
-        .user_add(0, "hey", "hey", invite1.token.clone(), 10, 10)
-        .await
-        .unwrap();
+    // register user
+    let user = {
+        let invite1 = db.invite_add(0, "hey@heyadora.com", 1).await.unwrap();
+        let user = db
+            .user_add(0, "hey", "hey", invite1.token.clone(), 10, 10)
+            .await
+            .unwrap();
+        user
+    };
 
-    let post1 = db
-        .post_add(0, user.username.clone(), "title", "description", "tags")
-        .await
-        .unwrap();
+    // assert success
+    {
+        // create post in draft state
+        let post1 = db
+            .post_add(0, user.username.clone(), "title", "description", "tags")
+            .await
+            .unwrap();
 
-    assert_eq!(post1.user_pfp_hash, 0);
-    assert_eq!(post1.user_pfp_proccesed, false);
-    assert_eq!(post1.liked, false);
+        assert_eq!(post1.followed, false);
 
-    assert_eq!(post1.id, 1);
-    assert_eq!(post1.user_username, "hey");
-    assert_eq!(post1.state, PostState::Draft.to_string());
-    assert_eq!(post1.title, "title");
-    assert_eq!(post1.description, "description");
-    assert_eq!(post1.tags, " tags ");
-    assert_eq!(post1.likes_count, 0);
-    assert_eq!(post1.size_bytes, 0);
-    assert_eq!(post1.images, Vec::new());
-    assert_eq!(post1.modified_at, 0);
-    assert_eq!(post1.created_at, 0);
+        assert_eq!(post1.user_pfp_hash, 0);
+        assert_eq!(post1.user_pfp_proccesed, false);
+        assert_eq!(post1.liked, false);
 
-    let post2 = db
-        .post_add(0, user.username.clone(), "title2", "description2", "tags2")
-        .await
-        .unwrap();
+        assert_eq!(post1.id, 1);
+        assert_eq!(post1.user_username, "hey");
+        assert_eq!(post1.state, PostState::Draft.to_string());
+        assert_eq!(post1.title, "title");
+        assert_eq!(post1.description, "description");
+        assert_eq!(post1.tags, " tags ");
+        assert_eq!(post1.likes_count, 0);
+        assert_eq!(post1.size_bytes, 0);
+        assert_eq!(post1.images, Vec::new());
+        assert_eq!(post1.modified_at, 0);
+        assert_eq!(post1.created_at, 0);
 
-    assert_eq!(post2.id, post1.id);
-    assert_eq!(post2.state, PostState::Draft.to_string());
-    assert_eq!(post2.title, "title2");
-    assert_eq!(post2.description, "description2");
-    assert_eq!(post2.tags, " tags2 ");
+        let post2 = db
+            .post_add(0, user.username.clone(), "title2", "description2", "tags2")
+            .await
+            .unwrap();
 
-    let post2 = db
-        .post_add(0, user.username.clone(), "title3", "", "")
-        .await
-        .unwrap();
+        assert_eq!(post1.followed, false);
 
-    assert_eq!(post2.id, post1.id);
-    assert_eq!(post2.state, PostState::Draft.to_string());
-    assert_eq!(post2.title, "title3");
-    assert_eq!(post2.description, "description2");
-    assert_eq!(post2.tags, " tags2 ");
+        assert_eq!(post2.id, post1.id); // gets the old post draft
+        assert_eq!(post2.state, PostState::Draft.to_string());
+        assert_eq!(post2.title, "title2");
+        assert_eq!(post2.description, "description2");
+        assert_eq!(post2.tags, " tags2 ");
 
-    let result = db
-        .post_add(0, "invalid", "title", "description", "tags")
-        .await;
-    assert!(matches!(result, Err(DbPostAddErr::UserNotFound)));
+        let post2 = db
+            .post_add(0, user.username.clone(), "title3", "", "")
+            .await
+            .unwrap();
 
-    // tags are proccessed
+        assert_eq!(post2.id, post1.id); // gets the old post draft
+        assert_eq!(post2.state, PostState::Draft.to_string());
+        assert_eq!(post2.title, "title3");
+        assert_eq!(post2.description, "description2");
+        assert_eq!(post2.tags, " tags2 ");
+    }
 
-    let post1 = db
-        .post_add(
-            0,
-            user.username.clone(),
-            "title",
-            "description",
-            " tAgs     tWo",
-        )
-        .await
-        .unwrap();
+    // assert error
+    {
+        let result = db
+            .post_add(0, "invalid", "title", "description", "tags")
+            .await;
+        assert!(matches!(result, Err(DbPostAddErr::UserNotFound)));
+    }
 
-    assert_eq!(post1.state, PostState::Draft.to_string());
-    assert_eq!(post1.title, "title");
-    assert_eq!(post1.description, "description");
-    assert_eq!(post1.tags, " tags two ");
+    // assert tags are proccessed
+    let post1 = {
+        let post1 = db
+            .post_add(
+                0,
+                user.username.clone(),
+                "title",
+                "description",
+                " tAgs     tWo",
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(post1.state, PostState::Draft.to_string());
+        assert_eq!(post1.title, "title");
+        assert_eq!(post1.description, "description");
+        assert_eq!(post1.tags, " tags two ");
+
+        post1
+    };
 
     // pfp
     {
