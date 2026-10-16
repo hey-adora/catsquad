@@ -96,6 +96,8 @@ impl Db {
                         post_images_hashes,
 
                         false as post_liked,
+
+                        user_followers_count as post_user_followers,
                         false as post_user_followed,
 
                         user_pfp_image_hash as post_user_pfp_hash,
@@ -232,8 +234,9 @@ impl Db {
             let post = DbPostGet {
                 user_pfp_hash: pfp_hash,
                 user_pfp_proccesed: pfp_proccesed,
-                followed: false, // here
-                liked: false,
+                followers: 0,    // here
+                followed: false, // cant follow yourself
+                liked: false,    // cant like yourself
 
                 id: post_id,
                 user_username: input_user_username,

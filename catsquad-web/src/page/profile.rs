@@ -82,7 +82,7 @@ pub fn Profile() -> impl IntoView {
                 <ProfileAuthor author_state=author_state.clone() spawner user_username=username />
                 <Show when=when_tab_support>
                     <Support
-                        class="px-2 sm:col-start-1 sm:col-row-1 sm:hidden"
+                        class="mt-4 px-2 sm:col-start-1 sm:col-row-1 sm:hidden"
                         user_username=username
                         spawner
                         author_state=author_state.clone()
@@ -90,7 +90,7 @@ pub fn Profile() -> impl IntoView {
                 </Show>
                 <Show when=when_tab_aboutme>
                     <Aboutme
-                        class="px-2 sm:col-start-1 sm:col-row-1 sm:hidden"
+                        class="mt-4 px-2 sm:col-start-1 sm:col-row-1 sm:hidden"
                         user_username=username
                         spawner
                         author_state=author_state_clone1.clone()

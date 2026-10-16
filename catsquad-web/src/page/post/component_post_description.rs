@@ -13,6 +13,7 @@ use web_sys::HtmlTextAreaElement;
 pub fn PostDescription(
     spawner: Spawner,
     post_api: PostApi,
+    #[prop(optional, into)] class: Signal<String>,
     #[prop(optional, into)] post_id: Signal<i64>,
 ) -> impl IntoView {
     let page = PageState::get();
@@ -39,6 +40,7 @@ pub fn PostDescription(
     view! {
 
         <TextEditor
+            class=class
             id_prefix="decription"
             title="Decription"
             text=post_api.description

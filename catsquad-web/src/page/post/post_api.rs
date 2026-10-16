@@ -50,6 +50,7 @@ pub struct PostApi {
     pub description: RwSignal<String>,
     pub post_state: RwSignal<Option<PostState>>,
     // pub description_is_empty: RwSignal<bool, LocalStorage>,
+    pub followers: RwSignal<u32>,
     pub followed: RwSignal<bool>,
     pub liked: RwSignal<bool>,
     pub likes: RwSignal<u32>,
@@ -104,6 +105,7 @@ impl PostApi {
             update_description_mode: RwSignal::new(false),
             description: RwSignal::new(String::new()),
             // description_is_empty: RwSignal::new_local(true),
+            followers: RwSignal::new(0),
             followed: RwSignal::new(false),
             liked: RwSignal::new(false),
             likes: RwSignal::new(0),
@@ -367,6 +369,7 @@ impl PostApi {
                 self.tags.set(post.tags);
                 self.live_description_length.set(post.description.len());
                 self.description.set(post.description);
+                self.followers.set(post.followers);
                 self.followed.set(post.followed);
                 self.liked.set(post.liked);
                 self.likes.set(post.likes_count);
@@ -609,7 +612,5 @@ pub mod tests {
         post_api.init(&app.client, post_id).await;
         assert!(!post_api.err_general.get_untracked().is_empty());
         assert_eq!(post_api.followed.get_untracked(), false);
-
-        // app.
     }
 }

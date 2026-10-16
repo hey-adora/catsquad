@@ -135,13 +135,13 @@ pub fn ProfileAuthor(
                     </div>
                 </div>
                 <Support
-                    class="max-w-[20rem]"
+                    class="mt-4 max-w-[20rem]"
                     user_username
                     spawner
                     author_state=author_state.clone()
                 />
                 <Aboutme
-                    class="max-w-[20rem]"
+                    class="mt-4 max-w-[20rem]"
                     user_username
                     spawner
                     author_state=author_state.clone()

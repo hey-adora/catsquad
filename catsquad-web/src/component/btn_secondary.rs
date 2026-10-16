@@ -19,9 +19,6 @@ pub fn BtnSecondary(
     };
     let id_fn = move || id.get();
     let class_fn = move || class.get();
-    let is_loading_fn = move || is_loading.get();
-    let disabled_fn = move || disabled.get();
-    let is_disabled_fn = move || is_loading_fn() || disabled_fn();
 
     let class_on_disable = move || "bg-base02 text-base01";
     let class_on_active = move || "hover:bg-base0D bg-base03 text-base05";
@@ -29,7 +26,8 @@ pub fn BtnSecondary(
     view! {
         <Btn
             id=id_fn
-            disabled=is_disabled_fn
+            is_loading=is_loading
+            disabled=disabled
             on:click=on_click_handler
             class=class_fn
             class_on_disable=class_on_disable

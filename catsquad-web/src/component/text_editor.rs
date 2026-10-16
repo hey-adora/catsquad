@@ -59,7 +59,7 @@ pub fn TextEditor(
         }
     };
 
-    let class_container = move || format!("flex flex-col gap-2 md:gap-4 mt-4 {}", class.get());
+    let class_container = move || format!("flex flex-col gap-2 md:gap-4 {}", class.get());
 
     view! {
         <div class=class_container >

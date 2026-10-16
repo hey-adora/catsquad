@@ -264,11 +264,11 @@ pub fn Comment(
         let is_owned_fn = is_owned_fn.clone();
         move || {
             format!(
-                "grid gap-2 items-center justify-between {}",
+                "grid gap-2 items-center {}",
                 if is_owned_fn() {
-                    "grid-cols-[auto_auto_auto]"
+                    "grid-cols-[auto_auto_1fr]"
                 } else {
-                    "grid-cols-[auto_auto]"
+                    "grid-cols-[auto_1fr]"
                 }
             )
         }

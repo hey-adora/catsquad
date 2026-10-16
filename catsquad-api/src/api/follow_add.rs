@@ -105,7 +105,7 @@ async fn test_api_follow_add() {
         .user_add_full("hey2", "hey2@heyadora.com", "1nnerogGeron@@$")
         .await;
 
-    // assert error
+    // assert errors
     {
         let result = server
             .follow_add(user1.username.clone(), session_key1)
@@ -126,7 +126,7 @@ async fn test_api_follow_add() {
             .unwrap();
     }
 
-    // assert error
+    // assert errors
     {
         let result = server
             .follow_add(user2.username.clone(), session_key1)

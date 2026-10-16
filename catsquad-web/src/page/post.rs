@@ -13,6 +13,7 @@ mod component_comment;
 mod component_comment_text;
 mod component_comments;
 pub mod component_edit_btn;
+mod component_follow_btn;
 mod component_length_counter;
 mod component_like_btn;
 mod component_post_controls;
@@ -29,6 +30,7 @@ pub mod post_like_state;
 
 use component_comments::Comments;
 use component_edit_btn::EditSaveCancel;
+pub use component_follow_btn::FollowBtn;
 use component_length_counter::LengthCounter;
 use component_like_btn::LikeBtn;
 use component_post_controls::PostControls;
@@ -117,8 +119,8 @@ pub fn Post() -> impl IntoView {
                             <PostTitle spawner=spawner_post post_api post_id />
                             <PostProfile spawner=spawner_post post_api post_id />
                         </div>
-                        <PostDescription spawner=spawner_post post_api post_id/>
-                        <PostTags spawner=spawner_post post_api post_id/>
+                        <PostDescription class="" spawner=spawner_post post_api post_id/>
+                        <PostTags class="mt-4" spawner=spawner_post post_api post_id/>
                         <Comments post_id />
                     </div>
                 </div>

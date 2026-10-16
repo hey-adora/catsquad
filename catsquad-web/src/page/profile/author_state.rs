@@ -15,6 +15,9 @@ where
     pub pfp_hash: RwSignal<i64>,
     pub pfp_proccesed: RwSignal<bool>,
 
+    pub following: RwSignal<u32>,
+    pub followed: RwSignal<bool>,
+
     pub support: RwSignal<String>,
     pub err_support: RwSignal<String>,
     pub support_edit_mode: RwSignal<bool>,
@@ -49,6 +52,9 @@ where
             username: RwSignal::new(String::new()),
             pfp_hash: RwSignal::new(0),
             pfp_proccesed: RwSignal::new(false),
+
+            following: RwSignal::new(0),
+            followed: RwSignal::new(false),
 
             support: RwSignal::new(String::new()),
             err_support: RwSignal::new(String::new()),

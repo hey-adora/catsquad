@@ -29,6 +29,7 @@ pub fn from_db_post_get(value: DbPostGet) -> PostRes {
         state: PostState::from(value.state),
         title: value.title,
         tags: value.tags,
+        followers: value.followers,
         followed: value.followed,
         liked: value.liked,
         likes_count: value.likes_count,

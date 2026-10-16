@@ -33,6 +33,9 @@ pub struct DbPostGet {
     pub description: String,
     #[sqlx(rename = "post_tags")]
     pub tags: String,
+    #[sqlx(rename = "post_user_followers")]
+    #[sqlx(try_from = "i64")]
+    pub followers: u32,
     #[sqlx(rename = "post_user_followed")]
     pub followed: bool,
     #[sqlx(rename = "post_liked")]
@@ -135,6 +138,7 @@ impl Db {
 
                                     {q_liked_by_me_field},
 
+                                    user_followers_count as post_user_followers,
                                     {q_followed_by_me_field},
 
                                     post_id,
@@ -155,7 +159,6 @@ impl Db {
                                 {q_liked_by_me}
 
                                 {q_followed_by_me}
-
 
                                 WHERE post_id = $1 AND post_state != 'draft'"
             );
@@ -453,6 +456,7 @@ async fn test_post_get_by_id() {
             .await
             .unwrap();
 
+        assert_eq!(post1.followers, 1);
         assert_eq!(post1.followed, true);
 
         let post1 = db
