@@ -216,9 +216,9 @@ async fn test_follow_add() {
     };
 
     let result = db.follow_add(0, "hey", "hey2").await.unwrap();
-    let user1 = db.user_get_by_username("hey").await.unwrap();
-    let user2 = db.user_get_by_username("hey2").await.unwrap();
-    let user3 = db.user_get_by_username("hey3").await.unwrap();
+    let user1 = db.user_get_by_username("", "hey").await.unwrap();
+    let user2 = db.user_get_by_username("", "hey2").await.unwrap();
+    let user3 = db.user_get_by_username("", "hey3").await.unwrap();
     assert_eq!(result.following_user_username, "hey2");
     assert_eq!(result.follower_user_username, "hey");
     assert_eq!(user1.following_count, 1);
@@ -229,9 +229,9 @@ async fn test_follow_add() {
     assert_eq!(user3.followers_count, 0);
 
     let result = db.follow_add(0, "hey3", "hey2").await.unwrap();
-    let user1 = db.user_get_by_username("hey").await.unwrap();
-    let user2 = db.user_get_by_username("hey2").await.unwrap();
-    let user3 = db.user_get_by_username("hey3").await.unwrap();
+    let user1 = db.user_get_by_username("", "hey").await.unwrap();
+    let user2 = db.user_get_by_username("", "hey2").await.unwrap();
+    let user3 = db.user_get_by_username("", "hey3").await.unwrap();
     assert_eq!(result.following_user_username, "hey2");
     assert_eq!(result.follower_user_username, "hey3");
     assert_eq!(user1.following_count, 1);
@@ -242,9 +242,9 @@ async fn test_follow_add() {
     assert_eq!(user3.followers_count, 0);
 
     let result = db.follow_add(0, "hey2", "hey3").await.unwrap();
-    let user1 = db.user_get_by_username("hey").await.unwrap();
-    let user2 = db.user_get_by_username("hey2").await.unwrap();
-    let user3 = db.user_get_by_username("hey3").await.unwrap();
+    let user1 = db.user_get_by_username("", "hey").await.unwrap();
+    let user2 = db.user_get_by_username("", "hey2").await.unwrap();
+    let user3 = db.user_get_by_username("", "hey3").await.unwrap();
     assert_eq!(result.following_user_username, "hey3");
     assert_eq!(result.follower_user_username, "hey2");
     assert_eq!(user1.following_count, 1);
@@ -255,9 +255,9 @@ async fn test_follow_add() {
     assert_eq!(user3.followers_count, 1);
 
     let result = db.follow_add(0, "hey", "hey3").await.unwrap();
-    let user1 = db.user_get_by_username("hey").await.unwrap();
-    let user2 = db.user_get_by_username("hey2").await.unwrap();
-    let user3 = db.user_get_by_username("hey3").await.unwrap();
+    let user1 = db.user_get_by_username("", "hey").await.unwrap();
+    let user2 = db.user_get_by_username("", "hey2").await.unwrap();
+    let user3 = db.user_get_by_username("", "hey3").await.unwrap();
     assert_eq!(result.following_user_username, "hey3");
     assert_eq!(result.follower_user_username, "hey");
     assert_eq!(user1.following_count, 2);

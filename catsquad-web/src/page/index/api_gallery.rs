@@ -48,6 +48,7 @@ impl GalleryApi {
         tags: impl Into<String>,
         author_username: impl Into<String>,
         liked_by_username: impl Into<String>,
+        followed_by_username: impl Into<String>,
     ) -> f64
     where
         TSender: Sender + Debug + Clone,
@@ -72,6 +73,7 @@ impl GalleryApi {
                 tags,
                 author_username,
                 liked_by_username,
+                followed_by_username,
                 time,
                 limit,
                 range,
@@ -122,6 +124,7 @@ impl GalleryApi {
         tags: impl Into<String>,
         author_username: impl Into<String>,
         liked_by_username: impl Into<String>,
+        followed_by_username: impl Into<String>,
     ) -> f64
     where
         TSender: Sender + Debug + Clone,
@@ -144,6 +147,7 @@ impl GalleryApi {
             tags,
             author_username,
             liked_by_username,
+            followed_by_username,
         )
         .await
     }
@@ -157,6 +161,7 @@ impl GalleryApi {
         tags: impl Into<String>,
         author_username: impl Into<String>,
         liked_by_username: impl Into<String>,
+        followed_by_username: impl Into<String>,
     ) -> f64
     where
         TSender: Sender + Debug + Clone,
@@ -180,6 +185,7 @@ impl GalleryApi {
             tags,
             author_username,
             liked_by_username,
+            followed_by_username,
         )
         .await
     }
@@ -194,6 +200,7 @@ impl GalleryApi {
         tags: impl Into<String>,
         author_username: impl Into<String>,
         liked_by_username: impl Into<String>,
+        followed_by_username: impl Into<String>,
     ) -> f64
     where
         TSender: Sender + Debug + Clone,
@@ -208,6 +215,7 @@ impl GalleryApi {
                 tags,
                 author_username,
                 liked_by_username,
+                followed_by_username,
             )
             .await
         } else {
@@ -219,6 +227,7 @@ impl GalleryApi {
                 tags,
                 author_username,
                 liked_by_username,
+                followed_by_username,
             )
             .await
         }
@@ -239,32 +248,28 @@ impl GalleryApi {
 
 #[cfg(test)]
 pub mod tests {
-    use catsquad_api::{TestServer, auth::create_auth_cookie_str};
-    use catsquad_log::prelude::*;
-    use catsquad_shared::{PostState, uuid_to_str};
-    use http::header;
-    use leptos::prelude::*;
-    use std::sync::Arc;
-
     use crate::{
         hook::ScrollCorrection,
         init_owner,
         page::index::api_gallery::{GalleryApi, GalleryContainerSize},
     };
+    use catsquad_api::{TestServer, auth::create_auth_cookie_str};
+    use catsquad_log::prelude::*;
+    use catsquad_shared::{PostState, uuid_to_str};
+    use http::header;
 
     #[tokio::test]
     pub async fn hook_gallery_api_post() {
         init_log();
         let _owner = init_owner();
-        // let owner = Owner::new_root(Some(Arc::new(HydrateSharedContext::new())));
         let scroll_corerction = ScrollCorrection::new();
-        let mut app = TestServer::new(0, "hook_gallery_api_post").await;
+        let app = TestServer::new(0, "hook_gallery_api_post").await;
 
-        let (user1, session_key1) = app
+        let (_user1, session_key1) = app
             .user_add_full("hey", "hey@heyadora.com", "pasA$word123456789")
             .await;
 
-        let (user2, session_key2) = app
+        let (_user2, session_key2) = app
             .user_add_full("hey2", "hey2@heyadora.com", "paAs$word123456789")
             .await;
 
@@ -273,7 +278,6 @@ pub mod tests {
             create_auth_cookie_str(uuid_to_str(session_key1)),
         )
         .await;
-        // app.api.auth_token_overwrite = auth_token.clone();
 
         let post_api = GalleryApi::new(scroll_corerction.clone());
         let size = GalleryContainerSize {
@@ -310,136 +314,179 @@ pub mod tests {
         trace!("aaaaa {items:#?}");
         assert_eq!(items.len(), 0);
 
-        app.state.set_time(4);
-        let post_api2 = GalleryApi::new(scroll_corerction.clone());
-        post_api2
-            .fetch_btm(&app.client, 10, size, 4, "", "", "")
-            .await;
-        let items = post_api2.items.get_untracked();
-        assert_eq!(items.len(), 3);
+        // assert fetch btm all
+        {
+            app.state.set_time(4);
+            let post_api2 = GalleryApi::new(scroll_corerction.clone());
+            post_api2
+                .fetch_btm(&app.client, 10, size, 4, "", "", "", "")
+                .await;
+            let items = post_api2.items.get_untracked();
+            assert_eq!(items.len(), 3);
+        }
 
-        let post_api3 = GalleryApi::new(scroll_corerction.clone());
-        post_api3
-            .fetch_btm(&app.client, 2, size, 4, "", "", "")
-            .await;
-        let items = post_api3.items.get_untracked();
-        assert_eq!(items.len(), 2);
-        post_api3
-            .fetch_btm(&app.client, 2, size, 4, "", "", "")
-            .await;
-        let items = post_api3.items.get_untracked();
-        assert_eq!(items.len(), 3);
+        // assert fetch btm by 2
+        {
+            let post_api3 = GalleryApi::new(scroll_corerction.clone());
+            post_api3
+                .fetch_btm(&app.client, 2, size, 4, "", "", "", "")
+                .await;
+            let items = post_api3.items.get_untracked();
+            assert_eq!(items.len(), 2);
+            post_api3
+                .fetch_btm(&app.client, 2, size, 4, "", "", "", "")
+                .await;
+            let items = post_api3.items.get_untracked();
+            assert_eq!(items.len(), 3);
+        }
 
-        let post_api = GalleryApi::new(scroll_corerction.clone());
-        post_api
-            .fetch_top(&app.client, 2, size, 4, "", "", "")
-            .await;
-        let items = post_api.items.get_untracked();
-        assert_eq!(items.len(), 0);
+        // assert fetch top by 2, time 4
+        // gets 0 because all other posts are older than time 4
+        {
+            let post_api = GalleryApi::new(scroll_corerction.clone());
+            post_api
+                .fetch_top(&app.client, 2, size, 4, "", "", "", "")
+                .await;
+            let items = post_api.items.get_untracked();
+            assert_eq!(items.len(), 0);
+        }
 
-        let post_api = GalleryApi::new(scroll_corerction.clone());
-        post_api
-            .fetch_top(&app.client, 2, size, 0, "", "", "")
-            .await;
-        let items = post_api.items.get_untracked();
-        assert_eq!(items.len(), 2);
-        assert_eq!(items[0].created_at, 2);
-        assert_eq!(items[1].created_at, 1);
-        post_api
-            .fetch_top(&app.client, 2, size, 0, "", "", "")
-            .await;
-        let items = post_api.items.get_untracked();
-        assert_eq!(items.len(), 3);
-        assert_eq!(items[0].created_at, 3);
-        assert_eq!(items[1].created_at, 2);
-        assert_eq!(items[2].created_at, 1);
+        // assert fetch top by 2, time 0
+        {
+            let post_api = GalleryApi::new(scroll_corerction.clone());
+            post_api
+                .fetch_top(&app.client, 2, size, 0, "", "", "", "")
+                .await;
+            let items = post_api.items.get_untracked();
+            assert_eq!(items.len(), 2);
+            assert_eq!(items[0].created_at, 2);
+            assert_eq!(items[1].created_at, 1);
+            post_api
+                .fetch_top(&app.client, 2, size, 0, "", "", "", "")
+                .await;
+            let items = post_api.items.get_untracked();
+            assert_eq!(items.len(), 3);
+            assert_eq!(items[0].created_at, 3);
+            assert_eq!(items[1].created_at, 2);
+            assert_eq!(items[2].created_at, 1);
+        }
 
-        let post_api = GalleryApi::new(scroll_corerction.clone());
-        post_api
-            .fetch_btm(&app.client, 3, size, 3, "", "", "")
-            .await;
-        let items = post_api.items.get_untracked();
-        assert_eq!(items.len(), 3);
-        assert_eq!(items[0].created_at, 3);
-        assert_eq!(items[1].created_at, 2);
-        assert_eq!(items[2].created_at, 1);
-        post_api.items.update_untracked(|v| {
-            v.remove(0);
-            v.remove(0);
-        });
-        let items = post_api.items.get_untracked();
-        assert_eq!(items.len(), 1);
-        assert_eq!(items[0].created_at, 1);
-        post_api
-            .fetch_top(&app.client, 1, size, 4, "", "", "")
-            .await;
-        let items = post_api.items.get_untracked();
-        assert_eq!(items.len(), 2);
-        assert_eq!(items[0].created_at, 2);
-        assert_eq!(items[1].created_at, 1);
-        post_api
-            .fetch_top(&app.client, 1, size, 4, "", "", "")
-            .await;
-        let items = post_api.items.get_untracked();
-        assert_eq!(items.len(), 3);
-        assert_eq!(items[0].created_at, 3);
-        assert_eq!(items[1].created_at, 2);
-        assert_eq!(items[2].created_at, 1);
+        // assert fetching after removing some posts
+        {
+            let post_api = GalleryApi::new(scroll_corerction.clone());
+            post_api
+                .fetch_btm(&app.client, 3, size, 3, "", "", "", "")
+                .await;
+            let items = post_api.items.get_untracked();
+            assert_eq!(items.len(), 3);
+            assert_eq!(items[0].created_at, 3);
+            assert_eq!(items[1].created_at, 2);
+            assert_eq!(items[2].created_at, 1);
 
-        let post_api = GalleryApi::new(scroll_corerction.clone());
-        post_api
-            .fetch_btm(&app.client, 50, size, 4, "", "", "")
+            // remove first 2
+            {
+                post_api.items.update_untracked(|v| {
+                    v.remove(0);
+                    v.remove(0);
+                });
+                let items = post_api.items.get_untracked();
+                assert_eq!(items.len(), 1);
+                assert_eq!(items[0].created_at, 1);
+            }
+
+            post_api
+                .fetch_top(&app.client, 1, size, 4, "", "", "", "")
+                .await;
+            let items = post_api.items.get_untracked();
+            assert_eq!(items.len(), 2);
+            assert_eq!(items[0].created_at, 2);
+            assert_eq!(items[1].created_at, 1);
+
+            post_api
+                .fetch_top(&app.client, 1, size, 4, "", "", "", "")
+                .await;
+            let items = post_api.items.get_untracked();
+            assert_eq!(items.len(), 3);
+            assert_eq!(items[0].created_at, 3);
+            assert_eq!(items[1].created_at, 2);
+            assert_eq!(items[2].created_at, 1);
+        }
+
+        // assert tag search
+        {
+            app.remove_header(header::COOKIE).await;
+            app.inject_header(
+                header::COOKIE,
+                create_auth_cookie_str(uuid_to_str(session_key2)),
+            )
             .await;
-        let items = post_api.items.get_untracked();
-        trace!("ITEMS1: {items:#?}");
-        assert_eq!(items.len(), 3);
-        post_api
-            .fetch_top(&app.client, 50, size, 4, "", "", "")
+
+            app.state.set_time(5);
+            post_add("title1", "0", "one two three").await;
+            app.state.set_time(6);
+            post_add("title2", "0", "one two").await;
+            app.state.set_time(7);
+            post_add("title2", "0", "one").await;
+            app.state.set_time(8);
+
+            let post_api = GalleryApi::new(scroll_corerction.clone());
+
+            post_api
+                .fetch_btm(&app.client, 2, size, 8, "one", "hey2", "", "")
+                .await;
+
+            let items = post_api.items.get_untracked();
+            assert_eq!(items.len(), 2);
+            assert_eq!(items[0].created_at, 7);
+            assert_eq!(items[1].created_at, 6);
+
+            post_api
+                .fetch_btm(&app.client, 2, size, 8, "one", "hey2", "", "")
+                .await;
+
+            let items = post_api.items.get_untracked();
+            assert_eq!(items.len(), 3);
+            assert_eq!(items[2].created_at, 5);
+
+            let post_api = GalleryApi::new(scroll_corerction.clone());
+
+            post_api
+                .fetch_btm(&app.client, 3, size, 9, "one two", "hey2", "", "")
+                .await;
+
+            let items = post_api.items.get_untracked();
+            assert_eq!(items.len(), 2);
+        }
+
+        // assert followed
+        {
+            app.remove_header(header::COOKIE).await;
+            app.inject_header(
+                header::COOKIE,
+                create_auth_cookie_str(uuid_to_str(session_key1)),
+            )
             .await;
-        let items = post_api.items.get_untracked();
-        trace!("ITEMS2: {items:#?}");
-        assert_eq!(items.len(), 3);
 
-        app.remove_header(header::COOKIE).await;
-        app.inject_header(
-            header::COOKIE,
-            create_auth_cookie_str(uuid_to_str(session_key2)),
-        )
-        .await;
+            let post_api = GalleryApi::new(scroll_corerction.clone());
 
-        let post_api = GalleryApi::new(scroll_corerction.clone());
+            // hey follows none, so asserts 0
+            post_api
+                .fetch_btm(&app.client, 3, size, 9, "one", "", "", "hey2")
+                .await;
 
-        app.state.set_time(5);
-        post_add("title1", "0", "one two three").await;
-        app.state.set_time(6);
-        post_add("title2", "0", "one two").await;
-        app.state.set_time(7);
-        post_add("title2", "0", "one").await;
+            let items = post_api.items.get_untracked();
+            assert_eq!(items.len(), 0);
 
-        app.state.set_time(8);
-        let post_api2 = GalleryApi::new(scroll_corerction.clone());
-        post_api2
-            .fetch_btm(&app.client, 2, size, 8, "one", "hey2", "")
-            .await;
-        let items = post_api2.items.get_untracked();
-        assert_eq!(items.len(), 2);
-        assert_eq!(items[0].created_at, 7);
-        assert_eq!(items[1].created_at, 6);
-        post_api2
-            .fetch_btm(&app.client, 2, size, 8, "one", "hey2", "")
-            .await;
-        let items = post_api2.items.get_untracked();
-        assert_eq!(items.len(), 3);
-        assert_eq!(items[2].created_at, 5);
+            // hey will follow hey2
+            app.follow_add("hey2", session_key1).await.unwrap();
 
-        app.state.set_time(9);
-        let post_api2 = GalleryApi::new(scroll_corerction.clone());
-        post_api2
-            .fetch_btm(&app.client, 3, size, 9, "one two", "hey2", "")
-            .await;
-        let items = post_api2.items.get_untracked();
-        assert_eq!(items.len(), 2);
+            // get posts that hey following
+            post_api
+                .fetch_btm(&app.client, 3, size, 9, "one", "", "", "hey")
+                .await;
 
-        //
+            let items = post_api.items.get_untracked();
+            assert_eq!(items.len(), 3);
+        }
     }
 }

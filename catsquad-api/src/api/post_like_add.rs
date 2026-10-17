@@ -1,12 +1,7 @@
+use crate::state::AppState;
 use axum::{Extension, Form, Json, extract::State, http::StatusCode, response::IntoResponse};
 use catsquad_db::{DbPostLike, DbPostLikeAddErr, DbUser};
-use catsquad_log::prelude::*;
 use catsquad_shared::{PostLikeAddErr, PostLikeAddReq, PostLikeRes};
-
-use crate::{
-    api::user_add::{from_db_user_redacted, from_db_user_sensitive},
-    state::AppState,
-};
 
 pub fn from_db_post_like(value: DbPostLike) -> PostLikeRes {
     PostLikeRes { id: value.id }
@@ -97,6 +92,8 @@ mod test_utils {
 
 #[tokio::test]
 async fn test_api_post_like_add() {
+    use catsquad_log::prelude::*;
+
     init_log();
     let server = crate::TestServer::new(0, "test_api_post_like_add").await;
 

@@ -1,5 +1,6 @@
 use super::author_state::AuthorState;
 use super::{Aboutme, Support};
+use crate::page::post::FollowBtn;
 use crate::{
     Btn, BtnSecondary, BtnSize, PageState, Pfp, SVGArrowDown, SVGBell, hook::Spawner,
     page_state::CurrentRoute,
@@ -41,7 +42,10 @@ pub fn ProfileAuthor(
     let author_pfp_hash = author_state.pfp_hash;
     let author_pfp_proccesed = author_state.pfp_proccesed;
     let created_at = author_state.created_at;
+    let author_followed = author_state.followed;
 
+    let followers_count = move || author_state.followers.get();
+    let likes_count = move || author_state.likes.get();
     let author_username = move || author_username.get();
     let joined = move || micro_to_str(time_now_micro().saturating_sub(created_at.get()));
     let toggle_open = move |_| is_open.update(|v| *v = !*v);
@@ -89,19 +93,20 @@ pub fn ProfileAuthor(
 
     view! {
         <div class=" sm:hidden grid grid-rows-[auto_auto] gap-2 max-w-full overflow-hidden ">
-            <div class="grid grid-cols-[auto_auto] justify-start  px-2 gap-2 mb-2 " >
-                <p class="self-start text-[1rem] rounded-full h-[3.2rem] w-[3.2rem] shrink-0 bg-base05"></p>
+            <div class="grid grid-cols-[auto_1fr] justify-start  px-2 gap-2 mb-2 " >
+                <Pfp username=author_username proccesed=author_pfp_proccesed hash=author_pfp_hash class="self-start size-[3.2rem] shrink-0"/>
                 <div class="grid grid-rows-[auto_auto_auto] gap-1">
-                    <ul class="grid grid-cols-[auto_auto_auto] ml-[1rem] whitespace-nowrap gap-[1.5rem] text-[0.8rem] list-disc">
-                        <li>"followers 9999"</li>
-                        <li>"paws 450"</li>
+                    <ul class="grid grid-cols-[auto_auto_auto] justify-start ml-[1rem] whitespace-nowrap gap-[1.5rem] text-[0.8rem] list-disc">
+                        <li>"followers "{followers_count}</li>
+                        <li>"paws "{likes_count}</li>
                         <li>"joined "{joined}" ago"</li>
                     </ul>
                     <div class="grid grid-cols-[auto_auto] max-w-[calc(100%-3.5rem)] justify-start items-center gap-[1.5rem] ">
                         <p class="text-ellipsis overflow-hidden shrink-0 text-[1.2rem] leading-[1.2rem] font-medium text-base0F">
                             {author_username}
                         </p>
-                        <BtnSecondary size=BtnSize::Small class="grid grid-cols-[auto_auto] gap-2 place-items-center ">"Follow"<SVGBell class="size-4"/></BtnSecondary>
+                        <FollowBtn spawner followed=author_followed post_user_username=author_username />
+                        // <BtnSecondary size=BtnSize::Small class="grid grid-cols-[auto_auto] gap-2 place-items-center ">"Follow"<SVGBell class="size-4"/></BtnSecondary>
                     </div>
                 </div>
             </div>
@@ -126,10 +131,11 @@ pub fn ProfileAuthor(
                     <Pfp username=author_username proccesed=author_pfp_proccesed hash=author_pfp_hash class="self-start size-[5rem] shrink-0"/>
                     <div class="grid grid-rows-[auto_auto_auto] gap-2 place-items-start" >
                         <p class="text-[1.2rem] leading-[1.2rem] font-medium text-base0F max-w-[10rem] break-all ">{ author_username }</p>
-                        <BtnSecondary size=BtnSize::Normal class="grid grid-cols-[auto_auto] gap-2 place-items-center ">"Follow"<SVGBell class="size-4"/></BtnSecondary>
+                        <FollowBtn spawner followed=author_followed post_user_username=author_username />
+                        // <BtnSecondary size=BtnSize::Normal class="grid grid-cols-[auto_auto] gap-2 place-items-center ">"Follow"<SVGBell class="size-4"/></BtnSecondary>
                         <ul class="ml-[1rem] whitespace-nowrap gap-[1.5rem] text-[1rem] list-disc">
-                            <li>"followers 9999"</li>
-                            <li>"paws 450"</li>
+                            <li>"followers "{followers_count}</li>
+                            <li>"paws "{likes_count}</li>
                             <li>"joined "{joined}" ago"</li>
                         </ul>
                     </div>

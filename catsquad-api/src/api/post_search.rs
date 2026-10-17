@@ -74,10 +74,7 @@ pub async fn post_search(
     let author_username = req.author_username.unwrap_or_default();
     let search_time = req.time.unwrap_or_default();
     let liked_by_username = req.liked_by_username.unwrap_or_default();
-    // let time = req
-    //     .time
-    //     .map(|v| u128::from_str_radix(&v, 10).unwrap_or_default())
-    //     .unwrap_or_default();
+    let followed_by_username = req.followed_by_username.unwrap_or_default();
     let limit = req.limit.unwrap_or(50);
     let limit = if limit == 0 { 50 } else { limit };
 
@@ -92,6 +89,7 @@ pub async fn post_search(
                 user_username,
                 author_username,
                 liked_by_username,
+                followed_by_username,
                 search_time,
                 limit,
                 range,
@@ -121,6 +119,7 @@ mod test_utils {
             tags: impl Into<String>,
             author_username: impl Into<String>,
             liked_by_username: impl Into<String>,
+            followed_by_username: impl Into<String>,
             time: u64,
             limit: usize,
             range: TimeRange,
@@ -132,6 +131,7 @@ mod test_utils {
                     tags,
                     author_username,
                     liked_by_username,
+                    followed_by_username,
                     time,
                     limit,
                     range,
@@ -172,6 +172,7 @@ async fn test_api_post_search() {
             "",
             "",
             "",
+            "",
             0,
             10,
             TimeRange::MoreOrEqual,
@@ -190,6 +191,7 @@ async fn test_api_post_search() {
 
     let posts = server
         .post_search(
+            "",
             "",
             "",
             "",

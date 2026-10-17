@@ -88,7 +88,7 @@ pub async fn user_pfp_get_bytes(
     let inner = async || -> Result<Vec<u8>, UserPfpGetBytesErr> {
         let user = app
             .db
-            .user_get_by_username(username)
+            .user_get_by_username("", username)
             .await
             .map_err(from_post_image_get_by_hash_err)?;
 

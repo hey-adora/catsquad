@@ -180,7 +180,12 @@ async fn test_api_user_password_change_confirm() {
         .await
         .unwrap();
 
-    let db_user = server.state.db.user_get_by_username("hey").await.unwrap();
+    let db_user = server
+        .state
+        .db
+        .user_get_by_username("", "hey")
+        .await
+        .unwrap();
     verify_password("hello1111111@2P", db_user.password).unwrap();
 
     let emails = server
@@ -213,7 +218,12 @@ async fn test_api_user_password_change_confirm() {
         .await
         .unwrap();
 
-    let db_user = server.state.db.user_get_by_username("hey").await.unwrap();
+    let db_user = server
+        .state
+        .db
+        .user_get_by_username("", "hey")
+        .await
+        .unwrap();
     let result = verify_password("hello1111111@3P", db_user.password);
     assert!(result.is_ok());
 

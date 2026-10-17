@@ -766,7 +766,7 @@ where
     pub fn user_get_by_username(
         &self,
         username: impl Display,
-    ) -> Builder<TSender, cs::RedactedUserRes, cs::UserGetByUsernameErr> {
+    ) -> Builder<TSender, cs::UserGetRes, cs::UserGetByUsernameErr> {
         self.get(cs::link_relative_user_get_by_username(username))
     }
 
@@ -937,6 +937,7 @@ where
         tags: impl Into<String>,
         author_username: impl Into<String>,
         liked_by_username: impl Into<String>,
+        followed_by_username: impl Into<String>,
         time: u64,
         limit: usize,
         range: TimeRange,
@@ -950,6 +951,7 @@ where
             tags: Some(tags.into()),
             liked_by_username: Some(liked_by_username.into()),
             author_username: Some(author_username.into()),
+            followed_by_username: Some(followed_by_username.into()),
         }))
     }
 

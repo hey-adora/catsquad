@@ -39,6 +39,7 @@ pub fn Gallery(
     #[prop(default = 250)] row_height: u32,
     #[prop(optional, into)] author_username: Signal<String>,
     #[prop(optional, into)] liked_by_username: Signal<String>,
+    #[prop(optional, into)] followed_by_username: Signal<String>,
     #[prop(optional, into)] class: Signal<String>,
 ) -> impl IntoView {
     let spawner = Spawner::new();
@@ -83,6 +84,7 @@ pub fn Gallery(
 
         let author_username = author_username.get_untracked();
         let liked_by_username = liked_by_username.get_untracked();
+        let followed_by_username = followed_by_username.get_untracked();
 
         let tags = get_query_tags.get_untracked().unwrap_or_default();
         trace!("wheres my super suit?");
@@ -104,6 +106,7 @@ pub fn Gallery(
                     tags,
                     author_username,
                     liked_by_username,
+                    followed_by_username,
                 )
                 .await;
 

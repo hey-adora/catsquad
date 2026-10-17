@@ -42,6 +42,7 @@ pub struct PostSearchParams {
     //     deserialize_with = "serde_to_option_u128"
     // )]
     pub liked_by_username: Option<String>,
+    pub followed_by_username: Option<String>,
     pub time: Option<u64>,
     pub range: Option<TimeRange>,
     pub order: Option<Order>,
@@ -58,6 +59,7 @@ impl Default for PostSearchParams {
             liked_by_username: Some(String::new()),
             tags: Some(String::new()),
             author_username: Some(String::new()),
+            followed_by_username: Some(String::new()),
         }
     }
 }

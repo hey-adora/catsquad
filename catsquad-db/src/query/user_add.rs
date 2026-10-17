@@ -17,6 +17,9 @@ pub struct DbUser {
     pub pfp_image_hash: i64,
     #[sqlx(default, rename = "user_pfp_image_proccesed")]
     pub pfp_image_proccesed: bool,
+    #[sqlx(rename = "user_likes_count")]
+    #[sqlx(try_from = "i64")]
+    pub likes_count: u32,
     #[sqlx(rename = "user_followers_count")]
     #[sqlx(try_from = "i64")]
     pub followers_count: u32,
@@ -72,6 +75,7 @@ impl Db {
                 user_support text DEFAULT '',
                 user_aboutme text DEFAULT '',
                 user_pfp_image_hash int8 DEFAULT 0,
+                user_likes_count int8 DEFAULT 0,
                 user_followers_count int8 DEFAULT 0,
                 user_following_count int8 DEFAULT 0,
                 user_used_storage_bytes int8 DEFAULT 0,
@@ -214,6 +218,7 @@ impl Db {
             aboutme: String::new(),
             pfp_image_hash: 0,
             pfp_image_proccesed: false,
+            likes_count: 0,
             followers_count: 0,
             following_count: 0,
             used_storage_bytes: 0,
@@ -231,7 +236,7 @@ async fn test_user_add() {
     init_log();
     let db = Db::test_db(0, "test_user_add").await;
 
-    // simple errors
+    // assert errors
     {
         let result = db
             .user_add(0, "hey", "hey", 0_u128.to_be_bytes(), 10, 10)
@@ -241,8 +246,10 @@ async fn test_user_add() {
         let invite = db.invite_add(0, "hey@hey.com", 1).await.unwrap();
         let result = db.user_add(2, "hey", "hey", invite.token, 10, 10).await;
         assert!(matches!(result, Err(DbUserAddErr::InviteExpired)));
+    }
 
-        // success
+    // assert success
+    let invite = {
         let invite = db.invite_add(2, "hey@hey.com", 3).await.unwrap();
         let result = db
             .user_add(3, "hey", "hey", invite.token.clone(), 10, 5)
@@ -251,12 +258,20 @@ async fn test_user_add() {
         assert_eq!(result.username, "hey");
         assert_eq!(result.email, "hey@hey.com");
         assert_eq!(result.password, "hey");
+        assert_eq!(result.followers_count, 0);
+        assert_eq!(result.following_count, 0);
+        assert_eq!(result.likes_count, 0);
         assert_eq!(result.used_storage_bytes, 0);
         assert_eq!(result.max_storage_bytes, 10);
         assert_eq!(result.max_storage_per_image_bytes, 5);
         assert_eq!(result.modified_at, 3);
         assert_eq!(result.created_at, 3);
 
+        invite
+    };
+
+    // assert errors
+    {
         let result = db
             .user_add(2, "hey", "hey", invite.token.clone(), 10, 10)
             .await;
@@ -269,7 +284,7 @@ async fn test_user_add() {
         assert!(matches!(result, Err(DbUserAddErr::UsernameIsTaken)));
     }
 
-    // complicated error email is taken
+    // assert error email is taken
     {
         let invite1 = db.invite_add(2, "hey3@hey.com", 3).await.unwrap();
         let invite2 = db.invite_add(2, "hey3@hey.com", 3).await.unwrap();

@@ -48,7 +48,7 @@ impl Db {
                 post_like_created_at timestamp NOT NULL
             );
             CREATE INDEX post_like_username_idx ON posts_likes (post_like_user_username);
-            CREATE INDEX post_like_username_and_post_id_idx ON posts_likes (post_like_user_username, post_like_post_id);
+            CREATE UNIQUE INDEX post_like_username_and_post_id_idx ON posts_likes (post_like_user_username, post_like_post_id);
         ";
         trace!("about to run {query}");
         let _result = sqlx::raw_sql(query).execute(pool).await.unwrap();
@@ -69,34 +69,34 @@ impl Db {
             .inspect_err(|err| error!("post_like_add {err}"))?;
 
         // get post like
-        {
-            let query = "SELECT EXISTS(SELECT 1 FROM posts_likes WHERE post_like_user_username=$1 AND post_like_post_id=$2)";
+        // {
+        //     let query = "SELECT EXISTS(SELECT 1 FROM posts_likes WHERE post_like_user_username=$1 AND post_like_post_id=$2)";
 
-            let result = sqlx::query_as(query)
-                .bind(&user_username)
-                .bind(post_id)
-                .fetch_one(&mut *tx)
-                .await;
+        //     let result = sqlx::query_as(query)
+        //         .bind(&user_username)
+        //         .bind(post_id)
+        //         .fetch_one(&mut *tx)
+        //         .await;
 
-            debug!("query: {query}\nresult: {result:#?}");
+        //     debug!("query: {query}\nresult: {result:#?}");
 
-            let result = match result {
-                Ok(v) => v,
-                Err(err) => {
-                    error!("unexpected db error {err}");
-                    return Err(DbPostLikeAddErr::Db(err));
-                }
-            };
+        //     let result = match result {
+        //         Ok(v) => v,
+        //         Err(err) => {
+        //             error!("unexpected db error {err}");
+        //             return Err(DbPostLikeAddErr::Db(err));
+        //         }
+        //     };
 
-            let (exists,): (bool,) = result;
+        //     let (exists,): (bool,) = result;
 
-            if exists {
-                return Err(DbPostLikeAddErr::PostWasAlreadyLiked);
-            }
-        }
+        //     if exists {
+        //         return Err(DbPostLikeAddErr::PostWasAlreadyLiked);
+        //     }
+        // }
 
         // get post
-        {
+        let post_user_username = {
             let query = "SELECT post_user_username, post_state FROM posts WHERE post_id = $1";
 
             let result = sqlx::query_as(query)
@@ -129,6 +129,8 @@ impl Db {
                 PostState::Hidden => return Err(DbPostLikeAddErr::Unauthorized),
                 PostState::Active => (),
             }
+
+            post_user_username
         };
 
         // add post like
@@ -155,6 +157,12 @@ impl Db {
 
             let result = match result {
                 Ok(v) => v,
+                Err(sqlx::Error::Database(err))
+                    if err.is_unique_violation()
+                        && err.constraint() == Some("post_like_username_and_post_id_idx") =>
+                {
+                    return Err(DbPostLikeAddErr::PostWasAlreadyLiked);
+                }
                 Err(sqlx::Error::Database(err))
                     if err.is_foreign_key_violation()
                         && err.constraint() == Some("posts_likes_post_like_user_username_fkey") =>
@@ -184,6 +192,32 @@ impl Db {
             let result = sqlx::query(query)
                 .bind(XTimestamp(time as i64))
                 .bind(post_id)
+                .execute(&mut *tx)
+                .await;
+
+            let result = match result {
+                Ok(v) => v,
+                Err(err) => {
+                    error!("unexpected db error {err}");
+                    return Err(DbPostLikeAddErr::Db(err));
+                }
+            };
+
+            assert_eq!(result.rows_affected(), 1);
+        }
+
+        // update user total like count
+        {
+            let query = "UPDATE users SET
+                            user_likes_count = user_likes_count + 1,
+                            user_modified_at = $1
+                            WHERE user_username = $2";
+
+            debug!("about to run {query}");
+
+            let result = sqlx::query(query)
+                .bind(XTimestamp(time as i64))
+                .bind(&post_user_username)
                 .execute(&mut *tx)
                 .await;
 
@@ -295,6 +329,18 @@ async fn test_post_like_add() {
             .await
             .unwrap();
 
+        let user1 = db
+            .user_get_by_username("", user1.username.clone())
+            .await
+            .unwrap();
+
+        let user2 = db
+            .user_get_by_username("", user2.username.clone())
+            .await
+            .unwrap();
+
+        assert_eq!(user1.likes_count, 1);
+        assert_eq!(user2.likes_count, 0);
         assert_eq!(post1.likes_count, 1);
         assert_eq!(post_like.id, 1);
         assert_eq!(post_like.user_username, user2.username);
@@ -329,6 +375,24 @@ async fn test_post_like_add() {
             .await
             .unwrap();
 
+        let user1 = db
+            .user_get_by_username("", user1.username.clone())
+            .await
+            .unwrap();
+
+        let user2 = db
+            .user_get_by_username("", user2.username.clone())
+            .await
+            .unwrap();
+
+        let user3 = db
+            .user_get_by_username("", user3.username.clone())
+            .await
+            .unwrap();
+
+        assert_eq!(user1.likes_count, 3);
+        assert_eq!(user2.likes_count, 0);
+        assert_eq!(user3.likes_count, 0);
         assert_eq!(post2.likes_count, 2);
     }
 

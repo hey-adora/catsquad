@@ -411,7 +411,7 @@ async fn test_proccess_images_all() {
         let user1 = server
             .state
             .db
-            .user_get_by_username(user1.username.clone())
+            .user_get_by_username("", user1.username.clone())
             .await
             .unwrap();
         // let post1 = server.post_get_by_id(post1.id, session_key1).await.unwrap();

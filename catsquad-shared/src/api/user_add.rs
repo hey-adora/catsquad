@@ -6,16 +6,16 @@ use catsquad_log::prelude::*;
 
 pub const LINK_API_USER_ADD: &str = "/api/register";
 
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
-pub struct RedactedUserRes {
-    // pub key: i64,
-    pub username: String,
-    pub pfp_hash: i64,
-    pub pfp_proccesed: bool,
-    pub support: String,
-    pub aboutme: String,
-    pub created_at: u64,
-}
+// #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
+// pub struct RedactedUserRes {
+//     // pub key: i64,
+//     pub username: String,
+//     pub pfp_hash: i64,
+//     pub pfp_proccesed: bool,
+//     pub support: String,
+//     pub aboutme: String,
+//     pub created_at: u64,
+// }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
 pub struct SensitiveUserRes {

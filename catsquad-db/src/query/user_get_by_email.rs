@@ -25,6 +25,7 @@ impl Db {
                             user_support,
                             user_aboutme,
                             user_pfp_image_hash,
+                            user_likes_count,
                             user_followers_count,
                             user_following_count,
                             coalesce(image_processed, false) as user_pfp_image_proccesed,

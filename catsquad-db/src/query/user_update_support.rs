@@ -70,7 +70,7 @@ async fn test_user_update_support() {
         .await
         .unwrap();
 
-    let user = db.user_get_by_username("hey").await.unwrap();
+    let user = db.user_get_by_username("", "hey").await.unwrap();
 
     assert_eq!(user.support, "one two three");
 }

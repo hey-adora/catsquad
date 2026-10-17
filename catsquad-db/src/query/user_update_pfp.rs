@@ -163,7 +163,7 @@ async fn test_user_update_pfp() {
             assert_eq!(image.used_count, 1);
 
             let user1 = db
-                .user_get_by_username(user1.username.clone())
+                .user_get_by_username("", user1.username.clone())
                 .await
                 .unwrap();
 

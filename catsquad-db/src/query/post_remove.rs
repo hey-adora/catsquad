@@ -268,8 +268,8 @@ async fn test_post_remove() {
     {
         use crate::DbFileImageGetByHashErr;
 
-        let user1 = db.user_get_by_username("hey").await.unwrap();
-        let user2 = db.user_get_by_username("hey2").await.unwrap();
+        let user1 = db.user_get_by_username("", "hey").await.unwrap();
+        let user2 = db.user_get_by_username("", "hey2").await.unwrap();
         let img1 = db.file_image_get_by_hash(666).await.unwrap();
         let img2 = db.file_image_get_by_hash(667).await.unwrap();
 
@@ -282,8 +282,8 @@ async fn test_post_remove() {
             .await
             .unwrap();
 
-        let user1 = db.user_get_by_username("hey").await.unwrap();
-        let user2 = db.user_get_by_username("hey2").await.unwrap();
+        let user1 = db.user_get_by_username("", "hey").await.unwrap();
+        let user2 = db.user_get_by_username("", "hey2").await.unwrap();
         let img1 = db.file_image_get_by_hash(666).await;
         let img2 = db.file_image_get_by_hash(667).await.unwrap();
 

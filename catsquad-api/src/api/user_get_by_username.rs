@@ -1,16 +1,26 @@
+use crate::state::AppState;
 use axum::{
     Extension, Json,
     extract::{Path, State},
     http::StatusCode,
     response::IntoResponse,
 };
-use catsquad_db::{DbUser, DbUserGetByUsernameErr};
-use catsquad_shared::{RedactedUserRes, UserGetByUsernameErr, UserGetByUsernameParams};
+use catsquad_db::{DbUser, DbUserGet, DbUserGetByUsernameErr};
+use catsquad_shared::{UserGetByUsernameErr, UserGetByUsernameParams, UserGetRes};
 
-use crate::{
-    api::user_add::{from_db_user_redacted, from_db_user_sensitive},
-    state::AppState,
-};
+pub fn from_db_user_get(value: DbUserGet) -> UserGetRes {
+    UserGetRes {
+        username: value.username,
+        pfp_hash: value.pfp_image_hash,
+        pfp_proccesed: value.pfp_image_proccesed,
+        followers: value.followers_count,
+        followed: value.followed,
+        likes: value.likes_count,
+        support: value.support,
+        aboutme: value.aboutme,
+        created_at: value.created_at,
+    }
+}
 
 fn from_db_user_get_by_username(value: DbUserGetByUsernameErr) -> UserGetByUsernameErr {
     match value {
@@ -19,7 +29,7 @@ fn from_db_user_get_by_username(value: DbUserGetByUsernameErr) -> UserGetByUsern
     }
 }
 
-fn status_code(result: &Result<RedactedUserRes, UserGetByUsernameErr>) -> StatusCode {
+fn status_code(result: &Result<UserGetRes, UserGetByUsernameErr>) -> StatusCode {
     match result {
         Ok(_) => StatusCode::OK,
         Err(UserGetByUsernameErr::NotFound) => StatusCode::NOT_FOUND,
@@ -28,19 +38,24 @@ fn status_code(result: &Result<RedactedUserRes, UserGetByUsernameErr>) -> Status
 }
 
 pub async fn user_get_by_username(
+    db_user: Extension<Option<DbUser>>,
     State(app): State<AppState>,
     Path(params): Path<UserGetByUsernameParams>,
 ) -> impl IntoResponse {
-    let inner = async || -> Result<RedactedUserRes, UserGetByUsernameErr> {
-        let username = params.username;
+    let user_username = db_user
+        .as_ref()
+        .map(|v| v.username.clone())
+        .unwrap_or_default();
+    let username = params.username;
 
+    let inner = async || -> Result<UserGetRes, UserGetByUsernameErr> {
         let user = app
             .db
-            .user_get_by_username(username)
+            .user_get_by_username(user_username, username)
             .await
             .map_err(from_db_user_get_by_username)?;
 
-        Ok(from_db_user_redacted(user))
+        Ok(from_db_user_get(user))
     };
 
     let result = inner().await;
@@ -59,7 +74,7 @@ mod test_utils {
         pub async fn user_get_by_username(
             &self,
             username: impl Display,
-        ) -> Result<cs::RedactedUserRes, cs::UserGetByUsernameErr> {
+        ) -> Result<cs::UserGetRes, cs::UserGetByUsernameErr> {
             self.client
                 .user_get_by_username(username)
                 .send()

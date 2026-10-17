@@ -283,7 +283,7 @@ async fn test_post_update_file_add() {
             .await
             .unwrap();
         let user1 = db
-            .user_get_by_username(user1.username.clone())
+            .user_get_by_username("", user1.username.clone())
             .await
             .unwrap();
 
@@ -344,7 +344,7 @@ async fn test_post_update_file_add() {
             .await
             .unwrap();
         let user1 = db
-            .user_get_by_username(user1.username.clone())
+            .user_get_by_username("", user1.username.clone())
             .await
             .unwrap();
 
@@ -391,7 +391,7 @@ async fn test_post_update_file_add() {
             .await
             .unwrap();
         let user1 = db
-            .user_get_by_username(user1.username.clone())
+            .user_get_by_username("", user1.username.clone())
             .await
             .unwrap();
 

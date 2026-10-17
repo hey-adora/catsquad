@@ -7,8 +7,8 @@ use axum::{
 use catsquad_db::{DbSessionAddErr, DbUser, DbUserAddErr};
 use catsquad_log::prelude::*;
 use catsquad_shared::{
-    MAX_STORAGE, MAX_STORAGE_PER_FILE, RedactedUserRes, SensitiveUserRes, UserAddErr, UserAddReq,
-    validate_password, validate_username,
+    MAX_STORAGE, MAX_STORAGE_PER_FILE, SensitiveUserRes, UserAddErr, UserAddReq, validate_password,
+    validate_username,
 };
 
 use crate::{
@@ -16,17 +16,17 @@ use crate::{
     state::AppState,
 };
 
-pub fn from_db_user_redacted(value: DbUser) -> RedactedUserRes {
-    RedactedUserRes {
-        // key: value.id,
-        username: value.username,
-        pfp_hash: value.pfp_image_hash,
-        pfp_proccesed: value.pfp_image_proccesed,
-        support: value.support,
-        aboutme: value.aboutme,
-        created_at: value.created_at,
-    }
-}
+// pub fn from_db_user_redacted(value: DbUser) -> RedactedUserRes {
+//     RedactedUserRes {
+//         // key: value.id,
+//         username: value.username,
+//         pfp_hash: value.pfp_image_hash,
+//         pfp_proccesed: value.pfp_image_proccesed,
+//         support: value.support,
+//         aboutme: value.aboutme,
+//         created_at: value.created_at,
+//     }
+// }
 
 pub fn from_db_user_sensitive(value: DbUser) -> SensitiveUserRes {
     SensitiveUserRes {
@@ -309,7 +309,12 @@ async fn test_api_user_add() {
 
     // check if encrypted
     {
-        let user = server.state.db.user_get_by_username("prime").await.unwrap();
+        let user = server
+            .state
+            .db
+            .user_get_by_username("", "prime")
+            .await
+            .unwrap();
         assert_ne!(user.password, "hello1111111@1P");
     }
 }

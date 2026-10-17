@@ -1,11 +1,7 @@
+use crate::state::AppState;
 use axum::{Extension, Form, Json, extract::State, http::StatusCode, response::IntoResponse};
 use catsquad_db::{DbComment, DbCommentAddErr, DbUser};
 use catsquad_shared::{CommentAddErr, CommentAddReq, CommentRes, validate_comment_text};
-
-use crate::{
-    api::user_add::{from_db_user_redacted, from_db_user_sensitive},
-    state::AppState,
-};
 
 pub fn from_db_comment(value: DbComment) -> CommentRes {
     CommentRes {

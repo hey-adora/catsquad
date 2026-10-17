@@ -34,8 +34,8 @@ impl Db {
             .inspect_err(|err| error!("post_like_add {err}"))?;
 
         // get post
-        {
-            let query = "SELECT post_state FROM posts WHERE post_id = $1";
+        let post_user_username = {
+            let query = "SELECT post_user_username, post_state FROM posts WHERE post_id = $1";
 
             let result = sqlx::query_as(query)
                 .bind(post_id)
@@ -44,7 +44,7 @@ impl Db {
 
             debug!("query: {query}\nresult: {result:#?}");
 
-            let (post_state,): (String,) = match result {
+            let (post_user_username, post_state): (String, String) = match result {
                 Ok(v) => v,
                 Err(sqlx::Error::RowNotFound) => {
                     return Err(DbPostLikeRemoveErr::PostNotFound);
@@ -61,7 +61,9 @@ impl Db {
                 PostState::Hidden => return Err(DbPostLikeRemoveErr::Unauthorized),
                 PostState::Active => (),
             }
-        }
+
+            post_user_username
+        };
 
         // delete post like
         {
@@ -109,6 +111,32 @@ impl Db {
                 .await;
 
             debug!("query: {query}\nresult: {result:#?}");
+
+            let result = match result {
+                Ok(v) => v,
+                Err(err) => {
+                    error!("unexpected db error {err}");
+                    return Err(DbPostLikeRemoveErr::Db(err));
+                }
+            };
+
+            assert_eq!(result.rows_affected(), 1);
+        }
+
+        // update user total like count
+        {
+            let query = "UPDATE users SET
+                            user_likes_count = user_likes_count - 1,
+                            user_modified_at = $1
+                            WHERE user_username = $2";
+
+            debug!("about to run {query}");
+
+            let result = sqlx::query(query)
+                .bind(XTimestamp(time as i64))
+                .bind(&post_user_username)
+                .execute(&mut *tx)
+                .await;
 
             let result = match result {
                 Ok(v) => v,
@@ -223,6 +251,12 @@ async fn test_post_like_remove() {
             .post_get_by_id(user1.username.clone(), post2.id)
             .await
             .unwrap();
+        let user1 = db
+            .user_get_by_username("", user1.username.clone())
+            .await
+            .unwrap();
+
+        assert_eq!(user1.likes_count, 1);
         assert_eq!(post1.likes_count, 1);
         assert_eq!(post2.likes_count, 0);
 
@@ -238,6 +272,12 @@ async fn test_post_like_remove() {
             .post_get_by_id(user1.username.clone(), post2.id)
             .await
             .unwrap();
+        let user1 = db
+            .user_get_by_username("", user1.username.clone())
+            .await
+            .unwrap();
+
+        assert_eq!(user1.likes_count, 0);
         assert_eq!(post1.likes_count, 0);
         assert_eq!(post2.likes_count, 0);
     }

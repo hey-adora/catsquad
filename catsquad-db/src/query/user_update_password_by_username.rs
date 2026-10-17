@@ -67,6 +67,6 @@ async fn test_user_update_password_by_username() {
     db.user_update_password_by_username(0, user.username.clone(), "hey2")
         .await
         .unwrap();
-    let user = db.user_get_by_username("hey").await.unwrap();
+    let user = db.user_get_by_username("", "hey").await.unwrap();
     assert_eq!(user.password, "hey2");
 }

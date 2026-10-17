@@ -79,6 +79,7 @@ impl Db {
         user_username: impl Into<String>,
         author_username: impl Into<String>,
         liked_by_username: impl Into<String>,
+        followed_by_username: impl Into<String>,
         search_time: u64,
         limit: usize,
         range: TimeRange,
@@ -88,16 +89,26 @@ impl Db {
         let user_username = user_username.into();
         let author_username = author_username.into();
         let liked_by_username = liked_by_username.into();
+        let followed_by_username = followed_by_username.into();
 
         let is_liked_by_and_user_same =
             !user_username.is_empty() && user_username == liked_by_username;
 
+        // starts at 3 because 3 of them are already used in query statically
+
         let mut bind_index = 3_usize;
+
+        // order
 
         let q_order = match order {
             Order::OneTwoThree => "ASC",
             Order::ThreeTwoOne => "DESC",
         };
+        // filter - state
+
+        let q_state = "post_state = $2".to_string();
+
+        // filter - time
 
         let q_time_after = match range {
             TimeRange::None => "",
@@ -108,7 +119,7 @@ impl Db {
         }
         .to_string();
 
-        let q_state = "post_state = $2".to_string();
+        // filter - tags
 
         let tags = split_tags(tags);
 
@@ -116,6 +127,8 @@ impl Db {
             bind_index += 1;
             format!("position(${bind_index} in post_tags) > 0")
         });
+
+        // filter - liked by user
 
         // TODO investigate, somehow works with field `user`
         let q_user = run_if_not_empty(&author_username, || {
@@ -125,12 +138,12 @@ impl Db {
 
         let q_liked_by_user = run_if_not_empty(&liked_by_username, || {
             bind_index += 1;
-            // format!("post_like_user_username = ${bind_index}")
-            // "INNER JOIN posts_likes ON post_id=post_like_post_id AND post_like_user_username = ${bind_index}"
             format!(
                 "INNER JOIN posts_likes l1 ON post_id=l1.post_like_post_id AND l1.post_like_user_username = ${bind_index}"
             )
         });
+
+        // field - liked by me
 
         let q_liked_by_me = if is_liked_by_and_user_same || user_username.is_empty() {
             String::new()
@@ -151,6 +164,17 @@ impl Db {
             }
 
             "false as post_liked"
+        };
+
+        // filter - followed by
+
+        let q_followed_by_user = if followed_by_username.is_empty() {
+            String::new()
+        } else {
+            bind_index += 1;
+            format!(
+                "JOIN follow fo1 ON fo1.follower_user_username=${bind_index} AND post_user_username=fo1.following_user_username"
+            )
         };
 
         let filters = [q_tags, q_time_after, q_user, q_state];
@@ -189,6 +213,7 @@ impl Db {
                 LEFT JOIN files_images f2 ON user_pfp_image_hash=f2.image_hash
                 {q_liked_by_user}
                 {q_liked_by_me}
+                {q_followed_by_user}
                 {q_where}
                 ORDER BY post_created_at {q_order}
                 LIMIT $3
@@ -216,6 +241,10 @@ impl Db {
 
         if !user_username.is_empty() {
             builder = builder.bind(user_username);
+        }
+
+        if !followed_by_username.is_empty() {
+            builder = builder.bind(followed_by_username);
         }
 
         let result = builder.fetch_all(pool).await;
@@ -287,6 +316,7 @@ async fn test_post_search() {
                 tags,
                 "",
                 author_user,
+                "",
                 "",
                 time,
                 limit,
@@ -387,6 +417,7 @@ async fn test_post_search() {
             "",
             "",
             "hey2",
+            "",
             0,
             10,
             TimeRange::MoreOrEqual,
@@ -405,6 +436,7 @@ async fn test_post_search() {
             "hey2",
             "",
             "hey2",
+            "",
             0,
             10,
             TimeRange::MoreOrEqual,
@@ -423,6 +455,7 @@ async fn test_post_search() {
             "hey3",
             "",
             "hey2",
+            "",
             0,
             10,
             TimeRange::MoreOrEqual,
@@ -447,6 +480,7 @@ async fn test_post_search() {
             "hey",
             "",
             "hey2",
+            "",
             0,
             10,
             TimeRange::MoreOrEqual,
@@ -469,6 +503,7 @@ async fn test_post_search() {
             "hey2",
             "",
             "",
+            "",
             0,
             10,
             TimeRange::MoreOrEqual,
@@ -485,5 +520,45 @@ async fn test_post_search() {
     assert_eq!(result[1].liked, false);
     assert_eq!(&result[2].title, "3");
     assert_eq!(result[2].liked, true);
-    // assert_eq!(result[0].liked, false);
+
+    // following
+    {
+        let result = db
+            .post_search(
+                PostState::Active,
+                "",
+                "hey2",
+                "",
+                "",
+                "hey2",
+                0,
+                10,
+                TimeRange::MoreOrEqual,
+                Order::OneTwoThree,
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(result.len(), 0);
+
+        db.follow_add(0, "hey2", "hey").await.unwrap();
+
+        let result = db
+            .post_search(
+                PostState::Active,
+                "",
+                "hey2",
+                "",
+                "",
+                "hey2",
+                0,
+                10,
+                TimeRange::MoreOrEqual,
+                Order::OneTwoThree,
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(result.len(), 3);
+    }
 }

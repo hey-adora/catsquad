@@ -15,7 +15,8 @@ where
     pub pfp_hash: RwSignal<i64>,
     pub pfp_proccesed: RwSignal<bool>,
 
-    pub following: RwSignal<u32>,
+    pub likes: RwSignal<u32>,
+    pub followers: RwSignal<u32>,
     pub followed: RwSignal<bool>,
 
     pub support: RwSignal<String>,
@@ -53,7 +54,8 @@ where
             pfp_hash: RwSignal::new(0),
             pfp_proccesed: RwSignal::new(false),
 
-            following: RwSignal::new(0),
+            likes: RwSignal::new(0),
+            followers: RwSignal::new(0),
             followed: RwSignal::new(false),
 
             support: RwSignal::new(String::new()),
@@ -101,6 +103,9 @@ where
             }
         };
 
+        self.followed.set(user.followed);
+        self.followers.set(user.followers);
+        self.likes.set(user.likes);
         self.username.set(user.username);
         self.pfp_hash.set(user.pfp_hash);
         self.pfp_proccesed.set(user.pfp_proccesed);
