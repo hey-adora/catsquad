@@ -1,7 +1,8 @@
 use super::component_edit_area::EditArea;
 use super::upload_state::UploadState;
 use crate::{
-    Errs, Floater, LengthCounter, PageState, SVGSpinner, SVGTrash, Zone, ZoneData, ZoneStage,
+    BtnSecondary, BtnSize, Errs, Floater, LengthCounter, PageState, SVGSpinner, SVGTrash, Zone,
+    ZoneData, ZoneStage,
     hook::{
         EventListener, ParsedPostImage, ParsedPostImageState, PostImageId, PostImagesState, Spawner,
     },
@@ -603,13 +604,21 @@ pub fn TrashCanBtn(
         });
     };
     let when_is_owner = move || page.acc_username() == author_username.get();
+    let modal_text = move || format!("delete image {}?", image_index.get());
     // <SVGTrash class="bg-base03 p-[0.35rem] text-base08 rounded-full z-[3] absolute left-[100%] top-[100%] transform -translate-x-1/2 -translate-y-1/2 size-[2.0rem]" />
 
     view! {
         <Show when=when_is_owner>
-            <button on:click=on_click.clone()>
-                <SVGTrash class="bg-base03 p-[0.35rem] text-base08 rounded-full z-[3] absolute left-[100%] top-[100%] transform -translate-x-full -translate-y-full size-[2.0rem]" />
-            </button>
+            <BtnSecondary
+                modal_enable=true
+                modal_title="delete image"
+                modal_text=modal_text
+                no_default_style=true
+                class="rounded-full bg-base03 p-[0.35rem] text-base08 z-[3] absolute left-[100%] top-[100%] transform -translate-x-full -translate-y-full "
+                on_click=on_click.clone()
+            >
+                <SVGTrash class="size-[1.2rem]" />
+            </BtnSecondary>
         </Show>
     }
 }

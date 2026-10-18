@@ -22,6 +22,8 @@ pub fn Btn(
     #[prop(optional, into)] modal_title: Signal<String>,
     #[prop(optional, into)] modal_text: Signal<String>,
     #[prop(optional, into)] on_click: Option<Callback<MouseEvent>>,
+    #[prop(optional, into)] on_modal_open: Option<Callback<()>>,
+    #[prop(optional, into)] no_default_style: Signal<bool>,
     #[prop(optional, into)] class_on_disable: Signal<String>,
     #[prop(optional, into)] class_on_active: Signal<String>,
     #[prop(optional, into)] size: Signal<BtnSize>,
@@ -42,22 +44,34 @@ pub fn Btn(
     };
 
     let class_fn = move || {
-        format!(
-            "flex gap-2 place-content-center rounded-xl {} {} {}",
-            size_class(),
-            if is_disabled_fn() {
-                class_on_disable()
-            } else {
-                class_on_active()
-            },
-            class_fn()
-        )
+        if no_default_style.get() {
+            format!(
+                "{} {}",
+                if is_disabled_fn() {
+                    class_on_disable()
+                } else {
+                    class_on_active()
+                },
+                class_fn()
+            )
+        } else {
+            format!(
+                "flex gap-2 place-content-center rounded-xl {} {} {}",
+                size_class(),
+                if is_disabled_fn() {
+                    class_on_disable()
+                } else {
+                    class_on_active()
+                },
+                class_fn()
+            )
+        }
     };
 
     let modal_confirm = ModalConfirmDto::get();
     let modal_rw_query = RwQuery::new(MODAL_QUERY_PARAM_NAME);
 
-    let run_on_click = move |e: MouseEvent| {
+    let run_callback_fn = move |e: MouseEvent| {
         trace!("on click 5");
         if let Some(on_click) = on_click {
             trace!("on click 6");
@@ -65,11 +79,11 @@ pub fn Btn(
         }
     };
 
-    let on_click_modal = move |e: MouseEvent| {
+    let open_modal_fn = move |e: MouseEvent| {
         trace!("on click 4");
         modal_confirm.run(
             modal_rw_query,
-            move || run_on_click(e.clone()),
+            move || run_callback_fn(e.clone()),
             modal_title.get_untracked(),
             modal_text.get_untracked(),
             ModalConfirmLevel::High,
@@ -79,11 +93,15 @@ pub fn Btn(
     let on_click = move |e: MouseEvent| {
         trace!("on click 1");
         if modal_enable.get_untracked() {
+            if let Some(on_modal_open) = on_modal_open {
+                trace!("on click 6");
+                on_modal_open.run(());
+            }
             trace!("on click 2");
-            on_click_modal(e);
+            open_modal_fn(e);
         } else {
             trace!("on click 3");
-            run_on_click(e);
+            run_callback_fn(e);
         }
     };
     // on:click=on_click_handler

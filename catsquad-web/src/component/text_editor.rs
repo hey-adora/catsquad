@@ -41,6 +41,7 @@ pub fn TextEditor(
     let id_textarea = move || format!("{}_editor_textarea", id_prefix.get());
     let id_errs = move || format!("{}_editor_errors", id_prefix.get());
 
+    let placeholder = move || format!("{}...", title().to_lowercase());
     let text_not_found = move || format!("No {}.", title().to_lowercase());
 
     let children = move || {
@@ -93,6 +94,7 @@ pub fn TextEditor(
                 { children.clone() }
             }>
                 <AutoTextArea
+                    placeholder
                     id=id_textarea
                     node_ref=node_ref
                     on_input=on_input

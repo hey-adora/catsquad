@@ -45,7 +45,7 @@ pub fn PfpEditor() -> impl IntoView {
 
     view! {
         <div class="flex flex-col gap-4 place-items-center">
-            <PfpAcc is_loading class="size-[10rem]"/>
+            <PfpAcc no_link=true is_loading class="size-[10rem]"/>
             <label
                 for="pfp_upload_input"
                 class=class

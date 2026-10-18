@@ -1,6 +1,6 @@
 use std::str::FromStr;
 
-use crate::{Errs, Nav, hook::Spawner};
+use crate::{Errs, ModalConfirm, Nav, hook::Spawner};
 use catsquad_shared::{RegisterPageParams, RegisterPageStage};
 use catsquad_web_utils::prelude::*;
 use leptos::{html, prelude::*};
@@ -27,6 +27,7 @@ pub fn Register() -> impl IntoView {
     view! {
         <main node_ref=main_ref class="grid grid-rows-[auto_1fr] min-h-[100dvh]">
             <Nav/>
+            <ModalConfirm/>
             <div class=move || format!("grid  text-base05 {}", if register_spawner.is_busy.get() {"items-center"} else {"justify-stretch"})>
                 <Show when=move || register_spawner.is_busy.get()  >
                     <div class=move||"mx-auto text-[1.5rem]">

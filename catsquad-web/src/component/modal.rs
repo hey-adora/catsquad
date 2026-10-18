@@ -13,7 +13,7 @@ pub fn Modal(
     let link_fn = move || link.get();
 
     view! {
-        <div id="modal_global" class="z-[99] bg-base01/80 absolute left-0 top-0 w-[100dvw] h-[100dvh] grid place-content-center">
+        <div id="modal_global" class="z-[99] bg-base01/80 fixed left-0 top-0 w-[100dvw] h-[100dvh] grid place-content-center">
             <a class=" absolute left-0 top-0 w-full h-full" href=link_fn></a>
             <div class="relative z-[100] flex flex-col gap-6 shadow-lg bg-base00 rounded-lg px-6 py-4">
                 { children() }

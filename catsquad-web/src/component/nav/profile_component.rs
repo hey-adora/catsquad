@@ -18,6 +18,9 @@ pub fn Profile(spawner: Spawner) -> impl IntoView {
             page.logout().await;
         });
     };
+    let on_modal_open = move || {
+        dropdown_open.set(false);
+    };
 
     let username = move || page.acc_username();
     let link_profile = move || link_relative_profile_gallery(username());
@@ -38,7 +41,13 @@ pub fn Profile(spawner: Spawner) -> impl IntoView {
                         <SVGGear class="size-6"/>
                         "Settings"
                     </a>
-                    <BtnPrimary on_click=on_logout >
+                    <BtnPrimary
+                        modal_enable=true
+                        modal_title="logout"
+                        modal_text="are you sure you want to logout?"
+                        on_click=on_logout
+                        on_modal_open=on_modal_open
+                        >
                         "logout"
                     </BtnPrimary>
                 </div>

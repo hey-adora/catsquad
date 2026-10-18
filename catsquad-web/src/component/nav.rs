@@ -1,12 +1,17 @@
 use catsquad_log::prelude::*;
-use catsquad_shared::{LINK_WEB_INDEX, LINK_WEB_LOGIN, link_relative_index_search};
+use catsquad_shared::{
+    LINK_WEB_FOLLOWED, LINK_WEB_INDEX, LINK_WEB_LOGIN, link_relative_index_search,
+};
 use catsquad_web_utils::prelude::rem_to_px;
 use leptos::{html, prelude::*};
-use leptos_router::hooks::{query_signal, use_navigate};
+use leptos_router::hooks::{query_signal, use_location, use_navigate};
 use wasm_bindgen::JsCast;
 use web_sys::{HtmlDivElement, HtmlInputElement, HtmlTextAreaElement, KeyboardEvent, SubmitEvent};
 
-use crate::{AutoTextArea, LinkPrimary, PageState, SVGUpload, hook::Spawner, page::create_client};
+use crate::{
+    AutoTextArea, LinkPrimary, PageState, SVGUpload, hook::Spawner, page::create_client,
+    page_state::CurrentRoute,
+};
 
 mod profile_component;
 mod search_bar_component;
@@ -18,6 +23,8 @@ use search_bar_component::SearchBar;
 pub fn Nav() -> impl IntoView {
     let page_state = PageState::get();
     let spawner = Spawner::new();
+    let location = use_location();
+    let current_route = page_state.current_route(location);
 
     let is_loading = move || page_state.acc_pending() || spawner.is_busy.get();
     let is_logged_in = move || page_state.is_logged_in().unwrap_or_default();
@@ -25,11 +32,46 @@ pub fn Nav() -> impl IntoView {
     let when_guest = move || !is_logged_in() && !is_loading();
     let when_user = move || is_logged_in() && !is_loading();
 
+    let class_link_index_underline = move || {
+        if current_route.get() == CurrentRoute::Index {
+            "underline"
+        } else {
+            ""
+        }
+    };
+
+    let class_link_followed_underline = move || {
+        if current_route.get() == CurrentRoute::Followed {
+            "underline"
+        } else {
+            ""
+        }
+    };
+
     view! {
         <nav class="text-gray-200 flex gap-2 px-4 h-[3rem] items-center justify-between">
-            <a id="banner" href=LINK_WEB_INDEX class="font-lucky font-black text-[1.3rem]">
-                "CatSquad"
-            </a>
+            <div
+                class="flex justify-start place-items-center gap-2"
+                >
+                <a id="banner" href=LINK_WEB_INDEX class="sm:hidden font-lucky font-black text-[1.3rem]">
+                    "CS"
+                </a>
+                <a id="banner-sm" href=LINK_WEB_INDEX class="hidden sm:block font-lucky font-black text-[1.3rem]">
+                    "CatSquad"
+                </a>
+                <a
+                    class=class_link_index_underline
+                    href=LINK_WEB_INDEX
+                    >
+                    "Home"
+                </a>
+                <a
+                    class=class_link_followed_underline
+                    href=LINK_WEB_FOLLOWED
+                    >
+                    "Followed"
+                </a>
+            </div>
             <SearchBar/>
             <Show when=is_loading>
                 <p>"loading..."</p>

@@ -65,6 +65,7 @@ pub fn PostTags(
             errors=post_api.err_tags
             on_save=edit_tags_save
             node_ref=edit_tags_input
+            min_height=200.0
             spawner
             >
                 <div class="flex flex-wrap gap-1">

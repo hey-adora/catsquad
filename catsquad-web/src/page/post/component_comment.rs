@@ -6,7 +6,7 @@ use crate::page::post::comments_api::{CommentKind, CommentsApi};
 use crate::page::post::component_edit_btn::EditSaveCancel;
 use crate::{Btn, Errs, PageState, Pfp, SVGArrowDown, SVGTrash, SVGTriangle, hook::EventListener};
 use catsquad_log::prelude::*;
-use catsquad_shared::CommentRes;
+use catsquad_shared::{CommentRes, link_relative_profile_gallery};
 use catsquad_web_utils::time::{micro_to_str, time_now_micro};
 use catsquad_web_utils::timeout::set_timeout_fn;
 use leptos::ev;
@@ -282,6 +282,13 @@ pub fn Comment(
     let modal_text = move || format!("\"{}\"", comment_text());
     let when_edit_mode = move || comments_manual.edit_mode.get();
     let when_normal_mode = move || !when_edit_mode();
+    let link_profile = move || link_relative_profile_gallery(comment_user_username());
+    let view_date = move || {
+        format!(
+            "{} ago",
+            micro_to_str(global_state.get_time().saturating_sub(comment.created_at))
+        )
+    };
 
     // let author_link = move || post_api.author_link.get();
 
@@ -310,8 +317,8 @@ pub fn Comment(
                     </div>
                     <div  class="pl-4  flex flex-col w-full group">
                         <div class=comment_bar_class>
-                            <div class="text-[1.2rem] text-base0F overflow-hidden whitespace-nowrap text-ellipsis max-w-full "> {comment.user_username.clone()} </div>
-                            <div class="text-[1rem] overflow-hidden whitespace-nowrap text-ellipsis max-w-full text-base03"> {move || micro_to_str(global_state.get_time().saturating_sub(comment.created_at))}" ago"</div>
+                            <a href=link_profile class="text-[1.2rem] text-base0F overflow-hidden whitespace-nowrap text-ellipsis max-w-full "> {comment_user_username} </a>
+                            <div class="text-[1rem] overflow-hidden whitespace-nowrap text-ellipsis max-w-full text-base03">{view_date}</div>
 
                             <Show when={move || is_owned_fn() || comments_manual.edit_mode.get()} >
                                 <div class="gap-2 ml-auto place-items-center flex">

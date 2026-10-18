@@ -78,6 +78,7 @@ pub use api::user_update_username::*;
 pub use page::MODAL_QUERY_PARAM_NAME;
 pub use page::ModalQueryParamValue;
 pub use page::assets::*;
+pub use page::followed::*;
 pub use page::index::*;
 pub use page::login::*;
 pub use page::modal_query_params;

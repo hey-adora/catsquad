@@ -8,6 +8,10 @@ pub fn BtnSecondary(
     #[prop(optional, into)] class: Signal<String>,
     #[prop(optional, into)] is_loading: Signal<bool>,
     #[prop(optional, into)] disabled: Signal<bool>,
+    #[prop(optional, into)] modal_enable: Signal<bool>,
+    #[prop(optional, into)] modal_title: Signal<String>,
+    #[prop(optional, into)] modal_text: Signal<String>,
+    #[prop(optional, into)] no_default_style: Signal<bool>,
     #[prop(optional, into)] on_click: Option<Callback<MouseEvent>>,
     #[prop(optional, into)] size: Signal<BtnSize>,
     children: Children,
@@ -25,10 +29,14 @@ pub fn BtnSecondary(
 
     view! {
         <Btn
+            modal_enable
+            modal_title
+            modal_text
+            no_default_style
             id=id_fn
             is_loading=is_loading
             disabled=disabled
-            on:click=on_click_handler
+            on_click=on_click_handler
             class=class_fn
             class_on_disable=class_on_disable
             class_on_active=class_on_active

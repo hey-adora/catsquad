@@ -1,4 +1,6 @@
-use crate::{BtnPrimary, Display, Nav, PageState, hook::Spawner, page::create_client};
+use crate::{
+    BtnPrimary, Display, ModalConfirm, Nav, PageState, hook::Spawner, page::create_client,
+};
 use catsquad_log::prelude::*;
 use catsquad_shared::{
     LoginPageParams, LoginPageStage, PasswordResetStage, link_relative_login_password_reset_send,
@@ -79,6 +81,7 @@ pub fn Login() -> impl IntoView {
     view! {
         <main id="login_page" class="grid grid-rows-[auto_1fr] h-screen">
             <Nav/>
+            <ModalConfirm/>
             <Show when=when_password_reset>
                 <PasswordReset
                         password_reset_stage_tracked=password_stage_tracked

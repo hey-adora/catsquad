@@ -2,8 +2,8 @@ use crate::ProfileParams;
 use catsquad_client::{Client, Response, Sender, XMLSender};
 use catsquad_log::prelude::*;
 use catsquad_shared::{
-    MATCH_PROFILE, MATCH_PROFILE_ABOUTME, MATCH_PROFILE_PAWS, MATCH_PROFILE_SUPPORT,
-    SensitiveUserRes, SessionRemoveErr, UserGetBySessionKeyErr,
+    MATCH_FOLLOWED, MATCH_INDEX, MATCH_PROFILE, MATCH_PROFILE_ABOUTME, MATCH_PROFILE_PAWS,
+    MATCH_PROFILE_SUPPORT, SensitiveUserRes, SessionRemoveErr, UserGetBySessionKeyErr,
 };
 use catsquad_web_utils::time::time_now_micro;
 use leptos::prelude::*;
@@ -39,6 +39,8 @@ where
 
 #[derive(Clone, PartialEq, PartialOrd, EnumIs)]
 pub enum CurrentRoute {
+    Index,
+    Followed,
     ProfileGallery,
     ProfilePaws,
     ProfileSupport,
@@ -76,6 +78,14 @@ where
         Memo::new(move |_| {
             let query = location.search.get();
             let pathname = location.pathname.get();
+
+            if pathname == MATCH_INDEX {
+                return CurrentRoute::Index;
+            }
+
+            if pathname == MATCH_FOLLOWED {
+                return CurrentRoute::Followed;
+            }
 
             if pathname.contains(MATCH_PROFILE) {
                 if query.contains(MATCH_PROFILE_PAWS) {

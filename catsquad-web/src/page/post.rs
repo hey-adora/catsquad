@@ -92,6 +92,7 @@ pub fn Post() -> impl IntoView {
     view! {
         <main node_ref=main_ref class="relative font-hi grid gap-6 grid-rows-[auto_1fr] h-screen text-base05">
             <Nav/>
+            <ModalConfirm/>
 
             <Show when=when_post_not_found >
                 <div class="grid place-items-center text-[1.5rem] ">
@@ -104,8 +105,6 @@ pub fn Post() -> impl IntoView {
                     "deleted"
                 </div>
             </Show>
-
-            <ModalConfirm/>
 
             <Show when=when_post_show >
                 <div class="flex flex-col lg:grid grid-rows-[auto_1fr] grid-cols-[2fr_1fr] lg:max-h-[calc(100vh-3rem)] gap-2">

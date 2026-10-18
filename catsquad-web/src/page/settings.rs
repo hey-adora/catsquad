@@ -1,6 +1,6 @@
 use std::str::FromStr;
 
-use crate::{BtnPrimary, BtnSecondary, LinkSecondary, Nav, PageState};
+use crate::{BtnPrimary, BtnSecondary, LinkSecondary, ModalConfirm, Nav, PageState};
 use catsquad_shared::{
     EmailCangeStage, PasswordCangeStage, SettingsPageParams, SettingsPageStage,
     link_relative_settings_email_change_current_add, link_relative_settings_password_change_add,
@@ -61,6 +61,8 @@ pub fn Settings() -> impl IntoView {
     view! {
         <main id="settings_page" class="relative font-hi text-base05 grid grid-rows-[auto_1fr] gap-4">
             <Nav/>
+            <ModalConfirm/>
+
             <Show when=when_stage_username_change>
                 <UsernameChange/>
             </Show>
@@ -83,7 +85,8 @@ pub fn Settings() -> impl IntoView {
                 <div class="grid grid-cols-[1fr] gap-2  ">
                     <div class="flex flex-col gap-2">
                         <p class="text-[1.3rem] text-base0A">"User"</p>
-                        <div class="grid grid-cols-[1fr_auto] gap-8">
+                        <div class="grid sm:grid-rows-[auto_auto] sm:grid-cols-[auto_1fr] gap-8">
+                            <PfpEditor/>
                             <div class="flex flex-col gap-4">
                                 <div class="flex flex-col gap-2">
                                     <div class="flex justify-between place-items-center">
@@ -107,7 +110,6 @@ pub fn Settings() -> impl IntoView {
                                     <input type="password" class="rounded-xl bg-base01 px-2 py-1 text-base0B" value="***********"/>
                                 </div>
                             </div>
-                            <PfpEditor/>
                         </div>
 
                     </div>

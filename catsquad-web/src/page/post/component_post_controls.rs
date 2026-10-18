@@ -67,6 +67,9 @@ pub fn PostControls(
                 <p class=class_state>{state}</p>
                 <Show when=when_hidden>
                     <BtnPrimary
+                        modal_enable=true
+                        modal_title="publish post"
+                        modal_text="are you sure you want to publish the post?"
                         is_loading
                         on_click=on_state_change
                         class="sm:ml-auto"
@@ -76,6 +79,9 @@ pub fn PostControls(
                 </Show>
                 <Show when=when_active>
                     <BtnSecondary
+                        modal_enable=true
+                        modal_title="hide post"
+                        modal_text="are you sure you want to hide the post?"
                         is_loading
                         on_click=on_state_change
                         class="sm:ml-auto"
@@ -86,7 +92,7 @@ pub fn PostControls(
                 <BtnDelete
                     modal_enable=true
                     modal_title="delete post"
-                    modal_text="are you sure you want to delete post?"
+                    modal_text="are you sure you want to delete the post?"
                     on_click=delete_post
                 >
                     "Delete"

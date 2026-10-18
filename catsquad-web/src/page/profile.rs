@@ -3,7 +3,7 @@ use crate::hook::Spawner;
 use crate::page::create_client;
 use crate::page::profile::author_state::AuthorState;
 use crate::page_state::CurrentRoute;
-use crate::{Nav, PageState};
+use crate::{ModalConfirm, Nav, PageState};
 use leptos::prelude::*;
 use leptos_router::hooks::use_location;
 use leptos_router::params::Params;
@@ -78,6 +78,7 @@ pub fn Profile() -> impl IntoView {
     view! {
         <main class="grid grid-rows-[auto_1fr] h-screen">
             <Nav />
+            <ModalConfirm/>
             <div class="grid grid-rows-[auto_1fr] sm:grid-rows-[1fr] sm:grid-cols-[1fr_auto] ">
                 <ProfileAuthor author_state=author_state.clone() spawner user_username=username />
                 <Show when=when_tab_support>

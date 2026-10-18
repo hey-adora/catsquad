@@ -8,6 +8,7 @@ use leptos_router::components::*;
 use leptos_router::path;
 use std::time::Duration;
 
+pub mod followed;
 pub mod index;
 pub mod login;
 pub mod post;
@@ -16,6 +17,7 @@ pub mod register;
 pub mod settings;
 pub mod upload;
 
+use followed::Followed as PageFollowed;
 use index::Index as PageIndex;
 use login::Login as PageLogin;
 use post::Post as PagePost;
@@ -73,6 +75,8 @@ pub fn App() -> impl IntoView {
     //     Duration::from_secs(1),
     // )
     // .unwrap();
+    let is_loggedout = move || page.is_logged_in().map(|v| !v);
+    let is_loggedin = move || page.is_logged_in().map(|v| v);
 
     view! {
      <Router>
@@ -80,10 +84,11 @@ pub fn App() -> impl IntoView {
             <Route path=path!("/") view=PageIndex />
             <Route path=path!("/p/:post") view=PagePost />
             <Route path=path!("/u/:username") view=PageProfile />
-            <ProtectedRoute path=path!("/login") condition=move||page.is_logged_in().map(|v|!v) redirect_path=move||"/" view=PageLogin />
-            <ProtectedRoute path=path!("/register") condition=move||page.is_logged_in().map(|v|!v) redirect_path=move||"/" view=PageRegister />
-            <ProtectedRoute path=path!("/upload") condition=move||page.is_logged_in().map(|v|v) redirect_path=move||"/login" view=PageUpload />
-            <ProtectedRoute path=path!("/settings") condition=move||page.is_logged_in().map(|v|v) redirect_path=move||"/login" view=PageSettings />
+            <ProtectedRoute path=path!("/login") condition=is_loggedout redirect_path=move||"/" view=PageLogin />
+            <ProtectedRoute path=path!("/register") condition=is_loggedout redirect_path=move||"/" view=PageRegister />
+            <ProtectedRoute path=path!("/upload") condition=is_loggedin redirect_path=move||"/login" view=PageUpload />
+            <ProtectedRoute path=path!("/settings") condition=is_loggedin redirect_path=move||"/login" view=PageSettings />
+            <ProtectedRoute path=path!("/followed") condition=is_loggedin redirect_path=move||"/login" view=PageFollowed />
         </Routes>
       </Router>
     }

@@ -459,10 +459,10 @@ pub fn GalleryImg(img: Img) -> impl IntoView {
     let post_like_state = PostLikeState::new_with_data(create_client(), img_post_id.into(), liked);
     let class_like = move || {
         format!(
-            "size-6 self-center {}",
+            "size-6 self-center cursor-pointer {}",
             match liked.get() {
                 // LikeState::Loading => "text-base00",
-                false => "hover:fill-base05",
+                false => "hover:fill-base03",
                 true => "fill-base05",
             }
         )
@@ -488,7 +488,7 @@ pub fn GalleryImg(img: Img) -> impl IntoView {
                     <Pfp username=author_username.clone() proccesed=author_pfp_proccesed hash=author_pfp_hash class="size-10 shrink-0"/>
                     <div class="grid grid-rows-[auto_auto] justify-start ">
                         <div class="grid grid-cols-[1fr_auto]">
-                            <a href=link_author.clone() class="max-w-full text-[1.2rem] text-base0F overflow-hidden text-ellipsis">{author_username}</a>
+                            <a href=link_author.clone() class="max-w-full mr-auto text-[1.2rem] text-base0F overflow-hidden text-ellipsis">{author_username}</a>
                             <Show when=when_show_like_btn>
                                 <button on:click=on_like >
                                     <SVGPawHollow class=class_like />
