@@ -94,18 +94,24 @@ impl Db {
             }
         };
 
+        let mut delete_this_image = None::<String>;
+
         if current_pfp_hash != 0 {
             let (img_used_count, _, extension) = self
                 .file_image_remove_tx(&mut *tx, time, current_pfp_hash)
                 .await?;
             if img_used_count == 0 {
-                callback_remove_image(current_pfp_hash, extension.as_str()).await;
+                delete_this_image = Some(extension);
             }
         }
 
         tx.commit()
             .await
             .inspect_err(|err| error!("user_update_pfp {err}"))?;
+
+        if let Some(extension) = delete_this_image {
+            callback_remove_image(current_pfp_hash, extension.as_str()).await;
+        }
 
         Ok(())
     }

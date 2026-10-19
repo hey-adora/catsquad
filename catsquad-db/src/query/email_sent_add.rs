@@ -58,6 +58,7 @@ impl Display for DbEmailSentReason {
 }
 
 // impl From<String>
+// email_sent_to_user_email varchar NOT NULL references users(user_email) ON UPDATE CASCADE ON DELETE CASCADE,
 
 #[derive(Debug, thiserror::Error)]
 pub enum DbEmailSentAddErr {
@@ -137,7 +138,6 @@ impl Db {
         };
 
         Ok(email_sent)
-
     }
 }
 

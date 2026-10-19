@@ -55,7 +55,7 @@ impl Db {
         let query = "
             CREATE TABLE posts (
                 post_id int8 PRIMARY KEY generated always as identity,
-                post_user_username varchar(32) NOT NULL references users(user_username) ON UPDATE CASCADE ON DELETE CASCADE,
+                post_user_username varchar NOT NULL references users(user_username) ON UPDATE CASCADE ON DELETE CASCADE,
                 post_state varchar(30) DEFAULT 'draft',
                 post_title varchar(120),
                 post_tags varchar(2000),

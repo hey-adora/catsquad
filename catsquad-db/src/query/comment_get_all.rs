@@ -18,6 +18,7 @@ impl Db {
                                 comment_post_id,
                                 comment_replies_count,
                                 comment_user_username,
+                                comment_parent_id,
                                 comment_parents,
                                 comment_text,
                                 comment_modified_at,

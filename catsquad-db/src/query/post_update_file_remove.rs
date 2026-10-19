@@ -147,13 +147,13 @@ impl Db {
             }
         }
 
-        if img_used_count == 0 {
-            callback_remove_image(file_hash, extension.as_str()).await;
-        }
-
         tx.commit()
             .await
             .inspect_err(|err| error!("post_update_file_remove {err}"))?;
+
+        if img_used_count == 0 {
+            callback_remove_image(file_hash, extension.as_str()).await;
+        }
 
         Ok(img_used_count)
     }

@@ -28,7 +28,7 @@ impl Db {
             "
             CREATE TABLE invites (
                 invite_token uuid PRIMARY KEY DEFAULT uuidv7(),
-                invite_email varchar(100) NOT NULL,
+                invite_email varchar NOT NULL,
                 invite_used bool NOT NULL DEFAULT false,
                 invite_expires_at timestamp NOT NULL,
                 invite_modified_at timestamp NOT NULL,

@@ -17,6 +17,8 @@ pub struct DbComment {
     #[sqlx(rename = "comment_replies_count")]
     #[sqlx(try_from = "i64")]
     pub replies_count: u32,
+    #[sqlx(default, rename = "comment_parent_id")]
+    pub parent_id: Option<i64>, // exists just for cascade_delete
     #[sqlx(rename = "comment_parents")]
     pub parents: Vec<i64>,
     #[sqlx(rename = "comment_text")]
@@ -56,6 +58,7 @@ impl Db {
                 comment_user_username varchar NOT NULL references users(user_username) ON UPDATE CASCADE ON DELETE CASCADE,
                 comment_post_id int8 NOT NULL references posts(post_id) ON DELETE CASCADE,
                 comment_replies_count int8 DEFAULT 0,
+                comment_parent_id int8 references comments(comment_id) ON DELETE CASCADE,
                 comment_parents int8[] DEFAULT array[]::int8[],
                 comment_text text NOT NULL,
                 comment_modified_at timestamp NOT NULL,
@@ -155,6 +158,8 @@ impl Db {
             Vec::new()
         };
 
+        let parent_id = parent_ids.last().cloned();
+
         // insert comment
         let comment_id = {
             let query = "
@@ -164,9 +169,10 @@ impl Db {
                             comment_parents,
                             comment_text,
                             comment_modified_at,
-                            comment_created_at
+                            comment_created_at,
+                            comment_parent_id
                         )
-                        VALUES ( $1, $2, $3, $4, $5, $5 )
+                        VALUES ( $1, $2, $3, $4, $5, $5, $6 )
                         RETURNING comment_id
                     ";
 
@@ -176,6 +182,7 @@ impl Db {
                 .bind(&parent_ids)
                 .bind(&text)
                 .bind(XTimestamp(time as i64))
+                .bind(parent_id)
                 .fetch_one(&mut *tx)
                 .await;
 
@@ -232,6 +239,7 @@ impl Db {
             user_username,
             user_pfp_hash: pfp_hash,
             user_pfp_proccesed: pfp_proccesed,
+            parent_id,
             post_id,
             replies_count: 0,
             parents: parent_ids,
@@ -336,12 +344,15 @@ async fn test_comment_add() {
     assert_eq!(comments[0].parents.len(), 2);
     assert_eq!(comments[0].user_pfp_hash, 666);
     assert_eq!(comments[0].user_pfp_proccesed, true);
+    assert_eq!(comments[0].parent_id, Some(3));
     assert_eq!(comments[0].parents[0], comment1.id.clone());
     assert_eq!(comments[0].parents[1], comment2.id.clone());
     assert_eq!(comments[0].text, "one4");
     assert_eq!(comments[1].parents.len(), 1);
+    assert_eq!(comments[1].parent_id, Some(1));
     assert_eq!(comments[1].parents[0], comment1.id.clone());
     assert_eq!(comments[1].text, "one3");
     assert_eq!(comments[2].parents.len(), 0);
+    assert_eq!(comments[2].parent_id, None);
     assert_eq!(comments[2].text, "one");
 }

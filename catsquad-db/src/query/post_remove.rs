@@ -72,12 +72,14 @@ impl Db {
             images
         };
 
+        let mut delete_these_images = Vec::<(i64, String)>::new();
         let mut total_removed_imgs_size = 0;
+
         for hash in images {
             let (img_used_count, img_size, extension) =
                 self.file_image_remove_tx(&mut *tx, time, hash).await?;
             if img_used_count == 0 {
-                callback_remove_image(hash, extension.as_str()).await;
+                delete_these_images.push((hash, extension));
             }
             total_removed_imgs_size += img_size;
         }
@@ -142,6 +144,10 @@ impl Db {
         tx.commit()
             .await
             .inspect_err(|err| error!("post_like_add {err}"))?;
+
+        for (hash, extension) in delete_these_images {
+            callback_remove_image(hash, extension.as_str()).await;
+        }
 
         Ok(())
     }
