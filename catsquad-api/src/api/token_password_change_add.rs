@@ -1,29 +1,25 @@
-use std::fmt::Display;
-
+use crate::state::AppState;
 use axum::{Extension, Form, Json, extract::State, http::StatusCode, response::IntoResponse};
-use catsquad_db::{DbEmailSentReason, DbPasswordChange, DbPasswordChangeAddErr, DbUser};
-use catsquad_log::prelude::*;
+use catsquad_db::{DbToken, DbTokenAddErr, DbTokenLabel, DbUser, DbUserGetByEmailErr};
 use catsquad_shared::{
-    PasswordChangeAddErr, PasswordChangeAddReq, PasswordChangeRes, Uuid,
+    TokenPasswordChangeAddErr, TokenPasswordChangeAddReq, TokenPasswordChangeRes, Uuid,
     link_absolute_login_password_reset_confirm, link_absolute_settings_password_change_confirm,
     uuid_to_str, validate_email,
 };
 use url::Url;
 
-use crate::state::AppState;
-
-fn from_db_password_change(value: DbPasswordChange) -> PasswordChangeRes {
-    PasswordChangeRes {
+fn from_db_token_password_change(value: DbToken) -> TokenPasswordChangeRes {
+    TokenPasswordChangeRes {
         expires: value.expires_at,
     }
 }
 
-fn status_code(result: &Result<PasswordChangeRes, PasswordChangeAddErr>) -> StatusCode {
+fn status_code(result: &Result<TokenPasswordChangeRes, TokenPasswordChangeAddErr>) -> StatusCode {
     match result {
         Ok(_) => StatusCode::OK,
-        Err(PasswordChangeAddErr::InvalidEmail(_)) => StatusCode::BAD_REQUEST,
-        Err(PasswordChangeAddErr::BadRequest(_)) => StatusCode::BAD_REQUEST,
-        Err(PasswordChangeAddErr::InternalServer) => StatusCode::INTERNAL_SERVER_ERROR,
+        Err(TokenPasswordChangeAddErr::InvalidEmail(_)) => StatusCode::BAD_REQUEST,
+        Err(TokenPasswordChangeAddErr::BadRequest(_)) => StatusCode::BAD_REQUEST,
+        Err(TokenPasswordChangeAddErr::InternalServer) => StatusCode::INTERNAL_SERVER_ERROR,
     }
 }
 
@@ -50,30 +46,47 @@ fn send_email_password_reset(address: Url, token: Uuid) -> String {
 pub async fn password_change_add(
     db_user: Extension<Option<DbUser>>,
     State(app): State<AppState>,
-    Form(req): Form<PasswordChangeAddReq>,
+    Form(req): Form<TokenPasswordChangeAddReq>,
 ) -> impl IntoResponse {
     let time = app.get_time_micro();
     let password_change_expiration = app.get_password_change_expiration_micro().await;
-    let inner = async || -> Result<PasswordChangeRes, PasswordChangeAddErr> {
+    let inner = async || -> Result<TokenPasswordChangeRes, TokenPasswordChangeAddErr> {
         let email = req.email.trim().to_lowercase();
-        validate_email(&email).map_err(|err| PasswordChangeAddErr::InvalidEmail(err))?;
-
         let expires = time + password_change_expiration;
-        let result = app.db.password_change_add(time, &email, expires).await;
+
+        validate_email(&email).map_err(|err| TokenPasswordChangeAddErr::InvalidEmail(err))?;
+
+        // TODO maybe combine both quries into one
+
+        let result = app.db.user_get_by_email(&email).await;
+        let username = match result {
+            Ok(v) => v.username,
+            Err(DbUserGetByEmailErr::NotFound) => {
+                return Ok(TokenPasswordChangeRes { expires });
+            }
+            Err(DbUserGetByEmailErr::Db(_)) => {
+                return Err(TokenPasswordChangeAddErr::InternalServer);
+            }
+        };
+
+        let result = app
+            .db
+            .token_add(time, &username, expires, DbTokenLabel::PasswordChange)
+            .await;
         let password_change = match result {
             Ok(v) => v,
-            Err(DbPasswordChangeAddErr::UserNotFound(_)) => {
-                return Ok(PasswordChangeRes { expires });
+            Err(DbTokenAddErr::UserNotFound(_)) => {
+                return Ok(TokenPasswordChangeRes { expires });
             }
-            Err(DbPasswordChangeAddErr::Db(_)) => {
-                return Err(PasswordChangeAddErr::InternalServer);
+            Err(DbTokenAddErr::Db(_)) => {
+                return Err(TokenPasswordChangeAddErr::InternalServer);
             }
         };
 
         let address = app.get_address().await;
 
         if let Some(db_user) = &*db_user {
-            let email_body = send_email_password_change(address, password_change.token);
+            let email_body = send_email_password_change(address, password_change.id);
             let _ = app
                 .db
                 .email_sent_add(
@@ -84,7 +97,7 @@ pub async fn password_change_add(
                 )
                 .await;
         } else {
-            let email_body = send_email_password_reset(address, password_change.token);
+            let email_body = send_email_password_reset(address, password_change.id);
             let _ = app
                 .db
                 .email_sent_add(
@@ -96,7 +109,7 @@ pub async fn password_change_add(
                 .await;
         }
 
-        Ok(from_db_password_change(password_change))
+        Ok(from_db_token_password_change(password_change))
     };
 
     let result = inner().await;
@@ -113,13 +126,13 @@ mod test_utils {
     use crate::{TestServer, auth::create_auth_cookie_str};
 
     impl TestServer {
-        pub async fn password_change_add(
+        pub async fn token_password_change_add(
             &self,
             email: impl Into<String>,
             session_token: Uuid,
-        ) -> Result<cs::PasswordChangeRes, cs::PasswordChangeAddErr> {
+        ) -> Result<cs::TokenPasswordChangeRes, cs::TokenPasswordChangeAddErr> {
             self.client
-                .password_change_add(email.into())
+                .token_password_change_add(email.into())
                 .header_add(
                     header::COOKIE,
                     create_auth_cookie_str(uuid_to_str(session_token)),
@@ -132,10 +145,14 @@ mod test_utils {
     }
 }
 
+#[cfg(test)]
 #[tokio::test]
-async fn test_api_password_change_add() {
+async fn test_api_token_password_change_add() {
+    use catsquad_db::DbEmailSentReason;
+    use catsquad_log::prelude::*;
+
     init_log();
-    let server = crate::TestServer::new(0, "test_api_password_change_add").await;
+    let server = crate::TestServer::new(0, "test_api_token_password_change_add").await;
 
     let email = "hey@heyadora.com";
     let (_user1, token) = server
@@ -144,25 +161,33 @@ async fn test_api_password_change_add() {
 
     {
         let result = server
-            .password_change_add("hey2@heyadora.com", 0_u128.to_be_bytes())
+            .token_password_change_add("hey2@heyadora.com", 0_u128.to_be_bytes())
             .await;
         assert!(matches!(result, Ok(_)));
-
-        let result = server.password_change_add("hey2@heyadora.com", token).await;
-        assert!(matches!(result, Ok(_)));
-
-        let result = server.password_change_add("invalid", token).await;
-        assert!(matches!(result, Err(PasswordChangeAddErr::InvalidEmail(_))));
 
         let result = server
-            .password_change_add("invalid", 0_u128.to_be_bytes())
+            .token_password_change_add("hey2@heyadora.com", token)
             .await;
-        assert!(matches!(result, Err(PasswordChangeAddErr::InvalidEmail(_))));
+        assert!(matches!(result, Ok(_)));
+
+        let result = server.token_password_change_add("invalid", token).await;
+        assert!(matches!(
+            result,
+            Err(TokenPasswordChangeAddErr::InvalidEmail(_))
+        ));
+
+        let result = server
+            .token_password_change_add("invalid", 0_u128.to_be_bytes())
+            .await;
+        assert!(matches!(
+            result,
+            Err(TokenPasswordChangeAddErr::InvalidEmail(_))
+        ));
     }
 
     // password change
-    let _result = server.password_change_add(email, token).await;
-    let _password_change = server.state.db.password_change_get_all().await.unwrap()[0].clone();
+    let _result = server.token_password_change_add(email, token).await;
+    let _token = server.state.db.token_get_all().await.unwrap()[0].clone();
 
     let emails = server
         .email_sent_get_filtered(DbEmailSentReason::UserPasswordChangeAdd)
@@ -175,9 +200,9 @@ async fn test_api_password_change_add() {
 
     // password reset
     let _result = server
-        .password_change_add(email, 0_u128.to_be_bytes())
+        .token_password_change_add(email, 0_u128.to_be_bytes())
         .await;
-    let password_change = server.state.db.password_change_get_all().await.unwrap();
+    let password_change = server.state.db.token_get_all().await.unwrap();
     assert_eq!(password_change.len(), 2);
 
     let emails = server

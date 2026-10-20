@@ -1,5 +1,6 @@
 use crate::{Db, DbFileImageRemoveTxErr};
 use catsquad_log::prelude::*;
+use sqlx::PgConnection;
 
 #[derive(Debug, thiserror::Error)]
 pub enum DbUserRemoveErr {
@@ -13,17 +14,12 @@ pub enum DbUserRemoveErr {
 impl Db {
     pub async fn user_remove(
         &self,
+        tx: &mut PgConnection,
         time: u64,
         mut callback_remove_image: impl AsyncFnMut(i64, &str),
         user_username: impl Into<String>,
     ) -> Result<(), DbUserRemoveErr> {
-        let pool = &self.db;
         let user_username = user_username.into();
-
-        let mut tx = pool
-            .begin()
-            .await
-            .inspect_err(|err| error!("user_remove {err}"))?;
 
         // get posts images
         let posts_images = {
@@ -136,10 +132,6 @@ impl Db {
         }
 
         //
-
-        tx.commit()
-            .await
-            .inspect_err(|err| error!("user_remove {err}"))?;
 
         for (hash, extension) in delete_these_images {
             callback_remove_image(hash, extension.as_str()).await;
@@ -333,11 +325,13 @@ async fn test_user_remove() {
 
         // add password change
         {
-            db.password_change_add(0, user.email.clone(), 100)
+            use crate::DbTokenLabel;
+
+            db.token_add(0, user.username.clone(), 100, DbTokenLabel::PasswordChange)
                 .await
                 .unwrap();
 
-            db.password_change_add(0, user2.email.clone(), 100)
+            db.token_add(0, user2.username.clone(), 100, DbTokenLabel::PasswordChange)
                 .await
                 .unwrap();
         }
@@ -355,7 +349,7 @@ async fn test_user_remove() {
         let images = db.file_image_get_all().await.unwrap();
         let follows = db.follow_get_all().await.unwrap();
         let invites = db.invite_get_all().await.unwrap();
-        let password_change = db.password_change_get_all().await.unwrap();
+        let password_change = db.token_get_all().await.unwrap();
 
         assert_eq!(password_change.len(), 2);
         assert_eq!(invites.len(), 3);
@@ -381,7 +375,10 @@ async fn test_user_remove() {
         assert_eq!(images[3].hash, 666);
         assert_eq!(images[3].used_count, 2);
 
-        let result = db.user_remove(0, callback_remove, "hey").await;
+        let mut tx = db.db.begin().await.unwrap();
+        let result = db.user_remove(&mut *tx, 0, callback_remove, "hey").await;
+        tx.commit().await.unwrap();
+
         assert!(matches!(result, Ok(_)));
 
         let users = db.user_get_all().await.unwrap();
@@ -394,7 +391,7 @@ async fn test_user_remove() {
         let images = db.file_image_get_all().await.unwrap();
         let follows = db.follow_get_all().await.unwrap();
         let invites = db.invite_get_all().await.unwrap();
-        let password_change = db.password_change_get_all().await.unwrap();
+        let password_change = db.token_get_all().await.unwrap();
 
         assert_eq!(password_change.len(), 1);
         assert_eq!(invites.len(), 2);

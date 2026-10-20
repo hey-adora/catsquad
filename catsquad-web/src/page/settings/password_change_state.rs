@@ -2,7 +2,7 @@ use std::fmt::Debug;
 
 use catsquad_client::{Client, Response, Sender};
 use catsquad_shared::{
-    PasswordChangeRes, PasswordChangeUpdateConfirmErr, PasswordChangeUpdateConfirmRes, Uuid,
+    TokenPasswordChangeRes, UserUpdatePasswordByTokenErr, UserUpdatePasswordByTokenRes, Uuid,
     validate_password,
 };
 use leptos::prelude::*;
@@ -51,13 +51,13 @@ where
         }
     }
 
-    pub async fn add(&self, email: impl Into<String>) -> Option<PasswordChangeRes> {
+    pub async fn add(&self, email: impl Into<String>) -> Option<TokenPasswordChangeRes> {
         self.err_general.update(|v| v.clear());
         self.err_password.update(|v| v.clear());
 
         let client = self.client.get_value();
         let result = client
-            .password_change_add(email)
+            .token_password_change_add(email)
             .send()
             .await
             .into_json()
@@ -78,7 +78,7 @@ where
         password_change_token: Uuid,
         new_password: impl Into<String>,
         new_confirm: impl Into<String>,
-    ) -> Option<PasswordChangeUpdateConfirmRes> {
+    ) -> Option<UserUpdatePasswordByTokenRes> {
         self.err_general.update(|v| v.clear());
         self.err_password.update(|v| v.clear());
 
@@ -97,7 +97,7 @@ where
 
         let client = self.client.get_value();
         let result = client
-            .password_change_update_confirm(password_change_token, new_password)
+            .user_update_password_by_token(password_change_token, new_password)
             .send()
             .await
             .into_json()
@@ -106,7 +106,7 @@ where
             Ok(v) => {
                 return Some(v);
             }
-            Err(PasswordChangeUpdateConfirmErr::NewPasswordInvalid(err)) => {
+            Err(UserUpdatePasswordByTokenErr::NewPasswordInvalid(err)) => {
                 self.err_password.set(err.to_string());
                 return None;
             }
@@ -157,7 +157,7 @@ async fn test_passowrd_change_state() {
     assert_eq!(password_change.err_general.get_untracked(), "");
     assert_eq!(password_change.err_password.get_untracked(), "");
 
-    let key = server.password_change_get_latest_key().await;
+    let key = server.token_password_change_get_latest_key().await;
 
     let res = password_change
         .confirm(key, "A6prime1@heyadora.com", "A6prime1@heyadora.com")

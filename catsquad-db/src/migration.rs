@@ -15,7 +15,7 @@ impl Db {
                 self.invite_define().await;
                 self.email_sent_define().await;
                 self.session_define().await;
-                self.password_change_define().await;
+                self.token_define().await;
                 self.email_change_define().await;
                 self.post_define().await;
                 self.file_image_define().await;

@@ -450,6 +450,30 @@ where
         Builder::new(sender, params)
     }
 
+    pub fn delete_form<TReq, TResult, TError>(
+        &self,
+        link: impl Into<String>,
+        req: TReq,
+    ) -> Builder<TSender, TResult, TError>
+    where
+        TReq: serde::Serialize + Debug,
+        TResult: for<'a> serde::Deserialize<'a> + Debug,
+        TError: for<'a> serde::Deserialize<'a> + Debug + Default,
+    {
+        let req = req
+            .to_form()
+            .inspect_err(|err| error!("serializing of\n{req:#?}\nfailed {err}"))
+            .unwrap_or_default();
+        let params = SenderParams {
+            path: link.into(),
+            method: Method::Delete,
+            body: Body::Form(req),
+            ..Default::default()
+        };
+        let sender = self.sender.clone();
+        Builder::new(sender, params)
+    }
+
     pub fn post_form<TReq, TResult, TError>(
         &self,
         link: impl Into<String>,
@@ -611,6 +635,16 @@ where
             cs::UserUpdateAboutmeReq {
                 new_aboutme: new_aboutme.into(),
             },
+        )
+    }
+
+    pub fn user_remove_by_token(
+        &self,
+        token: Uuid,
+    ) -> Builder<TSender, (), cs::UserRemoveByTokenErr> {
+        self.delete_form(
+            cs::LINK_API_USER_REMOVE_BY_TOKEN,
+            cs::UserRemoveByTokenReq { token: token },
         )
     }
 
@@ -1047,27 +1081,26 @@ where
         )
     }
 
-    pub fn password_change_add(
+    pub fn token_password_change_add(
         &self,
         email: impl Into<String>,
-    ) -> Builder<TSender, cs::PasswordChangeRes, cs::PasswordChangeAddErr> {
+    ) -> Builder<TSender, cs::TokenPasswordChangeRes, cs::TokenPasswordChangeAddErr> {
         self.post_form(
-            cs::LINK_API_PASSWORD_CHANGE_ADD,
-            cs::PasswordChangeAddReq {
+            cs::LINK_API_TOKEN_PASSWORD_CHANGE_ADD,
+            cs::TokenPasswordChangeAddReq {
                 email: email.into(),
             },
         )
     }
 
-    pub fn password_change_update_confirm(
+    pub fn user_update_password_by_token(
         &self,
         token: Uuid,
         new_password: impl Into<String>,
-    ) -> Builder<TSender, cs::PasswordChangeUpdateConfirmRes, cs::PasswordChangeUpdateConfirmErr>
-    {
+    ) -> Builder<TSender, cs::UserUpdatePasswordByTokenRes, cs::UserUpdatePasswordByTokenErr> {
         self.post_form(
-            cs::LINK_API_PASSWORD_CHANGE_UPDATE_CONFIRM,
-            cs::PasswordChangeUpdateConfirmReq {
+            cs::LINK_API_USER_UPDATE_PASSWORD_BY_TOKEN,
+            cs::UserUpdatePasswordByTokenReq {
                 token,
                 new_password: new_password.into(),
             },

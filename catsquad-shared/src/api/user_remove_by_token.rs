@@ -1,24 +1,30 @@
-pub const LINK_API_PASSWORD_CHANGE_UPDATE_CONFIRM: &str = "/api/password_change_update_confirm";
+use std::fmt::Display;
 
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
-pub struct PasswordChangeUpdateConfirmRes {
-    pub email: String,
+pub const LINK_API_USER_REMOVE_BY_TOKEN: &str = "/api/remove";
+
+pub fn link_relative_user_remove_by_token() -> &'static str {
+    LINK_API_USER_REMOVE_BY_TOKEN
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
-pub struct PasswordChangeUpdateConfirmReq {
+pub struct UserRemoveByTokenReq {
     #[serde(
         serialize_with = "crate::serde_from_uuid",
         deserialize_with = "crate::serde_to_uuid"
     )]
     pub token: crate::Uuid,
-    pub new_password: String,
+    // pub token: String,
 }
+
+// #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
+// pub struct UserRemoveByTokenParams {
+//     pub user_username: String,
+// }
 
 #[derive(
     Default, Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq, thiserror::Error,
 )]
-pub enum PasswordChangeUpdateConfirmErr {
+pub enum UserRemoveByTokenErr {
     #[error("expired")]
     Expired,
 
@@ -28,11 +34,11 @@ pub enum PasswordChangeUpdateConfirmErr {
     #[error("password key not found")]
     TokenNotFound,
 
-    #[error("new password is invalid")]
-    NewPasswordInvalid(String),
-
     #[error("bad request {0}")]
     BadRequest(String),
+
+    #[error("unauthorized {0}")]
+    Unauthorized(String),
 
     #[default]
     #[error("internal server err")]
