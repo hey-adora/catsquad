@@ -43,7 +43,7 @@ fn send_email_password_reset(address: Url, token: Uuid) -> String {
     link.to_string()
 }
 
-pub async fn password_change_add(
+pub async fn token_password_change_add(
     db_user: Extension<Option<DbUser>>,
     State(app): State<AppState>,
     Form(req): Form<TokenPasswordChangeAddReq>,
@@ -73,7 +73,7 @@ pub async fn password_change_add(
             .db
             .token_add(time, &username, expires, DbTokenLabel::PasswordChange)
             .await;
-        let password_change = match result {
+        let token = match result {
             Ok(v) => v,
             Err(DbTokenAddErr::UserNotFound(_)) => {
                 return Ok(TokenPasswordChangeRes { expires });
@@ -86,7 +86,7 @@ pub async fn password_change_add(
         let address = app.get_address().await;
 
         if let Some(db_user) = &*db_user {
-            let email_body = send_email_password_change(address, password_change.id);
+            let email_body = send_email_password_change(address, token.id);
             let _ = app
                 .db
                 .email_sent_add(
@@ -97,7 +97,7 @@ pub async fn password_change_add(
                 )
                 .await;
         } else {
-            let email_body = send_email_password_reset(address, password_change.id);
+            let email_body = send_email_password_reset(address, token.id);
             let _ = app
                 .db
                 .email_sent_add(
@@ -109,7 +109,7 @@ pub async fn password_change_add(
                 .await;
         }
 
-        Ok(from_db_token_password_change(password_change))
+        Ok(from_db_token_password_change(token))
     };
 
     let result = inner().await;

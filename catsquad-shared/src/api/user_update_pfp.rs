@@ -10,7 +10,7 @@ pub fn link_relative_user_update_pfp() -> &'static str {
     Default, Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq, thiserror::Error,
 )]
 pub enum UserUpdatePfpErr {
-    #[error("user not found")]
+    #[error("is same pfp")]
     IsSame,
 
     #[error("unauthorized {0}")]

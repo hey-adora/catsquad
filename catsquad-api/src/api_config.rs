@@ -3,8 +3,6 @@ use std::{
     path::{Path, PathBuf},
     str::FromStr,
 };
-
-use catsquad_log::prelude::*;
 use tokio::fs;
 use url::Url;
 
@@ -15,6 +13,7 @@ pub struct ApiConfig {
     pub secret: String,
     pub invite_expiration_micros: u64,
     pub password_change_expiration_micros: u64,
+    pub user_remove_expiration_micros: u64,
     pub email_change_expiration_micros: u64,
     pub database_path: PathBuf,
     pub storage_path: PathBuf,
@@ -27,6 +26,7 @@ pub const FIELD_BIND: &'static str = "bind";
 pub const FIELD_SECRET: &'static str = "secret";
 pub const FIELD_INVITE_EXPIRATION: &'static str = "invite_expiration_micros";
 pub const FIELD_PASSWORD_CHANGE_EXPIRATION: &'static str = "password_change_expiration_micros";
+pub const FIELD_USER_REMOVE_EXPIRATION: &'static str = "user_remove_expiration_micros";
 pub const FIELD_EMAIL_CHANGE_EXPIRATION: &'static str = "email_change_expiration_micros";
 pub const FIELD_DATABASE_PATH: &'static str = "database_path";
 pub const FIELD_STORAGE_PATH: &'static str = "storage_path";
@@ -127,6 +127,7 @@ async fn read_or_create(path: impl AsRef<Path>, or_else: impl FnOnce() -> ApiCon
 
 #[tokio::test]
 async fn test_api_config_new() {
+    use catsquad_log::prelude::*;
     init_log();
 
     let test_config = async |conf_path: &str,
@@ -178,6 +179,7 @@ impl Default for ApiConfig {
             secret: "test".to_string(),
             invite_expiration_micros: 1800000000,
             password_change_expiration_micros: 1800000000,
+            user_remove_expiration_micros: 1800000000,
             email_change_expiration_micros: 1800000000,
             // 1800000000
             database_path: PathBuf::from("target/db"),
@@ -218,8 +220,16 @@ impl<T: AsRef<str>> From<T> for ApiConfig {
                             continue;
                         }
                 }
+                FIELD_USER_REMOVE_EXPIRATION => {
+                    conf.user_remove_expiration_micros =
+                        if let Ok(v) = u64::from_str_radix(value, 10) {
+                            v
+                        } else {
+                            continue;
+                        }
+                }
                 FIELD_EMAIL_CHANGE_EXPIRATION => {
-                    conf.password_change_expiration_micros =
+                    conf.email_change_expiration_micros =
                         if let Ok(v) = u64::from_str_radix(value, 10) {
                             v
                         } else {
@@ -268,8 +278,14 @@ impl From<&ApiConfig> for String {
         output.push('\n');
         push(
             &mut output,
+            FIELD_USER_REMOVE_EXPIRATION,
+            &value.user_remove_expiration_micros.to_string(),
+        );
+        output.push('\n');
+        push(
+            &mut output,
             FIELD_EMAIL_CHANGE_EXPIRATION,
-            &value.password_change_expiration_micros.to_string(),
+            &value.email_change_expiration_micros.to_string(),
         );
         output.push('\n');
         push(
@@ -314,20 +330,30 @@ impl ToString for ApiConfig {
 
 #[test]
 fn test_api_config_from_str() {
+    use catsquad_log::prelude::*;
+    init_log();
+
     let input = format!(
-        "{}=http://localhost/\n{}=111\n{}=hello2\n{}=123\n{}=124\n{}=124\n{}=hello3\n{}=tmp\n{}=tmp2\n{}=tmp3",
+        "{}=http://localhost/\n{}=111\n{}=hello2\n{}=1\n{}=2\n{}=3\n{}=4\n{}=hello3\n{}=tmp\n{}=tmp2\n{}=tmp3",
         FIELD_ADDRESS,
         FIELD_BIND,
         FIELD_SECRET,
         FIELD_INVITE_EXPIRATION,
         FIELD_PASSWORD_CHANGE_EXPIRATION,
+        FIELD_USER_REMOVE_EXPIRATION,
         FIELD_EMAIL_CHANGE_EXPIRATION,
         FIELD_DATABASE_PATH,
         FIELD_STORAGE_PATH,
         FIELD_ASSETS_PATH,
         FIELD_TMP_PATH,
     );
+
+    trace!("input {input}");
+
     let settings = ApiConfig::from(&input);
+
+    trace!("parsed {settings:#?}");
+
     let settings_str = settings.to_string();
     assert_eq!(input, settings_str);
 }

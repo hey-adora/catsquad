@@ -223,6 +223,47 @@ pub fn link_relative_settings_email_change_canceled() -> String {
     )
 }
 
+pub fn link_relative_settings_account_deletion_add() -> String {
+    format!(
+        "/settings?{}={}",
+        SettingsPageParams::Stage,
+        SettingsPageStage::AccountDeletion,
+    )
+}
+
+pub fn link_relative_settings_account_deletion_check_email() -> String {
+    format!(
+        "/settings?{}={}&{}={}",
+        SettingsPageParams::Stage,
+        SettingsPageStage::AccountDeletion,
+        //
+        SettingsPageParams::AccountDeletionStage,
+        AccountDeletionStage::Email,
+    )
+}
+
+pub fn link_relative_settings_account_deletion_confirm(token: impl Display) -> String {
+    format!(
+        "/settings?{}={}&{}={}&{}={}",
+        SettingsPageParams::Stage,
+        SettingsPageStage::AccountDeletion,
+        //
+        SettingsPageParams::AccountDeletionStage,
+        AccountDeletionStage::Confirm,
+        //
+        SettingsPageParams::Token,
+        token,
+    )
+}
+
+pub fn link_absolute_settings_account_deletion_confirm(
+    host: Url,
+    token: impl Display,
+) -> Result<Url, url::ParseError> {
+    let relative = link_relative_settings_account_deletion_confirm(token);
+    host.join(&relative)
+}
+
 #[derive(Debug, Clone, PartialEq, PartialOrd, strum::EnumString, strum::Display, strum::EnumIs)]
 #[strum(serialize_all = "lowercase")]
 pub enum SettingsPageParams {
@@ -232,6 +273,7 @@ pub enum SettingsPageParams {
     EmailChangeKey,
     EmailChangeStage,
     PasswordChangeStage,
+    AccountDeletionStage,
 }
 
 #[derive(
@@ -265,6 +307,17 @@ pub enum PasswordCangeStage {
 }
 
 #[derive(
+    Default, Debug, Clone, PartialEq, PartialOrd, strum::EnumString, strum::Display, strum::EnumIs,
+)]
+#[strum(serialize_all = "lowercase")]
+pub enum AccountDeletionStage {
+    #[default]
+    Add,
+    Email,
+    Confirm,
+}
+
+#[derive(
     Debug, Default, Clone, PartialEq, PartialOrd, strum::EnumString, strum::Display, strum::EnumIs,
 )]
 #[strum(serialize_all = "lowercase")]
@@ -274,4 +327,5 @@ pub enum SettingsPageStage {
     UsernameChange,
     EmailChange,
     PasswordChange,
+    AccountDeletion,
 }

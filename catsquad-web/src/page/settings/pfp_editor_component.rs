@@ -1,5 +1,5 @@
 use super::user_pfp_state::UserPfpState;
-use crate::{PageState, Pfp, PfpAcc, hook::Spawner, page::create_client};
+use crate::{Errs, PageState, PfpAcc, hook::Spawner, page::create_client};
 use catsquad_log::prelude::*;
 use catsquad_web_utils::file::GetFiles;
 use leptos::prelude::*;
@@ -46,6 +46,7 @@ pub fn PfpEditor() -> impl IntoView {
     view! {
         <div class="flex flex-col gap-4 place-items-center">
             <PfpAcc no_link=true is_loading class="size-[10rem]"/>
+            <Errs error=pfp_state.err_general />
             <label
                 for="pfp_upload_input"
                 class=class

@@ -121,6 +121,10 @@ impl AppState {
         self.conf.read().await.password_change_expiration_micros
     }
 
+    pub async fn get_user_remove_expiration_micro(&self) -> u64 {
+        self.conf.read().await.user_remove_expiration_micros
+    }
+
     pub async fn get_email_change_expiration_micro(&self) -> u64 {
         self.conf.read().await.email_change_expiration_micros
     }
@@ -128,6 +132,10 @@ impl AppState {
     // pub async fn get_email_change_expiration_(&self) -> u128 {
     //     self.conf.read().await.email_change_expiration_ns
     // }
+
+    pub async fn set_user_remove_expiration(&self, duration: u64) {
+        self.conf.write().await.user_remove_expiration_micros = duration;
+    }
 
     pub async fn set_email_change_expiration(&self, duration: u64) {
         self.conf.write().await.email_change_expiration_micros = duration;

@@ -1,14 +1,17 @@
 use std::str::FromStr;
 
-use crate::{BtnPrimary, BtnSecondary, LinkSecondary, ModalConfirm, Nav, PageState};
+use crate::{BtnDelete, BtnPrimary, BtnSecondary, LinkSecondary, ModalConfirm, Nav, PageState};
 use catsquad_shared::{
-    EmailCangeStage, PasswordCangeStage, SettingsPageParams, SettingsPageStage,
+    AccountDeletionStage, EmailCangeStage, PasswordCangeStage, SettingsPageParams,
+    SettingsPageStage, link_relative_settings_account_deletion_add,
     link_relative_settings_email_change_current_add, link_relative_settings_password_change_add,
     link_relative_settings_username_change, str_to_uuid, uuid_to_str,
 };
 use catsquad_web_utils::prelude::*;
 use leptos::prelude::*;
 
+mod account_deletion_component;
+mod account_deletion_state;
 mod email_change_component;
 mod email_change_state;
 mod password_change_component;
@@ -18,6 +21,7 @@ pub mod user_pfp_state;
 mod username_change_component;
 mod username_change_state;
 
+use account_deletion_component::AccountDeletion;
 use email_change_component::EmailChange;
 use password_change_component::PasswordChange;
 pub use password_change_state::PasswordChangeState;
@@ -42,6 +46,10 @@ pub fn Settings() -> impl IntoView {
         RwQuery::<EmailCangeStage>::new(SettingsPageParams::EmailChangeStage.to_string());
     let email_change_stage = move || email_change_stage.get_or_default();
 
+    let account_deletion_stage =
+        RwQuery::<AccountDeletionStage>::new(SettingsPageParams::AccountDeletionStage.to_string());
+    let account_deletion_stage = move || account_deletion_stage.get_or_default();
+
     let email_change_id = RwQuery::<i64>::new(SettingsPageParams::EmailChangeKey.to_string());
     let email_change_id = move || email_change_id.get_or_default();
 
@@ -54,9 +62,12 @@ pub fn Settings() -> impl IntoView {
     let link_username_change = move || link_relative_settings_username_change();
     let link_email_change = move || link_relative_settings_email_change_current_add();
     let link_password_change = move || link_relative_settings_password_change_add();
+    let link_account_deletion = move || link_relative_settings_account_deletion_add();
+
     let when_stage_username_change = move || stage() == SettingsPageStage::UsernameChange;
     let when_stage_email_change = move || stage() == SettingsPageStage::EmailChange;
     let when_stage_password_change = move || stage() == SettingsPageStage::PasswordChange;
+    let when_stage_account_deletion = move || stage() == SettingsPageStage::AccountDeletion;
 
     view! {
         <main id="settings_page" class="relative font-hi text-base05 grid grid-rows-[auto_1fr] gap-4">
@@ -80,11 +91,17 @@ pub fn Settings() -> impl IntoView {
                         password_change_token=token
                     />
             </Show>
+            <Show when=when_stage_account_deletion>
+                <AccountDeletion
+                        account_deletion_stage
+                        account_deletion_token=token
+                    />
+            </Show>
             <div class="px-[2rem] mx-auto max-w-[30rem] w-full">
                 <h1 class="text-[1.5rem] text-base0A font-bold mb-[2rem]">"Settings"</h1>
                 <div class="grid grid-cols-[1fr] gap-2  ">
                     <div class="flex flex-col gap-2">
-                        <p class="text-[1.3rem] text-base0A">"User"</p>
+                        <p class="text-[1.3rem] text-base0A font-bold">"User"</p>
                         <div class="grid sm:grid-rows-[auto_auto] sm:grid-cols-[auto_1fr] gap-8">
                             <PfpEditor/>
                             <div class="flex flex-col gap-4">
@@ -111,7 +128,10 @@ pub fn Settings() -> impl IntoView {
                                 </div>
                             </div>
                         </div>
-
+                    </div>
+                    <div class="flex flex-col gap-2">
+                        <p class="text-[1.3rem] text-base0A font-bold">"Account Deletion"</p>
+                        <LinkSecondary class="mr-auto" id="account_deletion_btn" link=link_account_deletion>"Delete"</LinkSecondary>
                     </div>
 
                 </div>

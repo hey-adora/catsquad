@@ -36,6 +36,7 @@ pub mod session_add;
 pub mod session_remove;
 pub mod test_backdoor_email_sent_get_all;
 pub mod token_password_change_add;
+pub mod token_user_remove_add;
 pub mod user_add;
 pub mod user_get_by_session_key;
 pub mod user_get_by_username;

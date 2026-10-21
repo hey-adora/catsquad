@@ -150,7 +150,7 @@ pub async fn app(state: AppState) -> Router {
         .route(catsquad_shared::LINK_API_POST_SEARCH, get(api::post_search))
         .route(
             catsquad_shared::LINK_API_TOKEN_PASSWORD_CHANGE_ADD,
-            post(api::password_change_add),
+            post(api::token_password_change_add),
         )
         .route(
             catsquad_shared::LINK_API_USER_UPDATE_PASSWORD_BY_TOKEN,
@@ -283,6 +283,10 @@ pub async fn app(state: AppState) -> Router {
         .route(
             catsquad_shared::LINK_API_USER_REMOVE_BY_TOKEN,
             delete(api::user_remove_by_token),
+        )
+        .route(
+            catsquad_shared::LINK_API_TOKEN_USER_REMOVE_ADD,
+            post(api::token_user_remove_add),
         )
         .route(
             catsquad_shared::LINK_API_SESSION_REMOVE,

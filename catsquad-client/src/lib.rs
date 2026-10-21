@@ -1093,6 +1093,12 @@ where
         )
     }
 
+    pub fn token_user_remove_add(
+        &self,
+    ) -> Builder<TSender, cs::TokenUserRemoveRes, cs::TokenUserRemoveAddErr> {
+        self.post_form_empty(cs::LINK_API_TOKEN_USER_REMOVE_ADD)
+    }
+
     pub fn user_update_password_by_token(
         &self,
         token: Uuid,

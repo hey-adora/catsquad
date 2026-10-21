@@ -73,6 +73,8 @@ where
         let client = self.client.get_value();
         let hash = self.pfp_hash.get_untracked();
 
+        self.err_general.try_update(|v| v.clear());
+
         if self.is_pfp_proccesed() {
             warn!("pfp is already updated");
             return;
@@ -90,7 +92,8 @@ where
                 self.pfp_proccesed_status.set(v.is_proccesed);
             }
             Err(err) => {
-                error!("pfp update internal server err {err}")
+                error!("pfp update internal server err {err}");
+                self.err_general.try_set(err.to_string());
             }
         }
     }
@@ -99,7 +102,11 @@ where
     where
         TImage: Into<SchrodingersImage>,
     {
-        let client = self.client.get_value();
+        let Some(client) = self.client.try_get_value() else {
+            return;
+        };
+
+        self.err_general.try_update(|v| v.clear());
 
         let result = client
             .user_update_pfp(vec![image])
@@ -110,15 +117,18 @@ where
 
         match result {
             Ok(v) => {
-                self.pfp_hash.set(v.hash);
-                self.pfp_proccesed_status.set(v.proccesed);
+                self.pfp_hash.try_set(v.hash);
+                self.pfp_proccesed_status.try_set(v.proccesed);
             }
             Err(err) => {
-                error!("pfp update internal server err {err}")
+                error!("pfp update internal server err {err}");
+                self.err_general.try_set(err.to_string());
             }
         }
     }
 }
+
+// todo maybe test if errors get set
 
 #[cfg(test)]
 #[tokio::test]

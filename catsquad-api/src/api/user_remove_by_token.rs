@@ -1,4 +1,8 @@
-use crate::{api::user_update_pfp::remove_images, auth::verify_password, state::AppState};
+use crate::{
+    api::user_update_pfp::remove_images,
+    auth::{create_deleted_cookie, verify_password},
+    state::AppState,
+};
 use axum::{Extension, Form, Json, extract::State, http::StatusCode, response::IntoResponse};
 use catsquad_db::{DbTokenUpdateConfirmErr, DbUser, DbUserRemoveByTokenErr};
 use catsquad_shared::{UserRemoveByTokenErr, UserRemoveByTokenReq};
@@ -62,11 +66,10 @@ pub async fn user_remove_by_token(
 
     let result = inner().await;
     let status_code = status_code(&result);
+    let headers = create_deleted_cookie();
 
-    (status_code, Json(result))
+    (status_code, headers, Json(result))
 }
-
-// TODO assert if it removes all images correctly
 
 #[cfg(test)]
 mod test_utils {
@@ -95,6 +98,9 @@ mod test_utils {
     }
 }
 
+// TODO assert if it removes all images correctly
+// TODO assert if delete cookie is set correctly
+
 #[tokio::test]
 async fn test_api_user_remove_by_token() {
     use catsquad_log::prelude::*;
@@ -103,25 +109,16 @@ async fn test_api_user_remove_by_token() {
     let server = crate::TestServer::new(0, "test_api_user_remove_by_token").await;
 
     let pss = "a1234567890111GG11$";
-    let (user1, user_token) = server.user_add_full("hey", "hey@heyadora.com", pss).await;
+    let (_user1, user_token) = server.user_add_full("hey", "hey@heyadora.com", pss).await;
     let _ = server.user_add_full("hey2", "hey2@heyadora.com", pss).await;
 
     // assert success
     {
-        let token_acc_del = server
-            .state
-            .db
-            .token_add(
-                0,
-                user1.username.clone(),
-                10,
-                catsquad_db::DbTokenLabel::AccountDeletion,
-            )
-            .await
-            .unwrap();
+        server.token_user_remove_add(user_token).await.unwrap();
+        let token = server.state.db.token_get_all().await.unwrap()[0].clone();
 
         server
-            .user_remove_by_token(token_acc_del.id, user_token)
+            .user_remove_by_token(token.id, user_token)
             .await
             .unwrap();
 
