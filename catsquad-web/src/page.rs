@@ -8,6 +8,7 @@ use leptos_router::components::*;
 use leptos_router::path;
 use std::time::Duration;
 
+pub mod admin;
 pub mod followed;
 pub mod index;
 pub mod login;
@@ -17,6 +18,7 @@ pub mod register;
 pub mod settings;
 pub mod upload;
 
+use admin::Admin as PageAdmin;
 use followed::Followed as PageFollowed;
 use index::Index as PageIndex;
 use login::Login as PageLogin;
@@ -89,6 +91,7 @@ pub fn App() -> impl IntoView {
             <ProtectedRoute path=path!("/upload") condition=is_loggedin redirect_path=move||"/login" view=PageUpload />
             <ProtectedRoute path=path!("/settings") condition=is_loggedin redirect_path=move||"/login" view=PageSettings />
             <ProtectedRoute path=path!("/followed") condition=is_loggedin redirect_path=move||"/login" view=PageFollowed />
+            <ProtectedRoute path=path!("/admin") condition=is_loggedin redirect_path=move||"/login" view=PageAdmin />
         </Routes>
       </Router>
     }

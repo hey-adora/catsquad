@@ -231,7 +231,7 @@ impl Db {
             //     WHERE post_id = $1)
 
             let result = sqlx::query_as(query)
-                .bind(post_id)
+                .bind(post_id) // TODO i think this is useless
                 .bind(&images_hashes)
                 .fetch_all(pool)
                 .await;

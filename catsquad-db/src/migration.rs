@@ -22,6 +22,7 @@ impl Db {
                 self.post_like_define().await;
                 self.comment_define().await;
                 self.follow_define().await;
+                self.role_define().await;
 
                 self.migration_add(time, 0).await.unwrap();
                 info!("database migration successful");

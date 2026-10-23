@@ -11,7 +11,7 @@ pub struct DbSession {
     #[sqlx(rename = "session_modified_at")]
     #[sqlx(try_from = "XTimestamp")]
     pub modified_at: u64,
-    #[sqlx(rename = "session_modified_at")]
+    #[sqlx(rename = "session_created_at")]
     #[sqlx(try_from = "XTimestamp")]
     pub created_at: u64,
 }

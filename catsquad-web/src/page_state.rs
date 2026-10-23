@@ -2,8 +2,9 @@ use crate::ProfileParams;
 use catsquad_client::{Client, Response, Sender, XMLSender};
 use catsquad_log::prelude::*;
 use catsquad_shared::{
-    MATCH_FOLLOWED, MATCH_INDEX, MATCH_PROFILE, MATCH_PROFILE_ABOUTME, MATCH_PROFILE_PAWS,
-    MATCH_PROFILE_SUPPORT, SensitiveUserRes, SessionRemoveErr, UserGetBySessionKeyErr,
+    MATCH_ADMIN, MATCH_FOLLOWED, MATCH_INDEX, MATCH_PROFILE, MATCH_PROFILE_ABOUTME,
+    MATCH_PROFILE_PAWS, MATCH_PROFILE_SUPPORT, SensitiveUserRes, SessionRemoveErr,
+    UserGetBySessionKeyErr,
 };
 use catsquad_web_utils::time::time_now_micro;
 use leptos::prelude::*;
@@ -41,6 +42,7 @@ where
 pub enum CurrentRoute {
     Index,
     Followed,
+    Admin,
     ProfileGallery,
     ProfilePaws,
     ProfileSupport,
@@ -85,6 +87,10 @@ where
 
             if pathname == MATCH_FOLLOWED {
                 return CurrentRoute::Followed;
+            }
+
+            if pathname == MATCH_ADMIN {
+                return CurrentRoute::Admin;
             }
 
             if pathname.contains(MATCH_PROFILE) {

@@ -1,8 +1,8 @@
 use catsquad_log::prelude::*;
 use catsquad_shared::{
-    LINK_WEB_FOLLOWED, LINK_WEB_INDEX, LINK_WEB_LOGIN, link_relative_index_search,
+    LINK_WEB_ADMIN, LINK_WEB_FOLLOWED, LINK_WEB_INDEX, LINK_WEB_LOGIN, link_relative_index_search,
 };
-use catsquad_web_utils::prelude::rem_to_px;
+use catsquad_web_utils::prelude::*;
 use leptos::{html, prelude::*};
 use leptos_router::hooks::{query_signal, use_location, use_navigate};
 use wasm_bindgen::JsCast;
@@ -32,21 +32,14 @@ pub fn Nav() -> impl IntoView {
     let when_guest = move || !is_logged_in() && !is_loading();
     let when_user = move || is_logged_in() && !is_loading();
 
-    let class_link_index_underline = move || {
-        if current_route.get() == CurrentRoute::Index {
-            "underline"
-        } else {
-            ""
-        }
-    };
+    let class_link_index_underline =
+        move || move || (current_route.get() == CurrentRoute::Index).or("underline");
 
-    let class_link_followed_underline = move || {
-        if current_route.get() == CurrentRoute::Followed {
-            "underline"
-        } else {
-            ""
-        }
-    };
+    let class_link_followed_underline =
+        move || (current_route.get() == CurrentRoute::Followed).or("underline");
+
+    let class_link_admin_underline =
+        move || (current_route.get() == CurrentRoute::Admin).or("underline");
 
     view! {
         <nav class="text-gray-200 flex gap-2 px-4 h-[3rem] items-center justify-between">
@@ -70,6 +63,12 @@ pub fn Nav() -> impl IntoView {
                     href=LINK_WEB_FOLLOWED
                     >
                     "Followed"
+                </a>
+                <a
+                    class=class_link_admin_underline
+                    href=LINK_WEB_ADMIN
+                    >
+                    "Admin"
                 </a>
             </div>
             <SearchBar/>

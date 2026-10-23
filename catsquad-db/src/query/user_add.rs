@@ -13,6 +13,8 @@ pub struct DbUser {
     pub support: String,
     #[sqlx(rename = "user_aboutme")]
     pub aboutme: String,
+    #[sqlx(rename = "user_roles")]
+    pub roles: Vec<i64>,
     #[sqlx(rename = "user_pfp_image_hash")]
     pub pfp_image_hash: i64,
     #[sqlx(default, rename = "user_pfp_image_proccesed")]
@@ -74,6 +76,7 @@ impl Db {
                 user_password varchar NOT NULL,
                 user_support text DEFAULT '',
                 user_aboutme text DEFAULT '',
+                user_roles int8[] DEFAULT array[]::int8[],
                 user_pfp_image_hash int8 DEFAULT 0,
                 user_likes_count int8 DEFAULT 0,
                 user_followers_count int8 DEFAULT 0,
@@ -216,6 +219,7 @@ impl Db {
             password,
             support: String::new(),
             aboutme: String::new(),
+            roles: Vec::new(),
             pfp_image_hash: 0,
             pfp_image_proccesed: false,
             likes_count: 0,

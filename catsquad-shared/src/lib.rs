@@ -61,6 +61,7 @@ pub use api::post_update_image_remove::*;
 pub use api::post_update_state::*;
 pub use api::post_update_tags::*;
 pub use api::post_update_title::*;
+pub use api::role_add::*;
 pub use api::session_add::*;
 pub use api::session_remove::*;
 pub use api::test_backdoor_email_sent_get_all::*;
@@ -79,6 +80,7 @@ pub use api::user_update_username::*;
 
 pub use page::MODAL_QUERY_PARAM_NAME;
 pub use page::ModalQueryParamValue;
+pub use page::admin::*;
 pub use page::assets::*;
 pub use page::followed::*;
 pub use page::index::*;
