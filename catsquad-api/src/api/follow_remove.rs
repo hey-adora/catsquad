@@ -5,7 +5,7 @@ use axum::{
     http::StatusCode,
     response::IntoResponse,
 };
-use catsquad_db::{DbFollowRemoveErr, DbUser};
+use catsquad_db::{DbFollowRemoveErr, DbUser, DbUserGet};
 use catsquad_shared::{FollowRemoveErr, FollowRemoveParams};
 
 fn from_db_follow_remove_err(value: DbFollowRemoveErr) -> FollowRemoveErr {
@@ -25,7 +25,7 @@ fn status_code(result: &Result<(), FollowRemoveErr>) -> StatusCode {
 }
 
 pub async fn follow_remove(
-    db_user: Extension<DbUser>,
+    db_user: Extension<DbUserGet>,
     State(app): State<AppState>,
     Path(params): Path<FollowRemoveParams>,
 ) -> impl IntoResponse {

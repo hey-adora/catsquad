@@ -679,6 +679,21 @@ where
         self.delete(link_relative_post_remove(post_id))
     }
 
+    pub fn role_add(
+        &self,
+        role_name: impl Display,
+        role_values: Vec<cs::RoleValue>,
+    ) -> Builder<TSender, cs::RoleRes, cs::RoleAddErr> {
+        // let role_values = role_values
+        //     .into_iter()
+        //     .map(|v| v.into())
+        //     .collect::<Vec<String>>();
+        self.post_form(
+            cs::link_relative_role_add(role_name),
+            cs::RoleAddReq { role_values },
+        )
+    }
+
     pub fn follow_add(
         &self,
         user_username: impl Display,

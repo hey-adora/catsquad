@@ -9,7 +9,7 @@ use axum::{
     http::StatusCode,
     response::IntoResponse,
 };
-use catsquad_db::{DbPostImageGetByHashErr, DbUser};
+use catsquad_db::{DbPostImageGetByHashErr, DbUser, DbUserGet};
 use catsquad_log::prelude::*;
 use catsquad_shared::{
     FILE_IMAGE_THUMBNAIL_EXTENSION, PostImageBytesGetByHashErr, PostImageBytesGetByHashParams,
@@ -86,7 +86,7 @@ pub async fn get_file_image(
 }
 
 pub async fn post_file_bytes_get_by_hash(
-    db_user: Extension<Option<DbUser>>,
+    db_user: Extension<Option<DbUserGet>>,
     State(app): State<AppState>,
     Path(params): Path<PostImageBytesGetByHashParams>,
 ) -> impl IntoResponse {

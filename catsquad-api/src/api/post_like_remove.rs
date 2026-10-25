@@ -1,5 +1,5 @@
 use axum::{Extension, Form, Json, extract::State, http::StatusCode, response::IntoResponse};
-use catsquad_db::{DbPostLikeRemoveErr, DbUser};
+use catsquad_db::{DbPostLikeRemoveErr, DbUser, DbUserGet};
 use catsquad_shared::{PostLikeRemoveErr, PostLikeRemoveReq, PostLikeRes};
 
 use crate::{api::post_like_add::from_db_post_like, state::AppState};
@@ -26,7 +26,7 @@ fn status_code(result: &Result<(), PostLikeRemoveErr>) -> StatusCode {
 }
 
 pub async fn post_like_remove(
-    db_user: Extension<DbUser>,
+    db_user: Extension<DbUserGet>,
     State(app): State<AppState>,
     Form(req): Form<PostLikeRemoveReq>,
 ) -> impl IntoResponse {

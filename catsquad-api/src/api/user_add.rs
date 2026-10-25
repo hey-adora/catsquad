@@ -4,7 +4,7 @@ use axum::{
     http::{HeaderMap, StatusCode},
     response::IntoResponse,
 };
-use catsquad_db::{DbSessionAddErr, DbUser, DbUserAddErr};
+use catsquad_db::{DbSessionAddErr, DbUser, DbUserAddErr, DbUserGet};
 use catsquad_log::prelude::*;
 use catsquad_shared::{
     MAX_STORAGE, MAX_STORAGE_PER_FILE, SensitiveUserRes, UserAddErr, UserAddReq, validate_password,
@@ -29,6 +29,18 @@ use crate::{
 // }
 
 pub fn from_db_user_sensitive(value: DbUser) -> SensitiveUserRes {
+    SensitiveUserRes {
+        // key: id_to_string(value.id),
+        username: value.username,
+        pfp_hash: value.pfp_image_hash,
+        pfp_proccesed: value.pfp_image_proccesed,
+        max_storage_bytes: value.max_storage_bytes,
+        email: value.email,
+        created_at: value.created_at,
+    }
+}
+
+pub fn from_db_user_get_sensitive(value: DbUserGet) -> SensitiveUserRes {
     SensitiveUserRes {
         // key: id_to_string(value.id),
         username: value.username,
@@ -155,7 +167,7 @@ mod test_utils {
         HeaderName,
         header::{self, SET_COOKIE},
     };
-    use catsquad_db::DbUser;
+    use catsquad_db::{DbUser, DbUserGet};
     use catsquad_shared::{self as cs, Uuid, str_to_uuid};
 
     use crate::{
@@ -200,7 +212,7 @@ mod test_utils {
             user: impl Into<String>,
             email: impl Into<String>,
             password: impl Into<String>,
-        ) -> (DbUser, Uuid) {
+        ) -> (DbUserGet, Uuid) {
             let username = user.into();
             let email = email.into();
             let password = password.into();

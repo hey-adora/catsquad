@@ -1,6 +1,6 @@
 use crate::state::AppState;
 use axum::{Extension, Form, Json, extract::State, http::StatusCode, response::IntoResponse};
-use catsquad_db::{DbComment, DbCommentAddErr, DbUser};
+use catsquad_db::{DbComment, DbCommentAddErr, DbUser, DbUserGet};
 use catsquad_shared::{CommentAddErr, CommentAddReq, CommentRes, validate_comment_text};
 
 pub fn from_db_comment(value: DbComment) -> CommentRes {
@@ -40,7 +40,7 @@ fn status_code(result: &Result<CommentRes, CommentAddErr>) -> StatusCode {
 }
 
 pub async fn comment_add(
-    db_user: Extension<DbUser>,
+    db_user: Extension<DbUserGet>,
     State(app): State<AppState>,
     Form(req): Form<CommentAddReq>,
 ) -> impl IntoResponse {

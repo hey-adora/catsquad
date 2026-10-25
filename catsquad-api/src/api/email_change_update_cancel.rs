@@ -1,5 +1,5 @@
 use axum::{Extension, Form, Json, extract::State, http::StatusCode, response::IntoResponse};
-use catsquad_db::{DbEmailChangeGetByIdErr, DbEmailChangeUpdateCancelErr, DbUser};
+use catsquad_db::{DbEmailChangeGetByIdErr, DbEmailChangeUpdateCancelErr, DbUser, DbUserGet};
 use catsquad_log::prelude::*;
 use catsquad_shared::{EmailChangeRes, EmailChangeUpdateCancelErr, EmailChangeUpdateCancelReq};
 
@@ -31,7 +31,7 @@ pub fn status_code(result: &Result<(), EmailChangeUpdateCancelErr>) -> StatusCod
 }
 
 pub async fn email_change_update_cancel(
-    db_user: Extension<DbUser>,
+    db_user: Extension<DbUserGet>,
     State(app): State<AppState>,
     Form(req): Form<EmailChangeUpdateCancelReq>,
 ) -> impl IntoResponse {

@@ -4,7 +4,7 @@ use axum::{
     http::{StatusCode, header},
     response::IntoResponse,
 };
-use catsquad_db::{DbFileImage, DbPostGet, DbPostGetByKeyErr, DbUser};
+use catsquad_db::{DbFileImage, DbPostGet, DbPostGetByKeyErr, DbUser, DbUserGet};
 use catsquad_log::prelude::*;
 use catsquad_shared::{FileImage, PostGetByKeyErr, PostGetByKeyParams, PostRes, PostState};
 
@@ -74,7 +74,7 @@ pub fn status_code(result: &Result<PostRes, PostGetByKeyErr>) -> StatusCode {
 }
 
 pub async fn post_get_by_id(
-    db_user: Extension<Option<DbUser>>,
+    db_user: Extension<Option<DbUserGet>>,
     State(app): State<AppState>,
     Path(params): Path<PostGetByKeyParams>,
 ) -> impl IntoResponse {

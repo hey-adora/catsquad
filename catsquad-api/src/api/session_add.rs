@@ -4,12 +4,12 @@ use axum::{
     http::{HeaderMap, StatusCode},
     response::IntoResponse,
 };
-use catsquad_db::{DbSession, DbSessionAddErr, DbUser, DbUserGetByEmailErr};
+use catsquad_db::{DbSession, DbSessionAddErr, DbUser, DbUserGet, DbUserGetByEmailErr};
 use catsquad_log::prelude::*;
 use catsquad_shared::{SensitiveUserRes, SessionAddErr, SessionAddReq};
 
 use crate::{
-    api::user_add::from_db_user_sensitive,
+    api::user_add::{from_db_user_get_sensitive, from_db_user_sensitive},
     auth::{create_auth_cookie, verify_password},
     state::AppState,
 };
@@ -58,7 +58,7 @@ pub async fn session_add(
     Form(req): Form<SessionAddReq>,
 ) -> impl IntoResponse {
     let time = app.get_time_micro();
-    let inner = async || -> Result<(DbUser, DbSession), SessionAddErr> {
+    let inner = async || -> Result<(DbUserGet, DbSession), SessionAddErr> {
         let email = req.email.trim().to_lowercase();
         let password = req.password;
 
@@ -95,7 +95,7 @@ pub async fn session_add(
     match result {
         Ok((user, session)) => {
             let headers = create_auth_cookie(session.token);
-            let result = Ok(from_db_user_sensitive(user));
+            let result = Ok(from_db_user_get_sensitive(user));
             let status_code = status_code(&result);
             (status_code, headers, Json(result))
         }

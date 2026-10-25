@@ -1,6 +1,6 @@
 use crate::state::AppState;
 use axum::{Extension, Form, Json, extract::State, http::StatusCode, response::IntoResponse};
-use catsquad_db::{DbToken, DbTokenAddErr, DbTokenLabel, DbUser, DbUserGetByEmailErr};
+use catsquad_db::{DbToken, DbTokenAddErr, DbTokenLabel, DbUser, DbUserGet, DbUserGetByEmailErr};
 use catsquad_shared::{
     TokenPasswordChangeAddErr, TokenPasswordChangeAddReq, TokenPasswordChangeRes, Uuid,
     link_absolute_login_password_reset_confirm, link_absolute_settings_password_change_confirm,
@@ -44,7 +44,7 @@ fn send_email_password_reset(address: Url, token: Uuid) -> String {
 }
 
 pub async fn token_password_change_add(
-    db_user: Extension<Option<DbUser>>,
+    db_user: Extension<Option<DbUserGet>>,
     State(app): State<AppState>,
     Form(req): Form<TokenPasswordChangeAddReq>,
 ) -> impl IntoResponse {

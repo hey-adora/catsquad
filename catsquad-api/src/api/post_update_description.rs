@@ -1,5 +1,5 @@
 use axum::{Extension, Form, Json, extract::State, http::StatusCode, response::IntoResponse};
-use catsquad_db::{DbPostUpdateBuilderTextErr, DbUser};
+use catsquad_db::{DbPostUpdateBuilderTextErr, DbUser, DbUserGet};
 use catsquad_shared::{
     PostRes, PostUpdateDescriptionErr, PostUpdateDescriptionReq, validate_post_description,
 };
@@ -30,7 +30,7 @@ fn status_code(result: &Result<(), PostUpdateDescriptionErr>) -> StatusCode {
 }
 
 pub async fn post_update_description(
-    db_user: Extension<DbUser>,
+    db_user: Extension<DbUserGet>,
     State(app): State<AppState>,
     Form(req): Form<PostUpdateDescriptionReq>,
 ) -> impl IntoResponse {
@@ -120,10 +120,7 @@ async fn test_api_post_update_description() {
         .await
         .unwrap();
 
-    let post1 = server
-        .post_get_by_id(post1.id, session_key1)
-        .await
-        .unwrap();
+    let post1 = server.post_get_by_id(post1.id, session_key1).await.unwrap();
 
     assert_eq!(post1.description, "description2");
 

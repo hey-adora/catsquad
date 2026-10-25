@@ -1,6 +1,6 @@
 use crate::state::AppState;
 use axum::{Extension, Form, Json, extract::State, http::StatusCode, response::IntoResponse};
-use catsquad_db::{DbPostLike, DbPostLikeAddErr, DbUser};
+use catsquad_db::{DbPostLike, DbPostLikeAddErr, DbUser, DbUserGet};
 use catsquad_shared::{PostLikeAddErr, PostLikeAddReq, PostLikeRes};
 
 pub fn from_db_post_like(value: DbPostLike) -> PostLikeRes {
@@ -40,7 +40,7 @@ fn status_code(result: &Result<PostLikeRes, PostLikeAddErr>) -> StatusCode {
 }
 
 pub async fn post_like_add(
-    db_user: Extension<DbUser>,
+    db_user: Extension<DbUserGet>,
     State(app): State<AppState>,
     Form(req): Form<PostLikeAddReq>,
 ) -> impl IntoResponse {

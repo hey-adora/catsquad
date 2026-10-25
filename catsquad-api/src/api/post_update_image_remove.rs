@@ -1,6 +1,6 @@
 use crate::{api::user_update_pfp::remove_images, state::AppState};
 use axum::{Extension, Form, Json, extract::State, http::StatusCode, response::IntoResponse};
-use catsquad_db::{DbPostUpdateImageRemoveErr, DbUser};
+use catsquad_db::{DbPostUpdateImageRemoveErr, DbUser, DbUserGet};
 use catsquad_shared::{PostUpdateImageRemoveErr, PostUpdateImageRemoveReq};
 
 fn from_db_post_update_image_remove_err(
@@ -29,7 +29,7 @@ fn status_code(result: &Result<(), PostUpdateImageRemoveErr>) -> StatusCode {
 }
 
 pub async fn post_update_image_remove(
-    db_user: Extension<DbUser>,
+    db_user: Extension<DbUserGet>,
     State(app): State<AppState>,
     Form(req): Form<PostUpdateImageRemoveReq>,
 ) -> impl IntoResponse {

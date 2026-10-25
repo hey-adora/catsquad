@@ -4,7 +4,7 @@ use axum::{
     http::StatusCode,
     response::IntoResponse,
 };
-use catsquad_db::{DbPostLikeExistsByPostErr, DbUser};
+use catsquad_db::{DbPostLikeExistsByPostErr, DbUser, DbUserGet};
 use catsquad_shared::{PostLikeGetByPostErr, PostLikeGetByPostParams};
 
 use crate::{api::post_like_add::from_db_post_like, state::AppState};
@@ -17,7 +17,7 @@ fn status_code(result: &Result<bool, PostLikeGetByPostErr>) -> StatusCode {
 }
 
 pub async fn post_like_get_by_post(
-    db_user: Extension<DbUser>,
+    db_user: Extension<DbUserGet>,
     State(app): State<AppState>,
     Path(req): Path<PostLikeGetByPostParams>,
 ) -> impl IntoResponse {

@@ -1,7 +1,7 @@
 use std::fmt::Display;
 
 use axum::{Extension, Form, Json, extract::State, http::StatusCode, response::IntoResponse};
-use catsquad_db::{DbEmailChange, DbEmailChangeAddErr, DbEmailSentReason, DbUser};
+use catsquad_db::{DbEmailChange, DbEmailChangeAddErr, DbEmailSentReason, DbUser, DbUserGet};
 use catsquad_log::prelude::*;
 use catsquad_shared::{
     EmailChangeAddErr, EmailChangeRes, EmailChangeToken, Uuid,
@@ -72,7 +72,7 @@ pub fn send_email_email_change_add(
 }
 
 pub async fn email_change_add(
-    db_user: Extension<DbUser>,
+    db_user: Extension<DbUserGet>,
     State(app): State<AppState>,
 ) -> impl IntoResponse {
     let time = app.get_time_micro();
@@ -115,7 +115,7 @@ pub async fn email_change_add(
 mod test_utils {
     use crate::{TestServer, auth::create_auth_cookie_str};
     use axum::http::header;
-    use catsquad_db::DbUser;
+    use catsquad_db::{DbUser, DbUserGet};
     use catsquad_shared::{self as cs, Uuid, uuid_to_str};
 
     impl TestServer {
@@ -138,7 +138,7 @@ mod test_utils {
         pub async fn email_change_get_current_token(
             &self,
             time: u64,
-            user: &DbUser,
+            user: &DbUserGet,
             email_change_id: i64,
         ) -> Uuid {
             self.state
@@ -152,7 +152,7 @@ mod test_utils {
         pub async fn email_change_get_new_token(
             &self,
             time: u64,
-            user: &DbUser,
+            user: &DbUserGet,
             email_change_id: i64,
         ) -> Uuid {
             self.state

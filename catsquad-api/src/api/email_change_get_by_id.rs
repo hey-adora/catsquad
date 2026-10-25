@@ -4,7 +4,7 @@ use axum::{
     http::StatusCode,
     response::IntoResponse,
 };
-use catsquad_db::{DbEmailChangeGetByIdErr, DbUser};
+use catsquad_db::{DbEmailChangeGetByIdErr, DbUser, DbUserGet};
 use catsquad_shared::{EmailChangeGetByIdErr, EmailChangeGetByIdParams, EmailChangeRes};
 
 use crate::{api::email_change_add::from_db_email_change, state::AppState};
@@ -33,7 +33,7 @@ fn from_db_email_change_gey_by_id_err(value: DbEmailChangeGetByIdErr) -> EmailCh
 }
 
 pub async fn email_change_get_by_id(
-    db_user: Extension<DbUser>,
+    db_user: Extension<DbUserGet>,
     State(app): State<AppState>,
     Path(req): Path<EmailChangeGetByIdParams>,
 ) -> impl IntoResponse {

@@ -1,5 +1,5 @@
 use axum::{Extension, Form, Json, extract::State, http::StatusCode, response::IntoResponse};
-use catsquad_db::{DbPostUpdateStateErr, DbUser};
+use catsquad_db::{DbPostUpdateStateErr, DbUser, DbUserGet};
 use catsquad_log::prelude::*;
 use catsquad_shared::{PostUpdateStateErr, PostUpdateStateReq};
 
@@ -33,7 +33,7 @@ fn status_code(result: &Result<(), PostUpdateStateErr>) -> StatusCode {
 }
 
 pub async fn post_update_state(
-    db_user: Extension<DbUser>,
+    db_user: Extension<DbUserGet>,
     State(app): State<AppState>,
     Form(req): Form<PostUpdateStateReq>,
 ) -> impl IntoResponse {
@@ -114,10 +114,7 @@ async fn test_api_post_update_state() {
         .post_update_state(post1.id, PostState::Active, session_key1.clone())
         .await
         .unwrap();
-    let post1 = server
-        .post_get_by_id(post1.id, session_key1)
-        .await
-        .unwrap();
+    let post1 = server.post_get_by_id(post1.id, session_key1).await.unwrap();
 
     assert_eq!(post1.state, PostState::Active);
 }

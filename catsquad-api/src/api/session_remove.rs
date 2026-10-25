@@ -1,5 +1,5 @@
 use axum::{Extension, Form, Json, extract::State, http::StatusCode, response::IntoResponse};
-use catsquad_db::DbSessionRemoveErr;
+use catsquad_db::{DbSessionRemoveErr, DbUserGet};
 use catsquad_log::prelude::*;
 use catsquad_shared::{SessionRemoveErr, SessionRemoveRes};
 
@@ -23,6 +23,7 @@ fn status_code(result: &Result<SessionRemoveRes, SessionRemoveErr>) -> StatusCod
 }
 
 pub async fn session_remove(
+    _db_user: Extension<DbUserGet>,
     State(app): State<AppState>,
     session_key: Extension<SessionKey>,
 ) -> impl IntoResponse {

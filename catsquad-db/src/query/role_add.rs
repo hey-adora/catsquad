@@ -9,8 +9,6 @@ pub struct DbRole {
     pub name: String,
     #[sqlx(rename = "role_values")]
     pub values: Vec<String>,
-    // #[sqlx(rename = "role_user_username")]
-    // pub user_username: String,
     #[sqlx(rename = "role_modified_at")]
     #[sqlx(try_from = "XTimestamp")]
     pub modified_at: u64,
@@ -21,10 +19,6 @@ pub struct DbRole {
 
 #[derive(Debug, thiserror::Error)]
 pub enum DbRoleAddErr {
-    // #[error("role \"{role}\" for user \"{username}\" already exists")]
-    // RoleAlreadyExists { username: String, role: String },
-    // #[error("role \"{role}\" already exists")]
-    // NameIsTaken{ name: String },
     #[error("db error {0}")]
     Db(#[from] sqlx::Error),
 }
@@ -50,16 +44,17 @@ impl Db {
         .unwrap();
     }
 
-    pub async fn role_add(
+    pub async fn role_add<T: Into<String>>(
         &self,
         time: u64,
         // user_username: impl Into<String>,
         name: impl Into<String>,
-        values: Vec<String>,
+        values: Vec<T>,
     ) -> Result<DbRole, DbRoleAddErr> {
         let pool = &self.db;
         // let user_username = user_username.into();
         let name = name.into();
+        let values = values.into_iter().map(|v| v.into()).collect();
 
         let query = "
             INSERT INTO roles (
@@ -127,23 +122,17 @@ async fn test_role_add() {
 
     // assert success
     {
-        let role_one = db
-            .role_add(0, "one", vec!["foo".to_string()])
-            .await
-            .unwrap();
+        let role_one = db.role_add(0, "one", vec!["foo"]).await.unwrap();
 
-        let role_two = db
-            .role_add(1, "two", vec!["bar".to_string()])
-            .await
-            .unwrap();
+        let role_two = db.role_add(1, "two", vec!["bar"]).await.unwrap();
 
         let roles = db.role_get_all().await.unwrap();
 
         assert_eq!(role_one.name, "one");
-        assert_eq!(role_one.values, vec!["foo".to_string()]);
+        assert_eq!(role_one.values, vec!["foo"]);
 
         assert_eq!(role_two.name, "two");
-        assert_eq!(role_two.values, vec!["bar".to_string()]);
+        assert_eq!(role_two.values, vec!["bar"]);
 
         assert_eq!(roles.len(), 2);
         assert_eq!(roles[0].name, "two");

@@ -1,5 +1,5 @@
 use axum::{Extension, Form, Json, extract::State, http::StatusCode, response::IntoResponse};
-use catsquad_db::{DbPostUpdateBuilderTextErr, DbUser};
+use catsquad_db::{DbPostUpdateBuilderTextErr, DbUser, DbUserGet};
 use catsquad_log::prelude::*;
 use catsquad_shared::{
     PostRes, PostState, PostUpdateTitleErr, PostUpdateTitleReq, validate_post_title,
@@ -28,7 +28,7 @@ fn status_code(result: &Result<(), PostUpdateTitleErr>) -> StatusCode {
 }
 
 pub async fn post_update_title(
-    db_user: Extension<DbUser>,
+    db_user: Extension<DbUserGet>,
     State(app): State<AppState>,
     Form(req): Form<PostUpdateTitleReq>,
 ) -> impl IntoResponse {
@@ -115,10 +115,7 @@ async fn test_api_post_update_title() {
         .await
         .unwrap();
 
-    let post1 = server
-        .post_get_by_id(post1.id, session_key1)
-        .await
-        .unwrap();
+    let post1 = server.post_get_by_id(post1.id, session_key1).await.unwrap();
 
     assert_eq!(post1.title, "title2");
 

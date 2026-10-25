@@ -1,6 +1,6 @@
 use crate::{auth::hash_password, state::AppState};
 use axum::{Extension, Form, Json, extract::State, http::StatusCode, response::IntoResponse};
-use catsquad_db::{DbTokenUpdateConfirmErr, DbUser};
+use catsquad_db::{DbTokenUpdateConfirmErr, DbUser, DbUserGet};
 use catsquad_log::prelude::*;
 use catsquad_shared::{
     UserUpdatePasswordByTokenErr, UserUpdatePasswordByTokenReq, UserUpdatePasswordByTokenRes,
@@ -44,7 +44,7 @@ fn send_email_password_reset_confirm(address: impl AsRef<str>) -> String {
 }
 
 pub async fn user_update_password_by_token(
-    db_user: Extension<Option<DbUser>>,
+    db_user: Extension<Option<DbUserGet>>,
     State(app): State<AppState>,
     Form(req): Form<UserUpdatePasswordByTokenReq>,
 ) -> impl IntoResponse {

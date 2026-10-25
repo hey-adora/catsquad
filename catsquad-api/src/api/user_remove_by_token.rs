@@ -4,7 +4,7 @@ use crate::{
     state::AppState,
 };
 use axum::{Extension, Form, Json, extract::State, http::StatusCode, response::IntoResponse};
-use catsquad_db::{DbTokenUpdateConfirmErr, DbUser, DbUserRemoveByTokenErr};
+use catsquad_db::{DbTokenUpdateConfirmErr, DbUser, DbUserGet, DbUserRemoveByTokenErr};
 use catsquad_shared::{UserRemoveByTokenErr, UserRemoveByTokenReq};
 
 fn from_db_user_remove_by_token_err(value: DbUserRemoveByTokenErr) -> UserRemoveByTokenErr {
@@ -42,7 +42,7 @@ fn status_code(result: &Result<(), UserRemoveByTokenErr>) -> StatusCode {
 }
 
 pub async fn user_remove_by_token(
-    db_user: Extension<DbUser>,
+    db_user: Extension<DbUserGet>,
     State(app): State<AppState>,
     Form(req): Form<UserRemoveByTokenReq>,
 ) -> impl IntoResponse {

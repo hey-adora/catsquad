@@ -3,13 +3,13 @@ use axum::{
     extract::{Path, State},
     response::IntoResponse,
 };
-use catsquad_db::DbUser;
+use catsquad_db::{DbUser, DbUserGet};
 use catsquad_shared::PostImageBytesGetByHashParams;
 
 use crate::{api::post_image_bytes_get_by_hash::get_file_image, state::AppState};
 
 pub async fn post_thumbnail_bytes_get_by_hash(
-    db_user: Extension<Option<DbUser>>,
+    db_user: Extension<Option<DbUserGet>>,
     State(app): State<AppState>,
     Path(params): Path<PostImageBytesGetByHashParams>,
 ) -> impl IntoResponse {

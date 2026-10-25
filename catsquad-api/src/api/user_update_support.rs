@@ -1,6 +1,6 @@
 use crate::{state::AppState, utils::rng_str};
 use axum::{Extension, Form, Json, extract::State, http::StatusCode, response::IntoResponse};
-use catsquad_db::{DbUser, DbUserUpdateSupportErr};
+use catsquad_db::{DbUser, DbUserGet, DbUserUpdateSupportErr};
 use catsquad_shared::{
     MAX_SUPPORT_LENGTH, UserUpdateSupportErr, UserUpdateSupportReq, validate_user_support,
 };
@@ -22,7 +22,7 @@ fn status_code(result: &Result<(), UserUpdateSupportErr>) -> StatusCode {
 }
 
 pub async fn user_update_support(
-    db_user: Extension<DbUser>,
+    db_user: Extension<DbUserGet>,
     State(app): State<AppState>,
     Form(req): Form<UserUpdateSupportReq>,
 ) -> impl IntoResponse {

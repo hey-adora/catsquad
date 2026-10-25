@@ -5,7 +5,7 @@ use axum::{
     http::StatusCode,
     response::IntoResponse,
 };
-use catsquad_db::{DbFollow, DbFollowAddErr, DbUser};
+use catsquad_db::{DbFollow, DbFollowAddErr, DbUser, DbUserGet};
 use catsquad_shared::{FollowAddErr, FollowAddParams, FollowRes};
 
 pub fn from_db_following(value: DbFollow) -> FollowRes {
@@ -38,7 +38,7 @@ fn status_code(result: &Result<FollowRes, FollowAddErr>) -> StatusCode {
 }
 
 pub async fn follow_add(
-    db_user: Extension<DbUser>,
+    db_user: Extension<DbUserGet>,
     State(app): State<AppState>,
     Path(params): Path<FollowAddParams>,
 ) -> impl IntoResponse {

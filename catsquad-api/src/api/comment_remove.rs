@@ -1,5 +1,5 @@
 use axum::{Extension, Form, Json, extract::State, http::StatusCode, response::IntoResponse};
-use catsquad_db::{DbCommentRemoveErr, DbUser};
+use catsquad_db::{DbCommentRemoveErr, DbUser, DbUserGet};
 use catsquad_log::prelude::*;
 use catsquad_shared::{CommentRemoveErr, CommentRemoveReq, CommentRes, PostState};
 
@@ -25,7 +25,7 @@ fn status_code(result: &Result<(), CommentRemoveErr>) -> StatusCode {
 }
 
 pub async fn comment_remove(
-    db_user: Extension<DbUser>,
+    db_user: Extension<DbUserGet>,
     State(app): State<AppState>,
     Form(req): Form<CommentRemoveReq>,
 ) -> impl IntoResponse {

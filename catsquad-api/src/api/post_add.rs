@@ -1,6 +1,6 @@
 use crate::{api::post_get_by_id::from_db_post_get, state::AppState};
 use axum::{Extension, Form, Json, extract::State, http::StatusCode, response::IntoResponse};
-use catsquad_db::{DbPostAddErr, DbUser};
+use catsquad_db::{DbPostAddErr, DbUser, DbUserGet};
 use catsquad_shared::{
     PostAddErr, PostAddReq, PostRes, validate_post_description, validate_post_tags,
     validate_post_title,
@@ -55,7 +55,7 @@ fn status_code(result: &Result<PostRes, PostAddErr>) -> StatusCode {
 }
 
 pub async fn post_add(
-    db_user: Extension<DbUser>,
+    db_user: Extension<DbUserGet>,
     State(app): State<AppState>,
     Form(req): Form<PostAddReq>,
 ) -> impl IntoResponse {

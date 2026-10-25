@@ -1,5 +1,5 @@
 use axum::{Extension, Form, Json, extract::State, http::StatusCode, response::IntoResponse};
-use catsquad_db::{DbPostUpdateBuilderTextErr, DbUser};
+use catsquad_db::{DbPostUpdateBuilderTextErr, DbUser, DbUserGet};
 use catsquad_log::prelude::*;
 use catsquad_shared::{
     PostRes, PostState, PostUpdateTagsErr, PostUpdateTagsReq, validate_post_tags,
@@ -28,7 +28,7 @@ fn status_code(result: &Result<(), PostUpdateTagsErr>) -> StatusCode {
 }
 
 pub async fn post_update_tags(
-    db_user: Extension<DbUser>,
+    db_user: Extension<DbUserGet>,
     State(app): State<AppState>,
     Form(req): Form<PostUpdateTagsReq>,
 ) -> impl IntoResponse {
@@ -114,10 +114,7 @@ async fn test_api_post_update_tags() {
         .await
         .unwrap();
 
-    let post1 = server
-        .post_get_by_id(post1.id, session_key1)
-        .await
-        .unwrap();
+    let post1 = server.post_get_by_id(post1.id, session_key1).await.unwrap();
     assert_eq!(post1.tags, " tags2 ");
 
     let result = server

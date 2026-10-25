@@ -1,5 +1,5 @@
 use axum::{Extension, Form, Json, extract::State, http::StatusCode, response::IntoResponse};
-use catsquad_db::{DbUser, DbUserUpdateUsernameErr};
+use catsquad_db::{DbUser, DbUserGet, DbUserUpdateUsernameErr};
 use catsquad_log::prelude::*;
 use catsquad_shared::{
     UserUpdateUsernameErr, UserUpdateUsernameReq, UserUpdateUsernameRes, validate_username,
@@ -37,7 +37,7 @@ fn send_email_user_update_username(
 }
 
 pub async fn user_update_username(
-    db_user: Extension<DbUser>,
+    db_user: Extension<DbUserGet>,
     State(app): State<AppState>,
     Form(req): Form<UserUpdateUsernameReq>,
 ) -> impl IntoResponse {

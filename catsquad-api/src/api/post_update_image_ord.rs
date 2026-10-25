@@ -1,6 +1,6 @@
 use crate::state::AppState;
 use axum::{Extension, Form, Json, extract::State, http::StatusCode, response::IntoResponse};
-use catsquad_db::{DbPostUpdateOrderErr, DbUser};
+use catsquad_db::{DbPostUpdateOrderErr, DbUser, DbUserGet};
 use catsquad_shared::{PostUpdateImageOrdErr, PostUpdateImageOrdReq};
 
 fn from_db_post_update_image_ord_err(value: DbPostUpdateOrderErr) -> PostUpdateImageOrdErr {
@@ -26,7 +26,7 @@ fn status_code(result: &Result<(), PostUpdateImageOrdErr>) -> StatusCode {
 }
 
 pub async fn post_update_image_ord(
-    db_user: Extension<DbUser>,
+    db_user: Extension<DbUserGet>,
     State(app): State<AppState>,
     Form(req): Form<PostUpdateImageOrdReq>,
 ) -> impl IntoResponse {

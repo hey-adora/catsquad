@@ -1,5 +1,5 @@
 use axum::{Extension, Form, Json, extract::State, http::StatusCode, response::IntoResponse};
-use catsquad_db::{DbEmailChangeUpdateNewConfirmErr, DbUser};
+use catsquad_db::{DbEmailChangeUpdateNewConfirmErr, DbUser, DbUserGet};
 use catsquad_shared::{
     EmailChangeRes, EmailChangeUpdateNewConfirmErr, EmailChangeUpdateNewConfirmReq,
 };
@@ -42,7 +42,7 @@ fn status_code(result: &Result<(), EmailChangeUpdateNewConfirmErr>) -> StatusCod
 }
 
 pub async fn email_change_update_new_confirm(
-    db_user: Extension<DbUser>,
+    db_user: Extension<DbUserGet>,
     State(app): State<AppState>,
     Form(req): Form<EmailChangeUpdateNewConfirmReq>,
 ) -> impl IntoResponse {

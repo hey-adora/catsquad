@@ -1,5 +1,5 @@
 use axum::{Extension, Form, Json, extract::State, http::StatusCode, response::IntoResponse};
-use catsquad_db::{DbEmailChangeUpdateFinishErr, DbUser};
+use catsquad_db::{DbEmailChangeUpdateFinishErr, DbUser, DbUserGet};
 use catsquad_shared::{EmailChangeRes, EmailChangeUpdateFinishErr, EmailChangeUpdateFinishReq};
 
 use crate::{api::email_change_add::from_db_email_change, state::AppState};
@@ -36,7 +36,7 @@ fn status_code(result: &Result<(), EmailChangeUpdateFinishErr>) -> StatusCode {
 }
 
 pub async fn email_change_update_finish(
-    db_user: Extension<DbUser>,
+    db_user: Extension<DbUserGet>,
     State(app): State<AppState>,
     Form(req): Form<EmailChangeUpdateFinishReq>,
 ) -> impl IntoResponse {

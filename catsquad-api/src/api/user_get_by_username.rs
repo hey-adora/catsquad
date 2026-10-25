@@ -38,7 +38,7 @@ fn status_code(result: &Result<UserGetRes, UserGetByUsernameErr>) -> StatusCode 
 }
 
 pub async fn user_get_by_username(
-    db_user: Extension<Option<DbUser>>,
+    db_user: Extension<Option<DbUserGet>>,
     State(app): State<AppState>,
     Path(params): Path<UserGetByUsernameParams>,
 ) -> impl IntoResponse {

@@ -1,5 +1,5 @@
 use axum::{Extension, Form, Json, extract::State, http::StatusCode, response::IntoResponse};
-use catsquad_db::{DbUser, DbUserUpdateAboutmeErr};
+use catsquad_db::{DbUser, DbUserGet, DbUserUpdateAboutmeErr};
 use catsquad_shared::{
     MAX_ABOUTME_LENGTH, UserUpdateAboutmeErr, UserUpdateAboutmeReq, validate_user_aboutme,
 };
@@ -25,7 +25,7 @@ fn status_code(result: &Result<(), UserUpdateAboutmeErr>) -> StatusCode {
 // TODO add length checks to aboutme and support fields
 
 pub async fn user_update_aboutme(
-    db_user: Extension<DbUser>,
+    db_user: Extension<DbUserGet>,
     State(app): State<AppState>,
     Form(req): Form<UserUpdateAboutmeReq>,
 ) -> impl IntoResponse {

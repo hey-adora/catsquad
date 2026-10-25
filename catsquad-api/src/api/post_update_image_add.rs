@@ -11,7 +11,7 @@ use axum::{
     response::IntoResponse,
 };
 use bytes::Bytes;
-use catsquad_db::{DbPostUpdateImageAddErr, DbUser};
+use catsquad_db::{DbPostUpdateImageAddErr, DbUser, DbUserGet};
 use catsquad_log::prelude::*;
 use catsquad_shared::{
     FileImage, FileImageAddErr, POST_UPDATE_IMAGE_ADD_PARAMS_FIELD_POST_ID, PostState,
@@ -381,7 +381,7 @@ pub fn resolution_from_str(res: impl AsRef<str>) -> anyhow::Result<(u32, u32)> {
 }
 
 pub async fn post_update_image_add(
-    db_user: Extension<DbUser>,
+    db_user: Extension<DbUserGet>,
     State(app): State<AppState>,
     params: axum::extract::RawPathParams,
     multipart: Multipart,

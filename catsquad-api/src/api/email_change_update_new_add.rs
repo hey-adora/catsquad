@@ -1,5 +1,5 @@
 use axum::{Extension, Form, Json, extract::State, http::StatusCode, response::IntoResponse};
-use catsquad_db::{DbEmailChangeUpdateNewAddErr, DbEmailSentReason, DbUser};
+use catsquad_db::{DbEmailChangeUpdateNewAddErr, DbEmailSentReason, DbUser, DbUserGet};
 use catsquad_log::prelude::*;
 use catsquad_shared::{
     EmailChangeRes, EmailChangeUpdateNewAddErr, EmailChangeUpdateNewAddReq, Uuid,
@@ -58,7 +58,7 @@ pub fn send_email_email_change_update_new_add(
 }
 
 pub async fn email_change_update_new_add(
-    db_user: Extension<DbUser>,
+    db_user: Extension<DbUserGet>,
     State(app): State<AppState>,
     Form(req): Form<EmailChangeUpdateNewAddReq>,
 ) -> impl IntoResponse {

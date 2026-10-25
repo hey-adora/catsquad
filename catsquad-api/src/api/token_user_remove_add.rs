@@ -1,6 +1,6 @@
 use crate::state::AppState;
 use axum::{Extension, Form, Json, extract::State, http::StatusCode, response::IntoResponse};
-use catsquad_db::{DbToken, DbTokenAddErr, DbTokenLabel, DbUser};
+use catsquad_db::{DbToken, DbTokenAddErr, DbTokenLabel, DbUser, DbUserGet};
 use catsquad_log::prelude::*;
 use catsquad_shared::{
     TokenUserRemoveAddErr, TokenUserRemoveRes, Uuid,
@@ -40,7 +40,7 @@ fn send_email_user_remove(address: Url, token: Uuid) -> String {
 }
 
 pub async fn token_user_remove_add(
-    db_user: Extension<DbUser>,
+    db_user: Extension<DbUserGet>,
     State(app): State<AppState>,
 ) -> impl IntoResponse {
     let time = app.get_time_micro();

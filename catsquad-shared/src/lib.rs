@@ -24,6 +24,7 @@ pub const FILE_IMAGE_THUMBNAIL_SIZE: u32 = 1280;
 pub const MAX_PFP_SIZE_BYTES: u32 = 1024 * 1000 * 2; // 2MB probably
 pub type Hash = i64;
 
+use anyhow::anyhow;
 pub use api::Order;
 pub use api::TimeRange;
 pub use api::ToForm;
@@ -62,6 +63,7 @@ pub use api::post_update_state::*;
 pub use api::post_update_tags::*;
 pub use api::post_update_title::*;
 pub use api::role_add::*;
+pub use api::role_remove::*;
 pub use api::session_add::*;
 pub use api::session_remove::*;
 pub use api::test_backdoor_email_sent_get_all::*;
@@ -105,6 +107,41 @@ pub use uuid::*;
 //     let time = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
 //     time.as_micros()
 // }
+
+fn serde_from_role_value<S: serde::Serializer>(
+    v: &Vec<RoleValue>,
+    serializer: S,
+) -> Result<S::Ok, S::Error> {
+    use serde::Serialize;
+
+    let mut output = String::new();
+    let mut iter = v.into_iter();
+
+    if let Some(v) = iter.next() {
+        output.push_str(v.as_str());
+    }
+
+    for v in iter {
+        output.push(',');
+        output.push_str(v.as_str());
+    }
+
+    output.serialize(serializer)
+}
+
+fn serde_to_role_value<'de, D: serde::Deserializer<'de>>(
+    deserializer: D,
+) -> Result<Vec<RoleValue>, D::Error> {
+    use serde::Deserialize;
+
+    String::deserialize(deserializer).and_then(|v| {
+        v.split(',')
+            .into_iter()
+            .map(|v| RoleValue::try_from(v))
+            .collect::<anyhow::Result<Vec<RoleValue>>>()
+            .map_err(serde::de::Error::custom)
+    })
+}
 
 fn serde_from_uuid<S: serde::Serializer>(v: &Uuid, serializer: S) -> Result<S::Ok, S::Error> {
     use serde::Serialize;

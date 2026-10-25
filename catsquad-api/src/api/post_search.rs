@@ -4,7 +4,7 @@ use axum::{
     http::{StatusCode, header},
     response::IntoResponse,
 };
-use catsquad_db::{DbPostSearch, DbPostSearchErr, DbUser};
+use catsquad_db::{DbPostSearch, DbPostSearchErr, DbUser, DbUserGet};
 use catsquad_shared::{
     Order, PostSearchErr, PostSearchParams, PostSearchRes, PostState, TimeRange,
 };
@@ -62,7 +62,7 @@ pub fn status_code(result: &Result<Vec<PostSearchRes>, PostSearchErr>) -> Status
 }
 
 pub async fn post_search(
-    db_user: Extension<Option<DbUser>>,
+    db_user: Extension<Option<DbUserGet>>,
     State(app): State<AppState>,
     Query(req): Query<PostSearchParams>,
 ) -> impl IntoResponse {

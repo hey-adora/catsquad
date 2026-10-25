@@ -8,7 +8,9 @@ use axum::{
     },
     response::IntoResponse,
 };
-use catsquad_db::{DbSession, DbSessionGetByKeyErr, DbUser, Uuid};
+use catsquad_db::{
+    DbSession, DbSessionGetByKeyErr, DbUser, DbUserGet, DbUserGetBySessionErr, Uuid,
+};
 use catsquad_log::prelude::*;
 use catsquad_shared::{str_to_uuid, uuid_to_str};
 
@@ -110,12 +112,12 @@ pub async fn auth_optional_middleware(
         Ok((token, user)) => {
             let extensions = req.extensions_mut();
             extensions.insert(Some::<SessionKey>(SessionKey(token)));
-            extensions.insert(Some::<DbUser>(user));
+            extensions.insert(Some::<DbUserGet>(user));
         }
         Err(_err) => {
             let extensions = req.extensions_mut();
             extensions.insert(None::<SessionKey>);
-            extensions.insert(None::<DbUser>);
+            extensions.insert(None::<DbUserGet>);
         }
     }
     next.run(req).await
@@ -149,7 +151,7 @@ pub async fn auth_middleware(
     }
 }
 
-pub async fn check_auth(app: &AppState, headers: &HeaderMap) -> Result<(Uuid, DbUser), AuthErr> {
+pub async fn check_auth(app: &AppState, headers: &HeaderMap) -> Result<(Uuid, DbUserGet), AuthErr> {
     trace!("CHECKING AUTH");
 
     let token = auth_token_get(headers, header::COOKIE)
@@ -157,20 +159,14 @@ pub async fn check_auth(app: &AppState, headers: &HeaderMap) -> Result<(Uuid, Db
     let token = str_to_uuid(&token);
 
     trace!("CHECKING AUTH SESSION");
-    // TODO make this single db request, join user in session
-    let session: DbSession = app
-        .db
-        .session_get_by_token(token)
-        .await
-        .map_err(|err| match err {
-            DbSessionGetByKeyErr::NotFound => AuthErr::Unauthorized(ERR_MSG_SESSION.to_string()),
-            _ => AuthErr::InternalServer,
-        })?;
     let user = app
         .db
-        .user_get_by_email(session.user_email)
+        .user_get_by_session("", token)
         .await
-        .map_err(|err| AuthErr::InternalServer)?;
+        .map_err(|err| match err {
+            DbUserGetBySessionErr::NotFound => AuthErr::Unauthorized(ERR_MSG_SESSION.to_string()),
+            _ => AuthErr::InternalServer,
+        })?;
 
     Ok((token, user))
 }

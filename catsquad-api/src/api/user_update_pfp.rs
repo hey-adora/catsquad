@@ -6,7 +6,7 @@ use axum::{
     http::StatusCode,
     response::IntoResponse,
 };
-use catsquad_db::{DbUser, DbUserUpdatePfpErr};
+use catsquad_db::{DbUser, DbUserGet, DbUserUpdatePfpErr};
 use catsquad_log::prelude::*;
 use catsquad_shared::{
     FileImage, FileImageAddErr, MAX_PFP_SIZE_BYTES, UserUpdatePfpErr, i64_to_str,
@@ -90,7 +90,7 @@ pub async fn remove_images(storage_path: impl AsRef<Path>, file_hash: i64, file_
 }
 
 pub async fn user_update_pfp(
-    db_user: Extension<DbUser>,
+    db_user: Extension<DbUserGet>,
     State(app): State<AppState>,
     multipart: Multipart,
     // Form(req): Form<UserUpdateUsernameReq>,

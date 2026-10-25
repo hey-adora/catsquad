@@ -5,7 +5,7 @@ use axum::{
     http::StatusCode,
     response::IntoResponse,
 };
-use catsquad_db::{DbPostRemoveErr, DbUser};
+use catsquad_db::{DbPostRemoveErr, DbUser, DbUserGet};
 use catsquad_shared::{PostRemoveErr, PostRemoveParams};
 
 fn from_db_post_remove_err(value: DbPostRemoveErr) -> PostRemoveErr {
@@ -27,7 +27,7 @@ fn status_code(result: &Result<(), PostRemoveErr>) -> StatusCode {
 }
 
 pub async fn post_remove(
-    db_user: Extension<DbUser>,
+    db_user: Extension<DbUserGet>,
     State(app): State<AppState>,
     Path(req): Path<PostRemoveParams>,
 ) -> impl IntoResponse {
