@@ -53,6 +53,7 @@ pub mod post_update_title;
 pub mod role_add;
 pub mod role_get_all;
 pub mod role_remove;
+pub mod role_update_value;
 pub mod session_add;
 pub mod session_get_all;
 pub mod session_get_by_id;

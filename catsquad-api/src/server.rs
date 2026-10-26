@@ -1,26 +1,19 @@
-use std::time::Duration;
-
-use axum::{
-    Router,
-    extract::{DefaultBodyLimit, Path, State},
-    http::{HeaderMap, StatusCode},
-    middleware,
-    response::IntoResponse,
-    routing::{delete, get, post},
-};
-use catsquad_db::DbUser;
-use catsquad_log::prelude::*;
-use catsquad_shared::{
-    DEFAULT_GLOBAL_MAX_UPLOAD_SIZE, FILE_IMAGE_THUMBNAIL_SIZE, MAX_STORAGE_PER_FILE,
-};
-use tokio::fs;
-
 use crate::{
     api::{self, assets::index_404},
     auth::{auth_middleware, auth_optional_middleware},
     proccess_images::proccess_images_all,
     state::AppState,
 };
+use axum::{
+    Router,
+    extract::DefaultBodyLimit,
+    middleware,
+    routing::{delete, get, post},
+};
+use catsquad_log::prelude::*;
+use catsquad_shared::{DEFAULT_GLOBAL_MAX_UPLOAD_SIZE, FILE_IMAGE_THUMBNAIL_SIZE};
+use std::time::Duration;
+
 pub async fn server() {
     let state = AppState::local().await;
     let addr = state.get_bind().await;
@@ -71,8 +64,6 @@ pub async fn server() {
         .with_graceful_shutdown(shutdown)
         .await
         .unwrap();
-
-    // axum::serve(listener, app).await.unwrap();
 }
 
 pub async fn app(state: AppState) -> Router {
@@ -174,7 +165,10 @@ pub async fn app(state: AppState) -> Router {
         ));
 
     let router_auth = Router::new()
-        .route(catsquad_shared::LINK_API_ROLE_ADD, post(api::role_add))
+        .route(
+            catsquad_shared::LINK_API_ROLE,
+            post(api::role_add).delete(api::role_remove),
+        )
         .route(catsquad_shared::LINK_API_FOLLOW_ADD, post(api::follow_add))
         .route(
             catsquad_shared::LINK_API_FOLLOW_REMOVE,

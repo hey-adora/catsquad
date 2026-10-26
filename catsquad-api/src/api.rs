@@ -85,6 +85,7 @@ pub use post_update_state::post_update_state;
 pub use post_update_tags::post_update_tags;
 pub use post_update_title::post_update_title;
 pub use role_add::role_add;
+pub use role_remove::role_remove;
 pub use session_add::session_add;
 pub use session_remove::session_remove;
 pub use token_password_change_add::token_password_change_add;

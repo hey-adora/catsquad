@@ -432,7 +432,7 @@ where
         Builder::new(sender, params)
     }
 
-    pub fn delete<TResult, TError>(
+    pub fn delete_empty<TResult, TError>(
         &self,
         link: impl Into<String>,
     ) -> Builder<TSender, TResult, TError>
@@ -676,7 +676,7 @@ where
         &self,
         post_id: i64,
     ) -> Builder<TSender, (), catsquad_shared::PostRemoveErr> {
-        self.delete(link_relative_post_remove(post_id))
+        self.delete_empty(link_relative_post_remove(post_id))
     }
 
     pub fn role_add(
@@ -684,14 +684,14 @@ where
         role_name: impl Display,
         role_values: Vec<cs::RoleValue>,
     ) -> Builder<TSender, cs::RoleRes, cs::RoleAddErr> {
-        // let role_values = role_values
-        //     .into_iter()
-        //     .map(|v| v.into())
-        //     .collect::<Vec<String>>();
         self.post_form(
             cs::link_relative_role_add(role_name),
             cs::RoleAddReq { role_values },
         )
+    }
+
+    pub fn role_remove(&self, role_id: i64) -> Builder<TSender, (), cs::RoleRemoveErr> {
+        self.delete_empty(cs::link_relative_role_remove(role_id))
     }
 
     pub fn follow_add(
@@ -705,7 +705,7 @@ where
         &self,
         user_username: impl Display,
     ) -> Builder<TSender, (), cs::FollowRemoveErr> {
-        self.delete(cs::link_relative_follow_remove(user_username))
+        self.delete_empty(cs::link_relative_follow_remove(user_username))
     }
 
     pub fn post_like_add(

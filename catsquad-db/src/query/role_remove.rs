@@ -1,39 +1,38 @@
 use crate::Db;
 use catsquad_log::prelude::*;
-use std::fmt::Display;
 
 #[derive(Debug, thiserror::Error)]
 pub enum DbRoleRemoveErr {
-    // #[error("not found")]
-    // NotFound,
+    #[error("not found")]
+    NotFound,
+
     #[error("db error {0}")]
     Db(#[from] sqlx::Error),
 }
 
 impl Db {
-    pub async fn role_remove(&self, role_name: impl Into<String>) -> Result<(), DbRoleRemoveErr> {
-        let role_name = role_name.into();
+    pub async fn role_remove(&self, role_id: i64) -> Result<(), DbRoleRemoveErr> {
         let pool = &self.db;
 
-        let query = "DELETE FROM sessions WHERE session_token = $1";
+        let query = "DELETE FROM roles WHERE role_id = $1";
 
-        debug!("about to run {query}");
+        let result = sqlx::query(query).bind(role_id).execute(pool).await;
 
-        let result = sqlx::query(query)
-            .bind(XUuid(session_token))
-            .execute(pool)
-            .await;
+        debug!("query {query}\nresult {result:#?}");
 
         let result = match result {
             Ok(v) => v,
-            // Err(sqlx::Error::RowNotFound) => {
-            //     // DOESNT GET TRIGGERED ON EXECUTE
-            // }
             Err(err) => {
                 error!("unexpected db error {err}");
-                return Err(DbSessionRemoveErr::Db(err));
+                return Err(DbRoleRemoveErr::Db(err));
             }
         };
+
+        match result.rows_affected() {
+            0 => return Err(DbRoleRemoveErr::NotFound),
+            1 => (),
+            _ => unreachable!("invalid quary, must only update 1 role max"),
+        }
 
         debug!("query {query}\nresults {result:?}");
 
@@ -43,27 +42,16 @@ impl Db {
 
 #[cfg(test)]
 #[tokio::test]
-async fn test_session_remove() {
+async fn test_role_remove() {
     init_log();
 
-    let db = Db::test_db(0, "test_session_remove").await;
+    let db = Db::test_db(0, "test_role_remove").await;
 
-    let invite = db.invite_add(0, "hey@hey.com", 1).await.unwrap();
-    let _result = db
-        .user_add(0, "hey", "hey", invite.token, 10, 10)
-        .await
-        .unwrap();
-    let session = db.session_add(0, "hey@hey.com").await.unwrap();
+    let _role_admin = db.role_add(0, "admin", vec!["ban"]).await.unwrap();
+    let role_mod = db.role_add(1, "mod", vec!["kick"]).await.unwrap();
 
-    db.session_remove(0_u128.to_be_bytes()).await.unwrap();
-    // let result = db.session_remove(0_u128.to_be_bytes()).await;
-    // assert!(matches!(result, Err(DbSessionRemoveErr::NotFound)));
+    db.role_remove(role_mod.id).await.unwrap();
 
-    let result = db.session_get_by_token(session.token).await;
-    assert!(result.is_ok());
-
-    db.session_remove(session.token.clone()).await.unwrap();
-
-    let result = db.session_get_by_token(session.token).await;
-    assert!(result.is_err());
+    let roles = db.role_get_all().await.unwrap();
+    assert_eq!(roles[0].name, "admin");
 }

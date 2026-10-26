@@ -19,6 +19,9 @@ pub struct DbRole {
 
 #[derive(Debug, thiserror::Error)]
 pub enum DbRoleAddErr {
+    #[error("duplicate role values")]
+    DuplicateValue,
+
     #[error("db error {0}")]
     Db(#[from] sqlx::Error),
 }
@@ -54,7 +57,21 @@ impl Db {
         let pool = &self.db;
         // let user_username = user_username.into();
         let name = name.into();
-        let values = values.into_iter().map(|v| v.into()).collect();
+        let mut values = values
+            .into_iter()
+            .map(|v| v.into())
+            .collect::<Vec<String>>();
+
+        // check if duplicate values
+        {
+            let len_before = values.len();
+            values.sort();
+            values.dedup();
+            let len_after = values.len();
+            if len_before != len_after {
+                return Err(DbRoleAddErr::DuplicateValue);
+            }
+        }
 
         let query = "
             INSERT INTO roles (
@@ -137,5 +154,11 @@ async fn test_role_add() {
         assert_eq!(roles.len(), 2);
         assert_eq!(roles[0].name, "two");
         assert_eq!(roles[1].name, "one");
+    }
+
+    // asser error
+    {
+        let role_two = db.role_add(1, "two", vec!["bar", "bar"]).await;
+        assert!(matches!(role_two, Err(DbRoleAddErr::DuplicateValue)));
     }
 }

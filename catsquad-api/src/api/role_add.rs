@@ -20,6 +20,7 @@ pub fn from_db_role(value: DbRole) -> RoleRes {
 
 pub fn from_db_role_add_err(value: DbRoleAddErr) -> RoleAddErr {
     match value {
+        DbRoleAddErr::DuplicateValue => RoleAddErr::DuplicateValue,
         DbRoleAddErr::Db(_) => RoleAddErr::InternalServer,
     }
 }
@@ -27,6 +28,7 @@ pub fn from_db_role_add_err(value: DbRoleAddErr) -> RoleAddErr {
 fn status_code(result: &Result<RoleRes, RoleAddErr>) -> StatusCode {
     match result {
         Ok(_) => StatusCode::OK,
+        Err(RoleAddErr::DuplicateValue) => StatusCode::BAD_REQUEST,
         Err(RoleAddErr::BadRequest(_)) => StatusCode::BAD_REQUEST,
         Err(RoleAddErr::Unauthorized(_)) => StatusCode::UNAUTHORIZED,
         Err(RoleAddErr::InternalServer) => StatusCode::INTERNAL_SERVER_ERROR,
@@ -104,7 +106,7 @@ async fn test_api_role_add() {
     use catsquad_shared::RoleValue;
 
     init_log();
-    let server = crate::TestServer::new(0, "test_api_post_like_add").await;
+    let server = crate::TestServer::new(0, "test_api_role_add").await;
 
     let email = "hey@heyadora.com";
     let password = "1nnerogGeron@@$";

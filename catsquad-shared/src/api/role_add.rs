@@ -2,7 +2,9 @@ use std::fmt::Display;
 
 use anyhow::anyhow;
 
-pub const LINK_API_ROLE_ADD: &str = "/api/role/{role_name}";
+/// also used in /shared/src/api/role_remove.rs
+pub const LINK_API_ROLE: &str = "/api/role/{role_name}";
+
 pub const ROLE_VALUE_PERMISSION_ROLE_ADD: &'static str = "permission_role_add";
 pub const ROLE_VALUE_PERMISSION_ROLE_REMOVE: &'static str = "permission_role_remove";
 
@@ -22,8 +24,8 @@ pub enum RoleValue {
     PermissionRoleRemove,
 }
 
-pub fn role_extract_permission_role_add(roles: &[String]) -> bool {
-    roles
+pub fn role_extract_permission_role_add(roles_values: &[String]) -> bool {
+    roles_values
         .iter()
         .any(|v| v == RoleValue::PermissionRoleAdd.as_str())
 }
@@ -94,6 +96,9 @@ pub struct RoleAddReq {
     Default, Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq, thiserror::Error,
 )]
 pub enum RoleAddErr {
+    #[error("duplicate role values")]
+    DuplicateValue,
+
     #[error("bad request {0}")]
     BadRequest(String),
 

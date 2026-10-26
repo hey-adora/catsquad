@@ -56,6 +56,7 @@ pub use query::migration_get_latest::*;
 pub use query::post_add::*;
 pub use query::post_get_all::*;
 pub use query::post_get_by_id::*;
+pub use query::role_remove::*;
 pub use query::token_add::*;
 pub use query::token_get_all::*;
 pub use query::user_update_password_by_token::*;

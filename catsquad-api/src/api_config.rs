@@ -1,7 +1,6 @@
 use std::{
     io,
     path::{Path, PathBuf},
-    str::FromStr,
 };
 use tokio::fs;
 use url::Url;
@@ -11,6 +10,7 @@ pub struct ApiConfig {
     pub address: Url,
     pub bind: String,
     pub secret: String,
+    pub admin_username: String,
     pub invite_expiration_micros: u64,
     pub password_change_expiration_micros: u64,
     pub user_remove_expiration_micros: u64,
@@ -24,6 +24,7 @@ pub struct ApiConfig {
 pub const FIELD_ADDRESS: &'static str = "address";
 pub const FIELD_BIND: &'static str = "bind";
 pub const FIELD_SECRET: &'static str = "secret";
+pub const FIELD_ADMIN_USERNAME: &'static str = "admin_username";
 pub const FIELD_INVITE_EXPIRATION: &'static str = "invite_expiration_micros";
 pub const FIELD_PASSWORD_CHANGE_EXPIRATION: &'static str = "password_change_expiration_micros";
 pub const FIELD_USER_REMOVE_EXPIRATION: &'static str = "user_remove_expiration_micros";
@@ -177,6 +178,7 @@ impl Default for ApiConfig {
             address: Url::parse("http://localhost:3000").unwrap(),
             bind: "localhost:3000".to_string(),
             secret: "test".to_string(),
+            admin_username: "".to_string(),
             invite_expiration_micros: 1800000000,
             password_change_expiration_micros: 1800000000,
             user_remove_expiration_micros: 1800000000,
@@ -205,6 +207,7 @@ impl<T: AsRef<str>> From<T> for ApiConfig {
                 FIELD_ADDRESS => conf.address = Url::parse(value).unwrap(),
                 FIELD_BIND => conf.bind = value.to_string(),
                 FIELD_SECRET => conf.secret = value.to_string(),
+                FIELD_ADMIN_USERNAME => conf.admin_username = value.to_string(),
                 FIELD_INVITE_EXPIRATION => {
                     conf.invite_expiration_micros = if let Ok(v) = u64::from_str_radix(value, 10) {
                         v
@@ -263,6 +266,8 @@ impl From<&ApiConfig> for String {
         push(&mut output, FIELD_BIND, &value.bind);
         output.push('\n');
         push(&mut output, FIELD_SECRET, &value.secret);
+        output.push('\n');
+        push(&mut output, FIELD_ADMIN_USERNAME, &value.admin_username);
         output.push('\n');
         push(
             &mut output,
@@ -334,10 +339,11 @@ fn test_api_config_from_str() {
     init_log();
 
     let input = format!(
-        "{}=http://localhost/\n{}=111\n{}=hello2\n{}=1\n{}=2\n{}=3\n{}=4\n{}=hello3\n{}=tmp\n{}=tmp2\n{}=tmp3",
+        "{}=http://localhost/\n{}=111\n{}=hello2\n{}=hey\n{}=1\n{}=2\n{}=3\n{}=4\n{}=hello3\n{}=tmp\n{}=tmp2\n{}=tmp3",
         FIELD_ADDRESS,
         FIELD_BIND,
         FIELD_SECRET,
+        FIELD_ADMIN_USERNAME,
         FIELD_INVITE_EXPIRATION,
         FIELD_PASSWORD_CHANGE_EXPIRATION,
         FIELD_USER_REMOVE_EXPIRATION,
@@ -351,6 +357,18 @@ fn test_api_config_from_str() {
     trace!("input {input}");
 
     let settings = ApiConfig::from(&input);
+    assert_eq!(settings.address, Url::parse("http://localhost/").unwrap());
+    assert_eq!(settings.bind, "111");
+    assert_eq!(settings.secret, "hello2");
+    assert_eq!(settings.admin_username, "hey");
+    assert_eq!(settings.invite_expiration_micros, 1);
+    assert_eq!(settings.password_change_expiration_micros, 2);
+    assert_eq!(settings.user_remove_expiration_micros, 3);
+    assert_eq!(settings.email_change_expiration_micros, 4);
+    assert_eq!(settings.database_path, PathBuf::from("hello3"));
+    assert_eq!(settings.storage_path, PathBuf::from("tmp"));
+    assert_eq!(settings.assets_path, PathBuf::from("tmp2"));
+    assert_eq!(settings.tmp_path, PathBuf::from("tmp3"));
 
     trace!("parsed {settings:#?}");
 
