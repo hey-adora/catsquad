@@ -22,7 +22,7 @@ pub struct DbUserGet {
     #[sqlx(rename = "user_aboutme")]
     pub aboutme: String,
     #[sqlx(rename = "user_roles")]
-    pub roles: Vec<i64>,
+    pub roles: Vec<i64>, // TODO maybe rename to roles_ids
     #[sqlx(rename = "user_roles_values")]
     pub roles_values: Vec<String>,
     #[sqlx(rename = "user_pfp_image_hash")]

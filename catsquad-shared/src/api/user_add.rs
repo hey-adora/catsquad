@@ -23,6 +23,7 @@ pub struct SensitiveUserRes {
     pub username: String,
     pub pfp_hash: i64,
     pub pfp_proccesed: bool,
+    pub roles_ids: Vec<i64>,
     pub max_storage_bytes: u32, // TODO add max per image and add that to UI
     pub email: String,
     pub created_at: u64,

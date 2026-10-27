@@ -19,6 +19,7 @@ use crate::{
 pub struct AppState {
     pub db: Db,
     pub assets: Arc<Assets>,
+    pub keep_check_if_admin_promoted: Arc<SyncRwLock<bool>>,
     conf: Arc<AsyncRwLock<ApiConfig>>,
     time: Option<Arc<SyncRwLock<u64>>>,
 }
@@ -45,6 +46,7 @@ impl AppState {
         Self {
             db: Db::test_db(time, test_db).await,
             conf: Arc::new(AsyncRwLock::new(conf)),
+            keep_check_if_admin_promoted: Arc::new(SyncRwLock::new(true)),
             time: Some(Arc::new(SyncRwLock::new(0))),
             assets: Arc::new(assets),
         }
@@ -61,6 +63,7 @@ impl AppState {
         Self {
             db: Db::create(0, "catsquad1").await,
             conf: Arc::new(AsyncRwLock::new(conf)),
+            keep_check_if_admin_promoted: Arc::new(SyncRwLock::new(true)),
             time: None, // dont set time here, it will never update, used only in tests
             assets: Arc::new(assets),
         }
@@ -86,6 +89,24 @@ impl AppState {
         }
 
         get_time_micro() as u64
+    }
+
+    // TODO remove all this un-needed async nonsense
+
+    pub fn set_keep_checking_if_admin_promoted(&self, state: bool) {
+        *self.keep_check_if_admin_promoted.write().unwrap() = state;
+    }
+
+    pub fn get_keep_checking_if_admin_promoted(&self) -> bool {
+        *self.keep_check_if_admin_promoted.write().unwrap()
+    }
+
+    pub async fn set_admin_username(&self, username: impl Into<String>) {
+        self.conf.write().await.admin_username = username.into();
+    }
+
+    pub async fn get_admin_username(&self) -> String {
+        self.conf.read().await.admin_username.clone()
     }
 
     pub async fn get_secret(&self) -> String {

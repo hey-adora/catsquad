@@ -1,3 +1,8 @@
+use crate::{
+    auth::{create_auth_cookie, hash_password},
+    server::promote_admin::promote_admin,
+    state::AppState,
+};
 use axum::{
     Form, Json,
     extract::State,
@@ -9,11 +14,6 @@ use catsquad_log::prelude::*;
 use catsquad_shared::{
     MAX_STORAGE, MAX_STORAGE_PER_FILE, SensitiveUserRes, UserAddErr, UserAddReq, validate_password,
     validate_username,
-};
-
-use crate::{
-    auth::{create_auth_cookie, hash_password},
-    state::AppState,
 };
 
 // pub fn from_db_user_redacted(value: DbUser) -> RedactedUserRes {
@@ -31,6 +31,7 @@ use crate::{
 pub fn from_db_user_sensitive(value: DbUser) -> SensitiveUserRes {
     SensitiveUserRes {
         // key: id_to_string(value.id),
+        roles_ids: value.roles,
         username: value.username,
         pfp_hash: value.pfp_image_hash,
         pfp_proccesed: value.pfp_image_proccesed,
@@ -43,6 +44,7 @@ pub fn from_db_user_sensitive(value: DbUser) -> SensitiveUserRes {
 pub fn from_db_user_get_sensitive(value: DbUserGet) -> SensitiveUserRes {
     SensitiveUserRes {
         // key: id_to_string(value.id),
+        roles_ids: value.roles,
         username: value.username,
         pfp_hash: value.pfp_image_hash,
         pfp_proccesed: value.pfp_image_proccesed,
@@ -89,6 +91,7 @@ fn status_code(result: &Result<SensitiveUserRes, UserAddErr>) -> StatusCode {
     }
 }
 
+#[axum::debug_handler]
 pub async fn user_add(
     State(app): State<AppState>,
     Form(req): Form<UserAddReq>,
@@ -112,7 +115,7 @@ pub async fn user_add(
             .inspect_err(|err| error!("{err}"))
             .map_err(from_argon_err)?;
 
-        let user = app
+        let mut user = app
             .db
             .user_add(
                 time,
@@ -124,6 +127,19 @@ pub async fn user_add(
             )
             .await
             .map_err(from_db_user_add_err)?;
+
+        // promote admin
+        {
+            if app.get_keep_checking_if_admin_promoted() {
+                let admin_username = app.get_admin_username().await;
+                if !admin_username.is_empty() && user.username == admin_username {
+                    let Ok(admin_role_id) = promote_admin(app.clone()).await else {
+                        return Err(UserAddErr::InternalServer);
+                    };
+                    user.roles.push(admin_role_id);
+                }
+            }
+        }
 
         let user = from_db_user_sensitive(user);
         Ok(user)

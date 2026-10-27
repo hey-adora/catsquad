@@ -1,8 +1,7 @@
-use axum::{Extension, Json, extract::State, http::StatusCode, response::IntoResponse};
+use crate::state::AppState;
+use axum::{Json, extract::State, http::StatusCode, response::IntoResponse};
 use catsquad_db::DbEmailSent;
 use catsquad_shared::{EmailSentRes, TestBackdoorEmailSentGetAllErr};
-
-use crate::{api::user_add::from_db_user_sensitive, state::AppState};
 
 fn from_db_email_sent(value: DbEmailSent) -> EmailSentRes {
     EmailSentRes {

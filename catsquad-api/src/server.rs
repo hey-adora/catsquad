@@ -2,6 +2,7 @@ use crate::{
     api::{self, assets::index_404},
     auth::{auth_middleware, auth_optional_middleware},
     proccess_images::proccess_images_all,
+    server::promote_admin::promote_admin,
     state::AppState,
 };
 use axum::{
@@ -14,6 +15,8 @@ use catsquad_log::prelude::*;
 use catsquad_shared::{DEFAULT_GLOBAL_MAX_UPLOAD_SIZE, FILE_IMAGE_THUMBNAIL_SIZE};
 use std::time::Duration;
 
+pub mod promote_admin;
+
 pub async fn server() {
     let state = AppState::local().await;
     let addr = state.get_bind().await;
@@ -22,6 +25,8 @@ pub async fn server() {
     let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
 
     let app = app(state.clone()).await;
+
+    let _ = promote_admin(state.clone()).await;
 
     let proccess_files = tokio::spawn({
         let app_state = state.clone();

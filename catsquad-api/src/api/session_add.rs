@@ -1,18 +1,17 @@
+use crate::{
+    api::user_add::from_db_user_get_sensitive,
+    auth::{create_auth_cookie, verify_password},
+    state::AppState,
+};
 use axum::{
     Form, Json,
     extract::State,
     http::{HeaderMap, StatusCode},
     response::IntoResponse,
 };
-use catsquad_db::{DbSession, DbSessionAddErr, DbUser, DbUserGet, DbUserGetByEmailErr};
+use catsquad_db::{DbSession, DbSessionAddErr, DbUserGet, DbUserGetByEmailErr};
 use catsquad_log::prelude::*;
 use catsquad_shared::{SensitiveUserRes, SessionAddErr, SessionAddReq};
-
-use crate::{
-    api::user_add::{from_db_user_get_sensitive, from_db_user_sensitive},
-    auth::{create_auth_cookie, verify_password},
-    state::AppState,
-};
 
 // fn from_db_session(value: DbUser) -> SensitiveUserRes {
 //     SensitiveUserRes {

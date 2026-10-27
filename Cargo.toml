@@ -6,7 +6,7 @@ default-members = ["catsquad-api"]
 
 [workspace.dependencies]
 # api
-axum = { version = "0.8.8", features = ["http1", "multipart", "form"] }
+axum = { version = "0.8.8", features = ["http1", "multipart", "form", "macros"] }
 tokio = { version = "1.46.1" }
 tokio-util = { version="0.7.18", features=["rt"] }
 # tokio = { version = "1.46.1", features = ["macros", "rt-multi-thread", "process", "fs"] }

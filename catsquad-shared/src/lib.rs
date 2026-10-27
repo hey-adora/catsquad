@@ -22,6 +22,7 @@ pub const MAX_PASSWORD_LENGTH: usize = 100;
 pub const FILE_IMAGE_THUMBNAIL_EXTENSION: &'static str = "webp";
 pub const FILE_IMAGE_THUMBNAIL_SIZE: u32 = 1280;
 pub const MAX_PFP_SIZE_BYTES: u32 = 1024 * 1000 * 2; // 2MB probably
+pub const ADMIN_ROLE_NAME: &'static str = "admin";
 pub type Hash = i64;
 
 use anyhow::anyhow;

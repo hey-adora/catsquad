@@ -1,8 +1,8 @@
 use axum::{Extension, Json, http::StatusCode, response::IntoResponse};
-use catsquad_db::{DbUser, DbUserGet};
+use catsquad_db::DbUserGet;
 use catsquad_shared::{SensitiveUserRes, UserGetBySessionKeyErr};
 
-use crate::api::user_add::{from_db_user_get_sensitive, from_db_user_sensitive};
+use crate::api::user_add::from_db_user_get_sensitive;
 
 fn status_code(result: &Result<SensitiveUserRes, UserGetBySessionKeyErr>) -> StatusCode {
     match result {
