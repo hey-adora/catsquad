@@ -7,6 +7,7 @@ pub const LINK_API_ROLE: &str = "/api/role/{role_name}";
 
 pub const ROLE_VALUE_PERMISSION_ROLE_ADD: &'static str = "permission_role_add";
 pub const ROLE_VALUE_PERMISSION_ROLE_REMOVE: &'static str = "permission_role_remove";
+pub const ROLE_VALUE_PERMISSION_USER_SEARCH: &'static str = "permission_user_search";
 
 pub fn link_relative_role_add(role_name: impl Display) -> String {
     format!("/api/role/{role_name}")
@@ -22,6 +23,65 @@ pub struct RoleRes {
 pub enum RoleValue {
     PermissionRoleAdd,
     PermissionRoleRemove,
+    PermissionUserSearch,
+}
+
+pub fn contains_roles<T>(expected_roles: &[RoleValue], roles_values: &[T]) -> bool
+where
+    T: TryInto<RoleValue> + Clone,
+{
+    expected_roles.iter().all(|expected_role| {
+        roles_values.iter().any(|role_value| {
+            let Ok(role_value): Result<RoleValue, T::Error> = role_value.clone().try_into() else {
+                return false;
+            };
+            role_value == *expected_role
+        })
+    })
+}
+
+#[test]
+fn test_contains_roles() {
+    assert!(contains_roles(
+        &[RoleValue::PermissionRoleAdd],
+        &[RoleValue::PermissionRoleAdd],
+    ));
+
+    assert!(!contains_roles(
+        &[RoleValue::PermissionRoleAdd],
+        &[RoleValue::PermissionRoleRemove],
+    ));
+
+    assert!(contains_roles(
+        &[RoleValue::PermissionRoleAdd],
+        &[
+            RoleValue::PermissionRoleRemove,
+            RoleValue::PermissionRoleAdd
+        ],
+    ));
+
+    assert!(!contains_roles(
+        &[
+            RoleValue::PermissionRoleAdd,
+            RoleValue::PermissionUserSearch
+        ],
+        &[
+            RoleValue::PermissionRoleRemove,
+            RoleValue::PermissionRoleAdd
+        ],
+    ));
+
+    assert!(contains_roles(
+        &[
+            RoleValue::PermissionRoleAdd,
+            RoleValue::PermissionUserSearch
+        ],
+        &[
+            RoleValue::PermissionRoleRemove,
+            RoleValue::PermissionRoleAdd,
+            RoleValue::PermissionUserSearch
+        ],
+    ));
 }
 
 pub fn role_extract_permission_role_add(roles_values: &[String]) -> bool {
@@ -30,11 +90,24 @@ pub fn role_extract_permission_role_add(roles_values: &[String]) -> bool {
         .any(|v| v == RoleValue::PermissionRoleAdd.as_str())
 }
 
+pub fn role_extract_permission_role_remove(roles_values: &[String]) -> bool {
+    roles_values
+        .iter()
+        .any(|v| v == RoleValue::PermissionRoleRemove.as_str())
+}
+
+pub fn role_extract_permission_user_search(roles_values: &[String]) -> bool {
+    roles_values
+        .iter()
+        .any(|v| v == RoleValue::PermissionUserSearch.as_str())
+}
+
 impl RoleValue {
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::PermissionRoleAdd => ROLE_VALUE_PERMISSION_ROLE_ADD,
             Self::PermissionRoleRemove => ROLE_VALUE_PERMISSION_ROLE_REMOVE,
+            Self::PermissionUserSearch => ROLE_VALUE_PERMISSION_USER_SEARCH,
         }
     }
 }
@@ -69,11 +142,7 @@ impl TryFrom<String> for RoleValue {
 
 impl Display for RoleValue {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let text = match self {
-            RoleValue::PermissionRoleAdd => ROLE_VALUE_PERMISSION_ROLE_ADD,
-            RoleValue::PermissionRoleRemove => ROLE_VALUE_PERMISSION_ROLE_REMOVE,
-        };
-
+        let text = self.as_str();
         write!(f, "{}", text)
     }
 }

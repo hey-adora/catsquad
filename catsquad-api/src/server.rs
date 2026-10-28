@@ -296,6 +296,7 @@ pub async fn app(state: AppState) -> Router {
             catsquad_shared::LINK_API_USER_GET_BY_SESSION_KEY,
             get(api::user_get_by_session_token),
         )
+        .route(catsquad_shared::LINK_API_USER_SEARCH, get(api::user_search))
         .route_layer(middleware::from_fn_with_state(
             state.clone(),
             auth_middleware,

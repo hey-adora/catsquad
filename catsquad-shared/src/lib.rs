@@ -75,6 +75,7 @@ pub use api::user_get_by_session_key::*;
 pub use api::user_get_by_username::*;
 pub use api::user_pfp_get_bytes::*;
 pub use api::user_remove_by_token::*;
+pub use api::user_search::*;
 pub use api::user_update_aboutme::*;
 pub use api::user_update_password_by_token::*;
 pub use api::user_update_pfp::*;

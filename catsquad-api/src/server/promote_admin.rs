@@ -1,7 +1,13 @@
 use crate::state::AppState;
 use catsquad_db::DbUserGetByUsernameErr;
 use catsquad_log::prelude::*;
-use catsquad_shared::{ADMIN_ROLE_NAME, RoleValue, role_extract_permission_role_add};
+use catsquad_shared::{ADMIN_ROLE_NAME, RoleValue, contains_roles};
+
+const ADMIN_ROLES: [RoleValue; 3] = [
+    RoleValue::PermissionRoleAdd,
+    RoleValue::PermissionRoleRemove,
+    RoleValue::PermissionUserSearch,
+];
 
 #[derive(Clone, Debug, PartialEq, thiserror::Error)]
 pub enum PromoteAdminErr {
@@ -37,11 +43,11 @@ pub async fn promote_admin(state: AppState) -> Result<i64, PromoteAdminErr> {
             let admin_role_exists = roles.iter().find(|v| v.name == ADMIN_ROLE_NAME);
             let admin_role_id = if let Some(admin_role) = admin_role_exists {
                 // check if contains correct permissions
-                let contains_role_add = role_extract_permission_role_add(&admin_role.values);
-                if !contains_role_add {
+                let contains_expected_roles = contains_roles(&ADMIN_ROLES, &admin_role.values);
+                if !contains_expected_roles {
                     let result = state
                         .db
-                        .role_update_value(0, admin_role.id, vec![RoleValue::PermissionRoleAdd])
+                        .role_update_value(0, admin_role.id, ADMIN_ROLES.to_vec())
                         .await;
                     match result {
                         Ok(v) => v,
@@ -57,7 +63,7 @@ pub async fn promote_admin(state: AppState) -> Result<i64, PromoteAdminErr> {
                 // create new admin role
                 let result = state
                     .db
-                    .role_add(0, ADMIN_ROLE_NAME, vec![RoleValue::PermissionRoleAdd])
+                    .role_add(0, ADMIN_ROLE_NAME, ADMIN_ROLES.to_vec())
                     .await;
                 let admin_role = match result {
                     Ok(v) => v,
@@ -172,11 +178,8 @@ async fn test_promote_admin_empty() {
         let keep_checking = server.state.get_keep_checking_if_admin_promoted();
 
         assert!(!keep_checking);
-        assert_eq!(user1.roles_ids.len(), 1);
-        assert_eq!(
-            admin_role.values,
-            vec![RoleValue::PermissionRoleAdd.to_string()]
-        );
+        assert_eq!(user1.roles_ids.len(), ADMIN_ROLES.len());
+        assert!(contains_roles(&ADMIN_ROLES, &admin_role.values));
     }
 }
 
@@ -224,10 +227,7 @@ async fn test_promote_admin_update_role() {
         let keep_checking = server.state.get_keep_checking_if_admin_promoted();
 
         assert!(!keep_checking);
-        assert_eq!(user1.roles_ids.len(), 1);
-        assert_eq!(
-            admin_role.values,
-            vec![RoleValue::PermissionRoleAdd.to_string()]
-        );
+        assert_eq!(user1.roles_ids.len(), ADMIN_ROLES.len());
+        assert!(contains_roles(&ADMIN_ROLES, &admin_role.values));
     }
 }

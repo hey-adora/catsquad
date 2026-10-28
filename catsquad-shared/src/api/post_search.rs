@@ -28,7 +28,7 @@ pub fn link_relative_post_search(params: PostSearchParams) -> String {
         "{LINK_API_POST_SEARCH}?{}",
         params
             .to_form()
-            .inspect_err(|err| error!("{:#?}", params))
+            .inspect_err(|err| error!("{} {:#?}", err, params))
             .unwrap()
     )
 }

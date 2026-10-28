@@ -1,8 +1,8 @@
 use catsquad_log::prelude::*;
 use catsquad_shared::{
-    self as cs, FileImage, Order, PostSearchParams, PostState, TimeRange, ToForm, Uuid,
-    link_relative_invite_get_by_key, link_relative_post_get_by_key, link_relative_post_remove,
-    link_relative_post_search, uuid_to_str,
+    self as cs, FileImage, Order, PostSearchParams, PostState, TimeRange, ToForm, UserSearchParams,
+    Uuid, link_relative_invite_get_by_key, link_relative_post_get_by_key,
+    link_relative_post_remove, link_relative_post_search, uuid_to_str,
 };
 use http::{HeaderMap, HeaderName, StatusCode, header};
 use std::{
@@ -817,6 +817,25 @@ where
         username: impl Display,
     ) -> Builder<TSender, cs::UserGetRes, cs::UserGetByUsernameErr> {
         self.get(cs::link_relative_user_get_by_username(username))
+    }
+
+    pub fn user_search(
+        &self,
+        // tags: impl Into<String>,
+        // author_username: impl Into<String>,
+        // liked_by_username: impl Into<String>,
+        // followed_by_username: impl Into<String>,
+        time: u64,
+        limit: usize,
+        range: TimeRange,
+        order: Order,
+    ) -> Builder<TSender, Vec<cs::UserSearchRes>, cs::UserSearchErr> {
+        self.get(cs::link_relative_user_search(UserSearchParams {
+            time: Some(time),
+            range: Some(range),
+            order: Some(order),
+            limit: Some(limit),
+        }))
     }
 
     pub fn session_add(

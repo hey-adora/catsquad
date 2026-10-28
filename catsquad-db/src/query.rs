@@ -70,6 +70,7 @@ pub mod user_get_by_username;
 pub mod user_get_password;
 pub mod user_remove_by_token;
 pub mod user_remove_tx;
+pub mod user_search;
 pub mod user_update_aboutme;
 pub mod user_update_password_by_email;
 pub mod user_update_password_by_token;

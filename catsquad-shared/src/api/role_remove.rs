@@ -8,12 +8,6 @@ pub fn link_relative_role_remove(role_id: i64) -> String {
     format!("/api/role/{role_id}")
 }
 
-pub fn role_extract_permission_role_remove(roles_values: &[String]) -> bool {
-    roles_values
-        .iter()
-        .any(|v| v == RoleValue::PermissionRoleRemove.as_str())
-}
-
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
 pub struct RoleRemoveParams {
     pub role_name: i64, // role_id

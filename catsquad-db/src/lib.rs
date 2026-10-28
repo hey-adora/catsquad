@@ -88,6 +88,7 @@ pub use query::session_add::*;
 pub use query::session_get_by_id::*;
 pub use query::session_remove::*;
 pub use query::user_add::*;
+pub use query::user_search::*;
 // pub use query::role_remo::*;
 pub use query::user_get_all::*;
 pub use query::user_get_by_email::*;
