@@ -5,7 +5,7 @@ use axum::{
     http::StatusCode,
     response::IntoResponse,
 };
-use catsquad_db::{DbUserGet, DbUserSearch, DbUserSearchErr};
+use catsquad_db::{DbUserGet, DbUserSearch, DbUserSearchBuilderErr};
 use catsquad_shared::{
     Order, ROLE_VALUE_PERMISSION_USER_SEARCH, TimeRange, UserSearchErr, UserSearchParams,
     UserSearchRes, role_extract_permission_user_search,
@@ -28,9 +28,9 @@ pub fn from_db_user_search(value: Vec<DbUserSearch>) -> Vec<UserSearchRes> {
         .collect()
 }
 
-fn from_db_user_search_err(value: DbUserSearchErr) -> UserSearchErr {
+fn from_db_user_search_err(value: DbUserSearchBuilderErr) -> UserSearchErr {
     match value {
-        DbUserSearchErr::Db(_) => UserSearchErr::InternalServer,
+        DbUserSearchBuilderErr::Db(_) => UserSearchErr::InternalServer,
     }
 }
 
@@ -60,10 +60,11 @@ pub async fn user_search(
         let time_range = params.range.unwrap_or(TimeRange::MoreOrEqual);
         let order = params.order.unwrap_or(Order::ThreeTwoOne);
         let limit = params.limit.unwrap_or(100);
+        let offset = params.offset.unwrap_or(0);
 
         let users = app
             .db
-            .user_search(time_range_value, limit, time_range, order)
+            .user_search_users(time_range_value, limit, offset, time_range, order)
             .await
             .map_err(from_db_user_search_err)?;
 
@@ -87,12 +88,13 @@ mod test_utils {
             &self,
             time: u64,
             limit: usize,
+            offset: usize,
             range: TimeRange,
             order: Order,
             session_token: Uuid,
         ) -> Result<Vec<cs::UserSearchRes>, cs::UserSearchErr> {
             self.client
-                .user_search(time, limit, range, order)
+                .user_search(time, limit, offset, range, order)
                 .header_add(
                     header::COOKIE,
                     create_auth_cookie_str(uuid_to_str(session_token)),
@@ -133,6 +135,7 @@ async fn test_api_user_search() {
             .user_search(
                 0,
                 10,
+                0,
                 TimeRange::MoreOrEqual,
                 Order::OneTwoThree,
                 0_u128.to_be_bytes(),
@@ -148,6 +151,7 @@ async fn test_api_user_search() {
             .user_search(
                 0,
                 10,
+                0,
                 TimeRange::MoreOrEqual,
                 Order::OneTwoThree,
                 session_key,

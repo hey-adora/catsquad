@@ -1,8 +1,14 @@
-use crate::{BtnDelete, ModalConfirm, Nav};
+use crate::{BtnDelete, ModalConfirm, Nav, page::create_client};
 use leptos::prelude::*;
+
+mod users_state;
+
+use users_state::UsersState;
 
 #[component]
 pub fn Admin() -> impl IntoView {
+    let user_state = UsersState::new(create_client());
+
     view! {
         <main class="">
             <Nav/>

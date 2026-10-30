@@ -16,6 +16,8 @@ use std::os::unix::fs::MetadataExt;
 
 pub use server::server;
 
+pub use server::promote_admin::promote_admin;
+
 #[cfg(any(test, feature = "test_server"))]
 mod test_server;
 #[cfg(any(test, feature = "test_server"))]

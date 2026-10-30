@@ -827,11 +827,13 @@ where
         // followed_by_username: impl Into<String>,
         time: u64,
         limit: usize,
+        offset: usize,
         range: TimeRange,
         order: Order,
     ) -> Builder<TSender, Vec<cs::UserSearchRes>, cs::UserSearchErr> {
         self.get(cs::link_relative_user_search(UserSearchParams {
             time: Some(time),
+            offset: Some(offset),
             range: Some(range),
             order: Some(order),
             limit: Some(limit),

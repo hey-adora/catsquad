@@ -32,6 +32,7 @@ pub struct UserSearchParams {
     pub range: Option<TimeRange>,
     pub order: Option<Order>,
     pub limit: Option<usize>,
+    pub offset: Option<usize>,
 }
 
 impl Default for UserSearchParams {
@@ -41,6 +42,7 @@ impl Default for UserSearchParams {
             range: Some(TimeRange::MoreOrEqual),
             order: Some(Order::ThreeTwoOne),
             limit: Some(100),
+            offset: Some(0),
         }
     }
 }
