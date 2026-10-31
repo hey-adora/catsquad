@@ -653,6 +653,7 @@ name = "catsquad-seed"
 version = "0.1.0"
 dependencies = [
  "ab_glyph",
+ "catsquad-api",
  "catsquad-client",
  "catsquad-log",
  "catsquad-shared",

@@ -31,3 +31,50 @@ pub enum SessionAddErr {
     #[error("internal server err")]
     InternalServer,
 }
+
+pub fn extract_auth_token_plain(input: impl AsRef<str>) -> Option<String> {
+    let input = input.as_ref();
+    let input_len = input.len();
+    let mut i = input.chars();
+
+    let mut start = 0;
+    let mut end;
+    // let mut stage = 0_usize;
+
+    while let Some(c) = i.next() {
+        start += 1;
+        if c == ' ' {
+            break;
+        }
+    }
+
+    end = start;
+
+    while let Some(c) = i.next() {
+        let valid_char = (c >= '0' && c <= '9') || (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z');
+        if !valid_char {
+            break;
+        }
+        end += 1;
+    }
+
+    let is_not_out_of_index = end <= input_len && start < end;
+    if !is_not_out_of_index {
+        return None;
+    }
+
+    Some(input[start..end].to_string())
+}
+
+#[cfg(test)]
+#[test]
+fn test_extract_auth_token_plain() {
+    use catsquad_log::prelude::*;
+
+    init_log();
+
+    let token =
+        extract_auth_token_plain("authorization=Bearer 34JSuIfanzy1UDwwCLh3c; HttpOnly; Secure")
+            .unwrap();
+    assert_eq!(token, "34JSuIfanzy1UDwwCLh3c");
+}

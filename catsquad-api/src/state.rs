@@ -47,7 +47,7 @@ impl AppState {
             db: Db::test_db(time, test_db).await,
             conf: Arc::new(AsyncRwLock::new(conf)),
             keep_check_if_admin_promoted: Arc::new(SyncRwLock::new(true)),
-            time: Some(Arc::new(SyncRwLock::new(0))),
+            time: Some(Arc::new(SyncRwLock::new(time))),
             assets: Arc::new(assets),
         }
     }

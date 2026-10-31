@@ -1,4 +1,6 @@
-use crate::{BtnDelete, ModalConfirm, Nav, page::create_client};
+use crate::{
+    BtnDelete, BtnSize, ErrGeneral, Errs, ModalConfirm, Nav, hook::Spawner, page::create_client,
+};
 use leptos::prelude::*;
 
 mod users_state;
@@ -7,12 +9,40 @@ use users_state::UsersState;
 
 #[component]
 pub fn Admin() -> impl IntoView {
+    let spawner = Spawner::new();
     let user_state = UsersState::new(create_client());
+    let user_errors = user_state.err_general;
+
+    Effect::new(move || {
+        spawner.spawn(async move {
+            user_state.fetch().await;
+        });
+    });
+
+    let view_users = move || {
+        user_state
+            .users
+            .get()
+            .into_iter()
+            .map(|user| {
+                let username = user.username;
+                view! {
+                      <tr class="bg-base01">
+                        <td class="border">{username}</td>
+                        <td class="border">
+                            <BtnDelete size=BtnSize::Small>"delete"</BtnDelete>
+                        </td>
+                      </tr>
+                }
+            })
+            .collect_view()
+    };
 
     view! {
         <main class="">
             <Nav/>
             <ModalConfirm/>
+            <Errs error=user_errors  />
             <table class="border-collapse border-spacing-[10rem] border">
               <thead>
                   <tr>
@@ -21,40 +51,7 @@ pub fn Admin() -> impl IntoView {
                   </tr>
               </thead>
               <tbody>
-                  <tr class="bg-base01">
-                    <td class="border">prime1</td>
-                    <td class="border">
-                        <BtnDelete>"delete"</BtnDelete>
-                    </td>
-                  </tr>
-                  <tr class="bg-base02">
-                    <td class="border">prime2</td>
-                    <td class="border">
-                        <BtnDelete>"delete"</BtnDelete>
-                    </td>
-                  </tr>
-              </tbody>
-            </table>
-            <table class="border-collapse border border-gray-400 ">
-              <thead>
-                <tr>
-                  <th class="border border-gray-300 ">State</th>
-                  <th class="border border-gray-300 ">City</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td class="border border-gray-300 ">Indiana</td>
-                  <td class="border border-gray-300 ">Indianapolis</td>
-                </tr>
-                <tr>
-                  <td class="border border-gray-300 ">Ohio</td>
-                  <td class="border border-gray-300 ">Columbus</td>
-                </tr>
-                <tr>
-                  <td class="border border-gray-300 ">Michigan</td>
-                  <td class="border border-gray-300 ">Detroit</td>
-                </tr>
+                  {view_users}
               </tbody>
             </table>
         </main>

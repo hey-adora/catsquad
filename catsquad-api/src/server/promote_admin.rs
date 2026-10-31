@@ -178,7 +178,8 @@ async fn test_promote_admin_empty() {
         let keep_checking = server.state.get_keep_checking_if_admin_promoted();
 
         assert!(!keep_checking);
-        assert_eq!(user1.roles_ids.len(), ADMIN_ROLES.len());
+        assert_eq!(user1.roles_ids.len(), 1); // we added only 1 role
+        trace!(" {ADMIN_ROLES:#?} {:#?}", admin_role.values);
         assert!(contains_roles(&ADMIN_ROLES, &admin_role.values));
     }
 }
@@ -227,7 +228,7 @@ async fn test_promote_admin_update_role() {
         let keep_checking = server.state.get_keep_checking_if_admin_promoted();
 
         assert!(!keep_checking);
-        assert_eq!(user1.roles_ids.len(), ADMIN_ROLES.len());
+        assert_eq!(user1.roles_ids.len(), 1); // we added only 1 role
         assert!(contains_roles(&ADMIN_ROLES, &admin_role.values));
     }
 }

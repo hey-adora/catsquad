@@ -1,4 +1,4 @@
-use crate::Btn;
+use crate::{Btn, BtnSize};
 use leptos::prelude::*;
 use web_sys::MouseEvent;
 
@@ -12,6 +12,7 @@ pub fn BtnDelete(
     #[prop(optional, into)] modal_text: Signal<String>,
     #[prop(optional, into)] disabled: Signal<bool>,
     #[prop(optional, into)] on_click: Option<Callback<MouseEvent>>,
+    #[prop(optional, into)] size: Signal<BtnSize>,
     children: Children,
 ) -> impl IntoView {
     let on_click_handler = move |e| {
@@ -26,6 +27,7 @@ pub fn BtnDelete(
 
     view! {
         <Btn
+            size
             id=move || id.get()
             disabled=is_disabled_fn
             on_click=on_click_handler

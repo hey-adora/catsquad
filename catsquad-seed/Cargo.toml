@@ -18,3 +18,5 @@ ab_glyph = { workspace = true }
 clap = { workspace = true }
 imageproc = { workspace = true }
 
+[dev-dependencies]
+catsquad-api = { workspace = true, features = ["test_server", "test_backdoors"] }

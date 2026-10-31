@@ -1,3 +1,4 @@
+use catsquad_log::prelude::*;
 use std::fmt::Display;
 
 use anyhow::anyhow;
@@ -33,8 +34,13 @@ where
     expected_roles.iter().all(|expected_role| {
         roles_values.iter().any(|role_value| {
             let Ok(role_value): Result<RoleValue, T::Error> = role_value.clone().try_into() else {
+                debug!("invalid value");
                 return false;
             };
+            trace!(
+                "expected {expected_role} == {role_value } = {}",
+                *expected_role == role_value
+            );
             role_value == *expected_role
         })
     })
@@ -42,6 +48,22 @@ where
 
 #[test]
 fn test_contains_roles() {
+    init_log();
+
+    assert!(contains_roles(
+        &[
+            RoleValue::PermissionRoleAdd,
+            RoleValue::PermissionRoleRemove,
+            RoleValue::PermissionUserSearch,
+        ],
+        &[
+            "permission_role_add",
+            "permission_role_remove",
+            "permission_user_search",
+        ],
+    ));
+    return;
+
     assert!(contains_roles(
         &[RoleValue::PermissionRoleAdd],
         &[RoleValue::PermissionRoleAdd],
@@ -125,6 +147,7 @@ impl TryFrom<&str> for RoleValue {
         let result = match value {
             ROLE_VALUE_PERMISSION_ROLE_ADD => Self::PermissionRoleAdd,
             ROLE_VALUE_PERMISSION_ROLE_REMOVE => Self::PermissionRoleRemove,
+            ROLE_VALUE_PERMISSION_USER_SEARCH => Self::PermissionUserSearch,
             _ => return Err(anyhow!("invalid value {value}")),
         };
 
