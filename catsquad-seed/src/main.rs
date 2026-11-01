@@ -1,34 +1,55 @@
-use ab_glyph::{FontRef, PxScale};
 use catsquad_client::{Client, ReqwestSender, Response, Sender};
-// use artbounty::{
-//     api::{Api, ApiNative, ServerReqImg},
-//     path::{
-//         PATH_API_LOGIN, PATH_API_POST_ADD, PATH_API_REGISTER, PATH_API_SEND_EMAIL_INVITE,
-//         PATH_API_USER,
-//     },
-// };
 use catsquad_log::prelude::*;
 use catsquad_seed::create_img;
 use catsquad_shared::{PostState, str_to_uuid};
-use clap::{Command, arg};
+use clap::{Arg, ArgAction, Command, arg};
 use http::header;
-use image::{Rgb, RgbImage};
-use imageproc::drawing::draw_text;
-use rand::Rng;
-use std::{collections::HashMap, env, fmt::Debug, time::Duration};
-use tokio::fs;
-// use tracing::{info, trace};
+use std::fmt::Debug;
+use tokio::{spawn, task::spawn_local};
+use tokio_util::task::TaskTracker;
 
 const ORIGIN: &'static str = "http://localhost:3000";
+const PASSWORD: &'static str = "A5%prime1@heyadora.com";
 
-#[tokio::main]
+#[tokio::main(flavor = "local")]
 async fn main() {
     init_log();
+
+    let sender = ReqwestSender::new(ORIGIN);
+    let client = Client::new(sender);
 
     let command = Command::new("seed")
         .about("data seeder")
         .subcommand_required(true)
         .arg_required_else_help(true)
+        .subcommand(
+            Command::new("user").subcommand_required(true).subcommand(
+                Command::new("add").subcommand(
+                    Command::new("batch")
+                        .about("create users ")
+                        .arg(
+                            Arg::new("number")
+                                .short('n')
+                                .long("number")
+                                .help("number of users it will create offset..number")
+                                .action(ArgAction::Set)
+                                .num_args(1..)
+                                .value_parser(clap::value_parser!(usize))
+                                .required(true),
+                        )
+                        .arg(
+                            Arg::new("offset")
+                                .long("offset")
+                                .help("number to skip when creating users offset..number")
+                                .action(ArgAction::Set)
+                                .num_args(1..)
+                                .value_parser(clap::value_parser!(usize))
+                                .required(false),
+                        )
+                        .arg_required_else_help(true),
+                ),
+            ),
+        )
         .subcommand(
             Command::new("post")
                 .about("create posts")
@@ -42,24 +63,22 @@ async fn main() {
                 .arg(arg!(--"token" <TOKEN>).required(true))
                 .arg_required_else_help(true),
         );
+
     let matches = command.get_matches();
     match matches.subcommand() {
-        Some(("register", sub_matches)) => {
-            let token = sub_matches.get_one::<String>("token").unwrap();
-            let count = sub_matches.get_one::<String>("count").unwrap();
-            let count = u32::from_str_radix(count, 10).unwrap();
-
-            for i in 0..count {
-                post_add(
-                    token,
-                    i.to_string(),
-                    format!("title{i}"),
-                    format!("description{i}"),
-                    format!("tag{i}"),
-                )
-                .await;
-            }
-        }
+        Some(("user", sub_matches)) => match sub_matches.subcommand() {
+            Some(("add", sub_matches)) => match sub_matches.subcommand() {
+                Some(("batch", sub_matches)) => {
+                    let number = *sub_matches.get_one::<usize>("number").unwrap();
+                    let offset = *sub_matches.get_one::<usize>("offset").unwrap_or(&0);
+                    command_user_add_batch(client.clone(), offset, number).await;
+                }
+                _ => {
+                    info!("not implemented yet");
+                }
+            },
+            _ => unreachable!(),
+        },
         Some(("post", sub_matches)) => {
             let token = sub_matches.get_one::<String>("token").unwrap();
             let count = sub_matches.get_one::<String>("count").unwrap();
@@ -148,115 +167,92 @@ pub async fn post_add(
         .unwrap();
 }
 
-async fn command_user_add<TSender>(client: Client<TSender>, offset: usize, n: usize)
+async fn command_user_add_batch<TSender>(client: Client<TSender>, offset: usize, n: usize)
 where
-    TSender: Sender + Debug + Clone,
+    TSender: Sender + Debug + Clone + 'static,
     TSender::TResponse: Response + Debug,
 {
+    let tracker = TaskTracker::new();
     for i in offset..n {
-        let username = format!("prime{i}");
-        let email = format!("prime{i}@heyadora.com");
-        let password = "A5%prime1@heyadora.com";
+        let client = client.clone();
+        tracker.spawn_local(async move {
+            let username = format!("prime{i}");
+            let email = format!("prime{i}@heyadora.com");
+            let password = PASSWORD;
 
-        let _invite = client
-            .invite_add(email.clone())
-            .send()
-            .await
-            .into_json()
-            .await
-            .unwrap();
+            let _invite = client
+                .invite_add(email.clone())
+                .send()
+                .await
+                .into_json()
+                .await
+                .unwrap();
 
-        let token = client
-            .test_backdoor_email_sent_get_all()
-            .send()
-            .await
-            .into_json()
-            .await
-            .inspect(|v| trace!("EMAILS RECEIVED {v:#?}"))
-            .unwrap()
-            .into_iter()
-            .find_map(|v| {
-                v.body
-                    .split_whitespace()
-                    .into_iter()
-                    .find(|v| v.contains("http://") && v.contains("register"))
-                    .map(|v| v.to_string())
-            })
-            .unwrap()
-            .split("token=")
-            .nth(1)
-            .unwrap()
-            .to_string();
+            let token = client
+                .test_backdoor_email_sent_get_all()
+                .send()
+                .await
+                .into_json()
+                .await
+                .inspect(|v| trace!("EMAILS RECEIVED {v:#?}"))
+                .unwrap()
+                .into_iter()
+                .find_map(|v| {
+                    if v.to_email != email {
+                        return None;
+                    }
 
-        trace!("TOKEN FOUND {token}");
+                    v.body
+                        .split_whitespace()
+                        .into_iter()
+                        .find(|v| v.contains("http://") && v.contains("register"))
+                        .map(|v| v.to_string())
+                })
+                .unwrap()
+                .split("token=")
+                .nth(1)
+                .unwrap()
+                .to_string();
 
-        let token = str_to_uuid(token);
+            let token = str_to_uuid(token);
+            let _res = client
+                .user_add(username, token, password)
+                .send()
+                .await
+                .into_json()
+                .await
+                .unwrap();
 
-        // .header_add(
-        //     header::COOKIE,
-        //     create_auth_cookie_str(uuid_to_str(session_token)),
-        // )
-        // server
-        //     .inject_header(
-        //         header::COOKIE,
-        //         create_auth_cookie_str(uuid_to_str(session1)),
-        //     )
-        //     .await;
-
-        // let invite = self.invite_add(email.clone()).await.unwrap();
-        // let invite = self
-        //     .state
-        //     .db
-        //     .invite_get_all()
-        //     .await
-        //     .unwrap()
-        //     .into_iter()
-        //     .find(|v| !v.used && v.email == email)
-        //     .unwrap()
-        //     .token
-        //     .clone();
-        let res = client.user_add(username, token, password).send().await;
-        let headers = res.get_headers().unwrap();
-        let res = res.into_json().await.unwrap();
-
-        // use catsquad_api::auth::auth_token_get;
-        // let session_token = auth_token_get(&headers, header::SET_COOKIE).unwrap();
-
-        // trace!("SESSION FOUND {session_token}");
-
-        // let session_token = str_to_uuid(session_token);
-
-        // let headers = res.get_headers().unwrap();
-        // let session_token = auth_token_get(&headers, header::SET_COOKIE).unwrap();
-        // let session_token = str_to_uuid(session_token);
-        // let _res = res.into_json().await.unwrap();
-
-        // // let session_key = res.get_auth_token().unwrap();
-        // // let res = res.into_res().await;
-        // let user = self.state.db.user_get_by_email(email).await.unwrap();
-        // (user, session_token)
+            info!("user registered {email}");
+        });
     }
+    tracker.close();
+    tracker.wait().await;
 }
 
 #[cfg(test)]
-#[tokio::test]
+#[tokio::test(flavor = "local")]
 async fn test_command_user_add() {
-    use catsquad_api::{TestServer, utils::get_time_micro};
+    use catsquad_api::TestServer;
 
     init_log();
 
-    let time = get_time_micro() as u64;
-    let server = TestServer::new(time, "test_command_user_add").await;
+    let server = TestServer::new(0, "test_command_user_add").await;
 
     // assert success
     {
-        let (user, user_token) = server
-            .user_add_full("prime1", "prime1@heyadora.com", "passwordA1@39jes0")
+        server
+            .user_add_full("prime0", "prime0@heyadora.com", PASSWORD)
             .await;
-        command_user_add(server.client.clone(), 0, 1).await;
-        // let result = server.user_add("hey", 0_u128.to_be_bytes(), "").await;
-        // assert!(
-        //     matches!(result, Err(UserAddErr::InvalidInput { username, password }) if username.is_none() && password.is_some())
-        // );
+        command_user_add_batch(server.client.clone(), 1, 10).await;
     }
 }
+
+// .header_add(
+//     header::COOKIE,
+//     create_auth_cookie_str(uuid_to_str(session_token)),
+// )
+// let res = client.user_add(username, token, password).send().await;
+// let headers = res.get_headers().unwrap();
+// let res = res.into_json().await.unwrap();
+// let session_token = auth_token_get(&headers, header::SET_COOKIE).unwrap();

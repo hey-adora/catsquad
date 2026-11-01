@@ -21,7 +21,7 @@ pub struct DbUser {
     pub pfp_image_proccesed: bool,
     #[sqlx(rename = "user_likes_count")]
     #[sqlx(try_from = "i64")]
-    pub likes_count: u32,
+    pub likes_count: u32, // likes that user receives
     #[sqlx(rename = "user_followers_count")]
     #[sqlx(try_from = "i64")]
     pub followers_count: u32,

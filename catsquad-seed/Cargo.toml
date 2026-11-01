@@ -11,6 +11,7 @@ catsquad-shared = { workspace = true }
 catsquad-client = { workspace = true, features = ["reqwest"] }
 catsquad-log = { workspace = true }
 tokio = { workspace = true, features = ["macros", "rt-multi-thread", "fs"] }
+tokio-util = { workspace = true }
 rand = { workspace = true }
 image = { workspace = true }
 http = { workspace = true }

@@ -1,3 +1,5 @@
+use anyhow::anyhow;
+
 pub mod comment_add;
 pub mod comment_remove;
 pub mod comment_search;
@@ -109,7 +111,7 @@ impl From<u8> for TimeRange {
     PartialOrd,
     serde::Serialize,
     serde::Deserialize,
-    strum::EnumString,
+    // strum::EnumString,
     strum::Display,
     strum::EnumIter,
     strum::EnumIs,
@@ -129,6 +131,17 @@ impl From<bool> for Order {
     }
 }
 
+impl TryFrom<&str> for Order {
+    type Error = anyhow::Error;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        match value {
+            "asc" | "ascending" => Ok(Self::OneTwoThree),
+            "desc" | "des" | "descending" => Ok(Self::ThreeTwoOne),
+            _ => Err(anyhow!("invalid")),
+        }
+    }
+}
 // #[derive(Clone, Copy, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
 // pub enum Method {
 //     Get,

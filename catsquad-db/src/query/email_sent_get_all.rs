@@ -10,7 +10,7 @@ pub enum DbEmailSentGetAllErr {
 impl Db {
     pub async fn email_sent_get_all(&self) -> Result<Vec<DbEmailSent>, DbEmailSentGetAllErr> {
         let pool = &self.db;
-        let query = "SELECT * FROM emails_sent ORDER BY email_sent_created_at DESC";
+        let query = "SELECT * FROM emails_sent ORDER BY email_sent_id DESC";
 
         trace!("about to run {query}");
 

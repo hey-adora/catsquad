@@ -16,6 +16,7 @@ pub fn link_relative_user_search(params: UserSearchParams) -> String {
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
 pub struct UserSearchRes {
     pub username: String,
+    pub email: String,
     pub pfp_hash: i64,
     pub pfp_proccesed: bool,
     pub likes: u32,

@@ -1,11 +1,12 @@
 use crate::state::AppState;
 use axum::{
     Extension, Json,
-    extract::{Path, State},
+    extract::{Path, Query, State},
     http::StatusCode,
     response::IntoResponse,
 };
 use catsquad_db::{DbUserGet, DbUserSearch, DbUserSearchBuilderErr};
+use catsquad_log::prelude::*;
 use catsquad_shared::{
     Order, ROLE_VALUE_PERMISSION_USER_SEARCH, TimeRange, UserSearchErr, UserSearchParams,
     UserSearchRes, role_extract_permission_user_search,
@@ -16,6 +17,7 @@ pub fn from_db_user_search(value: Vec<DbUserSearch>) -> Vec<UserSearchRes> {
         .into_iter()
         .map(|value| UserSearchRes {
             username: value.username,
+            email: value.email,
             pfp_hash: value.pfp_image_hash,
             pfp_proccesed: value.pfp_image_proccesed,
             followers: value.followers_count,
@@ -45,8 +47,9 @@ fn status_code(result: &Result<Vec<UserSearchRes>, UserSearchErr>) -> StatusCode
 pub async fn user_search(
     db_user: Extension<DbUserGet>,
     State(app): State<AppState>,
-    Path(params): Path<UserSearchParams>,
+    Query(params): Query<UserSearchParams>,
 ) -> impl IntoResponse {
+    trace!("user_search received params {params:#?}");
     let inner = async || -> Result<Vec<UserSearchRes>, UserSearchErr> {
         let permission_role_add = role_extract_permission_user_search(&db_user.roles_values);
         if !permission_role_add {
@@ -160,7 +163,22 @@ async fn test_api_user_search() {
             .unwrap();
 
         assert_eq!(users.len(), 10);
+
+        let users = server
+            .user_search(
+                0,
+                5,
+                0,
+                TimeRange::MoreOrEqual,
+                Order::OneTwoThree,
+                session_key,
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(users.len(), 5);
     }
+
     // let result = server.user_get_by_username("hey").await.unwrap();
     // assert_eq!(user_add.username, result.username);
 

@@ -12,6 +12,7 @@ where
 {
     pub err_general: RwSignal<String>,
     pub users: RwSignal<Vec<UserSearchRes>>,
+    pub param_order: RwSignal<Order>,
     pub client: StoredValue<Client<TSender>, LocalStorage>,
 }
 
@@ -31,15 +32,18 @@ where
         Self {
             err_general: RwSignal::new(String::new()),
             users: RwSignal::new(Vec::new()),
+            param_order: RwSignal::new(Order::ThreeTwoOne),
             client: StoredValue::new_local(client),
         }
     }
 
     pub async fn fetch(&self) {
         let client = self.client.get_value();
+        let param_order = self.param_order.get_untracked();
+
         self.err_general.update(|v| v.clear());
         let result = client
-            .user_search(0, 1000, 0, TimeRange::MoreOrEqual, Order::ThreeTwoOne)
+            .user_search(0, 1000, 0, TimeRange::MoreOrEqual, param_order)
             .send()
             .await
             .into_json()
