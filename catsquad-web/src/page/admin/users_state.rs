@@ -1,6 +1,6 @@
 use catsquad_client::{Client, Response, Sender};
 use catsquad_log::prelude::*;
-use catsquad_shared::{Order, TimeRange, UserSearchRes};
+use catsquad_shared::{Order, TimeRange, UserSearchFields, UserSearchRes};
 use leptos::prelude::*;
 use std::fmt::Debug;
 
@@ -12,7 +12,11 @@ where
 {
     pub err_general: RwSignal<String>,
     pub users: RwSignal<Vec<UserSearchRes>>,
-    pub param_order: RwSignal<Order>,
+    pub param_search_order: RwSignal<Order>,
+    pub param_search_limit: RwSignal<usize>,
+    pub param_search_field_username: RwSignal<bool>,
+    pub param_search_field_email: RwSignal<bool>,
+    pub param_search_query: RwSignal<String>,
     pub client: StoredValue<Client<TSender>, LocalStorage>,
 }
 
@@ -32,18 +36,38 @@ where
         Self {
             err_general: RwSignal::new(String::new()),
             users: RwSignal::new(Vec::new()),
-            param_order: RwSignal::new(Order::ThreeTwoOne),
+            param_search_order: RwSignal::new(Order::ThreeTwoOne),
+            param_search_limit: RwSignal::new(100),
+            param_search_field_username: RwSignal::new(true),
+            param_search_field_email: RwSignal::new(true),
+            param_search_query: RwSignal::new(String::new()),
             client: StoredValue::new_local(client),
         }
     }
 
     pub async fn fetch(&self) {
         let client = self.client.get_value();
-        let param_order = self.param_order.get_untracked();
+        let param_search_order = self.param_search_order.get_untracked();
+        let param_search_limit = self.param_search_limit.get_untracked();
+        let param_search_field_username = self.param_search_field_username.get_untracked();
+        let param_search_field_email = self.param_search_field_email.get_untracked();
+        let param_search_field = UserSearchFields {
+            username: param_search_field_username,
+            email: param_search_field_email,
+        };
+        let param_search_query = self.param_search_query.get_untracked();
 
         self.err_general.update(|v| v.clear());
         let result = client
-            .user_search(0, 1000, 0, TimeRange::MoreOrEqual, param_order)
+            .user_search(
+                0,
+                param_search_limit,
+                0,
+                TimeRange::MoreOrEqual,
+                param_search_order,
+                param_search_field,
+                param_search_query,
+            )
             .send()
             .await
             .into_json()

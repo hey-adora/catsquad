@@ -8,8 +8,8 @@ use axum::{
 use catsquad_db::{DbUserGet, DbUserSearch, DbUserSearchBuilderErr};
 use catsquad_log::prelude::*;
 use catsquad_shared::{
-    Order, ROLE_VALUE_PERMISSION_USER_SEARCH, TimeRange, UserSearchErr, UserSearchParams,
-    UserSearchRes, role_extract_permission_user_search,
+    Order, ROLE_VALUE_PERMISSION_USER_SEARCH, TimeRange, UserSearchErr, UserSearchFields,
+    UserSearchParams, UserSearchRes, role_extract_permission_user_search,
 };
 
 pub fn from_db_user_search(value: Vec<DbUserSearch>) -> Vec<UserSearchRes> {
@@ -65,9 +65,27 @@ pub async fn user_search(
         let limit = params.limit.unwrap_or(100);
         let offset = params.offset.unwrap_or(0);
 
+        let mut search_fields = UserSearchFields::default();
+        if let Some(search_field_username) = params.search_field_username {
+            search_fields.username = search_field_username;
+        };
+        if let Some(search_field_email) = params.search_field_email {
+            search_fields.email = search_field_email;
+        };
+        let search_query = params.search_query.unwrap_or_default();
+        let search_query = search_query.trim();
+
         let users = app
             .db
-            .user_search_users(time_range_value, limit, offset, time_range, order)
+            .user_search_users(
+                time_range_value,
+                limit,
+                offset,
+                time_range,
+                order,
+                search_fields,
+                search_query,
+            )
             .await
             .map_err(from_db_user_search_err)?;
 
@@ -84,7 +102,7 @@ pub async fn user_search(
 mod test_utils {
     use crate::{TestServer, auth::create_auth_cookie_str};
     use axum::http::header;
-    use catsquad_shared::{self as cs, Order, TimeRange, Uuid, uuid_to_str};
+    use catsquad_shared::{self as cs, Order, TimeRange, UserSearchFields, Uuid, uuid_to_str};
 
     impl TestServer {
         pub async fn user_search(
@@ -94,10 +112,20 @@ mod test_utils {
             offset: usize,
             range: TimeRange,
             order: Order,
+            search_fields: UserSearchFields,
+            search_query: impl Into<String>,
             session_token: Uuid,
         ) -> Result<Vec<cs::UserSearchRes>, cs::UserSearchErr> {
             self.client
-                .user_search(time, limit, offset, range, order)
+                .user_search(
+                    time,
+                    limit,
+                    offset,
+                    range,
+                    order,
+                    search_fields,
+                    search_query,
+                )
                 .header_add(
                     header::COOKIE,
                     create_auth_cookie_str(uuid_to_str(session_token)),
@@ -114,6 +142,8 @@ mod test_utils {
 #[tokio::test]
 async fn test_api_user_search() {
     use catsquad_log::prelude::*;
+    use catsquad_shared::UserSearchFields;
+
     init_log();
     let server = crate::TestServer::new(0, "test_api_user_search").await;
 
@@ -141,6 +171,8 @@ async fn test_api_user_search() {
                 0,
                 TimeRange::MoreOrEqual,
                 Order::OneTwoThree,
+                UserSearchFields::default(),
+                "",
                 0_u128.to_be_bytes(),
             )
             .await;
@@ -157,6 +189,8 @@ async fn test_api_user_search() {
                 0,
                 TimeRange::MoreOrEqual,
                 Order::OneTwoThree,
+                UserSearchFields::default(),
+                "",
                 session_key,
             )
             .await
@@ -171,6 +205,8 @@ async fn test_api_user_search() {
                 0,
                 TimeRange::MoreOrEqual,
                 Order::OneTwoThree,
+                UserSearchFields::default(),
+                "",
                 session_key,
             )
             .await
@@ -179,9 +215,23 @@ async fn test_api_user_search() {
         assert_eq!(users.len(), 5);
     }
 
-    // let result = server.user_get_by_username("hey").await.unwrap();
-    // assert_eq!(user_add.username, result.username);
+    // assert success search feature
+    {
+        let users = server
+            .user_search(
+                0,
+                5,
+                0,
+                TimeRange::MoreOrEqual,
+                Order::OneTwoThree,
+                UserSearchFields::default(),
+                "hey0",
+                session_key,
+            )
+            .await
+            .unwrap();
 
-    // let result = server.user_get_by_username("hey1").await;
-    // assert_eq!(result, Err(UserGetByUsernameErr::NotFound));
+        assert_eq!(users.len(), 1);
+        assert_eq!(users[0].username, "hey0");
+    }
 }

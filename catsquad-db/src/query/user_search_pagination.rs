@@ -1,5 +1,5 @@
 use crate::{Db, DbUserSearch, DbUserSearchBuilderErr};
-use catsquad_shared::{Order, TimeRange};
+use catsquad_shared::{Order, TimeRange, UserSearchFields};
 
 impl Db {
     pub async fn user_search_pagination(
@@ -9,9 +9,20 @@ impl Db {
         offset: usize,
         time_range: TimeRange,
         order: Order,
+        fields: UserSearchFields,
+        query: impl Into<String>,
     ) -> Result<u32, DbUserSearchBuilderErr> {
         let result = self
-            .user_search_builder(true, time_range_value, limit, offset, time_range, order)
+            .user_search_builder(
+                true,
+                time_range_value,
+                limit,
+                offset,
+                time_range,
+                order,
+                fields,
+                query,
+            )
             .await;
 
         match result {
@@ -44,14 +55,30 @@ async fn test_user_search_pagination() {
     }
 
     let pages = db
-        .user_search_pagination(0, 10, 0, TimeRange::MoreOrEqual, Order::OneTwoThree)
+        .user_search_pagination(
+            0,
+            10,
+            0,
+            TimeRange::MoreOrEqual,
+            Order::OneTwoThree,
+            UserSearchFields::default(),
+            "",
+        )
         .await
         .unwrap();
     assert_eq!(pages, 10);
 
     let pages = db
-        .user_search_pagination(0, 10, 2, TimeRange::MoreOrEqual, Order::OneTwoThree)
+        .user_search_pagination(
+            0,
+            5,
+            2,
+            TimeRange::MoreOrEqual,
+            Order::OneTwoThree,
+            UserSearchFields::default(),
+            "",
+        )
         .await
         .unwrap();
-    assert_eq!(pages, 8);
+    assert_eq!(pages, 10);
 }

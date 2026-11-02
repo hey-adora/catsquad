@@ -34,6 +34,25 @@ pub struct UserSearchParams {
     pub order: Option<Order>,
     pub limit: Option<usize>,
     pub offset: Option<usize>,
+    // pub search_fields: Option<UserSearchFields>,
+    pub search_field_username: Option<bool>,
+    pub search_field_email: Option<bool>,
+    pub search_query: Option<String>,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
+pub struct UserSearchFields {
+    pub username: bool,
+    pub email: bool,
+}
+
+impl Default for UserSearchFields {
+    fn default() -> Self {
+        Self {
+            username: true,
+            email: true,
+        }
+    }
 }
 
 impl Default for UserSearchParams {
@@ -44,6 +63,10 @@ impl Default for UserSearchParams {
             order: Some(Order::ThreeTwoOne),
             limit: Some(100),
             offset: Some(0),
+            // search_fields: Some(UserSearchFields::default()),
+            search_field_username: Some(false),
+            search_field_email: Some(false),
+            search_query: Some(String::new()),
         }
     }
 }

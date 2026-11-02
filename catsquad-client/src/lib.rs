@@ -830,6 +830,8 @@ where
         offset: usize,
         range: TimeRange,
         order: Order,
+        search_fields: cs::UserSearchFields,
+        search_quary: impl Into<String>,
     ) -> Builder<TSender, Vec<cs::UserSearchRes>, cs::UserSearchErr> {
         self.get(cs::link_relative_user_search(UserSearchParams {
             time: Some(time),
@@ -837,6 +839,10 @@ where
             range: Some(range),
             order: Some(order),
             limit: Some(limit),
+            // search_fields: Some(search_fields),
+            search_field_username: Some(search_fields.username),
+            search_field_email: Some(search_fields.username),
+            search_query: Some(search_quary.into()),
         }))
     }
 

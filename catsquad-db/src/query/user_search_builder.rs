@@ -1,6 +1,6 @@
 use crate::{Db, XTimestamp, join_str};
 use catsquad_log::prelude::*;
-use catsquad_shared::{Order, TimeRange};
+use catsquad_shared::{Order, TimeRange, UserSearchFields};
 use sqlx::AssertSqlSafe;
 
 #[derive(Debug, thiserror::Error)]
@@ -51,8 +51,14 @@ impl Db {
         offset: usize,
         time_range: TimeRange,
         order: Order,
+        fields: UserSearchFields,
+        search_query: impl Into<String>,
     ) -> Result<DbUserSearchBuilder, DbUserSearchBuilderErr> {
+        // TODO implement search fields option
+        // so user could select which fields to search
+
         let pool = &self.db;
+        let search_query = search_query.into();
 
         let q_order = match order {
             Order::OneTwoThree => "ASC",
@@ -74,7 +80,13 @@ impl Db {
         }
         .to_string();
 
-        let filters = [q_time_after];
+        let q_like = if search_query.is_empty() {
+            "".to_string()
+        } else {
+            "(user_username || ' ' || user_email) LIKE $4".to_string()
+        };
+
+        let filters = [q_time_after, q_like];
         let q_where = join_str(filters, " AND ", |v| v);
         let q_where = if !q_where.is_empty() {
             format!("WHERE {q_where}")
@@ -82,9 +94,19 @@ impl Db {
             String::new()
         };
 
-        let q_limit = if limit == 0 { "" } else { "LIMIT $2" };
+        // pagination must return max possible count, so limit doesnt apply
+        let q_limit = if limit == 0 || pagination {
+            ""
+        } else {
+            "LIMIT $2"
+        };
 
-        let q_offset = if offset == 0 { "" } else { "OFFSET $3" };
+        // pagination always returns only 1 row, offset doesnt apply
+        let q_offset = if offset == 0 || pagination {
+            ""
+        } else {
+            "OFFSET $3"
+        };
 
         let q_selection = if pagination {
             "count(1)"
@@ -124,6 +146,7 @@ impl Db {
                 .bind(XTimestamp(time_range_value as i64))
                 .bind(limit as i64)
                 .bind(offset as i64)
+                .bind(search_query)
                 .fetch_one(pool)
                 .await;
 
@@ -144,6 +167,7 @@ impl Db {
             .bind(XTimestamp(time_range_value as i64))
             .bind(limit as i64)
             .bind(offset as i64)
+            .bind(search_query)
             .fetch_all(pool)
             .await;
 

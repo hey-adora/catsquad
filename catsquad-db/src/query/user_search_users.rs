@@ -1,5 +1,5 @@
 use crate::{Db, DbUserSearch, DbUserSearchBuilderErr};
-use catsquad_shared::{Order, TimeRange};
+use catsquad_shared::{Order, TimeRange, UserSearchFields};
 
 impl Db {
     pub async fn user_search_users(
@@ -9,9 +9,20 @@ impl Db {
         offset: usize,
         time_range: TimeRange,
         order: Order,
+        fields: UserSearchFields,
+        query: impl Into<String>,
     ) -> Result<Vec<DbUserSearch>, DbUserSearchBuilderErr> {
         let result = self
-            .user_search_builder(false, time_range_value, limit, offset, time_range, order)
+            .user_search_builder(
+                false,
+                time_range_value,
+                limit,
+                offset,
+                time_range,
+                order,
+                fields,
+                query,
+            )
             .await;
 
         match result {
@@ -44,7 +55,15 @@ async fn test_user_search_users() {
     }
 
     let users = db
-        .user_search_users(0, 10, 0, TimeRange::MoreOrEqual, Order::OneTwoThree)
+        .user_search_users(
+            0,
+            10,
+            0,
+            TimeRange::MoreOrEqual,
+            Order::OneTwoThree,
+            UserSearchFields::default(),
+            "",
+        )
         .await
         .unwrap();
     assert_eq!(users.len(), 10);
@@ -52,7 +71,15 @@ async fn test_user_search_users() {
     assert_eq!(users[9].username, "hey9");
 
     let users = db
-        .user_search_users(0, 2, 0, TimeRange::MoreOrEqual, Order::OneTwoThree)
+        .user_search_users(
+            0,
+            2,
+            0,
+            TimeRange::MoreOrEqual,
+            Order::OneTwoThree,
+            UserSearchFields::default(),
+            "",
+        )
         .await
         .unwrap();
     assert_eq!(users.len(), 2);
@@ -60,7 +87,15 @@ async fn test_user_search_users() {
     assert_eq!(users[1].username, "hey1");
 
     let users = db
-        .user_search_users(1, 2, 0, TimeRange::MoreOrEqual, Order::OneTwoThree)
+        .user_search_users(
+            1,
+            2,
+            0,
+            TimeRange::MoreOrEqual,
+            Order::OneTwoThree,
+            UserSearchFields::default(),
+            "",
+        )
         .await
         .unwrap();
     assert_eq!(users.len(), 2);
@@ -68,10 +103,49 @@ async fn test_user_search_users() {
     assert_eq!(users[1].username, "hey2");
 
     let users = db
-        .user_search_users(1, 2, 2, TimeRange::MoreOrEqual, Order::OneTwoThree)
+        .user_search_users(
+            1,
+            2,
+            2,
+            TimeRange::MoreOrEqual,
+            Order::OneTwoThree,
+            UserSearchFields::default(),
+            "",
+        )
         .await
         .unwrap();
     assert_eq!(users.len(), 2);
     assert_eq!(users[0].username, "hey3");
     assert_eq!(users[1].username, "hey4");
+
+    let users = db
+        .user_search_users(
+            0,
+            2,
+            0,
+            TimeRange::MoreOrEqual,
+            Order::OneTwoThree,
+            UserSearchFields::default(),
+            "%hey3%",
+        )
+        .await
+        .unwrap();
+    assert_eq!(users.len(), 1);
+    assert_eq!(users[0].username, "hey3");
+
+    let users = db
+        .user_search_users(
+            0,
+            2,
+            0,
+            TimeRange::MoreOrEqual,
+            Order::OneTwoThree,
+            UserSearchFields::default(),
+            "%hey_ %",
+        )
+        .await
+        .unwrap();
+    assert_eq!(users.len(), 2);
+    assert_eq!(users[0].username, "hey0");
+    assert_eq!(users[1].username, "hey1");
 }

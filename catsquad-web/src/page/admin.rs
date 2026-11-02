@@ -68,7 +68,7 @@ pub fn Admin() -> impl IntoView {
         <main class="">
             <Nav/>
             <ModalConfirm/>
-            <div class="flex flex-col gap-2 place-items-start">
+            <div class="px-2 flex flex-col gap-2 place-items-start">
                 <h2 class="font-bold text-[1.1rem] text-base06">"Users"</h2>
                 <Errs error=user_errors  />
                 <UserTableControls user_state spawner />
@@ -78,23 +78,25 @@ pub fn Admin() -> impl IntoView {
                 </Show>
 
                 <Show when=when_is_not_loading>
-                    <table class="border-collapse border-spacing-[10rem] border">
-                      <thead>
-                          <tr>
-                            <th class="border">"username"</th>
-                            <th class="border">"email"</th>
-                            <th class="border">"likes"</th>
-                            <th class="border">"followers"</th>
-                            <th class="border">"following"</th>
-                            <th class="border">"support"</th>
-                            <th class="border">"aboutme"</th>
-                            <th class="border">"controls"</th>
-                          </tr>
-                      </thead>
-                      <tbody>
-                          {view_users}
-                      </tbody>
-                    </table>
+                    <div class="overflow-x-scroll max-w-full">
+                        <table class="border-collapse border-spacing-[10rem] border">
+                          <thead>
+                              <tr>
+                                <th class="border">"username"</th>
+                                <th class="border">"email"</th>
+                                <th class="border">"likes"</th>
+                                <th class="border">"followers"</th>
+                                <th class="border">"following"</th>
+                                <th class="border">"support"</th>
+                                <th class="border">"aboutme"</th>
+                                <th class="border">"controls"</th>
+                              </tr>
+                          </thead>
+                          <tbody>
+                              {view_users}
+                          </tbody>
+                        </table>
+                    </div>
                 </Show>
 
             </div>
