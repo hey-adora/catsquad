@@ -4,9 +4,11 @@ use crate::{
 use catsquad_shared::UserSearchRes;
 use leptos::prelude::*;
 
+mod component_user_table_rows;
 mod component_users_table_control;
 mod users_state;
 
+use component_user_table_rows::UserTableRows;
 use component_users_table_control::UserTableControls;
 use users_state::UsersState;
 
@@ -14,7 +16,6 @@ use users_state::UsersState;
 pub fn Admin() -> impl IntoView {
     let spawner = Spawner::new();
     let user_state = UsersState::new(create_client());
-    let user_errors = user_state.err_general;
 
     Effect::new(move || {
         spawner.spawn(async move {
@@ -22,47 +23,17 @@ pub fn Admin() -> impl IntoView {
         });
     });
 
-    let view_users = move || {
-        user_state
-            .users
-            .get()
-            .into_iter()
-            .map(|user: UserSearchRes| {
-                let username = user.username;
-                let email = user.email;
-                let likes = user.likes;
-                let followers = user.followers;
-                let following = user.following;
-                let support = user.support;
-                let aboutme = user.aboutme;
-                view! {
-                      <tr class="bg-base01">
-                        <td class="border">{username}</td>
-                        <td class="border">{email}</td>
-                        <td class="border">{likes}</td>
-                        <td class="border">{followers}</td>
-                        <td class="border">{following}</td>
-                        <td class="border ">
-                            <textarea rows=1 cols=20>
-                                {support}
-                            </textarea>
-                        </td>
-                        <td class="border ">
-                            <textarea rows=1 cols=20>
-                                {aboutme}
-                            </textarea>
-                        </td>
-                        <td class="border">
-                            <BtnDelete size=BtnSize::Small>"delete"</BtnDelete>
-                        </td>
-                      </tr>
-                }
-            })
-            .collect_view()
-    };
-
     let when_is_loading = move || spawner.is_busy.get();
     let when_is_not_loading = move || !when_is_loading();
+
+    let on_check_all_fn = move |_| {
+        user_state.check_all.update(|v| *v = !*v);
+    };
+
+    // <td class="border">
+    //     <BtnDelete size=BtnSize::Small>"delete"</BtnDelete>
+    // </td>
+    // <th class="border">"controls"</th>
 
     view! {
         <main class="">
@@ -70,7 +41,10 @@ pub fn Admin() -> impl IntoView {
             <ModalConfirm/>
             <div class="px-2 flex flex-col gap-2 place-items-start">
                 <h2 class="font-bold text-[1.1rem] text-base06">"Users"</h2>
-                <Errs error=user_errors  />
+
+                <Errs error=user_state.err_fetch  />
+                <Errs error=user_state.err_remove  />
+
                 <UserTableControls user_state spawner />
 
                 <Show when=when_is_loading>
@@ -78,22 +52,24 @@ pub fn Admin() -> impl IntoView {
                 </Show>
 
                 <Show when=when_is_not_loading>
-                    <div class="overflow-x-scroll max-w-full">
-                        <table class="border-collapse border-spacing-[10rem] border">
+                    <div class="mt-2 overflow-x-scroll max-w-full">
+                        <table class="table-bordered border-collapse border-spacing-[10rem] border">
                           <thead>
                               <tr>
-                                <th class="border">"username"</th>
-                                <th class="border">"email"</th>
-                                <th class="border">"likes"</th>
-                                <th class="border">"followers"</th>
-                                <th class="border">"following"</th>
-                                <th class="border">"support"</th>
-                                <th class="border">"aboutme"</th>
-                                <th class="border">"controls"</th>
+                                <th>
+                                    <input on:change=on_check_all_fn type="checkbox" id="user_table_checkbox" name="user_table_checkbox" checked=user_state.check_all />
+                                </th>
+                                <th>"username"</th>
+                                <th>"email"</th>
+                                <th>"likes"</th>
+                                <th>"followers"</th>
+                                <th>"following"</th>
+                                <th>"support"</th>
+                                <th>"aboutme"</th>
                               </tr>
                           </thead>
                           <tbody>
-                              {view_users}
+                              <UserTableRows user_state spawner />
                           </tbody>
                         </table>
                     </div>

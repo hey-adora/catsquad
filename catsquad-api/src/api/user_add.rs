@@ -91,7 +91,8 @@ fn status_code(result: &Result<SensitiveUserRes, UserAddErr>) -> StatusCode {
     }
 }
 
-#[axum::debug_handler]
+/// username cant contain ',' because its used as last_char marker in api_user_remove_by_usernames
+/// check in catsquad_shared/api/user_remove_by_username
 pub async fn user_add(
     State(app): State<AppState>,
     Form(req): Form<UserAddReq>,
@@ -312,21 +313,31 @@ async fn test_api_user_add() {
         );
     }
 
-    // invite not found
+    // assert errors
     {
         let result = server
             .user_add("hey", 10_u128.to_be_bytes(), "inesognf042n0NR)TN09nnfw9")
             .await;
         assert!(matches!(result, Err(UserAddErr::InviteNotFound)));
+
+        let _invite = server.invite_add("prime@heyadora.com").await.unwrap();
+        let invite_key = server.invite_get_key("prime@heyadora.com").await;
+
+        let result = server
+            .user_add("he,y", invite_key, "inesognf042n0NR)TN09nnfw9")
+            .await;
+        assert!(matches!(result, Err(UserAddErr::InvalidInput { .. })));
     }
 
-    // check if creates session
+    // assert success - check if creates session
     {
         let _invite = server.invite_add("prime@heyadora.com").await.unwrap();
         let invite_key = server.invite_get_key("prime@heyadora.com").await;
+
         let (_result, session_key) = server
             .user_add_with_session("prime", invite_key, "inesognf042n0NR)TN09nnfw9")
             .await;
+
         let _result = server
             .state
             .db

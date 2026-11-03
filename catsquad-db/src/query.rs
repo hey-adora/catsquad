@@ -58,7 +58,7 @@ pub mod session_add;
 pub mod session_get_all;
 pub mod session_get_by_id;
 pub mod session_remove;
-pub mod token_add;
+pub mod token_add; // maybe rename to confirm_token
 pub mod token_get_all;
 pub mod token_update_confirm_tx;
 pub mod user_add;
@@ -69,6 +69,7 @@ pub mod user_get_by_session;
 pub mod user_get_by_username;
 pub mod user_get_password;
 pub mod user_remove_by_token;
+pub mod user_remove_by_usernames;
 pub mod user_remove_tx;
 pub mod user_search_builder;
 pub mod user_search_pagination;

@@ -61,3 +61,6 @@
     --font-lucky: "Luckiest Guy", cursive;
 }
 
+.table-bordered table, .table-bordered th, .table-bordered td {
+  border: 1px solid var(--color-base05);
+}

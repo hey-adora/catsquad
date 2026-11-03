@@ -42,7 +42,7 @@ impl Db {
             return Err(DbUserRemoveByTokenErr::Unauthorized);
         }
 
-        self.user_remove(&mut *tx, time, callback_remove_image, token_user_username)
+        self.user_remove_tx(&mut *tx, time, callback_remove_image, token_user_username)
             .await?;
 
         tx.commit()

@@ -9,6 +9,8 @@ pub const LINK_API_ROLE: &str = "/api/role/{role_name}";
 pub const ROLE_VALUE_PERMISSION_ROLE_ADD: &'static str = "permission_role_add";
 pub const ROLE_VALUE_PERMISSION_ROLE_REMOVE: &'static str = "permission_role_remove";
 pub const ROLE_VALUE_PERMISSION_USER_SEARCH: &'static str = "permission_user_search";
+pub const ROLE_VALUE_PERMISSION_USER_REMOVE_BY_USERNAMES: &'static str =
+    "permission_user_remove_by_usernames";
 
 pub fn link_relative_role_add(role_name: impl Display) -> String {
     format!("/api/role/{role_name}")
@@ -25,6 +27,7 @@ pub enum RoleValue {
     PermissionRoleAdd,
     PermissionRoleRemove,
     PermissionUserSearch,
+    PermissionUserRemoveByUsername,
 }
 
 pub fn contains_roles<T>(expected_roles: &[RoleValue], roles_values: &[T]) -> bool
@@ -55,14 +58,15 @@ fn test_contains_roles() {
             RoleValue::PermissionRoleAdd,
             RoleValue::PermissionRoleRemove,
             RoleValue::PermissionUserSearch,
+            RoleValue::PermissionUserRemoveByUsername,
         ],
         &[
             "permission_role_add",
             "permission_role_remove",
             "permission_user_search",
+            "permission_user_remove_by_usernames"
         ],
     ));
-    return;
 
     assert!(contains_roles(
         &[RoleValue::PermissionRoleAdd],
@@ -130,6 +134,7 @@ impl RoleValue {
             Self::PermissionRoleAdd => ROLE_VALUE_PERMISSION_ROLE_ADD,
             Self::PermissionRoleRemove => ROLE_VALUE_PERMISSION_ROLE_REMOVE,
             Self::PermissionUserSearch => ROLE_VALUE_PERMISSION_USER_SEARCH,
+            Self::PermissionUserRemoveByUsername => ROLE_VALUE_PERMISSION_USER_REMOVE_BY_USERNAMES,
         }
     }
 }
@@ -148,6 +153,7 @@ impl TryFrom<&str> for RoleValue {
             ROLE_VALUE_PERMISSION_ROLE_ADD => Self::PermissionRoleAdd,
             ROLE_VALUE_PERMISSION_ROLE_REMOVE => Self::PermissionRoleRemove,
             ROLE_VALUE_PERMISSION_USER_SEARCH => Self::PermissionUserSearch,
+            ROLE_VALUE_PERMISSION_USER_REMOVE_BY_USERNAMES => Self::PermissionUserRemoveByUsername,
             _ => return Err(anyhow!("invalid value {value}")),
         };
 

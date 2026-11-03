@@ -644,7 +644,19 @@ where
     ) -> Builder<TSender, (), cs::UserRemoveByTokenErr> {
         self.delete_form(
             cs::LINK_API_USER_REMOVE_BY_TOKEN,
-            cs::UserRemoveByTokenReq { token: token },
+            cs::UserRemoveByTokenReq {
+                confirm_token: token,
+            },
+        )
+    }
+
+    pub fn user_remove_by_usernames(
+        &self,
+        usernames: Vec<String>,
+    ) -> Builder<TSender, (), cs::UserRemoveByUsernamesErr> {
+        self.delete_form(
+            cs::LINK_API_USER_REMOVE_BY_USERNAMES,
+            cs::UserRemoveByUsernamesReq { usernames },
         )
     }
 

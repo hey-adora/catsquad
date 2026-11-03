@@ -47,7 +47,7 @@ pub async fn user_remove_by_token(
     Form(req): Form<UserRemoveByTokenReq>,
 ) -> impl IntoResponse {
     let time = app.get_time_micro();
-    let token = req.token;
+    let confirm_token = req.confirm_token;
     let user_username = db_user.username.clone();
     let storage_path = app.get_storage_path().await;
 
@@ -57,7 +57,7 @@ pub async fn user_remove_by_token(
         };
 
         app.db
-            .user_remove_by_token(time, callback_remove_image, token, user_username)
+            .user_remove_by_token(time, callback_remove_image, confirm_token, user_username)
             .await
             .map_err(from_db_user_remove_by_token_err)?;
 
@@ -115,10 +115,10 @@ async fn test_api_user_remove_by_token() {
     // assert success
     {
         server.token_user_remove_add(user_token).await.unwrap();
-        let token = server.state.db.token_get_all().await.unwrap()[0].clone();
+        let confirm_token = server.state.db.token_get_all().await.unwrap()[0].clone();
 
         server
-            .user_remove_by_token(token.id, user_token)
+            .user_remove_by_token(confirm_token.id, user_token)
             .await
             .unwrap();
 

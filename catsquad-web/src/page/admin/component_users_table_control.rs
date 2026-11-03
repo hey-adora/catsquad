@@ -1,5 +1,5 @@
 use super::UsersState;
-use crate::{BtnPrimary, hook::Spawner};
+use crate::{BtnDelete, BtnPrimary, hook::Spawner};
 use catsquad_client::XMLSender;
 use catsquad_log::prelude::*;
 use catsquad_shared::Order;
@@ -59,32 +59,60 @@ pub fn UserTableControls(spawner: Spawner, user_state: UsersState<XMLSender>) ->
         search();
     };
 
+    let modal_text = move || {
+        let mut usernames = user_state.get_checked_usernames().join(",");
+        if usernames.is_empty() {
+            usernames.push_str("<none>");
+        }
+        format!("remove users {} ?", usernames)
+    };
+
+    let on_delete = move |_| {
+        spawner.spawn(async move {
+            user_state.remove_users().await;
+            user_state.fetch().await;
+        });
+    };
+
     view! {
-        <div class="flex gap-2 place-items-center flex-wrap">
-            <span>{view_user_count}" users"</span>
-            <input
-                autocomplete="off"
-                id="input_search_query"
-                name="input_search_query"
-                placeholder="search"
-                on:keydown=input_search_fn
-                node_ref=input_search_query
-                class="bg-base02 rounded-md px-2 py-1 "
-                />
-            <select node_ref=input_search_ord on:change=input_search_ord_fn class="bg-base02 rounded-md px-2 py-1" name="input_search_order" id="input_search_order">
-                <option value="desc">desc</option>
-                <option value="asc">asc</option>
-            </select>
-            <select node_ref=input_search_limit on:change=input_search_limit_fn class="bg-base02 rounded-md px-2 py-1" name="input_search_limit" id="input_search_limit">
-                <option value="100">100</option>
-                <option value="250">250</option>
-                <option value="500">500</option>
-                <option value="1000">1000</option>
-                <option value="10000">10000</option>
-            </select>
-            <BtnPrimary on_click=on_search_fn>
-                Search
-            </BtnPrimary>
+        <div class="flex flex-col gap-2">
+            <p class="font-bold text-base06">"Search"</p>
+            <div class="flex gap-2 place-items-center flex-wrap">
+                <span>{view_user_count}" users"</span>
+                <input
+                    autocomplete="off"
+                    id="input_search_query"
+                    name="input_search_query"
+                    placeholder="search"
+                    on:keydown=input_search_fn
+                    node_ref=input_search_query
+                    class="bg-base02 rounded-md px-2 py-1 "
+                    />
+                <select node_ref=input_search_ord on:change=input_search_ord_fn class="bg-base02 rounded-md px-2 py-1" name="input_search_order" id="input_search_order">
+                    <option value="desc">desc</option>
+                    <option value="asc">asc</option>
+                </select>
+                <select node_ref=input_search_limit on:change=input_search_limit_fn class="bg-base02 rounded-md px-2 py-1" name="input_search_limit" id="input_search_limit">
+                    <option value="100">100</option>
+                    <option value="250">250</option>
+                    <option value="500">500</option>
+                    <option value="1000">1000</option>
+                    <option value="10000">10000</option>
+                </select>
+                <BtnPrimary on_click=on_search_fn>
+                    Search
+                </BtnPrimary>
+            </div>
+
+            <p class="font-bold text-base06">"Actions"</p>
+            <div>
+                <BtnDelete
+                    on_click=on_delete
+                    modal_enable=true
+                    modal_title="delete users"
+                    modal_text=modal_text
+                >"delete"</BtnDelete>
+            </div>
         </div>
     }
 }

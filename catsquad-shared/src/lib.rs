@@ -75,6 +75,7 @@ pub use api::user_get_by_session_key::*;
 pub use api::user_get_by_username::*;
 pub use api::user_pfp_get_bytes::*;
 pub use api::user_remove_by_token::*;
+pub use api::user_remove_by_usernames::*;
 pub use api::user_search::*;
 pub use api::user_update_aboutme::*;
 pub use api::user_update_password_by_token::*;
@@ -109,6 +110,24 @@ pub use uuid::*;
 //     let time = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
 //     time.as_micros()
 // }
+
+fn serde_from_string_vec<S: serde::Serializer>(
+    v: &Vec<String>,
+    serializer: S,
+) -> Result<S::Ok, S::Error> {
+    use serde::Serialize;
+    let output = v.join(",");
+    output.serialize(serializer)
+}
+
+fn serde_to_string_vec<'de, D: serde::Deserializer<'de>>(
+    deserializer: D,
+) -> Result<Vec<String>, D::Error> {
+    use serde::Deserialize;
+
+    String::deserialize(deserializer)
+        .map(|v| v.split(',').map(|v| v.to_string()).collect::<Vec<String>>())
+}
 
 fn serde_from_role_value<S: serde::Serializer>(
     v: &Vec<RoleValue>,

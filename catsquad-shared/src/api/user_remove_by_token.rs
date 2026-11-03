@@ -12,7 +12,7 @@ pub struct UserRemoveByTokenReq {
         serialize_with = "crate::serde_from_uuid",
         deserialize_with = "crate::serde_to_uuid"
     )]
-    pub token: crate::Uuid,
+    pub confirm_token: crate::Uuid,
     // pub token: String,
 }
 

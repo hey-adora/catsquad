@@ -11,8 +11,13 @@ pub enum DbUserRemoveErr {
     Image(#[from] DbFileImageRemoveTxErr),
 }
 
+// TODO use user ID instead of username,
+// username changes and is unpredictable
+
+// TODO support multi user removal
+
 impl Db {
-    pub async fn user_remove(
+    pub async fn user_remove_tx(
         &self,
         tx: &mut PgConnection,
         time: u64,
@@ -133,6 +138,7 @@ impl Db {
 
         //
 
+        // TODO maybe move out of this function, query must commit successfully
         for (hash, extension) in delete_these_images {
             callback_remove_image(hash, extension.as_str()).await;
         }
@@ -376,7 +382,7 @@ async fn test_user_remove() {
         assert_eq!(images[3].used_count, 2);
 
         let mut tx = db.db.begin().await.unwrap();
-        let result = db.user_remove(&mut *tx, 0, callback_remove, "hey").await;
+        let result = db.user_remove_tx(&mut *tx, 0, callback_remove, "hey").await;
         tx.commit().await.unwrap();
 
         assert!(matches!(result, Ok(_)));

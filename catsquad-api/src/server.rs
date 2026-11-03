@@ -285,6 +285,10 @@ pub async fn app(state: AppState) -> Router {
             delete(api::user_remove_by_token),
         )
         .route(
+            catsquad_shared::LINK_API_USER_REMOVE_BY_USERNAMES,
+            delete(api::user_remove_by_usernames),
+        )
+        .route(
             catsquad_shared::LINK_API_TOKEN_USER_REMOVE_ADD,
             post(api::token_user_remove_add),
         )
