@@ -78,8 +78,8 @@ async fn test_user_remove_by_token() {
         db.session_add(1, &user2.email).await.unwrap();
         let sessions = db.sessoin_get_all().await.unwrap();
         assert_eq!(sessions.len(), 2);
-        assert_eq!(sessions[0].user_email, user2.email);
-        assert_eq!(sessions[1].user_email, user.email);
+        assert_eq!(sessions[0].user_id, user2.id);
+        assert_eq!(sessions[1].user_id, user.id);
 
         (user, user2)
     };

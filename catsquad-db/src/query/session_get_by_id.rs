@@ -51,13 +51,13 @@ async fn test_session_get_by_key() {
     let db = Db::test_db(0, "test_session_get_by_key").await;
 
     let invite = db.invite_add(0, "hey@hey.com", 1).await.unwrap();
-    let _result = db
+    let user1 = db
         .user_add(0, "hey", "hey", invite.token, 10, 10)
         .await
         .unwrap();
 
     let session = db.session_add(0, "hey@hey.com").await.unwrap();
-    assert_eq!(session.user_email, "hey@hey.com");
+    assert_eq!(session.user_id, user1.id);
 
     let _result = db.session_get_by_token(session.token).await.unwrap();
     let result = db.session_get_by_token(0_u128.to_be_bytes()).await;

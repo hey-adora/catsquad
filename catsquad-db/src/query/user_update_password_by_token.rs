@@ -24,7 +24,7 @@ impl Db {
             let query = "DELETE FROM sessions
                                     USING users
                                 WHERE
-                                    session_user_email=user_email
+                                    session_user_id=user_id
                                     AND user_username = $1";
 
             let result = sqlx::query(query)
@@ -107,8 +107,8 @@ async fn test_user_update_password_by_token() {
         db.session_add(1, &user2.email).await.unwrap();
         let sessions = db.sessoin_get_all().await.unwrap();
         assert_eq!(sessions.len(), 2);
-        assert_eq!(sessions[0].user_email, user2.email);
-        assert_eq!(sessions[1].user_email, user.email);
+        assert_eq!(sessions[0].user_id, user2.id);
+        assert_eq!(sessions[1].user_id, user.id);
 
         (user, user2)
     };
@@ -139,7 +139,7 @@ async fn test_user_update_password_by_token() {
     {
         let sessions = db.sessoin_get_all().await.unwrap();
         assert_eq!(sessions.len(), 1);
-        assert_eq!(sessions[0].user_email, user2.email);
+        assert_eq!(sessions[0].user_id, user2.id);
     }
 
     // assert other errors

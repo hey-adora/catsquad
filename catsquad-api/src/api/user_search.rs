@@ -225,7 +225,7 @@ async fn test_api_user_search() {
                 TimeRange::MoreOrEqual,
                 Order::OneTwoThree,
                 UserSearchFields::default(),
-                "hey0",
+                "hey0%",
                 session_key,
             )
             .await

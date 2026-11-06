@@ -63,7 +63,7 @@ impl Db {
 
             let q_join_session = 'a: {
                 if !session_token_is_empty {
-                    break 'a "JOIN sessions ON user_email=session_user_email";
+                    break 'a "JOIN sessions ON user_id=session_user_id";
                 }
                 ""
             };

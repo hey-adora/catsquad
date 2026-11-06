@@ -6,8 +6,8 @@ pub struct DbSession {
     #[sqlx(rename = "session_token")]
     #[sqlx(try_from = "XUuid")]
     pub token: Uuid,
-    #[sqlx(rename = "session_user_email")]
-    pub user_email: String,
+    #[sqlx(rename = "session_user_id")]
+    pub user_id: i64,
     #[sqlx(rename = "session_modified_at")]
     #[sqlx(try_from = "XTimestamp")]
     pub modified_at: u64,
@@ -33,11 +33,10 @@ impl Db {
             "
             CREATE TABLE sessions (
                 session_token uuid PRIMARY KEY DEFAULT uuidv7(),
-                session_user_email varchar NOT NULL references users(user_email) ON UPDATE CASCADE ON DELETE CASCADE,
+                session_user_id int8 NOT NULL references users(user_id) ON DELETE CASCADE,
                 session_modified_at timestamp NOT NULL,
                 session_created_at timestamp NOT NULL
             );
-            CREATE INDEX session_user_email_idx ON sessions (session_user_email);
         ",
         )
         .execute(pool)
@@ -55,28 +54,30 @@ impl Db {
 
         let query = "
             INSERT INTO sessions (
-                    session_user_email,
+                    session_user_id,
                     session_modified_at,
                     session_created_at
                 )
-                VALUES ( $2, $1, $1 )
-                RETURNING session_token
+                SELECT
+                    user_id, 
+                    $2,
+                    $2
+                    FROM users
+                    WHERE user_email = $1
+                RETURNING session_token, session_user_id
         ";
 
-        debug!("about to run {query}");
-
         let result = sqlx::query_as(query)
-            .bind(XTimestamp(time as i64))
             .bind(&email)
+            .bind(XTimestamp(time as i64))
             .fetch_one(pool)
             .await;
 
-        let result = match result {
+        debug!("query {query}, result {result:#?}");
+
+        let (XUuid(session_token), session_user_id): (XUuid, i64) = match result {
             Ok(v) => v,
-            Err(sqlx::Error::Database(err))
-                if err.is_foreign_key_violation()
-                    && err.constraint() == Some("sessions_session_user_email_fkey") =>
-            {
+            Err(sqlx::Error::RowNotFound) => {
                 return Err(DbSessionAddErr::UserNotFound(email));
             }
             Err(err) => {
@@ -85,16 +86,12 @@ impl Db {
             }
         };
 
-        let (XUuid(session_token),): (XUuid,) = result;
-
         let session = DbSession {
             token: session_token,
-            user_email: email,
+            user_id: session_user_id,
             modified_at: time,
             created_at: time,
         };
-
-        debug!("query {query}\nresults {session:#?}");
 
         Ok(session)
     }
@@ -108,16 +105,16 @@ async fn test_session_add() {
     let db = Db::test_db(0, "test_session_add").await;
 
     let invite = db.invite_add(0, "hey@hey.com", 1).await.unwrap();
-    let _result = db
+    let user1 = db
         .user_add(0, "hey", "hey", invite.token.clone(), 10, 10)
         .await
         .unwrap();
 
     let session1 = db.session_add(0, "hey@hey.com").await.unwrap();
-    assert_eq!(session1.user_email, "hey@hey.com");
+    assert_eq!(session1.user_id, user1.id);
 
     let session2 = db.session_add(0, "hey@hey.com").await.unwrap();
-    assert_eq!(session2.user_email, "hey@hey.com");
+    assert_eq!(session2.user_id, user1.id);
 
     let result = db.session_add(0, "hey2@hey.com").await;
     assert!(matches!(result, Err(DbSessionAddErr::UserNotFound(_))));
