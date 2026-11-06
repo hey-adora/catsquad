@@ -1,4 +1,4 @@
-use crate::{Db, DbTokenLabel, DbTokenUpdateConfirmErr, Uuid, XTimestamp};
+use crate::{Db, DbConfirmTokenLabel, DbTokenUpdateConfirmErr, Uuid, XTimestamp};
 use catsquad_log::prelude::*;
 
 impl Db {
@@ -16,7 +16,12 @@ impl Db {
             .inspect_err(|err| error!("token_update_confirm {err}"))?;
 
         let user_username = self
-            .token_update_confirm_tx(&mut *tx, time, token_id, DbTokenLabel::PasswordChange)
+            .token_update_confirm_tx(
+                &mut *tx,
+                time,
+                token_id,
+                DbConfirmTokenLabel::PasswordChange,
+            )
             .await?;
 
         // delete sessoins
@@ -84,7 +89,7 @@ impl Db {
 #[cfg(test)]
 #[tokio::test]
 async fn test_user_update_password_by_token() {
-    use crate::DbTokenLabel;
+    use crate::DbConfirmTokenLabel;
 
     init_log();
 
@@ -114,7 +119,12 @@ async fn test_user_update_password_by_token() {
     };
 
     let token = db
-        .token_add(0, user1.username.clone(), 10, DbTokenLabel::PasswordChange)
+        .confirm_token_add(
+            0,
+            user1.username.clone(),
+            10,
+            DbConfirmTokenLabel::PasswordChange,
+        )
         .await
         .unwrap();
 

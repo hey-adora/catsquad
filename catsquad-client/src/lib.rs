@@ -1135,22 +1135,23 @@ where
         )
     }
 
-    pub fn token_password_change_add(
+    pub fn confirm_token_password_change_add(
         &self,
         email: impl Into<String>,
-    ) -> Builder<TSender, cs::TokenPasswordChangeRes, cs::TokenPasswordChangeAddErr> {
+    ) -> Builder<TSender, cs::ConfirmTokenPasswordChangeRes, cs::ConfirmTokenPasswordChangeAddErr>
+    {
         self.post_form(
-            cs::LINK_API_TOKEN_PASSWORD_CHANGE_ADD,
-            cs::TokenPasswordChangeAddReq {
+            cs::LINK_API_CONFIRM_TOKEN_PASSWORD_CHANGE_ADD,
+            cs::ConfirmTokenPasswordChangeAddReq {
                 email: email.into(),
             },
         )
     }
 
-    pub fn token_user_remove_add(
+    pub fn confirm_token_user_remove_add(
         &self,
-    ) -> Builder<TSender, cs::TokenUserRemoveRes, cs::TokenUserRemoveAddErr> {
-        self.post_form_empty(cs::LINK_API_TOKEN_USER_REMOVE_ADD)
+    ) -> Builder<TSender, cs::ConfirmTokenUserRemoveRes, cs::ConfirmTokenUserRemoveAddErr> {
+        self.post_form_empty(cs::LINK_API_CONFIRM_TOKEN_USER_REMOVE_ADD)
     }
 
     pub fn user_update_password_by_token(

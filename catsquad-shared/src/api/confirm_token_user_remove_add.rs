@@ -1,7 +1,7 @@
-pub const LINK_API_TOKEN_USER_REMOVE_ADD: &str = "/api/token_user_remove_add";
+pub const LINK_API_CONFIRM_TOKEN_USER_REMOVE_ADD: &str = "/api/confirm_token_user_remove_add";
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
-pub struct TokenUserRemoveRes {
+pub struct ConfirmTokenUserRemoveRes {
     pub expires: u64,
 }
 
@@ -13,7 +13,7 @@ pub struct TokenUserRemoveRes {
 #[derive(
     Default, Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq, thiserror::Error,
 )]
-pub enum TokenUserRemoveAddErr {
+pub enum ConfirmTokenUserRemoveAddErr {
     // #[error("email is invalid")]
     // InvalidEmail(String),
     // #[error("bad request {0}")]

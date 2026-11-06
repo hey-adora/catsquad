@@ -1,32 +1,34 @@
 use crate::state::AppState;
 use axum::{Extension, Form, Json, extract::State, http::StatusCode, response::IntoResponse};
-use catsquad_db::{DbToken, DbTokenAddErr, DbTokenLabel, DbUser, DbUserGet};
+use catsquad_db::{DbConfirmToken, DbConfirmTokenAddErr, DbConfirmTokenLabel, DbUser, DbUserGet};
 use catsquad_log::prelude::*;
 use catsquad_shared::{
-    TokenUserRemoveAddErr, TokenUserRemoveRes, Uuid,
+    ConfirmTokenUserRemoveAddErr, ConfirmTokenUserRemoveRes, Uuid,
     link_absolute_settings_account_deletion_confirm,
     link_absolute_settings_password_change_confirm, uuid_to_str,
 };
 use url::Url;
 
-fn from_db_token_user_remove(value: DbToken) -> TokenUserRemoveRes {
-    TokenUserRemoveRes {
+fn from_db_token_user_remove(value: DbConfirmToken) -> ConfirmTokenUserRemoveRes {
+    ConfirmTokenUserRemoveRes {
         expires: value.expires_at,
     }
 }
 
-fn from_db_token_add_err(value: DbTokenAddErr) -> TokenUserRemoveAddErr {
+fn from_db_token_add_err(value: DbConfirmTokenAddErr) -> ConfirmTokenUserRemoveAddErr {
     match value {
-        DbTokenAddErr::UserNotFound(_) => TokenUserRemoveAddErr::InternalServer,
-        DbTokenAddErr::Db(_) => TokenUserRemoveAddErr::InternalServer,
+        DbConfirmTokenAddErr::UserNotFound(_) => ConfirmTokenUserRemoveAddErr::InternalServer,
+        DbConfirmTokenAddErr::Db(_) => ConfirmTokenUserRemoveAddErr::InternalServer,
     }
 }
 
-fn status_code(result: &Result<TokenUserRemoveRes, TokenUserRemoveAddErr>) -> StatusCode {
+fn status_code(
+    result: &Result<ConfirmTokenUserRemoveRes, ConfirmTokenUserRemoveAddErr>,
+) -> StatusCode {
     match result {
         Ok(_) => StatusCode::OK,
-        Err(TokenUserRemoveAddErr::Unauthorized(_)) => StatusCode::UNAUTHORIZED,
-        Err(TokenUserRemoveAddErr::InternalServer) => StatusCode::INTERNAL_SERVER_ERROR,
+        Err(ConfirmTokenUserRemoveAddErr::Unauthorized(_)) => StatusCode::UNAUTHORIZED,
+        Err(ConfirmTokenUserRemoveAddErr::InternalServer) => StatusCode::INTERNAL_SERVER_ERROR,
     }
 }
 
@@ -50,10 +52,15 @@ pub async fn token_user_remove_add(
     let email = db_user.email.clone();
     let address = app.get_address().await;
 
-    let inner = async || -> Result<TokenUserRemoveRes, TokenUserRemoveAddErr> {
+    let inner = async || -> Result<ConfirmTokenUserRemoveRes, ConfirmTokenUserRemoveAddErr> {
         let token = app
             .db
-            .token_add(time, username, expires, DbTokenLabel::AccountDeletion)
+            .confirm_token_add(
+                time,
+                username,
+                expires,
+                DbConfirmTokenLabel::AccountDeletion,
+            )
             .await
             .map_err(from_db_token_add_err)?;
 
@@ -87,9 +94,9 @@ mod test_utils {
         pub async fn token_user_remove_add(
             &self,
             session_token: Uuid,
-        ) -> Result<cs::TokenUserRemoveRes, cs::TokenUserRemoveAddErr> {
+        ) -> Result<cs::ConfirmTokenUserRemoveRes, cs::ConfirmTokenUserRemoveAddErr> {
             self.client
-                .token_user_remove_add()
+                .confirm_token_user_remove_add()
                 .header_add(
                     header::COOKIE,
                     create_auth_cookie_str(uuid_to_str(session_token)),
@@ -119,7 +126,7 @@ async fn test_api_token_user_remove_add() {
         let result = server.token_user_remove_add(0_u128.to_be_bytes()).await;
         assert!(matches!(
             result,
-            Err(TokenUserRemoveAddErr::Unauthorized(_))
+            Err(ConfirmTokenUserRemoveAddErr::Unauthorized(_))
         ));
     }
 
@@ -127,15 +134,15 @@ async fn test_api_token_user_remove_add() {
     {
         use catsquad_db::DbEmailSentReason;
 
-        let tokens = server.state.db.token_get_all().await.unwrap();
+        let tokens = server.state.db.confirm_token_get_all().await.unwrap();
         assert_eq!(tokens.len(), 0);
 
         server.state.set_user_remove_expiration(10).await;
         server.token_user_remove_add(user_token).await.unwrap();
 
-        let tokens = server.state.db.token_get_all().await.unwrap();
+        let tokens = server.state.db.confirm_token_get_all().await.unwrap();
         assert_eq!(tokens.len(), 1);
-        assert_eq!(tokens[0].label, DbTokenLabel::AccountDeletion);
+        assert_eq!(tokens[0].label, DbConfirmTokenLabel::AccountDeletion);
 
         let emails = server
             .email_sent_get_filtered(DbEmailSentReason::UserRemove)

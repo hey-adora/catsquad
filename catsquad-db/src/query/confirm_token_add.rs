@@ -3,7 +3,7 @@ use catsquad_log::prelude::*;
 use std::fmt::Display;
 
 #[derive(Debug, Clone, PartialEq, sqlx::FromRow)]
-pub struct DbToken {
+pub struct DbConfirmToken {
     #[sqlx(rename = "token_id")]
     #[sqlx(try_from = "XUuid")]
     pub id: Uuid,
@@ -11,7 +11,7 @@ pub struct DbToken {
     pub user_username: String,
     #[sqlx(rename = "token_label")]
     #[sqlx(try_from = "String")]
-    pub label: DbTokenLabel,
+    pub label: DbConfirmTokenLabel,
     #[sqlx(rename = "token_used")]
     pub used: bool,
     #[sqlx(rename = "token_expires_at")]
@@ -26,40 +26,40 @@ pub struct DbToken {
 }
 
 #[derive(Clone, Debug, Copy, PartialEq)]
-pub enum DbTokenLabel {
+pub enum DbConfirmTokenLabel {
     PasswordChange,
     AccountDeletion,
 }
 
-impl Display for DbTokenLabel {
+impl Display for DbConfirmTokenLabel {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let text = match self {
-            DbTokenLabel::PasswordChange => "password_change",
-            DbTokenLabel::AccountDeletion => "account_deletion",
+            DbConfirmTokenLabel::PasswordChange => "password_change",
+            DbConfirmTokenLabel::AccountDeletion => "account_deletion",
         };
 
         write!(f, "{}", text)
     }
 }
 
-impl From<&str> for DbTokenLabel {
+impl From<&str> for DbConfirmTokenLabel {
     fn from(value: &str) -> Self {
         match value {
-            "password_change" => DbTokenLabel::PasswordChange,
-            "account_deletion" => DbTokenLabel::AccountDeletion,
+            "password_change" => DbConfirmTokenLabel::PasswordChange,
+            "account_deletion" => DbConfirmTokenLabel::AccountDeletion,
             _ => panic!("database has invalid labels for tokens table"),
         }
     }
 }
 
-impl From<String> for DbTokenLabel {
+impl From<String> for DbConfirmTokenLabel {
     fn from(value: String) -> Self {
-        DbTokenLabel::from(value.as_str())
+        DbConfirmTokenLabel::from(value.as_str())
     }
 }
 
 #[derive(Debug, thiserror::Error)]
-pub enum DbTokenAddErr {
+pub enum DbConfirmTokenAddErr {
     #[error("DB error {0}")]
     Db(#[from] sqlx::Error),
 
@@ -68,7 +68,7 @@ pub enum DbTokenAddErr {
 }
 
 impl Db {
-    pub async fn token_define(&self) {
+    pub async fn confirm_token_define(&self) {
         let pool = &self.db;
         let query = "
             CREATE TABLE tokens (
@@ -85,13 +85,13 @@ impl Db {
         let _result = sqlx::raw_sql(query).execute(pool).await.unwrap();
     }
 
-    pub async fn token_add(
+    pub async fn confirm_token_add(
         &self,
         time: u64,
         username: impl Into<String>,
         expires: u64,
-        label: DbTokenLabel,
-    ) -> Result<DbToken, DbTokenAddErr> {
+        label: DbConfirmTokenLabel,
+    ) -> Result<DbConfirmToken, DbConfirmTokenAddErr> {
         let pool = &self.db;
         let username = username.into();
 
@@ -123,17 +123,17 @@ impl Db {
                 if err.is_foreign_key_violation()
                     && err.constraint() == Some("tokens_token_user_username_fkey") =>
             {
-                return Err(DbTokenAddErr::UserNotFound(username));
+                return Err(DbConfirmTokenAddErr::UserNotFound(username));
             }
             Err(err) => {
                 error!("unexpected db error {err}");
-                return Err(DbTokenAddErr::Db(err));
+                return Err(DbConfirmTokenAddErr::Db(err));
             }
         };
 
         let (XUuid(token),): (XUuid,) = result;
 
-        let token = DbToken {
+        let token = DbConfirmToken {
             id: token,
             user_username: username,
             label,
@@ -149,7 +149,7 @@ impl Db {
 
 #[cfg(test)]
 #[tokio::test]
-async fn test_token_add() {
+async fn test_confirm_token_add() {
     init_log();
 
     let db = Db::test_db(0, "test_token_add").await;
@@ -165,13 +165,13 @@ async fn test_token_add() {
         .unwrap();
 
     let _result = db
-        .token_add(0, username, 10, DbTokenLabel::PasswordChange)
+        .confirm_token_add(0, username, 10, DbConfirmTokenLabel::PasswordChange)
         .await
         .unwrap();
 
     let result = db
-        .token_add(0, "invalid", 10, DbTokenLabel::PasswordChange)
+        .confirm_token_add(0, "invalid", 10, DbConfirmTokenLabel::PasswordChange)
         .await;
     // matches!()
-    assert!(matches!(result, Err(DbTokenAddErr::UserNotFound(_))));
+    assert!(matches!(result, Err(DbConfirmTokenAddErr::UserNotFound(_))));
 }

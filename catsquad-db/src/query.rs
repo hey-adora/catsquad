@@ -6,6 +6,9 @@ pub mod comment_get_by_id;
 pub mod comment_remove;
 pub mod comment_search;
 pub mod comment_update_text;
+pub mod confirm_token_add; // maybe rename to confirm_token
+pub mod confirm_token_get_all;
+pub mod confirm_token_update_confirm_tx;
 pub mod email_change_add;
 pub mod email_change_get_all;
 pub mod email_change_get_by_id;
@@ -58,9 +61,6 @@ pub mod session_add;
 pub mod session_get_all;
 pub mod session_get_by_id;
 pub mod session_remove;
-pub mod token_add; // maybe rename to confirm_token
-pub mod token_get_all;
-pub mod token_update_confirm_tx;
 pub mod user_add;
 pub mod user_get_all;
 pub mod user_get_builder;

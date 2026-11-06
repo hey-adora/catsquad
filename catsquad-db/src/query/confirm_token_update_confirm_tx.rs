@@ -1,4 +1,4 @@
-use crate::{Db, DbTokenLabel, XTimestamp, XUuid};
+use crate::{Db, DbConfirmTokenLabel, XTimestamp, XUuid};
 use catsquad_log::prelude::*;
 use catsquad_shared::Uuid;
 use sqlx::PgConnection;
@@ -24,7 +24,7 @@ impl Db {
         tx: &mut PgConnection,
         time: u64,
         token_id: Uuid,
-        label: DbTokenLabel,
+        label: DbConfirmTokenLabel,
     ) -> Result<String, DbTokenUpdateConfirmErr> {
         // update token
         let user_username = {

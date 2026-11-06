@@ -1,14 +1,16 @@
-use crate::{Db, DbToken, DbUser};
+use crate::{Db, DbConfirmToken, DbUser};
 use catsquad_log::prelude::*;
 
 #[derive(Debug, thiserror::Error)]
-pub enum DbTokenGetAllErr {
+pub enum DbConfirmTokenGetAllErr {
     #[error("DB error {0}")]
     Db(#[from] sqlx::Error),
 }
 
 impl Db {
-    pub async fn token_get_all(&self) -> Result<Vec<DbToken>, DbTokenGetAllErr> {
+    pub async fn confirm_token_get_all(
+        &self,
+    ) -> Result<Vec<DbConfirmToken>, DbConfirmTokenGetAllErr> {
         let pool = &self.db;
         let query = "SELECT * FROM tokens ORDER BY token_created_at DESC";
 
@@ -20,7 +22,7 @@ impl Db {
             Ok(v) => v,
             Err(err) => {
                 error!("unexpected db error {err}");
-                return Err(DbTokenGetAllErr::Db(err));
+                return Err(DbConfirmTokenGetAllErr::Db(err));
             }
         };
 
@@ -30,8 +32,8 @@ impl Db {
 
 #[cfg(test)]
 #[tokio::test]
-async fn test_token_get_all() {
-    use crate::DbTokenLabel;
+async fn test_conform_token_get_all() {
+    use crate::DbConfirmTokenLabel;
 
     init_log();
 
@@ -40,9 +42,9 @@ async fn test_token_get_all() {
     db.user_add(0, "hey", "hey", invite.token, 10, 10)
         .await
         .unwrap();
-    db.token_add(0, "hey", 10, DbTokenLabel::PasswordChange)
+    db.confirm_token_add(0, "hey", 10, DbConfirmTokenLabel::PasswordChange)
         .await
         .unwrap();
-    let tokens = db.token_get_all().await.unwrap();
+    let tokens = db.confirm_token_get_all().await.unwrap();
     assert_eq!(tokens.len(), 1);
 }

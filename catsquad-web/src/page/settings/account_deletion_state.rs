@@ -41,7 +41,7 @@ where
         self.err_general.try_update(|v| v.clear());
 
         let result = client
-            .token_user_remove_add()
+            .confirm_token_user_remove_add()
             .send()
             .await
             .into_json()
@@ -126,7 +126,7 @@ async fn test_account_deletion_state() {
         assert!(result.is_some());
         assert!(account_deletion.err_general.get_untracked().is_empty());
 
-        let tokens = server.state.db.token_get_all().await.unwrap();
+        let tokens = server.state.db.confirm_token_get_all().await.unwrap();
         assert_eq!(tokens.len(), 1);
 
         tokens[0].clone()

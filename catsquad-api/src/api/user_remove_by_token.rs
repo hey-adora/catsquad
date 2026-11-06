@@ -115,14 +115,14 @@ async fn test_api_user_remove_by_token() {
     // assert success
     {
         server.token_user_remove_add(user_token).await.unwrap();
-        let confirm_token = server.state.db.token_get_all().await.unwrap()[0].clone();
+        let confirm_token = server.state.db.confirm_token_get_all().await.unwrap()[0].clone();
 
         server
             .user_remove_by_token(confirm_token.id, user_token)
             .await
             .unwrap();
 
-        let users = server.state.db.token_get_all().await.unwrap();
+        let users = server.state.db.confirm_token_get_all().await.unwrap();
         assert_eq!(users.len(), 0);
     }
 }

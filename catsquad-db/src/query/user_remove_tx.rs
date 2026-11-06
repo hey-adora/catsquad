@@ -9,6 +9,9 @@ pub enum DbUserRemoveErr {
 
     #[error(transparent)]
     Image(#[from] DbFileImageRemoveTxErr),
+
+    #[error("not found")]
+    UserNotFound,
 }
 
 // TODO use user ID instead of username,
@@ -74,14 +77,17 @@ impl Db {
                                     RETURNING user_email, user_pfp_image_hash";
 
             let result = sqlx::query_as(query)
-                .bind(user_username)
+                .bind(&user_username)
                 .fetch_one(&mut *tx)
                 .await;
 
-            debug!("query: {query}\nresult: {result:#?}");
+            debug!("query: {query}\n$1={user_username}\nresult: {result:#?}");
 
             let (user_email, pfp_img_hash): (String, i64) = match result {
                 Ok(v) => v,
+                Err(sqlx::Error::RowNotFound) => {
+                    return Err(DbUserRemoveErr::UserNotFound);
+                }
                 Err(err) => {
                     error!("unexpected db error {err}");
                     return Err(DbUserRemoveErr::Db(err));
@@ -178,6 +184,17 @@ async fn test_user_remove() {
     let callback_remove = async move |_hash: i64, _extension: &str| {
         //
     };
+
+    // assert error not found
+    {
+        let mut tx = db.db.begin().await.unwrap();
+        let result = db
+            .user_remove_tx(&mut *tx, 0, callback_remove, "invalid")
+            .await;
+        tx.commit().await.unwrap();
+
+        assert!(matches!(result, Err(DbUserRemoveErr::UserNotFound)));
+    }
 
     // add bunch of data
     {
@@ -331,15 +348,25 @@ async fn test_user_remove() {
 
         // add password change
         {
-            use crate::DbTokenLabel;
+            use crate::DbConfirmTokenLabel;
 
-            db.token_add(0, user.username.clone(), 100, DbTokenLabel::PasswordChange)
-                .await
-                .unwrap();
+            db.confirm_token_add(
+                0,
+                user.username.clone(),
+                100,
+                DbConfirmTokenLabel::PasswordChange,
+            )
+            .await
+            .unwrap();
 
-            db.token_add(0, user2.username.clone(), 100, DbTokenLabel::PasswordChange)
-                .await
-                .unwrap();
+            db.confirm_token_add(
+                0,
+                user2.username.clone(),
+                100,
+                DbConfirmTokenLabel::PasswordChange,
+            )
+            .await
+            .unwrap();
         }
     }
 
@@ -355,7 +382,7 @@ async fn test_user_remove() {
         let images = db.file_image_get_all().await.unwrap();
         let follows = db.follow_get_all().await.unwrap();
         let invites = db.invite_get_all().await.unwrap();
-        let password_change = db.token_get_all().await.unwrap();
+        let password_change = db.confirm_token_get_all().await.unwrap();
 
         assert_eq!(password_change.len(), 2);
         assert_eq!(invites.len(), 3);
@@ -397,7 +424,7 @@ async fn test_user_remove() {
         let images = db.file_image_get_all().await.unwrap();
         let follows = db.follow_get_all().await.unwrap();
         let invites = db.invite_get_all().await.unwrap();
-        let password_change = db.token_get_all().await.unwrap();
+        let password_change = db.confirm_token_get_all().await.unwrap();
 
         assert_eq!(password_change.len(), 1);
         assert_eq!(invites.len(), 2);

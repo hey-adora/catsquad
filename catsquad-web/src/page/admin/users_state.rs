@@ -132,7 +132,7 @@ where
         self.err_remove.update(|v| v.clear());
 
         let result = client
-            .user_remove_by_usernames(usernames)
+            .user_remove_by_usernames(usernames.clone())
             .send()
             .await
             .into_json()
@@ -147,11 +147,21 @@ where
                 return;
             }
         };
+
+        self.users.try_update(|v| {
+            for username in usernames {
+                if let Some(pos) = v.iter().position(|v| v.username == username) {
+                    v.swap_remove(pos);
+                }
+            }
+        });
     }
 }
 
 #[cfg(test)]
-async fn test_user_state_remove_setup() -> (
+async fn test_user_state_remove_setup(
+    db_name: &str,
+) -> (
     Owner,
     catsquad_api::TestServer,
     UsersState<catsquad_client::AxumTestSender>,
@@ -159,7 +169,7 @@ async fn test_user_state_remove_setup() -> (
 ) {
     catsquad_log::init_log();
     let owner = crate::init_owner();
-    let server = catsquad_api::TestServer::new(0, "test_user_state_remove_all").await;
+    let server = catsquad_api::TestServer::new(0, db_name).await;
 
     let create_user = async |i: usize| {
         let (user, session) = server
@@ -185,7 +195,8 @@ async fn test_user_state_remove_setup() -> (
 #[cfg(test)]
 #[tokio::test]
 async fn test_user_state_remove_checked() {
-    let (_owner, server, user_state, token0) = test_user_state_remove_setup().await;
+    let (_owner, server, user_state, token0) =
+        test_user_state_remove_setup("test_user_state_remove_checked").await;
 
     // TODO assert errors
 
@@ -202,23 +213,31 @@ async fn test_user_state_remove_checked() {
             .inject_header(header::COOKIE, create_auth_cookie_str(uuid_to_str(token0)))
             .await;
 
-        let users = server.state.db.user_get_all().await.unwrap();
-        assert_eq!(users.len(), 3);
+        user_state.fetch().await;
 
-        user_state.add_checked_username("prime1");
-        user_state.add_checked_username("prime2");
+        let users_in_state = user_state.users.get_untracked();
+        let users_in_db = server.state.db.user_get_all().await.unwrap();
+        assert_eq!(users_in_state.len(), 3);
+        assert_eq!(users_in_db.len(), 3);
+
+        user_state.add_checked_username("prime10");
+        user_state.add_checked_username("prime20");
         user_state.remove_users().await;
 
-        let users = server.state.db.user_get_all().await.unwrap();
-        assert_eq!(users.len(), 1);
-        assert_eq!(users[0].username, "prime0");
+        let users_in_state = user_state.users.get_untracked();
+        let users_in_db = server.state.db.user_get_all().await.unwrap();
+        assert_eq!(users_in_state.len(), 1);
+        assert_eq!(users_in_state[0].username, "prime0");
+        assert_eq!(users_in_db.len(), 1);
+        assert_eq!(users_in_db[0].username, "prime0");
     }
 }
 
 #[cfg(test)]
 #[tokio::test]
 async fn test_user_state_remove_all() {
-    let (_owner, server, user_state, token0) = test_user_state_remove_setup().await;
+    let (_owner, server, user_state, token0) =
+        test_user_state_remove_setup("test_user_state_remove_all").await;
     // TODO assert errors
 
     // assert success

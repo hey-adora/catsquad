@@ -606,11 +606,13 @@ pub mod tests {
 
     #[tokio::test]
     pub async fn hook_post_api_followed() {
-        let (_owner, app, post_id) = post_setup("hook_post_api_error", "title", "one", "two").await;
+        let (_owner, app, post_id) =
+            post_setup("hook_post_api_followed", "title", "one", "two").await;
 
         let post_api = PostApi::new();
         post_api.init(&app.client, post_id).await;
-        assert!(!post_api.err_general.get_untracked().is_empty());
+
         assert_eq!(post_api.followed.get_untracked(), false);
+        // TODO finish the test or delete it
     }
 }

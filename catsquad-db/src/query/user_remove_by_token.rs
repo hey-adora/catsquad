@@ -1,5 +1,5 @@
 use crate::{
-    Db, DbTokenLabel, DbTokenUpdateConfirmErr, Uuid, query::user_remove_tx::DbUserRemoveErr,
+    Db, DbConfirmTokenLabel, DbTokenUpdateConfirmErr, Uuid, query::user_remove_tx::DbUserRemoveErr,
 };
 use catsquad_log::prelude::*;
 
@@ -35,7 +35,12 @@ impl Db {
             .inspect_err(|err| error!("user_remove_by_token {err}"))?;
 
         let token_user_username = self
-            .token_update_confirm_tx(&mut *tx, time, token_id, DbTokenLabel::AccountDeletion)
+            .token_update_confirm_tx(
+                &mut *tx,
+                time,
+                token_id,
+                DbConfirmTokenLabel::AccountDeletion,
+            )
             .await?;
 
         if token_user_username != user_username {
@@ -124,7 +129,12 @@ async fn test_user_remove_by_token() {
             ));
 
             let token = db
-                .token_add(0, user1.username.clone(), 10, DbTokenLabel::PasswordChange)
+                .confirm_token_add(
+                    0,
+                    user1.username.clone(),
+                    10,
+                    DbConfirmTokenLabel::PasswordChange,
+                )
                 .await
                 .unwrap();
 
@@ -143,7 +153,12 @@ async fn test_user_remove_by_token() {
         // error expired
         let token = {
             let token = db
-                .token_add(0, user1.username.clone(), 10, DbTokenLabel::AccountDeletion)
+                .confirm_token_add(
+                    0,
+                    user1.username.clone(),
+                    10,
+                    DbConfirmTokenLabel::AccountDeletion,
+                )
                 .await
                 .unwrap();
 
@@ -173,7 +188,7 @@ async fn test_user_remove_by_token() {
         // error already used
         {
             let mut tx = db.db.begin().await.unwrap();
-            db.token_update_confirm_tx(&mut *tx, 0, token.id, DbTokenLabel::AccountDeletion)
+            db.token_update_confirm_tx(&mut *tx, 0, token.id, DbConfirmTokenLabel::AccountDeletion)
                 .await
                 .unwrap();
             tx.commit().await.unwrap();
@@ -194,7 +209,12 @@ async fn test_user_remove_by_token() {
     // assert success
     {
         let token = db
-            .token_add(0, user1.username.clone(), 10, DbTokenLabel::AccountDeletion)
+            .confirm_token_add(
+                0,
+                user1.username.clone(),
+                10,
+                DbConfirmTokenLabel::AccountDeletion,
+            )
             .await
             .unwrap();
 

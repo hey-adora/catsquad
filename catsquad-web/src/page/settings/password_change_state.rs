@@ -2,8 +2,8 @@ use std::fmt::Debug;
 
 use catsquad_client::{Client, Response, Sender};
 use catsquad_shared::{
-    TokenPasswordChangeRes, UserUpdatePasswordByTokenErr, UserUpdatePasswordByTokenRes, Uuid,
-    validate_password,
+    ConfirmTokenPasswordChangeRes, UserUpdatePasswordByTokenErr, UserUpdatePasswordByTokenRes,
+    Uuid, validate_password,
 };
 use leptos::prelude::*;
 
@@ -51,13 +51,13 @@ where
         }
     }
 
-    pub async fn add(&self, email: impl Into<String>) -> Option<TokenPasswordChangeRes> {
+    pub async fn add(&self, email: impl Into<String>) -> Option<ConfirmTokenPasswordChangeRes> {
         self.err_general.update(|v| v.clear());
         self.err_password.update(|v| v.clear());
 
         let client = self.client.get_value();
         let result = client
-            .token_password_change_add(email)
+            .confirm_token_password_change_add(email)
             .send()
             .await
             .into_json()

@@ -79,7 +79,7 @@ async fn test_user_username_change() {
     {
         use catsquad_shared::PostState;
 
-        use crate::DbTokenLabel;
+        use crate::DbConfirmTokenLabel;
 
         let post1 = db
             .post_add(0, user1.username.clone(), "title1", "", "")
@@ -91,9 +91,14 @@ async fn test_user_username_change() {
         db.post_like_add(0, user2.username.clone(), post1.id)
             .await
             .unwrap();
-        db.token_add(0, user1.username.clone(), 10, DbTokenLabel::PasswordChange)
-            .await
-            .unwrap();
+        db.confirm_token_add(
+            0,
+            user1.username.clone(),
+            10,
+            DbConfirmTokenLabel::PasswordChange,
+        )
+        .await
+        .unwrap();
         db.invite_add(0, "hey3@heyadora.com", 10).await.unwrap();
         db.session_add(0, user1.email.clone()).await.unwrap();
         db.post_update_image_add(

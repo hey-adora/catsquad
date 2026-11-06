@@ -139,7 +139,7 @@ async fn test_user_pfp_state() {
 
     catsquad_log::init_log();
     let _owner = crate::init_owner();
-    let server = catsquad_api::TestServer::new(0, "test_username_change_state").await;
+    let server = catsquad_api::TestServer::new(0, "test_user_pfp_state").await;
     let input1_img = server.create_img_input(0).await;
     let storage_path = server.state.get_storage_path().await;
 

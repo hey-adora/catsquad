@@ -123,7 +123,7 @@ mod test_utils {
         }
 
         pub async fn token_password_change_get_latest_key(&self) -> Uuid {
-            self.state.db.token_get_all().await.unwrap()[0].id
+            self.state.db.confirm_token_get_all().await.unwrap()[0].id
         }
     }
 }
