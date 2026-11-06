@@ -1051,14 +1051,14 @@ where
 
     pub fn email_change_get_by_id(
         &self,
-        email_change_id: i64,
+        email_change_id: Uuid,
     ) -> Builder<TSender, cs::EmailChangeRes, cs::EmailChangeGetByIdErr> {
         self.get(cs::link_relative_email_change_get_by_id(email_change_id))
     }
 
     pub fn email_change_resend(
         &self,
-        email_change_id: i64,
+        email_change_id: Uuid,
     ) -> Builder<TSender, catsquad_shared::EmailChangeRes, catsquad_shared::EmailChangeResendErr>
     {
         self.post_form(
@@ -1071,7 +1071,7 @@ where
 
     pub fn email_change_update_current_confirm(
         &self,
-        email_change_id: i64,
+        email_change_id: Uuid,
         token: Uuid,
     ) -> Builder<TSender, (), catsquad_shared::EmailChangeUpdateCurrentConfirmErr> {
         self.post_form(
@@ -1085,7 +1085,7 @@ where
 
     pub fn email_change_update_new_add(
         &self,
-        email_change_id: i64,
+        email_change_id: Uuid,
         new_email: impl Into<String>,
     ) -> Builder<
         TSender,
@@ -1103,7 +1103,7 @@ where
 
     pub fn email_change_update_new_confirm(
         &self,
-        email_change_id: i64,
+        email_change_id: Uuid,
         token: Uuid,
     ) -> Builder<TSender, (), catsquad_shared::EmailChangeUpdateNewConfirmErr> {
         self.post_form(
@@ -1117,7 +1117,7 @@ where
 
     pub fn email_change_update_finish(
         &self,
-        email_change_id: i64,
+        email_change_id: Uuid,
     ) -> Builder<TSender, (), cs::EmailChangeUpdateFinishErr> {
         self.post_form(
             cs::LINK_API_EMAIL_CHANGE_UPDATE_FINISH,
@@ -1127,7 +1127,7 @@ where
 
     pub fn email_change_update_cancel(
         &self,
-        email_change_id: i64,
+        email_change_id: Uuid,
     ) -> Builder<TSender, (), cs::EmailChangeUpdateCancelErr> {
         self.post_form(
             cs::LINK_API_EMAIL_CHANGE_UPDATE_CANCEL,

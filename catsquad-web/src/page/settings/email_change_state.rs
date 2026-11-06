@@ -14,7 +14,7 @@ where
     pub current_email: RwSignal<String>,
     pub new_email: RwSignal<String>,
     //params
-    pub email_change_id: StoredValue<i64>,
+    pub email_change_id: StoredValue<Uuid>,
     pub client: StoredValue<Client<TSender>, LocalStorage>,
 }
 
@@ -57,21 +57,21 @@ where
             current_email: RwSignal::new(String::new()),
             new_email: RwSignal::new(String::new()),
             //
-            email_change_id: StoredValue::new(0),
+            email_change_id: StoredValue::new(0_u128.to_be_bytes()),
             client: StoredValue::new_local(client),
         }
     }
 
-    pub fn get_params(&self) -> Option<(i64,)> {
+    pub fn get_params(&self) -> Option<(Uuid,)> {
         let email_change_id = self.email_change_id.get_value();
-        if email_change_id == 0 {
+        if u128::from_be_bytes(email_change_id) == 0 {
             warn!("trying to run email change without initialization");
             return None;
         }
         Some((email_change_id,))
     }
 
-    pub async fn init(&self, email_change_id: i64) -> Option<EmailChangeRes> {
+    pub async fn init(&self, email_change_id: Uuid) -> Option<EmailChangeRes> {
         self.err_general.update(|v| v.clear());
         let client = self.client.get_value();
 
@@ -266,7 +266,7 @@ async fn test_email_change_state() {
 
     {
         let email_change = EmailChangeState::new(server.client.clone());
-        let result = email_change.init(0).await;
+        let result = email_change.init(0_u128.to_be_bytes()).await;
         assert!(!email_change.err_general.get_untracked().is_empty());
         assert!(result.is_none());
     }

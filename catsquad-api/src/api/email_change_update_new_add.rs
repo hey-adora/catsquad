@@ -44,14 +44,13 @@ fn status_code(result: &Result<EmailChangeRes, EmailChangeUpdateNewAddErr>) -> S
 
 pub fn send_email_email_change_update_new_add(
     address: Url,
-    email_change_key: impl Display,
+    email_change_id: Uuid,
     token: Uuid,
 ) -> String {
     let token_str = uuid_to_str(token);
-    let link =
-        link_absolute_settings_email_change_new_confirm(address, email_change_key, token_str)
-            .unwrap()
-            .to_string();
+    let link = link_absolute_settings_email_change_new_confirm(address, email_change_id, token_str)
+        .unwrap()
+        .to_string();
     // let link = "placeholder change".to_string();
     // debug!("EMAIL SENT {link}");
     link
@@ -118,7 +117,7 @@ mod test_utils {
     impl TestServer {
         pub async fn email_change_update_new_add(
             &self,
-            email_change_id: i64,
+            email_change_id: Uuid,
             new_email: impl Into<String>,
             session_token: Uuid,
         ) -> Result<cs::EmailChangeRes, cs::EmailChangeUpdateNewAddErr> {
@@ -160,10 +159,8 @@ async fn test_api_email_change_update_new_add() {
         .email_change_get_current_token(0, &user1, email_change.id)
         .await;
 
-    let add_new = async |key: i64, email: &str, session: Uuid| {
-        server
-            .email_change_update_new_add(key, email, session)
-            .await
+    let add_new = async |id: Uuid, email: &str, session: Uuid| {
+        server.email_change_update_new_add(id, email, session).await
     };
 
     let result = add_new(email_change.id, "hey2@heyadora.com", session_key).await;
@@ -178,10 +175,15 @@ async fn test_api_email_change_update_new_add() {
         .await
         .unwrap();
 
-    let result = add_new(0, "hey2@heyadora.com", session_key).await;
+    let result = add_new(0_u128.to_be_bytes(), "hey2@heyadora.com", session_key).await;
     assert!(matches!(result, Err(EmailChangeUpdateNewAddErr::NotFound)));
 
-    let result = add_new(0, "hey2@heyadora.com", 0_u128.to_be_bytes()).await;
+    let result = add_new(
+        0_u128.to_be_bytes(),
+        "hey2@heyadora.com",
+        0_u128.to_be_bytes(),
+    )
+    .await;
     assert!(matches!(
         result,
         Err(EmailChangeUpdateNewAddErr::Unauthorized(_))

@@ -20,7 +20,7 @@ use web_sys::{HtmlInputElement, MouseEvent};
 #[component]
 pub fn EmailChange(
     #[prop(optional, into)] email_change_stage: Signal<EmailCangeStage>,
-    #[prop(optional, into)] email_change_id: Signal<i64>,
+    #[prop(optional, into)] email_change_id: Signal<Uuid>,
     #[prop(optional, into)] token: Signal<Uuid>,
     #[prop(optional, into)] new_email: Signal<String>,
 ) -> impl IntoView {
@@ -45,7 +45,7 @@ pub fn EmailChange(
             // let hook_email_change_id = email_change.email_change_id.get_value();
             // if param_email_change_id == 0 || hook_email_change_id != 0 {
 
-            if param_email_change_id == 0 {
+            if u128::from_be_bytes(param_email_change_id) == 0 {
                 return;
             }
 
@@ -78,12 +78,12 @@ pub fn EmailChange(
                         navigate(&link, NavigateOptions::default());
                     }
                     EmailCangeStage::ChangeEmailCurrentConfirm => {
-                        let email_change_key = email_change_id.get_untracked();
+                        let email_change_id = email_change_id.get_untracked();
                         let token = token.get_untracked();
                         let Some(_) = email_change.current_confirm(token).await else {
                             return;
                         };
-                        let link = link_relative_settings_email_change_new_add(email_change_key);
+                        let link = link_relative_settings_email_change_new_add(email_change_id);
                         navigate(&link, NavigateOptions::default());
                     }
                     EmailCangeStage::ChangeEmailNewAdd => {
@@ -94,23 +94,23 @@ pub fn EmailChange(
                         else {
                             return;
                         };
-                        let email_change_key = email_change_id.get_untracked();
+                        let email_change_id = email_change_id.get_untracked();
                         let Some(_) = email_change.new_add(new_email.clone()).await else {
                             return;
                         };
                         let link = link_relative_settings_email_change_new_check_email(
-                            &email_change_key,
+                            email_change_id,
                             new_email,
                         );
                         navigate(&link, NavigateOptions::default());
                     }
                     EmailCangeStage::ChangeEmailNewConfirm => {
-                        let email_change_key = email_change_id.get_untracked();
+                        let email_change_id = email_change_id.get_untracked();
                         let token = token.get_untracked();
                         let Some(_) = email_change.new_confirm(token).await else {
                             return;
                         };
-                        let link = link_relative_settings_email_change_finish(email_change_key);
+                        let link = link_relative_settings_email_change_finish(email_change_id);
                         navigate(&link, NavigateOptions::default());
                     }
                     EmailCangeStage::ChangeEmailFinish => {

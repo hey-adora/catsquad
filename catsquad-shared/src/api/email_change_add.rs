@@ -1,8 +1,10 @@
+use crate::Uuid;
+
 pub const LINK_API_EMAIL_CHANGE_ADD: &str = "/api/email_change_update_current_add";
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct EmailChangeRes {
-    pub id: i64,
+    pub id: Uuid,
     pub current: EmailChangeToken,
     pub new: Option<EmailChangeToken>,
     pub completed: bool,

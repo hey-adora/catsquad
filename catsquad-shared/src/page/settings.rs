@@ -2,6 +2,8 @@ use std::fmt::Display;
 
 use url::Url;
 
+use crate::{Uuid, uuid_to_str};
+
 pub const LINK_WEB_SETTINGS: &str = "/settings";
 
 pub fn link_relative_settings() -> &'static str {
@@ -79,9 +81,7 @@ pub fn link_relative_settings_email_change_error() -> String {
     )
 }
 
-pub fn link_relative_settings_email_change_current_check_email(
-    email_change_key: impl Display,
-) -> String {
+pub fn link_relative_settings_email_change_current_check_email(email_change_id: Uuid) -> String {
     format!(
         "/settings?{}={}&{}={}&{}={}",
         SettingsPageParams::Stage,
@@ -91,12 +91,12 @@ pub fn link_relative_settings_email_change_current_check_email(
         EmailCangeStage::ChangeEmailCurrentCheckEmail,
         //
         SettingsPageParams::EmailChangeKey,
-        email_change_key,
+        uuid_to_str(email_change_id),
     )
 }
 
 pub fn link_relative_settings_email_change_current_confirm(
-    email_change_key: impl Display,
+    email_change_id: Uuid,
     token: impl Display,
 ) -> String {
     format!(
@@ -108,7 +108,7 @@ pub fn link_relative_settings_email_change_current_confirm(
         EmailCangeStage::ChangeEmailCurrentConfirm,
         //
         SettingsPageParams::EmailChangeKey,
-        email_change_key,
+        uuid_to_str(email_change_id),
         //
         SettingsPageParams::Token,
         token,
@@ -117,21 +117,21 @@ pub fn link_relative_settings_email_change_current_confirm(
 
 pub fn link_absolute_settings_email_change_current_confirm(
     host: Url,
-    email_change_key: impl Display,
+    email_change_id: Uuid,
     token: impl Display,
 ) -> Result<Url, url::ParseError> {
-    let relative = link_relative_settings_email_change_current_confirm(email_change_key, token);
+    let relative = link_relative_settings_email_change_current_confirm(email_change_id, token);
     host.join(&relative)
 }
 
-pub fn link_relative_settings_email_change_new_add(email_change_key: impl Display) -> String {
+pub fn link_relative_settings_email_change_new_add(email_change_id: Uuid) -> String {
     format!(
         "/settings?{}={}&{}={}&{}={}",
         SettingsPageParams::Stage,
         SettingsPageStage::EmailChange,
         //
         SettingsPageParams::EmailChangeKey,
-        email_change_key,
+        uuid_to_str(email_change_id),
         //
         SettingsPageParams::EmailChangeStage,
         EmailCangeStage::ChangeEmailNewAdd,
@@ -139,7 +139,7 @@ pub fn link_relative_settings_email_change_new_add(email_change_key: impl Displa
 }
 
 pub fn link_relative_settings_email_change_new_check_email(
-    email_change_key: impl Display,
+    email_change_id: Uuid,
     new_email: impl Display,
 ) -> String {
     format!(
@@ -154,12 +154,12 @@ pub fn link_relative_settings_email_change_new_check_email(
         new_email,
         //
         SettingsPageParams::EmailChangeKey,
-        email_change_key,
+        uuid_to_str(email_change_id),
     )
 }
 
 pub fn link_relative_settings_email_change_new_confirm(
-    email_change_key: impl Display,
+    email_change_id: Uuid,
     token: impl Display,
 ) -> String {
     format!(
@@ -174,20 +174,20 @@ pub fn link_relative_settings_email_change_new_confirm(
         token,
         //
         SettingsPageParams::EmailChangeKey,
-        email_change_key,
+        uuid_to_str(email_change_id),
     )
 }
 
 pub fn link_absolute_settings_email_change_new_confirm(
     host: Url,
-    email_change_key: impl Display,
-    token: impl Display,
+    email_change_id: Uuid,
+    token: impl Display, // TODO change to accept token directly
 ) -> Result<Url, url::ParseError> {
-    let relative = link_relative_settings_email_change_new_confirm(email_change_key, token);
+    let relative = link_relative_settings_email_change_new_confirm(email_change_id, token);
     host.join(&relative)
 }
 
-pub fn link_relative_settings_email_change_finish(email_change_key: impl Display) -> String {
+pub fn link_relative_settings_email_change_finish(email_change_id: Uuid) -> String {
     format!(
         "/settings?{}={}&{}={}&{}={}",
         SettingsPageParams::Stage,
@@ -197,7 +197,7 @@ pub fn link_relative_settings_email_change_finish(email_change_key: impl Display
         EmailCangeStage::ChangeEmailFinish,
         //
         SettingsPageParams::EmailChangeKey,
-        email_change_key,
+        uuid_to_str(email_change_id),
     )
 }
 

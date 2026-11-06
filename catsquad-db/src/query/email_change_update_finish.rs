@@ -1,4 +1,4 @@
-use crate::{Db, XTimestamp};
+use crate::{Db, Uuid, XTimestamp, XUuid};
 use catsquad_log::prelude::*;
 
 #[derive(Debug, thiserror::Error)]
@@ -30,7 +30,7 @@ impl Db {
         &self,
         time: u64,
         user_username: impl Into<String>,
-        email_change_id: i64,
+        email_change_id: Uuid,
     ) -> Result<(), DbEmailChangeUpdateFinishErr> {
         let pool = &self.db;
 
@@ -53,7 +53,7 @@ impl Db {
                                 FROM emails_changes WHERE email_change_id = $1";
 
             let result = sqlx::query_as(query)
-                .bind(email_change_id)
+                .bind(XUuid(email_change_id))
                 .fetch_one(&mut *tx)
                 .await;
 
@@ -106,7 +106,7 @@ impl Db {
 
             let result = sqlx::query(query)
                 .bind(XTimestamp(time as i64))
-                .bind(email_change_id)
+                .bind(XUuid(email_change_id))
                 .execute(&mut *tx)
                 .await;
 
@@ -220,7 +220,7 @@ async fn test_email_change_update_finish() {
         .unwrap();
 
         let result = db
-            .email_change_update_finish(0, user.username.clone(), 0)
+            .email_change_update_finish(0, user.username.clone(), 0_u128.to_be_bytes())
             .await;
 
         assert!(matches!(

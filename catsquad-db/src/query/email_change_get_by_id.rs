@@ -1,4 +1,4 @@
-use crate::{Db, DbEmailChange};
+use crate::{Db, DbEmailChange, Uuid, XUuid};
 use catsquad_log::prelude::*;
 
 #[derive(Debug, thiserror::Error)]
@@ -24,7 +24,7 @@ impl Db {
         &self,
         time: u64,
         user_username: impl Into<String>,
-        email_change_id: i64,
+        email_change_id: Uuid,
     ) -> Result<DbEmailChange, DbEmailChangeGetByIdErr> {
         let pool = &self.db;
         let user_username = user_username.into();
@@ -32,7 +32,7 @@ impl Db {
         let query = "SELECT * FROM emails_changes WHERE email_change_id = $1";
 
         let result = sqlx::query_as(query)
-            .bind(email_change_id)
+            .bind(XUuid(email_change_id))
             .fetch_one(pool)
             .await;
 

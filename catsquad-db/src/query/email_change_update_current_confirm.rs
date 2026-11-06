@@ -27,7 +27,7 @@ impl Db {
         &self,
         time: u64,
         user_username: impl Into<String>,
-        email_change_id: i64,
+        email_change_id: Uuid,
         token: Uuid,
     ) -> Result<(), DbEmailChangeConfirmUpdateCurrentErr> {
         let pool = &self.db;
@@ -50,7 +50,7 @@ impl Db {
                                 FROM emails_changes WHERE email_change_id = $1";
 
             let result = sqlx::query_as(query)
-                .bind(email_change_id)
+                .bind(XUuid(email_change_id))
                 .fetch_one(&mut *tx)
                 .await;
 
@@ -100,7 +100,7 @@ impl Db {
 
             let result = sqlx::query(query)
                 .bind(XTimestamp(time as i64))
-                .bind(email_change_id)
+                .bind(XUuid(email_change_id))
                 .execute(&mut *tx)
                 .await;
 
@@ -150,7 +150,12 @@ async fn test_email_change_confirm_update_current() {
         .unwrap();
 
     let result = db
-        .email_change_update_current_confirm(0, user.username.clone(), 0, 0_u128.to_be_bytes())
+        .email_change_update_current_confirm(
+            0,
+            user.username.clone(),
+            0_u128.to_be_bytes(),
+            0_u128.to_be_bytes(),
+        )
         .await;
     assert!(matches!(
         result,
@@ -158,7 +163,12 @@ async fn test_email_change_confirm_update_current() {
     ));
 
     let result = db
-        .email_change_update_current_confirm(0, user.username.clone(), 0, 0_u128.to_be_bytes())
+        .email_change_update_current_confirm(
+            0,
+            user.username.clone(),
+            0_u128.to_be_bytes(),
+            0_u128.to_be_bytes(),
+        )
         .await;
     assert!(matches!(
         result,

@@ -2,7 +2,11 @@ pub const LINK_API_EMAIL_CHANGE_RESEND: &str = "/api/email_change_resend";
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
 pub struct EmailChangeResendReq {
-    pub email_change_id: i64,
+    #[serde(
+        serialize_with = "crate::serde_from_uuid",
+        deserialize_with = "crate::serde_to_uuid"
+    )]
+    pub email_change_id: crate::Uuid,
 }
 
 #[derive(

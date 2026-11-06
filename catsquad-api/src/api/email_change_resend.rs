@@ -103,7 +103,7 @@ mod test_utils {
     impl TestServer {
         pub async fn email_change_resend(
             &self,
-            email_change_id: i64,
+            email_change_id: Uuid,
             session_token: Uuid,
         ) -> Result<cs::EmailChangeRes, cs::EmailChangeResendErr> {
             self.client
@@ -136,7 +136,9 @@ async fn test_api_email_change_resend() {
     server.state.set_time(0);
     server.state.set_email_change_expiration(10).await;
     {
-        let result = server.email_change_resend(0, session_key).await;
+        let result = server
+            .email_change_resend(0_u128.to_be_bytes(), session_key)
+            .await;
 
         let emails = server
             .email_sent_get_filtered(catsquad_db::DbEmailSentReason::UserEmailChangeAddCurrent)

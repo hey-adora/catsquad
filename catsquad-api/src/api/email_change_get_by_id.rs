@@ -66,7 +66,7 @@ mod test_utils {
     impl TestServer {
         pub async fn email_change_get_by_id(
             &self,
-            email_change_id: i64,
+            email_change_id: Uuid,
             session_token: Uuid,
         ) -> Result<cs::EmailChangeRes, cs::EmailChangeGetByIdErr> {
             self.client
@@ -88,7 +88,7 @@ async fn test_api_email_change_get_by_id() {
     use catsquad_log::prelude::*;
 
     init_log();
-    let server = crate::TestServer::new(0, "test_api_post_like_get_by_post").await;
+    let server = crate::TestServer::new(0, "test_api_email_change_get_by_id").await;
 
     let (_user1, session_token1) = server
         .user_add_full("hey", "hey@heyadora.com", "1nnerogGeron@@$")
@@ -99,7 +99,9 @@ async fn test_api_email_change_get_by_id() {
 
     server.state.set_email_change_expiration(5).await;
 
-    let result = server.email_change_get_by_id(1, session_token1).await;
+    let result = server
+        .email_change_get_by_id(0_u128.to_be_bytes(), session_token1)
+        .await;
     assert!(matches!(result, Err(EmailChangeGetByIdErr::NotFound)));
 
     let email_change = server.email_change_add(session_token1).await.unwrap();
@@ -109,14 +111,18 @@ async fn test_api_email_change_get_by_id() {
         .await;
     assert!(matches!(result, Ok(_)));
 
-    let result = server.email_change_get_by_id(1, session_token2).await;
+    let result = server
+        .email_change_get_by_id(email_change.id, session_token2)
+        .await;
     assert!(matches!(
         result,
         Err(EmailChangeGetByIdErr::Unauthorized(_))
     ));
     server.state.set_time(10);
 
-    let result = server.email_change_get_by_id(1, session_token1).await;
+    let result = server
+        .email_change_get_by_id(email_change.id, session_token1)
+        .await;
     assert!(matches!(result, Err(EmailChangeGetByIdErr::Expired)));
 
     server.state.set_time(1);
@@ -126,6 +132,8 @@ async fn test_api_email_change_get_by_id() {
         .await
         .unwrap();
 
-    let result = server.email_change_get_by_id(1, session_token1).await;
+    let result = server
+        .email_change_get_by_id(email_change.id, session_token1)
+        .await;
     assert!(matches!(result, Err(EmailChangeGetByIdErr::AlreadyUsed)));
 }

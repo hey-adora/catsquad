@@ -81,7 +81,7 @@ mod test_utils {
     impl TestServer {
         pub async fn email_change_update_new_confirm(
             &self,
-            email_change_id: i64,
+            email_change_id: Uuid,
             token: Uuid,
             session_token: Uuid,
         ) -> Result<(), cs::EmailChangeUpdateNewConfirmErr> {
@@ -133,9 +133,9 @@ async fn test_api_email_change_update_new_confirm() {
         .await
         .unwrap();
 
-    let new_confirm = async |key: i64, token: Uuid, session: Uuid| {
+    let new_confirm = async |id: Uuid, token: Uuid, session: Uuid| {
         server
-            .email_change_update_new_confirm(key, token, session)
+            .email_change_update_new_confirm(id, token, session)
             .await
     };
 
@@ -160,7 +160,7 @@ async fn test_api_email_change_update_new_confirm() {
         Err(EmailChangeUpdateNewConfirmErr::Unauthorized(_))
     ));
 
-    let result = new_confirm(0, new_token, session_key).await;
+    let result = new_confirm(0_u128.to_be_bytes(), new_token, session_key).await;
     assert!(matches!(
         result,
         Err(EmailChangeUpdateNewConfirmErr::NotFound)

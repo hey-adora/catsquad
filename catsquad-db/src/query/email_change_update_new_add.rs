@@ -1,4 +1,4 @@
-use crate::{Db, DbUser, XTimestamp, XUuid};
+use crate::{Db, DbUser, Uuid, XTimestamp, XUuid};
 use catsquad_log::prelude::*;
 
 #[derive(Debug, thiserror::Error)]
@@ -30,7 +30,7 @@ impl Db {
         &self,
         time: u64,
         user_username: impl Into<String>,
-        email_change_id: i64,
+        email_change_id: Uuid,
         new_email: impl Into<String>,
     ) -> Result<(), DbEmailChangeUpdateNewAddErr> {
         let pool = &self.db;
@@ -75,7 +75,7 @@ impl Db {
                                 FROM emails_changes WHERE email_change_id = $1";
 
             let result = sqlx::query_as(query)
-                .bind(email_change_id)
+                .bind(XUuid(email_change_id))
                 .fetch_one(&mut *tx)
                 .await;
 
@@ -125,7 +125,7 @@ impl Db {
 
             let result = sqlx::query(query)
                 .bind(XTimestamp(time as i64))
-                .bind(email_change_id)
+                .bind(XUuid(email_change_id))
                 .bind(new_email)
                 .execute(&mut *tx)
                 .await;
@@ -148,7 +148,6 @@ impl Db {
             .inspect_err(|err| error!("post_like_add {err}"))?;
 
         Ok(())
-
     }
 }
 
@@ -187,7 +186,12 @@ async fn test_email_change_update_new_add() {
         .unwrap();
 
         let result = db
-            .email_change_update_new_add(0, user.username.clone(), 0, "hey3@heyadora.com")
+            .email_change_update_new_add(
+                0,
+                user.username.clone(),
+                0_u128.to_be_bytes(),
+                "hey3@heyadora.com",
+            )
             .await;
         assert!(matches!(
             result,

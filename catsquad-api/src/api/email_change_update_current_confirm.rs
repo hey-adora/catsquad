@@ -85,7 +85,7 @@ mod test_utils {
     impl TestServer {
         pub async fn email_change_update_current_confirm(
             &self,
-            email_change_id: i64,
+            email_change_id: Uuid,
             token: Uuid,
             session_token: Uuid,
         ) -> Result<(), cs::EmailChangeUpdateCurrentConfirmErr> {
@@ -130,7 +130,11 @@ async fn test_api_email_change_update_current_confirm() {
             .await;
 
         let result = server
-            .email_change_update_current_confirm(0, 0_u128.to_be_bytes(), session_key)
+            .email_change_update_current_confirm(
+                0_u128.to_be_bytes(),
+                0_u128.to_be_bytes(),
+                session_key,
+            )
             .await;
 
         assert!(matches!(

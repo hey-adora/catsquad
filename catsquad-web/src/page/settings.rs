@@ -50,8 +50,8 @@ pub fn Settings() -> impl IntoView {
         RwQuery::<AccountDeletionStage>::new(SettingsPageParams::AccountDeletionStage.to_string());
     let account_deletion_stage = move || account_deletion_stage.get_or_default();
 
-    let email_change_id = RwQuery::<i64>::new(SettingsPageParams::EmailChangeKey.to_string());
-    let email_change_id = move || email_change_id.get_or_default();
+    let email_change_id = RwQuery::<String>::new(SettingsPageParams::EmailChangeKey.to_string());
+    let email_change_id = move || str_to_uuid(email_change_id.get_or_default());
 
     let token = RwQuery::<String>::new(SettingsPageParams::Token.to_string());
     let token = move || str_to_uuid(token.get_untracked().unwrap_or_default());

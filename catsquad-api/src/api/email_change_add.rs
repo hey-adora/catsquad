@@ -56,16 +56,10 @@ pub fn status_code(result: &Result<EmailChangeRes, EmailChangeAddErr>) -> Status
     }
 }
 
-pub fn send_email_email_change_add(
-    address: Url,
-    email_change_key: impl Display,
-    token: Uuid,
-) -> String {
-    // let link = link_absolute_reg_finish(address, token);
-    // let link = "placeholder change".to_string();
+pub fn send_email_email_change_add(address: Url, email_change_id: Uuid, token: Uuid) -> String {
     let token_str = uuid_to_str(token);
     let link =
-        link_absolute_settings_email_change_current_confirm(address, email_change_key, token_str)
+        link_absolute_settings_email_change_current_confirm(address, email_change_id, token_str)
             .unwrap();
     // debug!("EMAIL SENT {link}");
     link.to_string()
@@ -139,7 +133,7 @@ mod test_utils {
             &self,
             time: u64,
             user: &DbUserGet,
-            email_change_id: i64,
+            email_change_id: Uuid,
         ) -> Uuid {
             self.state
                 .db
@@ -153,7 +147,7 @@ mod test_utils {
             &self,
             time: u64,
             user: &DbUserGet,
-            email_change_id: i64,
+            email_change_id: Uuid,
         ) -> Uuid {
             self.state
                 .db

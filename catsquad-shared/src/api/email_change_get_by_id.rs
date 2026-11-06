@@ -1,12 +1,18 @@
+use crate::{Uuid, uuid_to_str};
+
 pub const LINK_API_EMAIL_CHANGE_GET_BY_ID: &str = "/api/email_change/{email_change_id}";
 
-pub fn link_relative_email_change_get_by_id(email_change_id: i64) -> String {
-    format!("/api/email_change/{}", email_change_id)
+pub fn link_relative_email_change_get_by_id(email_change_id: Uuid) -> String {
+    format!("/api/email_change/{}", uuid_to_str(email_change_id))
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
 pub struct EmailChangeGetByIdParams {
-    pub email_change_id: i64,
+    #[serde(
+        serialize_with = "crate::serde_from_uuid",
+        deserialize_with = "crate::serde_to_uuid"
+    )]
+    pub email_change_id: crate::Uuid,
 }
 
 #[derive(

@@ -4,7 +4,8 @@ use catsquad_log::prelude::*;
 #[derive(Debug, Clone, PartialEq, sqlx::FromRow)]
 pub struct DbEmailChange {
     #[sqlx(rename = "email_change_id")]
-    pub id: i64,
+    #[sqlx(try_from = "XUuid")]
+    pub id: Uuid,
     #[sqlx(rename = "email_change_user_username")]
     pub user_username: String,
     #[sqlx(rename = "email_change_current_email")]
@@ -49,7 +50,7 @@ impl Db {
         // add foreign key FILE
         let query = "
             CREATE TABLE emails_changes (
-                email_change_id int8 PRIMARY KEY generated always as identity,
+                email_change_id uuid PRIMARY KEY DEFAULT uuidv7(),
                 email_change_user_username varchar NOT NULL references users(user_username) ON UPDATE CASCADE ON DELETE CASCADE,
                 email_change_current_email varchar NOT NULL,
                 email_change_current_token uuid DEFAULT uuidv7(),
@@ -97,11 +98,11 @@ impl Db {
             .await;
 
         let (
-            email_change_id,
+            XUuid(email_change_id),
             XUuid(email_change_current_token),
             XUuid(email_change_new_token),
             email_change_current_email,
-        ): (i64, XUuid, XUuid, String) = match result {
+        ): (XUuid, XUuid, XUuid, String) = match result {
             Ok(v) => v,
             Err(sqlx::Error::RowNotFound) => {
                 return Err(DbEmailChangeAddErr::UserNotFound);
