@@ -36,7 +36,7 @@ impl Db {
         let result = match result {
             Ok(v) => v,
             Err(sqlx::Error::Database(err))
-                if err.is_unique_violation() && err.constraint() == Some("users_pkey") =>
+                if err.is_unique_violation() && err.constraint() == Some("user_username_idx") =>
             {
                 return Err(DbUserUpdateUsernameErr::UsernameAlreadyUsed);
             }

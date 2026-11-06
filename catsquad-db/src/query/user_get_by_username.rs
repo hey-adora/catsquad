@@ -11,6 +11,8 @@ pub enum DbUserGetByUsernameErr {
 
 #[derive(Debug, Clone, PartialEq, sqlx::FromRow)]
 pub struct DbUserGet {
+    #[sqlx(rename = "user_id")]
+    pub id: i64,
     #[sqlx(rename = "user_username")]
     pub username: String,
     #[sqlx(rename = "user_email")]

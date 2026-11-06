@@ -47,13 +47,6 @@ impl Db {
                 "false as user_followed"
             };
 
-            let q_group_followed_by_me = 'a: {
-                if !user_username.is_empty() {
-                    break 'a ", follow_id";
-                }
-                ""
-            };
-
             let q_where_username = 'a: {
                 if !username.is_empty() {
                     break 'a "user_username = $1";
@@ -85,6 +78,7 @@ impl Db {
             let query_str = format!(
                 "SELECT
                 {q_field_followed_by_me},
+                user_id,
                 user_username,
                 user_email,
                 user_password,
@@ -112,7 +106,6 @@ impl Db {
                     {q_where_username}
                     {q_where_email}
                     {q_where_session}
-                GROUP BY user_username, image_processed {q_group_followed_by_me}
                 "
             );
 

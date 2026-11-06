@@ -12,6 +12,7 @@ impl Db {
     pub async fn user_get_all(&self) -> Result<Vec<DbUser>, DbUserGetAllErr> {
         let pool = &self.db;
         let query = "SELECT
+                            user_id,
                             user_username,
                             user_email,
                             user_password,

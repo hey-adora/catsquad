@@ -3,6 +3,8 @@ use catsquad_log::prelude::*;
 
 #[derive(Debug, Clone, PartialEq, sqlx::FromRow)]
 pub struct DbUser {
+    #[sqlx(rename = "user_id")]
+    pub id: i64,
     #[sqlx(rename = "user_username")]
     pub username: String,
     #[sqlx(rename = "user_email")]
@@ -71,7 +73,8 @@ impl Db {
         let pool = &self.db;
         let query = "
             CREATE TABLE users (
-                user_username varchar PRIMARY KEY,
+                user_id int8 PRIMARY KEY generated always as identity,
+                user_username varchar NOT NULL,
                 user_email varchar NOT NULL,
                 user_password varchar NOT NULL,
                 user_support text DEFAULT '',
@@ -87,6 +90,7 @@ impl Db {
                 user_modified_at timestamp NOT NULL,
                 user_created_at timestamp NOT NULL
             );
+            CREATE UNIQUE INDEX user_username_idx ON users (user_username);
             CREATE UNIQUE INDEX user_email_idx ON users (user_email);
         ";
         trace!("about to run {query}");
@@ -103,6 +107,8 @@ impl Db {
         max_storage_per_file_bytes: u32,
     ) -> Result<DbUser, DbUserAddErr> {
         let pool = &self.db;
+        let username = username.into();
+        let password = password.into();
 
         let mut tx = pool.begin().await?;
 
@@ -147,10 +153,7 @@ impl Db {
         };
 
         // add user
-        let (username, password) = {
-            let username = username.into();
-            let password = password.into();
-
+        let user_id = {
             let query = "
             INSERT INTO users (
                     user_username,
@@ -162,19 +165,21 @@ impl Db {
                     user_created_at
                 )
                 VALUES ( $1, $2, $3, $4, $5, $6, $6 )
+                RETURNING user_id
         ";
-            debug!("about to run {query}");
-            let result = sqlx::query(query)
+            let result = sqlx::query_as(query)
                 .bind(&username)
                 .bind(&email)
                 .bind(&password)
                 .bind(max_storage_bytes as i64)
                 .bind(max_storage_per_file_bytes as i64)
                 .bind(XTimestamp(time as i64))
-                .execute(&mut *tx)
+                .fetch_one(&mut *tx)
                 .await;
 
-            let result = match result {
+            debug!("query: {query}\nresult: {result:#?}");
+
+            let (user_id,): (i64,) = match result {
                 Ok(v) => v,
                 Err(sqlx::Error::Database(err))
                     if err.is_unique_violation() && err.constraint() == Some("user_email_idx") =>
@@ -182,7 +187,8 @@ impl Db {
                     return Err(DbUserAddErr::EmailIsTaken);
                 }
                 Err(sqlx::Error::Database(err))
-                    if err.is_unique_violation() && err.constraint() == Some("users_pkey") =>
+                    if err.is_unique_violation()
+                        && err.constraint() == Some("user_username_idx") =>
                 {
                     return Err(DbUserAddErr::UsernameIsTaken);
                 }
@@ -191,9 +197,8 @@ impl Db {
                     return Err(DbUserAddErr::Db(err));
                 }
             };
-            debug!("query: {query}\nresult: {result:#?}");
 
-            (username, password)
+            user_id
         };
 
         // update invite
@@ -214,6 +219,7 @@ impl Db {
         tx.commit().await?;
 
         Ok(DbUser {
+            id: user_id,
             username,
             email,
             password,
