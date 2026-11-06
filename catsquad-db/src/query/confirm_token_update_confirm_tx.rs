@@ -31,8 +31,12 @@ impl Db {
             let query = "UPDATE tokens SET
                     token_used = TRUE,
                     token_modified_at = $1
-                    WHERE token_id = $2 AND token_label = $3
-                    RETURNING token_user_username, OLD.token_used, token_expires_at";
+                    FROM users
+                    WHERE
+                        token_id = $2
+                        AND token_label = $3
+                        AND user_id = token_user_id
+                    RETURNING user_username, OLD.token_used, token_expires_at";
 
             let result = sqlx::query_as(query)
                 .bind(XTimestamp(time as i64))

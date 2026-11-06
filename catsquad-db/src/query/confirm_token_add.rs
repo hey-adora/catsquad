@@ -7,8 +7,8 @@ pub struct DbConfirmToken {
     #[sqlx(rename = "token_id")]
     #[sqlx(try_from = "XUuid")]
     pub id: Uuid,
-    #[sqlx(rename = "token_user_username")]
-    pub user_username: String,
+    #[sqlx(rename = "token_user_id")]
+    pub user_id: i64,
     #[sqlx(rename = "token_label")]
     #[sqlx(try_from = "String")]
     pub label: DbConfirmTokenLabel,
@@ -73,7 +73,7 @@ impl Db {
         let query = "
             CREATE TABLE tokens (
                 token_id uuid PRIMARY KEY DEFAULT uuidv7(),
-                token_user_username varchar NOT NULL references users(user_username) ON UPDATE CASCADE ON DELETE CASCADE,
+                token_user_id int8 NOT NULL references users(user_id) ON DELETE CASCADE,
                 token_label varchar NOT NULL,
                 token_used bool DEFAULT FALSE,
                 token_expires_at timestamp NOT NULL,
@@ -97,14 +97,18 @@ impl Db {
 
         let query = "
             INSERT INTO tokens (
-                    token_user_username,
+                    token_user_id,
                     token_expires_at,
                     token_modified_at,
                     token_created_at,
                     token_label
                 )
-                VALUES ( $1, $2, $3, $3, $4 )
-                RETURNING token_id
+                SELECT
+                    user_id,
+                    $2, $3, $3, $4
+                   FROM users
+                   WHERE user_username = $1
+                RETURNING token_id, token_user_id
         ";
 
         debug!("about to run {query}");
@@ -117,12 +121,9 @@ impl Db {
             .fetch_one(pool)
             .await;
 
-        let result = match result {
+        let (XUuid(token), user_id): (XUuid, i64) = match result {
             Ok(v) => v,
-            Err(sqlx::Error::Database(err))
-                if err.is_foreign_key_violation()
-                    && err.constraint() == Some("tokens_token_user_username_fkey") =>
-            {
+            Err(sqlx::Error::RowNotFound) => {
                 return Err(DbConfirmTokenAddErr::UserNotFound(username));
             }
             Err(err) => {
@@ -131,11 +132,9 @@ impl Db {
             }
         };
 
-        let (XUuid(token),): (XUuid,) = result;
-
         let token = DbConfirmToken {
             id: token,
-            user_username: username,
+            user_id: user_id,
             label,
             used: false,
             expires_at: expires,
