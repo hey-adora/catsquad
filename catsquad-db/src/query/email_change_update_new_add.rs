@@ -67,12 +67,14 @@ impl Db {
         // get email_change
         {
             let query = "SELECT
-                                email_change_user_username,
+                                user_username as email_change_user_username,
                                 email_change_completed,
                                 email_change_expires_at,
                                 email_change_current_used,
                                 email_change_new_email
-                                FROM emails_changes WHERE email_change_id = $1";
+                                FROM emails_changes
+                                JOIN users ON email_change_user_id=user_id
+                                WHERE email_change_id = $1";
 
             let result = sqlx::query_as(query)
                 .bind(XUuid(email_change_id))

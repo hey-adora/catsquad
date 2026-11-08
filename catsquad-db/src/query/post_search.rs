@@ -7,6 +7,8 @@ use sqlx::AssertSqlSafe;
 pub struct DbPostSearch {
     #[sqlx(rename = "post_id")]
     pub id: i64,
+    #[sqlx(rename = "post_user_id")]
+    pub user_id: i64,
     #[sqlx(rename = "post_user_username")]
     pub user_username: String,
     #[sqlx(rename = "post_user_pfp_hash")]
@@ -94,10 +96,6 @@ impl Db {
         let is_liked_by_and_user_same =
             !user_username.is_empty() && user_username == liked_by_username;
 
-        // starts at 3 because 3 of them are already used in query statically
-
-        let mut bind_index = 3_usize;
-
         // order
 
         let q_order = match order {
@@ -106,7 +104,7 @@ impl Db {
         };
         // filter - state
 
-        let q_state = "post_state = $2".to_string();
+        let q_state = "post_state = $2";
 
         // filter - time
 
@@ -116,43 +114,48 @@ impl Db {
             TimeRange::LessOrEqual => "post_created_at <= $1",
             TimeRange::More => "post_created_at > $1",
             TimeRange::MoreOrEqual => "post_created_at >= $1",
-        }
-        .to_string();
+        };
 
         // filter - tags
 
         let tags = split_tags(tags);
 
-        let q_tags = join_str(0..tags.len(), " AND ", |_| {
-            bind_index += 1;
-            format!("position(${bind_index} in post_tags) > 0")
+        let q_tags = join_str(1..=tags.len(), " AND ", |i| {
+            format!("position(($4)[{i}] in post_tags) > 0")
         });
 
         // filter - liked by user
 
         // TODO investigate, somehow works with field `user`
-        let q_user = run_if_not_empty(&author_username, || {
-            bind_index += 1;
-            format!("post_user_username = ${bind_index}")
-        });
+        // TODO figure out what the hell that TODO above means
 
-        let q_liked_by_user = run_if_not_empty(&liked_by_username, || {
-            bind_index += 1;
-            format!(
-                "INNER JOIN posts_likes l1 ON post_id=l1.post_like_post_id AND l1.post_like_user_username = ${bind_index}"
-            )
-        });
+        let (q_user_filter,) = match author_username.is_empty() {
+            true => ("",),
+            false => ("post_user.user_username = $5",),
+        };
+
+        //
+
+        let (q_liked_by_user_join1, q_liked_by_user_join2) = match liked_by_username.is_empty() {
+            true => ("", ""),
+            false => (
+                "JOIN users liked_by_user ON $6=liked_by_user.user_username",
+                "INNER JOIN posts_likes l1 ON post_id=l1.post_like_post_id AND liked_by_user.user_username=l1.post_like_user_username",
+            ),
+        };
 
         // field - liked by me
 
-        let q_liked_by_me = if is_liked_by_and_user_same || user_username.is_empty() {
-            String::new()
-        } else {
-            bind_index += 1;
-            format!(
-                "LEFT JOIN posts_likes l2 ON post_id=l2.post_like_post_id AND l2.post_like_user_username = ${bind_index}"
-            )
-        };
+        let (q_liked_by_me_join1, q_liked_by_me_join2) =
+            match is_liked_by_and_user_same || user_username.is_empty() {
+                true => ("", ""),
+                false => (
+                    "JOIN users my_user ON $7=my_user.user_username",
+                    "LEFT JOIN posts_likes l2 ON
+                        post_id=l2.post_like_post_id
+                        AND my_user.user_username = l2.post_like_user_username",
+                ),
+            };
 
         let q_liked_by_me_field = 'a: {
             if is_liked_by_and_user_same {
@@ -168,16 +171,17 @@ impl Db {
 
         // filter - followed by
 
-        let q_followed_by_user = if followed_by_username.is_empty() {
-            String::new()
-        } else {
-            bind_index += 1;
-            format!(
-                "JOIN follow fo1 ON fo1.follower_user_username=${bind_index} AND post_user_username=fo1.following_user_username"
-            )
+        let (q_followed_by_user_join1, q_followed_by_user_join2) = match followed_by_username
+            .is_empty()
+        {
+            true => ("", ""),
+            false => (
+                "JOIN users followed_user ON $8=followed_user.user_username",
+                "JOIN follow fo1 ON fo1.follower_user_username=followed_user.user_username AND post_user.user_username=fo1.following_user_username",
+            ),
         };
 
-        let filters = [q_tags, q_time_after, q_user, q_state];
+        let filters = [q_tags.as_str(), q_time_after, q_user_filter, q_state];
         let q_where = join_str(filters, " AND ", |v| v);
         let q_where = if !q_where.is_empty() {
             format!("WHERE {q_where}")
@@ -190,8 +194,9 @@ impl Db {
             "
             SELECT
                 post_id,
-                post_user_username,
-                user_pfp_image_hash as post_user_pfp_hash,
+                post_user_id,
+                post_user.user_username as post_user_username,
+                post_user.user_pfp_image_hash as post_user_pfp_hash,
                 coalesce(f2.image_processed, false) as post_user_pfp_proccesed,
                 post_state,
                 post_title,
@@ -208,13 +213,21 @@ impl Db {
                 post_created_at
 
                 FROM posts
-                JOIN users ON post_user_username=user_username
+
+                JOIN users post_user ON post_user_id=post_user.user_id
+                {q_liked_by_user_join1}
+                {q_liked_by_me_join1}
+                {q_followed_by_user_join1}
+
                 LEFT JOIN files_images f1 ON post_images_hashes[1]=f1.image_hash
-                LEFT JOIN files_images f2 ON user_pfp_image_hash=f2.image_hash
-                {q_liked_by_user}
-                {q_liked_by_me}
-                {q_followed_by_user}
+                LEFT JOIN files_images f2 ON post_user.user_pfp_image_hash=f2.image_hash
+
+                {q_liked_by_user_join2}
+                {q_liked_by_me_join2}
+                {q_followed_by_user_join2}
+
                 {q_where}
+
                 ORDER BY post_created_at {q_order}
                 LIMIT $3
         "
@@ -222,34 +235,31 @@ impl Db {
 
         let query = AssertSqlSafe(query_str.clone());
 
-        let mut builder = sqlx::query_as(query)
+        let builder = sqlx::query_as(query)
             .bind(XTimestamp(search_time as i64))
             .bind(state.as_str())
-            .bind(limit as i64);
-
-        for tag in tags {
-            builder = builder.bind(tag);
-        }
-
-        if !author_username.is_empty() {
-            builder = builder.bind(author_username);
-        }
-
-        if !liked_by_username.is_empty() {
-            builder = builder.bind(liked_by_username);
-        }
-
-        if !user_username.is_empty() {
-            builder = builder.bind(user_username);
-        }
-
-        if !followed_by_username.is_empty() {
-            builder = builder.bind(followed_by_username);
-        }
+            .bind(limit as i64)
+            .bind(&tags)
+            .bind(&author_username)
+            .bind(&liked_by_username)
+            .bind(&user_username)
+            .bind(&followed_by_username);
 
         let result = builder.fetch_all(pool).await;
 
-        trace!("query {query_str} result {result:#?}");
+        trace!(
+            "
+            query {query_str}
+            $1 = {search_time}
+            $2 = {state}
+            $3 = {limit}
+            $4 = {tags:?}
+            $5 = {author_username}
+            $6 = {liked_by_username}
+            $7 = {user_username}
+            $8 = {followed_by_username}
+            result {result:#?}"
+        );
 
         let posts = match result {
             Ok(v) => v,

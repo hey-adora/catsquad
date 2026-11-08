@@ -68,36 +68,14 @@ impl Db {
             .await
             .inspect_err(|err| error!("post_like_add {err}"))?;
 
-        // get post like
-        // {
-        //     let query = "SELECT EXISTS(SELECT 1 FROM posts_likes WHERE post_like_user_username=$1 AND post_like_post_id=$2)";
-
-        //     let result = sqlx::query_as(query)
-        //         .bind(&user_username)
-        //         .bind(post_id)
-        //         .fetch_one(&mut *tx)
-        //         .await;
-
-        //     debug!("query: {query}\nresult: {result:#?}");
-
-        //     let result = match result {
-        //         Ok(v) => v,
-        //         Err(err) => {
-        //             error!("unexpected db error {err}");
-        //             return Err(DbPostLikeAddErr::Db(err));
-        //         }
-        //     };
-
-        //     let (exists,): (bool,) = result;
-
-        //     if exists {
-        //         return Err(DbPostLikeAddErr::PostWasAlreadyLiked);
-        //     }
-        // }
-
         // get post
         let post_user_username = {
-            let query = "SELECT post_user_username, post_state FROM posts WHERE post_id = $1";
+            let query = "SELECT
+                                user_username AS post_user_username,
+                                post_state
+                               FROM posts
+                               JOIN users ON post_user_id=user_id
+                               WHERE post_id = $1";
 
             let result = sqlx::query_as(query)
                 .bind(post_id)

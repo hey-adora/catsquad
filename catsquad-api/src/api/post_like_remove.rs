@@ -76,11 +76,11 @@ mod test_utils {
 }
 
 #[tokio::test]
-async fn test_post_like_remove() {
+async fn test_api_post_like_remove() {
     use catsquad_log::prelude::*;
     use catsquad_shared as cs;
     init_log();
-    let server = crate::TestServer::new(0, "test_post_like_remove").await;
+    let server = crate::TestServer::new(0, "test_api_post_like_remove").await;
 
     let (user1, session_key1) = server
         .user_add_full("hey", "hey@heyadora.com", "1nnerogGeron@@$")

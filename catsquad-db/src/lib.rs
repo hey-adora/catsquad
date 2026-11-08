@@ -108,6 +108,7 @@ pub use query::user_update_username::*;
 //     v.key.to_sql_pretty()
 // }
 
+const POSTGRES_TIME_EPOCH_OFFSET: i64 = 946684800000000;
 // pub type DbKindLocal = DbEngine;
 
 pub type Uuid = [u8; 16];
@@ -182,7 +183,7 @@ impl Encode<'_, Postgres> for XTimestamp {
         &self,
         buf: &mut PgArgumentBuffer,
     ) -> Result<sqlx::encode::IsNull, sqlx::error::BoxDynError> {
-        let micros = self.0 - 946684800000000;
+        let micros = self.0 - POSTGRES_TIME_EPOCH_OFFSET;
         Encode::<Postgres>::encode(micros, buf)
     }
 }
@@ -190,7 +191,7 @@ impl Encode<'_, Postgres> for XTimestamp {
 impl<'r> Decode<'r, Postgres> for XTimestamp {
     fn decode(value: PgValueRef<'r>) -> Result<Self, sqlx::error::BoxDynError> {
         let mut micros: i64 = Decode::<Postgres>::decode(value)?;
-        micros += 946684800000000_i64;
+        micros += POSTGRES_TIME_EPOCH_OFFSET;
         Ok(Self(micros))
     }
 }

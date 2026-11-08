@@ -85,8 +85,9 @@ impl Db {
                                     post_images_hashes = array_remove(post_images_hashes, $1),
                                     post_size_bytes = post_size_bytes - $3,
                                     post_modified_at = $2
-                                    WHERE $1 = ANY(post_images_hashes)
-                                    RETURNING post_user_username
+                                    FROM users
+                                    WHERE $1 = ANY(post_images_hashes) AND post_user_id = user_id
+                                    RETURNING user_username
 
                                     ";
 

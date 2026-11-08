@@ -91,9 +91,10 @@ impl Db {
         {
             let query = "
                 SELECT
-                       post_user_username,
+                       user_username AS post_user_username,
                        post_state
                 FROM posts
+                JOIN users ON post_user_id=user_id
                 WHERE
                     post_id = $1";
 

@@ -24,6 +24,8 @@ impl Db {
     ) -> Result<DbFileImage, DbPostImageGetByHashErr> {
         let pool = &self.db;
 
+        // nested array because its difficult to relate post and images without unnest'ing hashes
+
         let query = "SELECT
                                 image_hash,
                                 image_extension,
@@ -37,13 +39,19 @@ impl Db {
                                 image_created_at,
                                 post_user_username,
                                 post_state
-                            FROM (SELECT unnest(post_images_hashes) as post_image_hash, post_state, post_user_username FROM posts WHERE post_id = $1)
+                            FROM (
+                                    SELECT
+                                        unnest(post_images_hashes) as post_image_hash,
+                                        post_state,
+                                        user_username as post_user_username
+                                    FROM posts
+                                    JOIN users ON post_user_id = user_id
+                                    WHERE post_id = $1
+                                )
                             INNER JOIN files_images
                                 ON post_image_hash=image_hash
                             WHERE image_hash = $2
                             LIMIT 1";
-        // INNER JOIN posts ON comment_post_id = post_id
-        // let query = "SELECT * FROM posts WHERE post_id = $1 AND post_state != 'draft'";
 
         // debug!("about to run {query}");
 

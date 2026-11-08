@@ -31,8 +31,11 @@ impl Db {
 
         // get posts images
         let posts_images = {
-            let query = "SELECT post_images_hashes FROM posts
-                               WHERE post_user_username = $1
+            let query = "SELECT
+                                    post_images_hashes
+                               FROM posts
+                               JOIN users ON post_user_id=user_id
+                               WHERE user_username = $1
                                ORDER BY post_created_at DESC";
 
             trace!("about to run {query}");

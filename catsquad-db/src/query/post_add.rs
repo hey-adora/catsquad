@@ -8,6 +8,8 @@ use sqlx::{AssertSqlSafe, FromRow};
 pub struct DbPost {
     #[sqlx(rename = "post_id")]
     pub id: i64,
+    #[sqlx(rename = "post_user_id")]
+    pub user_id: i64,
     #[sqlx(rename = "post_user_username")]
     pub user_username: String,
     #[sqlx(rename = "post_state")]
@@ -55,7 +57,7 @@ impl Db {
         let query = "
             CREATE TABLE posts (
                 post_id int8 PRIMARY KEY generated always as identity,
-                post_user_username varchar NOT NULL references users(user_username) ON UPDATE CASCADE ON DELETE CASCADE,
+                post_user_id int8 NOT NULL references users(user_id) ON DELETE CASCADE,
                 post_state varchar DEFAULT 'draft',
                 post_title varchar,
                 post_tags text,
@@ -66,8 +68,8 @@ impl Db {
                 post_modified_at timestamp NOT NULL,
                 post_created_at timestamp NOT NULL
             );
-            CREATE INDEX post_user_username_idx ON posts (post_user_username);
-            CREATE INDEX post_username_and_state_idx ON posts (post_user_username, post_state);
+            CREATE INDEX post_user_id_idx ON posts (post_user_id);
+            CREATE INDEX post_username_and_state_idx ON posts (post_user_id, post_state);
         ";
         trace!("about to run {query}");
         let _result = sqlx::raw_sql(query).execute(pool).await.unwrap();
@@ -104,7 +106,8 @@ impl Db {
                         coalesce(image_processed, false) as post_user_pfp_proccesed,
 
                         post_id,
-                        post_user_username,
+                        post_user_id,
+                        user_username as post_user_username,
                         post_state,
                         post_title,
                         post_description,
@@ -115,10 +118,10 @@ impl Db {
                         post_created_at
 
                     FROM posts
-                    JOIN users ON post_user_username=user_username
+                    JOIN users ON post_user_id=user_id
                     LEFT JOIN files_images ON user_pfp_image_hash=image_hash
                     WHERE
-                        post_user_username=$1 AND post_state='draft'
+                        user_username=$1 AND post_state='draft'
                     LIMIT 1";
 
             debug!("about to run {query}");
@@ -194,17 +197,21 @@ impl Db {
             // add post
             let query = "
                 INSERT INTO posts (
-                        post_user_username,
+                        post_user_id,
                         post_title,
                         post_tags,
                         post_description,
                         post_modified_at,
                         post_created_at
                     )
-                    VALUES ( $1, $2, $3, $4, $5, $5 )
-                    RETURNING post_id
+                    SELECT
+                        user_id,
+                        $2, $3, $4, $5, $5
+                        FROM users
+                        WHERE user_username = $1
+                    RETURNING post_id, post_user_id
             ";
-            debug!("about to run {query}");
+
             let result = sqlx::query_as(query)
                 .bind(&input_user_username)
                 .bind(&input_title)
@@ -214,11 +221,13 @@ impl Db {
                 .fetch_one(&mut *tx)
                 .await;
 
-            let post = match result {
+            debug!("query: {query}\nresult: {result:#?}");
+
+            let (post_id, user_id): (i64, i64) = match result {
                 Ok(post) => post,
                 Err(sqlx::Error::Database(err))
                     if err.is_foreign_key_violation()
-                        && err.constraint() == Some("posts_post_user_username_fkey") =>
+                        && err.constraint() == Some("posts_post_user_id_fkey") =>
                 {
                     return Err(DbPostAddErr::UserNotFound);
                 }
@@ -227,9 +236,6 @@ impl Db {
                     return Err(DbPostAddErr::Db(err));
                 }
             };
-            debug!("query: {query}\nresult: {post:#?}");
-
-            let (post_id,): (i64,) = post;
 
             let post = DbPostGet {
                 user_pfp_hash: pfp_hash,
@@ -237,8 +243,8 @@ impl Db {
                 followers: 0,    // here
                 followed: false, // cant follow yourself
                 liked: false,    // cant like yourself
-
                 id: post_id,
+                user_id,
                 user_username: input_user_username,
                 state: POST_STATE_DRAFT.to_string(),
                 title: input_title,

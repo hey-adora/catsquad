@@ -6,6 +6,8 @@ pub struct DbEmailChange {
     #[sqlx(rename = "email_change_id")]
     #[sqlx(try_from = "XUuid")]
     pub id: Uuid,
+    #[sqlx(rename = "email_change_user_id")]
+    pub user_id: i64,
     #[sqlx(rename = "email_change_user_username")]
     pub user_username: String,
     #[sqlx(rename = "email_change_current_email")]
@@ -51,7 +53,7 @@ impl Db {
         let query = "
             CREATE TABLE emails_changes (
                 email_change_id uuid PRIMARY KEY DEFAULT uuidv7(),
-                email_change_user_username varchar NOT NULL references users(user_username) ON UPDATE CASCADE ON DELETE CASCADE,
+                email_change_user_id int8 NOT NULL references users(user_id) ON DELETE CASCADE,
                 email_change_current_email varchar NOT NULL,
                 email_change_current_token uuid DEFAULT uuidv7(),
                 email_change_current_used bool DEFAULT FALSE,
@@ -63,7 +65,6 @@ impl Db {
                 email_change_modified_at timestamp NOT NULL,
                 email_change_created_at timestamp NOT NULL
             );
-            CREATE INDEX email_change_user_username_idx ON emails_changes (email_change_user_username);
         ";
         trace!("about to run {query}");
         let _result = sqlx::raw_sql(query).execute(pool).await.unwrap();
@@ -80,16 +81,16 @@ impl Db {
 
         let query = "
             INSERT INTO emails_changes (
-                    email_change_user_username,
+                    email_change_user_id,
                     email_change_current_email,
                     email_change_expires_at,
                     email_change_modified_at,
                     email_change_created_at
                 )
-                SELECT $1, user_email, $2, $3, $3 FROM users WHERE user_username = $1
-                RETURNING email_change_id, email_change_current_token, email_change_new_token, email_change_current_email
+                SELECT user_id, user_email, $2, $3, $3 FROM users WHERE user_username = $1
+                RETURNING email_change_user_id, email_change_id, email_change_current_token, email_change_new_token, email_change_current_email
         ";
-        debug!("about to run {query}");
+
         let result = sqlx::query_as(query)
             .bind(&user_username)
             .bind(XTimestamp(expires as i64))
@@ -97,12 +98,15 @@ impl Db {
             .fetch_one(pool)
             .await;
 
+        debug!("query {query} result {result:#?}");
+
         let (
+            user_id,
             XUuid(email_change_id),
             XUuid(email_change_current_token),
             XUuid(email_change_new_token),
             email_change_current_email,
-        ): (XUuid, XUuid, XUuid, String) = match result {
+        ): (i64, XUuid, XUuid, XUuid, String) = match result {
             Ok(v) => v,
             Err(sqlx::Error::RowNotFound) => {
                 return Err(DbEmailChangeAddErr::UserNotFound);
@@ -115,6 +119,7 @@ impl Db {
 
         let email_change = DbEmailChange {
             id: email_change_id,
+            user_id,
             user_username,
             current_email: email_change_current_email,
             current_token: email_change_current_token,

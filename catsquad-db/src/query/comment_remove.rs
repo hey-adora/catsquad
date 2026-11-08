@@ -36,10 +36,11 @@ impl Db {
             let query = "SELECT
                                 comment_parents,
                                 comment_user_username,
-                                post_user_username,
+                                user_username as post_user_username,
                                 post_state
                                 FROM comments
-                                INNER JOIN posts ON comment_post_id = post_id
+                                JOIN posts ON comment_post_id = post_id
+                                JOIN users ON post_user_id = user_id
                                 WHERE comment_id = $1";
 
             let result = sqlx::query_as(query)

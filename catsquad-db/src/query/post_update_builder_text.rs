@@ -47,7 +47,11 @@ impl Db {
 
         let mut tx = pool.begin().await?;
 
-        let query = "SELECT post_user_username FROM posts WHERE post_id = $1";
+        let query = "SELECT
+                            user_username as post_user_username
+                           FROM posts
+                           JOIN users ON post_user_id=user_id
+                           WHERE post_id = $1";
 
         let result = sqlx::query_as(query)
             .bind(post_id)

@@ -37,7 +37,13 @@ impl Db {
 
         // get post
         let images = {
-            let query = "SELECT post_user_username, post_state, post_images_hashes FROM posts WHERE post_id = $1";
+            let query = "SELECT
+                                user_username AS post_user_username,
+                                post_state,
+                                post_images_hashes
+                               FROM posts
+                               JOIN users ON post_user_id=user_id
+                               WHERE post_id = $1";
 
             let result = sqlx::query_as(query)
                 .bind(post_id)

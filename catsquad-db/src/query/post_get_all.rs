@@ -10,7 +10,22 @@ pub enum DbPostGetAllErr {
 impl Db {
     pub async fn post_get_all(&self) -> Result<Vec<DbPost>, DbPostGetAllErr> {
         let pool = &self.db;
-        let query = "SELECT * FROM posts ORDER BY post_created_at DESC";
+        let query = "SELECT
+                                post_id,
+                                post_user_id,
+                                user_username AS post_user_username,
+                                post_state,
+                                post_title,
+                                post_tags,
+                                post_description,
+                                post_likes_count,
+                                post_size_bytes,
+                                post_images_hashes,
+                                post_modified_at,
+                                post_created_at
+                             FROM posts
+                             JOIN users ON post_user_id=user_id
+                             ORDER BY post_created_at DESC";
 
         trace!("about to run {query}");
 

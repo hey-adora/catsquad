@@ -29,7 +29,24 @@ impl Db {
         let pool = &self.db;
         let user_username = user_username.into();
 
-        let query = "SELECT * FROM emails_changes WHERE email_change_id = $1";
+        let query = "
+                SELECT
+                    email_change_id,
+                    email_change_user_id,
+                    user_username as email_change_user_username,
+                    email_change_current_email,
+                    email_change_current_token,
+                    email_change_current_used,
+                    email_change_new_email,
+                    email_change_new_token,
+                    email_change_new_used,
+                    email_change_completed,
+                    email_change_expires_at,
+                    email_change_modified_at,
+                    email_change_created_at
+                FROM emails_changes
+                JOIN users ON email_change_user_id=user_id
+                WHERE email_change_id = $1";
 
         let result = sqlx::query_as(query)
             .bind(XUuid(email_change_id))
@@ -70,7 +87,7 @@ impl Db {
 async fn test_email_change_get_by_id() {
     init_log();
 
-    let db = Db::test_db(0, "test_email_change_get_by_key").await;
+    let db = Db::test_db(0, "test_email_change_get_by_id").await;
 
     let invite = db.invite_add(0, "hey@hey.com", 10).await.unwrap();
     let user = db

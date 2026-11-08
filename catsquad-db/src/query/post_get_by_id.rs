@@ -19,6 +19,8 @@ pub enum DbPostGetByKeyErr {
 pub struct DbPostGet {
     #[sqlx(rename = "post_id")]
     pub id: i64,
+    #[sqlx(rename = "post_user_id")]
+    pub user_id: i64,
     #[sqlx(rename = "post_user_username")]
     pub user_username: String,
     #[sqlx(rename = "post_user_pfp_hash")]
@@ -56,25 +58,6 @@ pub struct DbPostGet {
     pub created_at: u64,
 }
 
-// impl From<DbPost> for DbPostGet {
-//     fn from(value: DbPost) -> Self {
-//         Self {
-//             id: value.id,
-//             user_username: value.user_username,
-//             user_pfp_hash: value.p,
-//             state: value.state,
-//             title: value.title,
-//             description: value.description,
-//             tags: value.tags,
-//             likes_count: value.likes_count,
-//             size_bytes: value.size_bytes,
-//             images: Vec::new(),
-//             modified_at: value.modified_at,
-//             created_at: value.created_at,
-//         }
-//     }
-// }
-
 impl Db {
     pub async fn post_get_by_id(
         &self,
@@ -82,48 +65,34 @@ impl Db {
         post_id: i64,
     ) -> Result<DbPostGet, DbPostGetByKeyErr> {
         let pool = &self.db;
-        // coalesce(l2.post_like_post_id > 0, false) as post_liked
-        // coalesce(f2.image_processed, false) as post_user_pfp_proccesed,
-        // coalesce(f1.image_width, 0) as post_image_width,
-        // coalesce(f1.image_height, 0) as post_image_height,
-        // coalesce(f1.image_extension, '') as post_image_extension,
-        // coalesce(f1.image_hash, 0) as post_image_hash,
-        //user_pfp_image_hash
-        // false as post_liked,
-        // user_pfp_image_hash as post_user_pfp_hash,
-        // coalesce(f1.image_processed, false) as post_user_pfp_proccesed,
-        // JOIN users ON post_user_username=user_username
-        // LEFT JOIN files_images f1 ON user_pfp_image_hash=f1.image_hash
 
-        // CAST(0 as int8) as post_user_pfp_hash,
-        // false as post_user_pfp_proccesed,
-
-        let q_liked_by_me = 'a: {
-            if !user_username.is_empty() {
-                break 'a "LEFT JOIN posts_likes ON post_id=post_like_post_id AND post_like_user_username = $2";
-            }
-            ""
-        };
-
-        let q_liked_by_me_field = 'a: {
-            if !user_username.is_empty() {
-                break 'a "coalesce(post_like_post_id > 0, false) as post_liked";
-            }
-            "false as post_liked"
-        };
-
-        let q_followed_by_me = 'a: {
-            if !user_username.is_empty() {
-                break 'a "LEFT JOIN follow ON follower_user_username=$2 AND following_user_username=post_user_username";
-            }
-            ""
-        };
-
-        let q_followed_by_me_field = 'a: {
-            if !user_username.is_empty() {
-                break 'a "coalesce(follow_id > 0, false) as post_user_followed";
-            }
-            "false as post_user_followed"
+        let (
+            q_join_my_user,
+            //
+            q_liked_by_me_join,
+            q_liked_by_me_field,
+            //
+            q_followed_by_me_join,
+            q_followed_by_me_field,
+        ) = match user_username.is_empty() {
+            true => (
+                "",
+                //
+                "",
+                "false as post_liked",
+                //
+                "",
+                "false as post_user_followed",
+            ),
+            false => (
+                "JOIN users my_user ON $2=my_user.user_username",
+                //
+                "LEFT JOIN posts_likes ON post_id=post_like_post_id AND post_like_user_username = my_user.user_username",
+                "coalesce(post_like_post_id > 0, false) as post_liked",
+                //
+                "LEFT JOIN follow ON my_user.user_username=follower_user_username AND post_user.user_username=following_user_username",
+                "coalesce(follow_id > 0, false) as post_user_followed",
+            ),
         };
 
         // get post
@@ -133,16 +102,17 @@ impl Db {
                             SELECT
                                     post_images_hashes,
 
-                                    user_pfp_image_hash as post_user_pfp_hash,
+                                    post_user.user_pfp_image_hash as post_user_pfp_hash,
                                     coalesce(image_processed, false) as post_user_pfp_proccesed,
 
                                     {q_liked_by_me_field},
 
-                                    user_followers_count as post_user_followers,
+                                    post_user.user_followers_count as post_user_followers,
                                     {q_followed_by_me_field},
 
                                     post_id,
-                                    post_user_username,
+                                    post_user_id,
+                                    post_user.user_username as post_user_username,
                                     post_state,
                                     post_title,
                                     post_description,
@@ -153,12 +123,12 @@ impl Db {
                                     post_created_at
                                 FROM posts
 
-                                JOIN users ON post_user_username=user_username
+                                JOIN users post_user ON post_user_id=post_user.user_id
                                 LEFT JOIN files_images ON user_pfp_image_hash=image_hash
 
-                                {q_liked_by_me}
-
-                                {q_followed_by_me}
+                                {q_join_my_user}
+                                {q_liked_by_me_join}
+                                {q_followed_by_me_join}
 
                                 WHERE post_id = $1 AND post_state != 'draft'"
             );
@@ -265,7 +235,7 @@ async fn test_post_get_by_id() {
 
     init_log();
 
-    let db = Db::test_db(0, "test_post_get_by_key").await;
+    let db = Db::test_db(0, "test_post_get_by_id").await;
 
     // register user1 and user2
     let (user1, user2) = {
