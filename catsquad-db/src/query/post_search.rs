@@ -140,7 +140,7 @@ impl Db {
             true => ("", ""),
             false => (
                 "JOIN users liked_by_user ON $6=liked_by_user.user_username",
-                "INNER JOIN posts_likes l1 ON post_id=l1.post_like_post_id AND liked_by_user.user_username=l1.post_like_user_username",
+                "INNER JOIN posts_likes l1 ON post_id=l1.post_like_post_id AND liked_by_user.user_id=l1.post_like_user_id",
             ),
         };
 
@@ -153,7 +153,7 @@ impl Db {
                     "JOIN users my_user ON $7=my_user.user_username",
                     "LEFT JOIN posts_likes l2 ON
                         post_id=l2.post_like_post_id
-                        AND my_user.user_username = l2.post_like_user_username",
+                        AND my_user.user_id = l2.post_like_user_id",
                 ),
             };
 
@@ -177,7 +177,7 @@ impl Db {
             true => ("", ""),
             false => (
                 "JOIN users followed_user ON $8=followed_user.user_username",
-                "JOIN follow fo1 ON fo1.follower_user_username=followed_user.user_username AND post_user.user_username=fo1.following_user_username",
+                "JOIN follow fo1 ON fo1.follower_user_id=followed_user.user_id AND post_user.user_id=fo1.following_user_id",
             ),
         };
 

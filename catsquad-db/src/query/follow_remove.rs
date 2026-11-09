@@ -32,9 +32,12 @@ impl Db {
         {
             let query = "
                     DELETE FROM follow
+                    USING users AS follower_user, users AS following_user
                     WHERE
-                        follower_user_username = $1
-                        AND following_user_username = $2";
+                        follower_user.user_id = follower_user_id
+                        AND following_user.user_id = following_user_id
+                        AND follower_user.user_username = $1
+                        AND following_user.user_username = $2";
 
             let result = sqlx::query(query)
                 .bind(&follower_user_username)

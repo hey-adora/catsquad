@@ -33,37 +33,33 @@ impl Db {
 
         // get user
         let mut user = {
-            let q_join_followed_by_me = 'a: {
-                if !user_username.is_empty() {
-                    break 'a "LEFT JOIN follow ON follower_user_username=$2 AND following_user_username=user_username";
-                }
-                ""
-            };
-
-            let q_field_followed_by_me = 'a: {
-                if !user_username.is_empty() {
-                    break 'a "coalesce(follow_id > 0, false) as user_followed";
-                }
-                "false as user_followed"
-            };
+            let (q_my_user_join, q_followed_by_me_join, q_followed_by_me_field) =
+                match user_username.is_empty() {
+                    true => ("", "", "false as user_followed"),
+                    false => (
+                        "JOIN users my_user ON $2 = my_user.user_username",
+                        "LEFT JOIN follow ON follower_user_id=my_user.user_id AND following_user_id=target_user.user_id",
+                        "coalesce(follow_id > 0, false) as user_followed",
+                    ),
+                };
 
             let q_where_username = 'a: {
                 if !username.is_empty() {
-                    break 'a "user_username = $1";
+                    break 'a "target_user.user_username = $1";
                 }
                 ""
             };
 
             let q_where_email = 'a: {
                 if !email.is_empty() {
-                    break 'a "user_email = $1";
+                    break 'a "target_user.user_email = $1";
                 }
                 ""
             };
 
             let q_join_session = 'a: {
                 if !session_token_is_empty {
-                    break 'a "JOIN sessions ON user_id=session_user_id";
+                    break 'a "JOIN sessions ON target_user.user_id=session_user_id";
                 }
                 ""
             };
@@ -77,30 +73,31 @@ impl Db {
 
             let query_str = format!(
                 "SELECT
-                {q_field_followed_by_me},
-                user_id,
-                user_username,
-                user_email,
-                user_password,
-                user_support,
-                user_aboutme,
-                user_roles,
-                array[]::varchar[] as user_roles_values,
-                user_pfp_image_hash,
-                user_likes_count,
-                user_followers_count,
-                user_following_count,
-                coalesce(image_processed, false) as user_pfp_image_proccesed,
-                user_used_storage_bytes,
-                user_max_storage_per_file_bytes,
-                user_max_storage_bytes,
-                user_max_storage_bytes,
-                user_modified_at,
-                user_created_at
-                    FROM users
+                    {q_followed_by_me_field},
+                    target_user.user_id as user_id,
+                    target_user.user_username as user_username,
+                    target_user.user_email as user_email,
+                    target_user.user_password as user_password,
+                    target_user.user_support as user_support,
+                    target_user.user_aboutme as user_aboutme,
+                    target_user.user_roles as user_roles,
+                    array[]::varchar[] as user_roles_values,
+                    target_user.user_pfp_image_hash as user_pfp_image_hash,
+                    target_user.user_likes_count as user_likes_count,
+                    target_user.user_followers_count as user_followers_count,
+                    target_user.user_following_count as user_following_count,
+                    coalesce(image_processed, false) as user_pfp_image_proccesed,
+                    target_user.user_used_storage_bytes as user_used_storage_bytes,
+                    target_user.user_max_storage_per_file_bytes as user_max_storage_per_file_bytes,
+                    target_user.user_max_storage_bytes as user_max_storage_bytes,
+                    target_user.user_max_storage_bytes as user_max_storage_bytes,
+                    target_user.user_modified_at as user_modified_at,
+                    target_user.user_created_at as user_created_at
+                FROM users target_user
                 LEFT JOIN files_images
-                    ON user_pfp_image_hash = image_hash
-                {q_join_followed_by_me}
+                    ON target_user.user_pfp_image_hash = image_hash
+                {q_my_user_join}
+                {q_followed_by_me_join}
                 {q_join_session}
                 WHERE
                     {q_where_username}
@@ -111,6 +108,8 @@ impl Db {
 
             let query = AssertSqlSafe(query_str.as_str());
             let mut builder = sqlx::query_as(query);
+
+            // TODO maybe use enum
             match (
                 email.is_empty(),
                 username.is_empty(),

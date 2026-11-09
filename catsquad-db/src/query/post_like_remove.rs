@@ -72,7 +72,11 @@ impl Db {
 
         // delete post like
         {
-            let query = "DELETE FROM posts_likes WHERE post_like_user_username = $1 AND post_like_post_id = $2";
+            let query = "DELETE FROM posts_likes
+                               USING users
+                               WHERE post_like_user_id = user_id
+                                   AND user_username  = $1
+                                   AND post_like_post_id = $2";
 
             let result = sqlx::query(query)
                 .bind(user_username)

@@ -34,12 +34,13 @@ impl Db {
         // get post
         {
             let query = "SELECT
-                                comment_user_username,
-                                user_username as post_user_username,
-                                post_state
+                                    comment_user.user_username as comment_user_username,
+                                    post_user.user_username as post_user_username,
+                                    post_state
                                 FROM comments
-                                JOIN posts ON comment_post_id = post_id
-                                JOIN users ON post_user_id=user_id
+                                    JOIN posts ON comment_post_id = post_id
+                                    JOIN users post_user ON post_user_id=post_user.user_id
+                                    JOIN users comment_user ON comment_user_id=comment_user.user_id
                                 WHERE comment_id = $1";
 
             let result = sqlx::query_as(query)

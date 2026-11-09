@@ -6,6 +6,8 @@ use catsquad_shared::PostState;
 pub struct DbComment {
     #[sqlx(rename = "comment_id")]
     pub id: i64,
+    #[sqlx(rename = "comment_user_id")]
+    pub user_id: i64,
     #[sqlx(rename = "comment_user_username")]
     pub user_username: String,
     #[sqlx(rename = "comment_user_pfp_hash")]
@@ -55,7 +57,7 @@ impl Db {
         let query = "
             CREATE TABLE comments (
                 comment_id int8 PRIMARY KEY generated always as identity,
-                comment_user_username varchar NOT NULL references users(user_username) ON UPDATE CASCADE ON DELETE CASCADE,
+                comment_user_id int8 NOT NULL references users(user_id) ON DELETE CASCADE,
                 comment_post_id int8 NOT NULL references posts(post_id) ON DELETE CASCADE,
                 comment_replies_count int8 DEFAULT 0,
                 comment_parent_id int8 references comments(comment_id) ON DELETE CASCADE,
@@ -64,7 +66,7 @@ impl Db {
                 comment_modified_at timestamp NOT NULL,
                 comment_created_at timestamp NOT NULL
             );
-            CREATE INDEX comment_user_username_idx ON comments (comment_user_username);
+            CREATE INDEX comment_user_id_idx ON comments (comment_user_id);
         ";
         trace!("about to run {query}");
         let _result = sqlx::raw_sql(query).execute(pool).await.unwrap();
@@ -162,10 +164,10 @@ impl Db {
         let parent_id = parent_ids.last().cloned();
 
         // insert comment
-        let comment_id = {
+        let (comment_id, comment_user_id) = {
             let query = "
                     INSERT INTO comments (
-                            comment_user_username,
+                            comment_user_id,
                             comment_post_id,
                             comment_parents,
                             comment_text,
@@ -173,8 +175,10 @@ impl Db {
                             comment_created_at,
                             comment_parent_id
                         )
-                        VALUES ( $1, $2, $3, $4, $5, $5, $6 )
-                        RETURNING comment_id
+                        SELECT user_id, $2, $3, $4, $5, $5, $6
+                            FROM users
+                            WHERE user_username = $1
+                        RETURNING comment_id, comment_user_id
                     ";
 
             let result = sqlx::query_as(query)
@@ -187,14 +191,21 @@ impl Db {
                 .fetch_one(&mut *tx)
                 .await;
 
-            debug!("query: {query}\nresult: {result:#?}");
+            debug!(
+                "query: {query}
+                    $1 = {user_username}
+                    $2 = {post_id}
+                    $3 = {parent_ids:?}
+                    $4 = {text:?}
+                    $5 = {time:?}
+                    $6 = {parent_id:?}
+                    nresult: {result:#?}
+                    "
+            );
 
-            let (comment_id,): (i64,) = match result {
+            let (comment_id, comment_user_id): (i64, i64) = match result {
                 Ok(v) => v,
-                Err(sqlx::Error::Database(err))
-                    if err.is_foreign_key_violation()
-                        && err.constraint() == Some("comments_comment_user_username_fkey") =>
-                {
+                Err(sqlx::Error::RowNotFound) => {
                     return Err(DbCommentAddErr::UserNotFound(user_username));
                 }
                 Err(err) => {
@@ -203,7 +214,7 @@ impl Db {
                 }
             };
 
-            comment_id
+            (comment_id, comment_user_id)
         };
         // comment_user_pfp_proccesed
         // get user
@@ -237,6 +248,7 @@ impl Db {
 
         let comment = DbComment {
             id: comment_id,
+            user_id: comment_user_id,
             user_username,
             user_pfp_hash: pfp_hash,
             user_pfp_proccesed: pfp_proccesed,
@@ -345,13 +357,13 @@ async fn test_comment_add() {
     assert_eq!(comments[0].parents.len(), 2);
     assert_eq!(comments[0].user_pfp_hash, 666);
     assert_eq!(comments[0].user_pfp_proccesed, true);
-    assert_eq!(comments[0].parent_id, Some(3));
-    assert_eq!(comments[0].parents[0], comment1.id.clone());
-    assert_eq!(comments[0].parents[1], comment2.id.clone());
+    assert_eq!(comments[0].parent_id, Some(comment2.id));
+    assert_eq!(comments[0].parents[0], comment1.id);
+    assert_eq!(comments[0].parents[1], comment2.id);
     assert_eq!(comments[0].text, "one4");
     assert_eq!(comments[1].parents.len(), 1);
-    assert_eq!(comments[1].parent_id, Some(1));
-    assert_eq!(comments[1].parents[0], comment1.id.clone());
+    assert_eq!(comments[1].parent_id, Some(comment1.id));
+    assert_eq!(comments[1].parents[0], comment1.id);
     assert_eq!(comments[1].text, "one3");
     assert_eq!(comments[2].parents.len(), 0);
     assert_eq!(comments[2].parent_id, None);

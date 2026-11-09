@@ -6,6 +6,8 @@ use catsquad_shared::PostState;
 pub struct DbPostLike {
     #[sqlx(rename = "post_like_id")]
     pub id: i64,
+    #[sqlx(rename = "post_like_user_id")]
+    pub user_id: i64,
     #[sqlx(rename = "post_like_user_username")]
     pub user_username: String,
     #[sqlx(rename = "post_like_post_id")]
@@ -42,13 +44,13 @@ impl Db {
         let query = "
             CREATE TABLE posts_likes (
                 post_like_id int8 PRIMARY KEY generated always as identity,
-                post_like_user_username varchar(32) NOT NULL references users(user_username) ON UPDATE CASCADE ON DELETE CASCADE,
+                post_like_user_id int8 NOT NULL references users(user_id) ON DELETE CASCADE,
                 post_like_post_id int8 NOT NULL references posts(post_id) ON DELETE CASCADE,
                 post_like_modified_at timestamp NOT NULL,
                 post_like_created_at timestamp NOT NULL
             );
-            CREATE INDEX post_like_username_idx ON posts_likes (post_like_user_username);
-            CREATE UNIQUE INDEX post_like_username_and_post_id_idx ON posts_likes (post_like_user_username, post_like_post_id);
+            CREATE INDEX post_like_user_id_idx ON posts_likes (post_like_user_id);
+            CREATE UNIQUE INDEX post_like_id_and_post_id_idx ON posts_likes (post_like_user_id, post_like_post_id);
         ";
         trace!("about to run {query}");
         let _result = sqlx::raw_sql(query).execute(pool).await.unwrap();
@@ -112,16 +114,18 @@ impl Db {
         };
 
         // add post like
-        let post_like_id = {
+        let (post_like_id, post_like_user_id) = {
             let query = "
             INSERT INTO posts_likes (
-                    post_like_user_username,
+                    post_like_user_id,
                     post_like_post_id,
                     post_like_modified_at,
                     post_like_created_at
                 )
-                VALUES ( $1, $2, $3, $3 )
-                RETURNING post_like_id
+                SELECT user_id, $2, $3, $3
+                    FROM users
+                    WHERE user_username = $1
+                RETURNING post_like_id, post_like_user_id 
         ";
 
             let result = sqlx::query_as(query)
@@ -133,17 +137,17 @@ impl Db {
 
             debug!("query: {query}\nresult: {result:#?}");
 
-            let result = match result {
+            let (post_like_id, post_like_user_id): (i64, i64) = match result {
                 Ok(v) => v,
                 Err(sqlx::Error::Database(err))
                     if err.is_unique_violation()
-                        && err.constraint() == Some("post_like_username_and_post_id_idx") =>
+                        && err.constraint() == Some("post_like_id_and_post_id_idx") =>
                 {
                     return Err(DbPostLikeAddErr::PostWasAlreadyLiked);
                 }
                 Err(sqlx::Error::Database(err))
                     if err.is_foreign_key_violation()
-                        && err.constraint() == Some("posts_likes_post_like_user_username_fkey") =>
+                        && err.constraint() == Some("posts_likes_post_like_user_id_fkey") =>
                 {
                     return Err(DbPostLikeAddErr::Unauthorized);
                 }
@@ -153,9 +157,7 @@ impl Db {
                 }
             };
 
-            let (post_like_id,): (i64,) = result;
-
-            post_like_id
+            (post_like_id, post_like_user_id)
         };
 
         // update post total like count
@@ -165,13 +167,13 @@ impl Db {
                             post_modified_at = $1
                             WHERE post_id = $2";
 
-            debug!("about to run {query}");
-
             let result = sqlx::query(query)
                 .bind(XTimestamp(time as i64))
                 .bind(post_id)
                 .execute(&mut *tx)
                 .await;
+
+            debug!("quary {query} result {result:#?}");
 
             let result = match result {
                 Ok(v) => v,
@@ -191,13 +193,13 @@ impl Db {
                             user_modified_at = $1
                             WHERE user_username = $2";
 
-            debug!("about to run {query}");
-
             let result = sqlx::query(query)
                 .bind(XTimestamp(time as i64))
                 .bind(&post_user_username)
                 .execute(&mut *tx)
                 .await;
+
+            debug!("quary {query} result {result:#?}");
 
             let result = match result {
                 Ok(v) => v,
@@ -216,6 +218,7 @@ impl Db {
 
         let post_like = DbPostLike {
             id: post_like_id,
+            user_id: post_like_user_id,
             user_username,
             post_id,
             modified_at: time,

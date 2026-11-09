@@ -20,7 +20,13 @@ impl Db {
 
         let user_username = user_username.into();
 
-        let query = "SELECT EXISTS(SELECT 1 FROM posts_likes WHERE post_like_user_username=$1 AND post_like_post_id=$2)";
+        let query = "SELECT EXISTS(
+                            SELECT 1
+                            FROM posts_likes
+                            JOIN users ON post_like_user_id = user_id
+                            WHERE user_username = $1
+                                AND post_like_post_id = $2
+                           )";
 
         let result = sqlx::query_as(query)
             .bind(user_username)

@@ -5,6 +5,8 @@ use catsquad_log::prelude::*;
 pub struct DbFollow {
     #[sqlx(rename = "follow_id")]
     pub id: i64,
+    pub follower_user_id: i64,
+    pub following_user_id: i64,
     pub follower_user_username: String,
     pub following_user_username: String,
     #[sqlx(rename = "follow_modified_at")]
@@ -36,12 +38,12 @@ impl Db {
         let query = "
             CREATE TABLE follow (
                 follow_id int8 PRIMARY KEY generated always as identity,
-                follower_user_username varchar NOT NULL references users(user_username) ON UPDATE CASCADE ON DELETE CASCADE,
-                following_user_username varchar NOT NULL references users(user_username) ON UPDATE CASCADE ON DELETE CASCADE,
+                follower_user_id int8 NOT NULL references users(user_id) ON DELETE CASCADE,
+                following_user_id int8 NOT NULL references users(user_id) ON DELETE CASCADE,
                 follow_modified_at timestamp NOT NULL,
                 follow_created_at timestamp NOT NULL
             );
-            CREATE UNIQUE INDEX follow_follower_and_following_idx ON follow (following_user_username, follower_user_username);
+            CREATE UNIQUE INDEX follow_follower_and_following_idx ON follow (following_user_id, follower_user_id);
         ";
         trace!("about to run {query}");
         let _result = sqlx::raw_sql(query).execute(pool).await.unwrap();
@@ -67,16 +69,20 @@ impl Db {
         }
 
         // add follow
-        let follow_id = {
+        let (follow_id, follower_user_id, following_user_id) = {
             let query = "
             INSERT INTO follow (
-                    follower_user_username,
-                    following_user_username,
+                    follower_user_id,
+                    following_user_id,
                     follow_modified_at,
                     follow_created_at
                 )
-                VALUES ( $1, $2, $3, $3 )
-                RETURNING follow_id
+                VALUES (
+                            coalesce((SELECT user_id FROM users WHERE user_username = $1), 0),
+                            coalesce((SELECT user_id FROM users WHERE user_username = $2), 0),
+                            $3,
+                            $3 )
+                RETURNING follow_id, follower_user_id, following_user_id
         ";
 
             let result = sqlx::query_as(query)
@@ -88,17 +94,17 @@ impl Db {
 
             debug!("query: {query}\nresult: {result:#?}");
 
-            let result = match result {
+            let (follow_id, follower_user_id, following_user_id): (i64, i64, i64) = match result {
                 Ok(v) => v,
                 Err(sqlx::Error::Database(err))
                     if err.is_foreign_key_violation()
-                        && err.constraint() == Some("follow_following_user_username_fkey") =>
+                        && err.constraint() == Some("follow_following_user_id_fkey") =>
                 {
                     return Err(DbFollowAddErr::UserNotFound(following_user_username));
                 }
                 Err(sqlx::Error::Database(err))
                     if err.is_foreign_key_violation()
-                        && err.constraint() == Some("follow_follower_user_username_fkey") =>
+                        && err.constraint() == Some("follow_follower_user_id_fkey") =>
                 {
                     return Err(DbFollowAddErr::UserNotFound(follower_user_username));
                 }
@@ -114,9 +120,7 @@ impl Db {
                 }
             };
 
-            let (follow_id,): (i64,) = result;
-
-            follow_id
+            (follow_id, follower_user_id, following_user_id)
         };
 
         // update user following count
@@ -177,6 +181,8 @@ impl Db {
 
         let follow = DbFollow {
             id: follow_id,
+            follower_user_id,
+            following_user_id,
             follower_user_username,
             following_user_username,
             modified_at: time,

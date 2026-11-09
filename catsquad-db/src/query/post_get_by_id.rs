@@ -87,10 +87,10 @@ impl Db {
             false => (
                 "JOIN users my_user ON $2=my_user.user_username",
                 //
-                "LEFT JOIN posts_likes ON post_id=post_like_post_id AND post_like_user_username = my_user.user_username",
+                "LEFT JOIN posts_likes ON post_id=post_like_post_id AND post_like_user_id = my_user.user_id",
                 "coalesce(post_like_post_id > 0, false) as post_liked",
                 //
-                "LEFT JOIN follow ON my_user.user_username=follower_user_username AND post_user.user_username=following_user_username",
+                "LEFT JOIN follow ON my_user.user_id=follower_user_id AND post_user.user_id=following_user_id",
                 "coalesce(follow_id > 0, false) as post_user_followed",
             ),
         };

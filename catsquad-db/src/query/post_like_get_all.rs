@@ -10,7 +10,16 @@ pub enum DbPostLikeGetAllErr {
 impl Db {
     pub async fn post_like_get_all(&self) -> Result<Vec<DbPostLike>, DbPostLikeGetAllErr> {
         let pool = &self.db;
-        let query = "SELECT * FROM posts_likes ORDER BY post_like_created_at DESC";
+        let query = "SELECT
+                            post_like_id,
+                            user_username as post_like_user_username,
+                            post_like_user_id,
+                            post_like_post_id,
+                            post_like_modified_at,
+                            post_like_created_at
+                           FROM posts_likes
+                           JOIN users ON post_like_user_id = user_id
+                           ORDER BY post_like_created_at DESC";
 
         let result = sqlx::query_as(query).fetch_all(pool).await;
 

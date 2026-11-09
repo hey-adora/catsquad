@@ -12,19 +12,19 @@ impl Db {
         let pool = &self.db;
         let query = "SELECT
                                 comment_id,
-                                comment_user_username,
+                                comment_user_id,
+                                user_username as comment_user_username,
                                 user_pfp_image_hash as comment_user_pfp_hash,
                                 coalesce(image_processed, false) as comment_user_pfp_proccesed,
                                 comment_post_id,
                                 comment_replies_count,
-                                comment_user_username,
                                 comment_parent_id,
                                 comment_parents,
                                 comment_text,
                                 comment_modified_at,
                                 comment_created_at
                             FROM comments
-                            LEFT JOIN users ON comment_user_username=user_username
+                            JOIN users ON comment_user_id=user_id
                             LEFT JOIN files_images ON user_pfp_image_hash=image_hash
                             ORDER BY comment_created_at DESC";
 

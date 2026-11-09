@@ -28,7 +28,6 @@ pub enum DbRoleAddErr {
 
 impl Db {
     pub async fn role_define(&self) {
-        // role_user_username varchar NOT NULL references users(user_username) ON UPDATE CASCADE ON DELETE CASCADE,
         // CREATE UNIQUE INDEX role_role_name_and_role_user_username ON roles (role_user_username, role_name);
         let pool = &self.db;
         let _result = sqlx::raw_sql(
