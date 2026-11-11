@@ -1,7 +1,7 @@
 use anyhow::anyhow;
 use axum::{
     Json,
-    extract::State,
+    extract::{FromRequestParts, State},
     http::{
         HeaderMap, StatusCode,
         header::{self, COOKIE, SET_COOKIE},
@@ -12,7 +12,7 @@ use catsquad_db::{
     DbSession, DbSessionGetByKeyErr, DbUser, DbUserGet, DbUserGetBySessionErr, Uuid,
 };
 use catsquad_log::prelude::*;
-use catsquad_shared::{extract_auth_token_plain, str_to_uuid, uuid_to_str};
+use catsquad_shared::{SessionTokenKind, extract_auth_token_plain, str_to_uuid, uuid_to_str};
 
 use crate::state::AppState;
 
@@ -26,13 +26,56 @@ const COOKIE_DELETED: &'static str =
     "authorization=Bearer DELETED; Secure; HttpOnly; expires=Thu, 01 Jan 1970 00:00:00 GMT";
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
-pub struct SessionKey(pub Uuid);
+pub struct SessionTokenV2(pub Option<Uuid>);
 
-impl ToString for SessionKey {
+impl From<SessionTokenV2> for SessionTokenKind {
+    fn from(value: SessionTokenV2) -> Self {
+        match value.0 {
+            None => SessionTokenKind::None,
+            Some(v) => SessionTokenKind::User(v),
+        }
+    }
+}
+
+impl<S> FromRequestParts<S> for SessionTokenV2
+where
+    S: Send + Sync,
+{
+    type Rejection = String;
+
+    async fn from_request_parts(
+        parts: &mut axum::http::request::Parts,
+        _state: &S,
+    ) -> Result<Self, Self::Rejection> {
+        let token = auth_token_get(&parts.headers, header::COOKIE).map(|token| str_to_uuid(&token));
+        Ok(Self(token))
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct SessionToken(pub Uuid);
+
+impl ToString for SessionToken {
     fn to_string(&self) -> String {
         uuid_to_str(self.0)
     }
 }
+// impl<T, S> FromRequestParts<S> for Extension<T>
+// where
+//     T: Clone + Send + Sync + 'static,
+//     S: Send + Sync,
+// {
+//     type Rejection = ExtensionRejection;
+
+//     async fn from_request_parts(req: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
+//         Ok(Self::from_extensions(&req.extensions).ok_or_else(|| {
+//             MissingExtension::from_err(format!(
+//                 "Extension of type `{}` was not found. Perhaps you forgot to add it? See `axum::Extension`.",
+//                 std::any::type_name::<T>()
+//             ))
+//         })?)
+//     }
+// }
 
 #[derive(thiserror::Error, Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub enum AuthErr {
@@ -111,12 +154,12 @@ pub async fn auth_optional_middleware(
     match result {
         Ok((token, user)) => {
             let extensions = req.extensions_mut();
-            extensions.insert(Some::<SessionKey>(SessionKey(token)));
+            extensions.insert(Some::<SessionToken>(SessionToken(token)));
             extensions.insert(Some::<DbUserGet>(user));
         }
         Err(_err) => {
             let extensions = req.extensions_mut();
-            extensions.insert(None::<SessionKey>);
+            extensions.insert(None::<SessionToken>);
             extensions.insert(None::<DbUserGet>);
         }
     }
@@ -137,7 +180,7 @@ pub async fn auth_middleware(
         Ok((token, user)) => {
             {
                 let extensions = req.extensions_mut();
-                extensions.insert(SessionKey(token));
+                extensions.insert(SessionToken(token));
                 extensions.insert(user);
             }
             let response = next.run(req).await;

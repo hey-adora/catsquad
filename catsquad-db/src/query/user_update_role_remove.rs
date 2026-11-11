@@ -83,16 +83,18 @@ async fn test_user_update_role_remove() {
 
     // assert success
     {
+        use catsquad_shared::SessionTokenKind;
+
         let _role_one = db
-            .role_add(0, "one", vec!["foo".to_string()])
+            .role_add(0, SessionTokenKind::Root, "one", vec!["foo".to_string()])
             .await
             .unwrap();
         let _role_two = db
-            .role_add(0, "two", vec!["bar".to_string()])
+            .role_add(0, SessionTokenKind::Root, "two", vec!["bar".to_string()])
             .await
             .unwrap();
         let _role_three = db
-            .role_add(0, "three", vec!["bar".to_string()])
+            .role_add(0, SessionTokenKind::Root, "three", vec!["bar".to_string()])
             .await
             .unwrap();
 

@@ -90,6 +90,7 @@ impl Db {
 #[tokio::test]
 async fn test_user_update_role_add() {
     init_log();
+    use catsquad_shared::SessionTokenKind;
 
     let db = Db::test_db(0, "test_user_update_role_add").await;
 
@@ -110,15 +111,15 @@ async fn test_user_update_role_add() {
     // assert success
     {
         let _role_one = db
-            .role_add(0, "one", vec!["foo".to_string()])
+            .role_add(0, SessionTokenKind::Root, "one", vec!["foo".to_string()])
             .await
             .unwrap();
         let _role_two = db
-            .role_add(0, "two", vec!["bar".to_string()])
+            .role_add(0, SessionTokenKind::Root, "two", vec!["bar".to_string()])
             .await
             .unwrap();
         let _role_three = db
-            .role_add(0, "three", vec!["bar".to_string()])
+            .role_add(0, SessionTokenKind::Root, "three", vec!["bar".to_string()])
             .await
             .unwrap();
 

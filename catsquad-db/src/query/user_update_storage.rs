@@ -27,8 +27,6 @@ impl Db {
                             user_modified_at = $1
                             WHERE user_username = $2";
 
-        debug!("about to run {query}");
-
         let result = sqlx::query(query)
             .bind(XTimestamp(time as i64))
             .bind(user_username)
@@ -37,18 +35,24 @@ impl Db {
             .execute(pool)
             .await;
 
+        debug!("query {query}\nresults {result:?}");
+
         let result = match result {
             Ok(v) => v,
-            Err(sqlx::Error::RowNotFound) => {
-                return Err(DbUserUpdateStorageErr::UserNotFound);
-            }
             Err(err) => {
                 error!("unexpected db error {err}");
                 return Err(DbUserUpdateStorageErr::Db(err));
             }
         };
 
-        debug!("query {query}\nresults {result:?}");
+        let affected = result.rows_affected();
+
+        // TODO check if other execute quaires are not missing this
+        match affected {
+            1 => (),
+            0 => return Err(DbUserUpdateStorageErr::UserNotFound),
+            _ => panic!("quary is wrong, must only modify 1 user"),
+        }
 
         Ok(())
     }

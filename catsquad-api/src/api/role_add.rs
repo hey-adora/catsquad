@@ -1,4 +1,4 @@
-use crate::state::AppState;
+use crate::{auth::SessionTokenV2, state::AppState};
 use axum::{
     Extension, Form, Json,
     extract::{Path, State},
@@ -6,10 +6,7 @@ use axum::{
     response::IntoResponse,
 };
 use catsquad_db::{DbRole, DbRoleAddErr, DbUserGet};
-use catsquad_shared::{
-    ROLE_VALUE_PERMISSION_ROLE_ADD, RoleAddErr, RoleAddPrams, RoleAddReq, RoleRes,
-    role_extract_permission_role_add,
-};
+use catsquad_shared::{RoleAddErr, RoleAddPrams, RoleAddReq, RoleRes, RoleValue, contains_roles};
 
 pub fn from_db_role(value: DbRole) -> RoleRes {
     RoleRes {
@@ -21,6 +18,7 @@ pub fn from_db_role(value: DbRole) -> RoleRes {
 pub fn from_db_role_add_err(value: DbRoleAddErr) -> RoleAddErr {
     match value {
         DbRoleAddErr::DuplicateValue => RoleAddErr::DuplicateValue,
+        DbRoleAddErr::Unauthorized(err) => RoleAddErr::Unauthorized(err),
         DbRoleAddErr::Db(_) => RoleAddErr::InternalServer,
     }
 }
@@ -36,28 +34,20 @@ fn status_code(result: &Result<RoleRes, RoleAddErr>) -> StatusCode {
 }
 
 pub async fn role_add(
-    db_user: Extension<DbUserGet>,
+    auth_session_token: SessionTokenV2,
+    // db_user: Extension<DbUserGet>,
     State(app): State<AppState>,
     Path(params): Path<RoleAddPrams>,
     Form(req): Form<RoleAddReq>,
 ) -> impl IntoResponse {
     let inner = async || -> Result<RoleRes, RoleAddErr> {
-        let permission_role_add = role_extract_permission_role_add(&db_user.roles_values);
-
-        if !permission_role_add {
-            return Err(RoleAddErr::Unauthorized(format!(
-                "user {} doesnt have permission {}",
-                db_user.username, ROLE_VALUE_PERMISSION_ROLE_ADD
-            )));
-        }
-
         let time = app.get_time_micro();
         let role_name = params.role_name;
         let role_values = req.role_values;
 
         let post_like = app
             .db
-            .role_add(time, role_name, role_values)
+            .role_add(time, auth_session_token.into(), role_name, role_values)
             .await
             .map_err(from_db_role_add_err)?;
 
@@ -123,10 +113,17 @@ async fn test_api_role_add() {
 
     // assert success
     {
+        use catsquad_shared::SessionTokenKind;
+
         server
             .state
             .db
-            .role_add(0, "admin", vec![RoleValue::PermissionRoleAdd])
+            .role_add(
+                0,
+                SessionTokenKind::Root,
+                "admin",
+                vec![RoleValue::PermissionRoleAdd],
+            )
             .await
             .unwrap();
 

@@ -1,5 +1,6 @@
 use crate::{Db, Uuid, XTimestamp, XUuid};
 use catsquad_log::prelude::*;
+use catsquad_shared::UUID_ZERO;
 
 #[derive(Debug, Clone, PartialEq, sqlx::FromRow)]
 pub struct DbSession {
@@ -52,6 +53,11 @@ impl Db {
         let pool = &self.db;
         let email = email.into();
 
+        let mut tx = pool
+            .begin()
+            .await
+            .inspect_err(|err| error!("follow_add {err}"))?;
+
         let query = "
             INSERT INTO sessions (
                     session_user_id,
@@ -70,7 +76,7 @@ impl Db {
         let result = sqlx::query_as(query)
             .bind(&email)
             .bind(XTimestamp(time as i64))
-            .fetch_one(pool)
+            .fetch_one(&mut *tx)
             .await;
 
         debug!("query {query}, result {result:#?}");
@@ -85,6 +91,10 @@ impl Db {
                 return Err(DbSessionAddErr::Db(err));
             }
         };
+
+        tx.commit()
+            .await
+            .inspect_err(|err| error!("follow_add {err}"))?;
 
         let session = DbSession {
             token: session_token,

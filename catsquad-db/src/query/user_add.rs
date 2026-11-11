@@ -1,5 +1,8 @@
 use crate::{Db, Uuid, XTimestamp, XUuid};
 use catsquad_log::prelude::*;
+#[cfg(test)]
+use catsquad_shared::SessionTokenKind;
+use catsquad_shared::UserState;
 
 #[derive(Debug, Clone, PartialEq, sqlx::FromRow)]
 pub struct DbUser {
@@ -15,6 +18,8 @@ pub struct DbUser {
     pub support: String,
     #[sqlx(rename = "user_aboutme")]
     pub aboutme: String,
+    #[sqlx(rename = "user_state")]
+    pub state: String,
     #[sqlx(rename = "user_roles")]
     pub roles: Vec<i64>,
     #[sqlx(rename = "user_pfp_image_hash")]
@@ -39,6 +44,9 @@ pub struct DbUser {
     #[sqlx(rename = "user_max_storage_bytes")]
     #[sqlx(try_from = "i64")]
     pub max_storage_bytes: u32,
+    #[sqlx(rename = "user_state_modified_at")]
+    #[sqlx(try_from = "XTimestamp")]
+    pub state_modified_at: u64,
     #[sqlx(rename = "user_modified_at")]
     #[sqlx(try_from = "XTimestamp")]
     pub modified_at: u64,
@@ -79,6 +87,7 @@ impl Db {
                 user_password varchar NOT NULL,
                 user_support text DEFAULT '',
                 user_aboutme text DEFAULT '',
+                user_state varchar NOT NULL,
                 user_roles int8[] DEFAULT array[]::int8[],
                 user_pfp_image_hash int8 DEFAULT 0,
                 user_likes_count int8 DEFAULT 0,
@@ -87,6 +96,7 @@ impl Db {
                 user_used_storage_bytes int8 DEFAULT 0,
                 user_max_storage_per_file_bytes int8 NOT NULL,
                 user_max_storage_bytes int8 NOT NULL,
+                user_state_modified_at timestamp NOT NULL,
                 user_modified_at timestamp NOT NULL,
                 user_created_at timestamp NOT NULL
             );
@@ -161,12 +171,15 @@ impl Db {
                     user_password,
                     user_max_storage_bytes,
                     user_max_storage_per_file_bytes,
+                    user_state_modified_at,
                     user_modified_at,
-                    user_created_at
+                    user_created_at,
+                    user_state
                 )
-                VALUES ( $1, $2, $3, $4, $5, $6, $6 )
+                VALUES ( $1, $2, $3, $4, $5, $6, $6, $6, $7 )
                 RETURNING user_id
-        ";
+            ";
+
             let result = sqlx::query_as(query)
                 .bind(&username)
                 .bind(&email)
@@ -174,6 +187,7 @@ impl Db {
                 .bind(max_storage_bytes as i64)
                 .bind(max_storage_per_file_bytes as i64)
                 .bind(XTimestamp(time as i64))
+                .bind(UserState::Active.as_str())
                 .fetch_one(&mut *tx)
                 .await;
 
@@ -225,6 +239,7 @@ impl Db {
             password,
             support: String::new(),
             aboutme: String::new(),
+            state: UserState::Active.to_string(),
             roles: Vec::new(),
             pfp_image_hash: 0,
             pfp_image_proccesed: false,
@@ -234,10 +249,63 @@ impl Db {
             used_storage_bytes: 0,
             max_storage_bytes,
             max_storage_per_image_bytes: max_storage_per_file_bytes,
+            state_modified_at: time,
             modified_at: time,
             created_at: time,
         })
     }
+}
+
+#[cfg(test)]
+pub async fn user_add_with_roles<TValue>(
+    db: &Db,
+    time: u64,
+    max_storage_bytes: u32,
+    max_storage_per_file_bytes: u32,
+    username: impl Into<String>,
+    password: impl Into<String>,
+    email: impl Into<String>,
+    permissions: Vec<TValue>,
+) -> (DbUser, SessionTokenKind)
+where
+    TValue: Into<String>,
+{
+    use catsquad_shared::SessionTokenKind;
+
+    let username = username.into();
+    let password = password.into();
+    let email = email.into();
+    let role_name = format!("{}_role", username);
+
+    let (user1, user1_session) = {
+        let invite1 = db.invite_add(time, &email, time).await.unwrap();
+
+        let user1 = db
+            .user_add(
+                time,
+                username,
+                password,
+                invite1.token.clone(),
+                max_storage_bytes,
+                max_storage_per_file_bytes,
+            )
+            .await
+            .unwrap();
+
+        let user1_session = db.session_add(time, email).await.unwrap();
+
+        (user1, SessionTokenKind::User(user1_session.token))
+    };
+
+    db.role_add(time, SessionTokenKind::Root, &role_name, permissions)
+        .await
+        .unwrap();
+
+    db.user_update_role_add(time, user1.username.clone(), role_name)
+        .await
+        .unwrap();
+
+    (user1, user1_session)
 }
 
 #[cfg(test)]

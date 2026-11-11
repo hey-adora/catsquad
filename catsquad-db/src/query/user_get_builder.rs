@@ -1,4 +1,4 @@
-use crate::{Db, DbUserGet, XUuid};
+use crate::{Db, DbUserGet, XUuid, query::role_get_by_role_tx::DbRoleGetTxErr};
 use catsquad_log::prelude::*;
 use catsquad_shared::Uuid;
 use sqlx::AssertSqlSafe;
@@ -30,6 +30,11 @@ impl Db {
         let username = username.into();
         let email = email.into();
         let session_token_is_empty = u128::from_be_bytes(session_token) == 0;
+
+        let mut tx = pool
+            .begin()
+            .await
+            .inspect_err(|err| error!("follow_add {err}"))?;
 
         // get user
         let mut user = {
@@ -80,6 +85,7 @@ impl Db {
                     target_user.user_password as user_password,
                     target_user.user_support as user_support,
                     target_user.user_aboutme as user_aboutme,
+                    target_user.user_state as user_state,
                     target_user.user_roles as user_roles,
                     array[]::varchar[] as user_roles_values,
                     target_user.user_pfp_image_hash as user_pfp_image_hash,
@@ -133,7 +139,7 @@ impl Db {
             if !user_username.is_empty() {
                 builder = builder.bind(user_username);
             }
-            let result = builder.fetch_one(pool).await;
+            let result = builder.fetch_one(&mut *tx).await;
 
             debug!("{query_str}\n{result:#?}");
 
@@ -153,48 +159,19 @@ impl Db {
 
         // get roles
         {
-            let query = "SELECT
-                                    role_id,
-                                    role_values
-                                FROM unnest($1)
-                                INNER JOIN roles ON unnest=role_id
-                                ";
-
-            let result = sqlx::query_as(query)
-                .bind(&user.roles)
-                .fetch_all(pool)
-                .await;
-
-            debug!("{query}\n{result:#?}");
-
-            let roles: Vec<(i64, Vec<String>)> = match result {
-                Ok(v) => v,
-                Err(err) => {
-                    error!("unexpected db error {err}");
-                    return Err(DbUserGetBuilderErr::Db(err));
-                }
-            };
-
-            let mut roles_values = Vec::new();
-
-            for role_id_a in &user.roles {
-                let Some((_, values)) = roles
-                    .iter()
-                    .find(|(role_id_b, _)| *role_id_a == *role_id_b)
-                    .cloned()
-                else {
-                    error!(
-                        "role missing for user {}, expected role ids {:?}, received: {:#?}",
-                        user.username, user.roles, roles
-                    );
-                    break;
-                };
-
-                roles_values.extend(values);
-            }
+            let roles_values = self
+                .role_get_by_role_ids_tx(&user.roles, &mut *tx)
+                .await
+                .map_err(|err| match err {
+                    DbRoleGetTxErr::Db(err) => DbUserGetBuilderErr::Db(err),
+                })?;
 
             user.roles_values = roles_values;
         }
+
+        tx.commit()
+            .await
+            .inspect_err(|err| error!("follow_add {err}"))?;
 
         Ok(user)
     }
@@ -277,13 +254,15 @@ async fn test_user_get_builder() {
 
     // assert role field
     {
+        use catsquad_shared::SessionTokenKind;
+
         let user = db
             .user_get_builder("", 0_u128.to_be_bytes(), "hey2", "")
             .await
             .unwrap();
         assert_eq!(user.roles_values, vec![] as Vec<String>);
 
-        db.role_add(0, "one", vec!["foo".to_string()])
+        db.role_add(0, SessionTokenKind::Root, "one", vec!["foo".to_string()])
             .await
             .unwrap();
 
@@ -295,7 +274,7 @@ async fn test_user_get_builder() {
             .unwrap();
         assert_eq!(user.roles_values, vec!["foo".to_string()]);
 
-        db.role_add(0, "two", vec!["bar".to_string()])
+        db.role_add(0, SessionTokenKind::Root, "two", vec!["bar".to_string()])
             .await
             .unwrap();
 

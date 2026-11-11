@@ -99,17 +99,29 @@ async fn test_api_role_remove() {
 
     // setup, create admin role
     let role_admin = {
+        use catsquad_shared::SessionTokenKind;
+
         let role_admin = server
             .state
             .db
-            .role_add(0, "admin", vec![RoleValue::PermissionRoleAdd])
+            .role_add(
+                0,
+                SessionTokenKind::Root,
+                "admin",
+                vec![RoleValue::PermissionRoleAdd],
+            )
             .await
             .unwrap();
 
         let _role_admin_2 = server
             .state
             .db
-            .role_add(0, "admin2", vec![RoleValue::PermissionRoleAdd])
+            .role_add(
+                0,
+                SessionTokenKind::Root,
+                "admin2",
+                vec![RoleValue::PermissionRoleAdd],
+            )
             .await
             .unwrap();
 

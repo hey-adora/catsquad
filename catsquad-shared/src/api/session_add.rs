@@ -11,6 +11,13 @@ pub const LINK_API_SESSION_ADD: &str = "/api/login";
 //     pub created_at: u64,
 // }
 
+#[derive(Debug, Copy, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub enum SessionTokenKind {
+    None,
+    User(Uuid),
+    Root,
+}
+
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
 pub struct SessionAddReq {
     pub email: String,

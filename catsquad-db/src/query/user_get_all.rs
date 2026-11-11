@@ -18,6 +18,7 @@ impl Db {
                             user_password,
                             user_support,
                             user_aboutme,
+                            user_state,
                             user_roles,
                             user_pfp_image_hash,
                             user_likes_count,
@@ -28,6 +29,7 @@ impl Db {
                             user_max_storage_per_file_bytes,
                             user_max_storage_bytes,
                             user_max_storage_bytes,
+                            user_state_modified_at,
                             user_modified_at,
                             user_created_at
                                 FROM users

@@ -1,7 +1,7 @@
 use crate::state::AppState;
 use catsquad_db::DbUserGetByUsernameErr;
 use catsquad_log::prelude::*;
-use catsquad_shared::{ADMIN_ROLE_NAME, RoleValue, contains_roles};
+use catsquad_shared::{ADMIN_ROLE_NAME, RoleValue, SessionTokenKind, contains_roles};
 
 const ADMIN_ROLES: [RoleValue; 4] = [
     RoleValue::PermissionRoleAdd,
@@ -64,7 +64,12 @@ pub async fn promote_admin(state: AppState) -> Result<i64, PromoteAdminErr> {
                 // create new admin role
                 let result = state
                     .db
-                    .role_add(0, ADMIN_ROLE_NAME, ADMIN_ROLES.to_vec())
+                    .role_add(
+                        0,
+                        SessionTokenKind::Root,
+                        ADMIN_ROLE_NAME,
+                        ADMIN_ROLES.to_vec(),
+                    )
                     .await;
                 let admin_role = match result {
                     Ok(v) => v,
@@ -198,7 +203,12 @@ async fn test_promote_admin_update_role() {
         server
             .state
             .db
-            .role_add(0, ADMIN_ROLE_NAME, Vec::<String>::new())
+            .role_add(
+                0,
+                SessionTokenKind::Root,
+                ADMIN_ROLE_NAME,
+                Vec::<String>::new(),
+            )
             .await
             .unwrap();
 

@@ -1,10 +1,15 @@
+use std::fmt::Display;
+
 use crate::{
     MAX_EMAIL_LENGTH, MAX_PASSWORD_LENGTH, MAX_USERNAME_LENGTH, MIN_EMAIL_LENGTH,
     MIN_PASSWORD_LENGTH, MIN_USERNAME_LENGTH, Uuid,
 };
+use anyhow::anyhow;
 use catsquad_log::prelude::*;
 
 pub const LINK_API_USER_ADD: &str = "/api/register";
+pub const USER_STATE_ACTIVE: &str = "active";
+pub const USER_STATE_SUSPENDED: &str = "suspended";
 
 // #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
 // pub struct RedactedUserRes {
@@ -38,6 +43,88 @@ pub struct UserAddReq {
         deserialize_with = "crate::serde_to_uuid"
     )]
     pub invite_token: Uuid,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub enum UserState {
+    Active,
+    Suspended,
+}
+
+impl UserState {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            UserState::Active => USER_STATE_ACTIVE,
+            UserState::Suspended => USER_STATE_SUSPENDED,
+        }
+    }
+}
+
+impl Display for UserState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.as_str())
+    }
+}
+
+impl TryFrom<String> for UserState {
+    type Error = anyhow::Error;
+
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        let value = value.as_str();
+        TryFrom::<&str>::try_from(value)
+    }
+}
+
+impl TryFrom<&str> for UserState {
+    type Error = anyhow::Error;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        match value {
+            USER_STATE_SUSPENDED => Ok(Self::Suspended),
+            USER_STATE_ACTIVE => Ok(Self::Active),
+            _ => Err(anyhow!("database has invalid state")),
+        }
+    }
+}
+
+impl PartialEq<&str> for UserState {
+    fn eq(&self, other: &&str) -> bool {
+        let other = *other;
+        let Ok(other) = UserState::try_from(other) else {
+            return false;
+        };
+        *self == other
+    }
+}
+
+impl PartialEq<String> for UserState {
+    fn eq(&self, other: &String) -> bool {
+        let other = other.as_str();
+        let Ok(other) = UserState::try_from(other) else {
+            return false;
+        };
+        *self == other
+    }
+}
+
+impl PartialEq<UserState> for String {
+    fn eq(&self, b: &UserState) -> bool {
+        let a = self.as_str();
+        let Ok(a) = UserState::try_from(a) else {
+            return false;
+        };
+        a == *b
+    }
+}
+
+impl PartialEq<UserState> for &str {
+    fn eq(&self, b: &UserState) -> bool {
+        let a = *self;
+        let Ok(a) = UserState::try_from(a) else {
+            return false;
+        };
+        a == *b
+    }
 }
 
 #[derive(

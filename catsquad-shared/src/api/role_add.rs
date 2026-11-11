@@ -9,6 +9,7 @@ pub const LINK_API_ROLE: &str = "/api/role/{role_name}";
 pub const ROLE_VALUE_PERMISSION_ROLE_ADD: &'static str = "permission_role_add";
 pub const ROLE_VALUE_PERMISSION_ROLE_REMOVE: &'static str = "permission_role_remove";
 pub const ROLE_VALUE_PERMISSION_USER_SEARCH: &'static str = "permission_user_search";
+pub const ROLE_VALUE_PERMISSION_USER_UPDATE_STATE: &'static str = "permission_user_update_state";
 pub const ROLE_VALUE_PERMISSION_USER_REMOVE_BY_USERNAMES: &'static str =
     "permission_user_remove_by_usernames";
 
@@ -27,24 +28,32 @@ pub enum RoleValue {
     PermissionRoleAdd,
     PermissionRoleRemove,
     PermissionUserSearch,
+    PermissionUserUserUpdateState,
     PermissionUserRemoveByUsername,
 }
 
-pub fn contains_roles<T>(expected_roles: &[RoleValue], roles_values: &[T]) -> bool
+pub fn contains_roles<T1, T2>(expected_roles: &[T1], roles_values: &[T2]) -> bool
 where
-    T: TryInto<RoleValue> + Clone,
+    T1: TryInto<RoleValue> + Clone,
+    T2: TryInto<RoleValue> + Clone,
 {
     expected_roles.iter().all(|expected_role| {
+        let Ok(expected_role): Result<RoleValue, T1::Error> = expected_role.clone().try_into()
+        else {
+            debug!("invalid expected");
+            return false;
+        };
+
         roles_values.iter().any(|role_value| {
-            let Ok(role_value): Result<RoleValue, T::Error> = role_value.clone().try_into() else {
+            let Ok(role_value): Result<RoleValue, T2::Error> = role_value.clone().try_into() else {
                 debug!("invalid value");
                 return false;
             };
             trace!(
                 "expected {expected_role} == {role_value } = {}",
-                *expected_role == role_value
+                expected_role == role_value
             );
-            role_value == *expected_role
+            role_value == expected_role
         })
     })
 }
@@ -110,12 +119,6 @@ fn test_contains_roles() {
     ));
 }
 
-pub fn role_extract_permission_role_add(roles_values: &[String]) -> bool {
-    roles_values
-        .iter()
-        .any(|v| v == RoleValue::PermissionRoleAdd.as_str())
-}
-
 pub fn role_extract_permission_role_remove(roles_values: &[String]) -> bool {
     roles_values
         .iter()
@@ -134,6 +137,7 @@ impl RoleValue {
             Self::PermissionRoleAdd => ROLE_VALUE_PERMISSION_ROLE_ADD,
             Self::PermissionRoleRemove => ROLE_VALUE_PERMISSION_ROLE_REMOVE,
             Self::PermissionUserSearch => ROLE_VALUE_PERMISSION_USER_SEARCH,
+            Self::PermissionUserUserUpdateState => ROLE_VALUE_PERMISSION_USER_UPDATE_STATE,
             Self::PermissionUserRemoveByUsername => ROLE_VALUE_PERMISSION_USER_REMOVE_BY_USERNAMES,
         }
     }
@@ -153,6 +157,7 @@ impl TryFrom<&str> for RoleValue {
             ROLE_VALUE_PERMISSION_ROLE_ADD => Self::PermissionRoleAdd,
             ROLE_VALUE_PERMISSION_ROLE_REMOVE => Self::PermissionRoleRemove,
             ROLE_VALUE_PERMISSION_USER_SEARCH => Self::PermissionUserSearch,
+            ROLE_VALUE_PERMISSION_USER_UPDATE_STATE => Self::PermissionUserUserUpdateState,
             ROLE_VALUE_PERMISSION_USER_REMOVE_BY_USERNAMES => Self::PermissionUserRemoveByUsername,
             _ => return Err(anyhow!("invalid value {value}")),
         };

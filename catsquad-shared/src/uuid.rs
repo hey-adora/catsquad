@@ -2,6 +2,7 @@ use catsquad_log::prelude::*;
 
 pub type Uuid = [u8; 16];
 
+pub const UUID_ZERO: [u8; 16] = 0_u128.to_be_bytes();
 pub const RADIX128: u128 = 62;
 pub const RADIX64: u64 = 62;
 

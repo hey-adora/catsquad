@@ -92,7 +92,12 @@ async fn test_role_update_value() {
 
     // assert success
     let role_one = {
-        let role_one = db.role_add(0, "one", vec!["foo"]).await.unwrap();
+        use catsquad_shared::SessionTokenKind;
+
+        let role_one = db
+            .role_add(0, SessionTokenKind::Root, "one", vec!["foo"])
+            .await
+            .unwrap();
         db.role_update_value(0, role_one.id, vec!["bar", "foo"])
             .await
             .unwrap();

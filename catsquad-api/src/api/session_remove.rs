@@ -4,7 +4,7 @@ use catsquad_log::prelude::*;
 use catsquad_shared::{SessionRemoveErr, SessionRemoveRes};
 
 use crate::{
-    auth::{SessionKey, create_auth_cookie, create_deleted_cookie, verify_password},
+    auth::{SessionToken, create_auth_cookie, create_deleted_cookie, verify_password},
     state::AppState,
 };
 
@@ -25,7 +25,7 @@ fn status_code(result: &Result<SessionRemoveRes, SessionRemoveErr>) -> StatusCod
 pub async fn session_remove(
     _db_user: Extension<DbUserGet>,
     State(app): State<AppState>,
-    session_key: Extension<SessionKey>,
+    session_key: Extension<SessionToken>,
 ) -> impl IntoResponse {
     let session_key = session_key.0.0;
     let inner = async || -> Result<SessionRemoveRes, SessionRemoveErr> {

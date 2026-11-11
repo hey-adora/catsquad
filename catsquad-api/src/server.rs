@@ -170,10 +170,6 @@ pub async fn app(state: AppState) -> Router {
         ));
 
     let router_auth = Router::new()
-        .route(
-            catsquad_shared::LINK_API_ROLE,
-            post(api::role_add).delete(api::role_remove),
-        )
         .route(catsquad_shared::LINK_API_FOLLOW_ADD, post(api::follow_add))
         .route(
             catsquad_shared::LINK_API_FOLLOW_REMOVE,
@@ -306,6 +302,11 @@ pub async fn app(state: AppState) -> Router {
             auth_middleware,
         ));
 
+    let router_advanced_auth = Router::new().route(
+        catsquad_shared::LINK_API_ROLE,
+        post(api::role_add).delete(api::role_remove),
+    );
+
     let app = Router::new()
         .merge(test_backdoors)
         .merge(api_router_upload)
@@ -314,6 +315,7 @@ pub async fn app(state: AppState) -> Router {
         .merge(router_public)
         .merge(router_auth)
         .merge(router_optionanl_auth)
+        .merge(router_advanced_auth)
         .fallback(index_404)
         .with_state(state.clone());
 

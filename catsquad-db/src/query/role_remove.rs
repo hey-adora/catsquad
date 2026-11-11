@@ -43,12 +43,20 @@ impl Db {
 #[cfg(test)]
 #[tokio::test]
 async fn test_role_remove() {
+    use catsquad_shared::SessionTokenKind;
+
     init_log();
 
     let db = Db::test_db(0, "test_role_remove").await;
 
-    let _role_admin = db.role_add(0, "admin", vec!["ban"]).await.unwrap();
-    let role_mod = db.role_add(1, "mod", vec!["kick"]).await.unwrap();
+    let _role_admin = db
+        .role_add(0, SessionTokenKind::Root, "admin", vec!["ban"])
+        .await
+        .unwrap();
+    let role_mod = db
+        .role_add(1, SessionTokenKind::Root, "mod", vec!["kick"])
+        .await
+        .unwrap();
 
     db.role_remove(role_mod.id).await.unwrap();
 
