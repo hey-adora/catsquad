@@ -35,6 +35,7 @@ pub enum DbEmailSentReason {
     UserPasswordResetAdd,
     UserPasswordResetConfirm,
     UserRemove,
+    UserStateChanged,
 }
 
 impl Display for DbEmailSentReason {
@@ -53,6 +54,7 @@ impl Display for DbEmailSentReason {
             DbEmailSentReason::UserPasswordResetAdd => "user_password_reset_add",
             DbEmailSentReason::UserPasswordResetConfirm => "user_password_reset_confirm",
             DbEmailSentReason::UserRemove => "user_remove",
+            DbEmailSentReason::UserStateChanged => "user_state_changed",
         };
 
         write!(f, "{}", text)

@@ -48,6 +48,7 @@ mod user_search;
 mod user_update_aboutme;
 mod user_update_password_by_token;
 mod user_update_pfp;
+mod user_update_state;
 mod user_update_support;
 mod user_update_username;
 
@@ -102,6 +103,7 @@ pub use user_search::user_search;
 pub use user_update_aboutme::user_update_aboutme;
 pub use user_update_password_by_token::user_update_password_by_token;
 pub use user_update_pfp::user_update_pfp;
+pub use user_update_state::user_update_state;
 pub use user_update_support::user_update_support;
 pub use user_update_username::user_update_username;
 

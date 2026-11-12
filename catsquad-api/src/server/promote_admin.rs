@@ -3,11 +3,12 @@ use catsquad_db::DbUserGetByUsernameErr;
 use catsquad_log::prelude::*;
 use catsquad_shared::{ADMIN_ROLE_NAME, RoleValue, SessionTokenKind, contains_roles};
 
-const ADMIN_ROLES: [RoleValue; 4] = [
+const ADMIN_ROLES: [RoleValue; 5] = [
     RoleValue::PermissionRoleAdd,
     RoleValue::PermissionRoleRemove,
     RoleValue::PermissionUserSearch,
     RoleValue::PermissionUserRemoveByUsername,
+    RoleValue::PermissionUserUserUpdateState,
 ];
 
 #[derive(Clone, Debug, PartialEq, thiserror::Error)]

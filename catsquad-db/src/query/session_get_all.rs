@@ -8,7 +8,7 @@ pub enum DbSessionGetAllErr {
 }
 
 impl Db {
-    pub async fn sessoin_get_all(&self) -> Result<Vec<DbSession>, DbSessionGetAllErr> {
+    pub async fn session_get_all(&self) -> Result<Vec<DbSession>, DbSessionGetAllErr> {
         let pool = &self.db;
         let query = "SELECT * FROM sessions ORDER BY session_created_at DESC";
 

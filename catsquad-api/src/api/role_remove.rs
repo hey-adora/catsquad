@@ -1,4 +1,4 @@
-use crate::state::AppState;
+use crate::{auth::SessionTokenV2, state::AppState};
 use axum::{
     Extension, Json,
     extract::{Path, State},
@@ -14,6 +14,7 @@ use catsquad_shared::{
 pub fn from_db_role_add_err(value: DbRoleRemoveErr) -> RoleRemoveErr {
     match value {
         DbRoleRemoveErr::NotFound => RoleRemoveErr::NotFound,
+        DbRoleRemoveErr::Unauthorized(err) => RoleRemoveErr::Unauthorized(err),
         DbRoleRemoveErr::Db(_) => RoleRemoveErr::InternalServer,
     }
 }
@@ -29,24 +30,14 @@ fn status_code(result: &Result<(), RoleRemoveErr>) -> StatusCode {
 }
 
 pub async fn role_remove(
-    db_user: Extension<DbUserGet>,
+    auth_session_token: SessionTokenV2,
     State(app): State<AppState>,
     Path(params): Path<RoleRemoveParams>,
 ) -> impl IntoResponse {
+    let role_name = params.role_name;
     let inner = async || -> Result<(), RoleRemoveErr> {
-        let permission_role_add = role_extract_permission_role_remove(&db_user.roles_values);
-
-        if !permission_role_add {
-            return Err(RoleRemoveErr::Unauthorized(format!(
-                "user {} doesnt have permission {}",
-                db_user.username, ROLE_VALUE_PERMISSION_ROLE_REMOVE
-            )));
-        }
-
-        let role_id = params.role_name;
-
         app.db
-            .role_remove(role_id)
+            .role_remove(auth_session_token.into(), role_name)
             .await
             .map_err(from_db_role_add_err)?;
 

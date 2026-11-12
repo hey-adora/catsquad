@@ -51,6 +51,7 @@ pub mod user_search;
 pub mod user_update_aboutme;
 pub mod user_update_password_by_token;
 pub mod user_update_pfp;
+pub mod user_update_state;
 pub mod user_update_support;
 pub mod user_update_username;
 // pub mod invite_get_email_by_key;

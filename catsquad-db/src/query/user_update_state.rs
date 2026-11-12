@@ -1,4 +1,7 @@
-use crate::{Db, XTimestamp, query::user_get_by_session_and_roles::DbUserGetBySessionAndRolesErr};
+use crate::{
+    Db, DbEmailSentReason, XTimestamp,
+    query::user_get_by_session_and_roles::DbUserGetBySessionAndRolesErr,
+};
 use catsquad_log::prelude::*;
 use catsquad_shared::{ROLE_VALUE_PERMISSION_USER_UPDATE_STATE, SessionTokenKind, UserState};
 
@@ -32,13 +35,14 @@ fn from_user_get_by_session_and_roles_err(
 impl Db {
     pub async fn user_update_state(
         &self,
+        email_sent_callback: impl AsyncFnOnce() -> String,
         time: u64,
         auth_session_token: SessionTokenKind,
-        user_username: impl Into<String>,
+        username: impl Into<String>,
         state: UserState,
     ) -> Result<(), DbUserUpdateStateErr> {
         let pool = &self.db;
-        let user_username = user_username.into();
+        let username = username.into();
 
         let mut tx = pool
             .begin()
@@ -55,37 +59,36 @@ impl Db {
             .map_err(from_user_get_by_session_and_roles_err)?;
 
         // update user
-        {
+        let user_email = {
             let query = "UPDATE users SET
                             user_state = $3,
                             user_modified_at = $1
-                            WHERE user_username = $2";
+                            WHERE user_username = $2
+                            RETURNING user_email
+                            ";
 
-            let result = sqlx::query(query)
+            let result = sqlx::query_as(query)
                 .bind(XTimestamp(time as i64))
-                .bind(user_username)
+                .bind(&username)
                 .bind(state.as_str())
-                .execute(pool)
+                .fetch_one(pool)
                 .await;
 
             debug!("query {query}\nresults {result:?}");
 
-            let result = match result {
+            let (user_email,): (String,) = match result {
                 Ok(v) => v,
+                Err(sqlx::Error::RowNotFound) => {
+                    return Err(DbUserUpdateStateErr::UserNotFound);
+                }
                 Err(err) => {
                     error!("unexpected db error {err}");
                     return Err(DbUserUpdateStateErr::Db(err));
                 }
             };
 
-            let affected = result.rows_affected();
-
-            match affected {
-                1 => (),
-                0 => return Err(DbUserUpdateStateErr::UserNotFound),
-                _ => panic!("quary is wrong, must only modify 1 user"),
-            }
-        }
+            user_email
+        };
 
         tx.commit()
             .await
@@ -94,13 +97,31 @@ impl Db {
         // delete sessions
         {
             let query = "DELETE FROM sessions 
-                                WHERE session_user_id = $2";
+                                USING users
+                                WHERE session_user_id=user_id
+                                    AND user_username = $2";
 
             let result = sqlx::query(query)
                 .bind(XTimestamp(time as i64))
-                .bind(user_username)
+                .bind(username)
                 .bind(state.as_str())
                 .execute(pool)
+                .await;
+
+            let _result = match result {
+                Ok(v) => v,
+                Err(err) => {
+                    error!("unexpected db error {err}");
+                    return Err(DbUserUpdateStateErr::Db(err));
+                }
+            };
+        }
+
+        // add email_sent
+        {
+            let body = email_sent_callback().await;
+            let _ = self
+                .email_sent_add(time, DbEmailSentReason::UserStateChanged, user_email, body)
                 .await;
         }
 
@@ -131,7 +152,7 @@ async fn test_user_update_state() {
 
     let (user2, user2_session) = user_add_with_roles(
         &db,
-        0,
+        1,
         10,
         10,
         "hey2",
@@ -141,39 +162,45 @@ async fn test_user_update_state() {
     )
     .await;
 
+    let email_send_fn = async move || "foo".to_string();
+
     // assert error
     {
         let result = db
-            .user_update_state(0, user2_session, "hey2", UserState::Suspended)
+            .user_update_state(
+                email_send_fn,
+                0,
+                user2_session,
+                "hey2",
+                UserState::Suspended,
+            )
             .await;
         assert!(matches!(result, Err(DbUserUpdateStateErr::Unauthorized(_))));
     }
 
     // assert success
     {
+        let sessions = db.session_get_all().await.unwrap();
+        assert_eq!(sessions.len(), 2);
+        assert_eq!(sessions[0].user_id, user2.id);
+        assert_eq!(sessions[1].user_id, user1.id);
+
         let result = db
-            .user_update_state(0, user1_session, "hey2", UserState::Suspended)
+            .user_update_state(
+                email_send_fn,
+                0,
+                user1_session,
+                "hey2",
+                UserState::Suspended,
+            )
             .await;
+
         let user2 = db.user_get_by_username("", "hey2").await.unwrap();
+        let sessions = db.session_get_all().await.unwrap();
 
         assert!(matches!(result, Ok(_)));
         assert_eq!(user2.state, UserState::Suspended);
+        assert_eq!(sessions.len(), 1);
+        assert_eq!(sessions[0].user_id, user1.id);
     }
-
-    // let invite1 = db.invite_add(0, "hey@heyadora.com", 1).await.unwrap();
-    // let user = db
-    //     .user_add(0, "hey", "hey", invite1.token.clone(), 10, 5)
-    //     .await
-    //     .unwrap();
-    // assert_eq!(user.max_storage_bytes, 10);
-    // assert_eq!(user.max_storage_per_image_bytes, 5);
-
-    // db.user_update_storage(0, user.username.clone(), 10, 5)
-    //     .await
-    //     .unwrap();
-
-    // let user = db.user_get_by_username("", "hey").await.unwrap();
-
-    // assert_eq!(user.max_storage_bytes, 10);
-    // assert_eq!(user.max_storage_per_image_bytes, 5);
 }

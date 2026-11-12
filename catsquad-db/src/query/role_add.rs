@@ -88,7 +88,7 @@ impl Db {
         let mut tx = pool
             .begin()
             .await
-            .inspect_err(|err| error!("follow_add {err}"))?;
+            .inspect_err(|err| error!("role_add {err}"))?;
 
         // check auth
         let _user = self

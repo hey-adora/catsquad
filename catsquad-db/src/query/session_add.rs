@@ -1,6 +1,6 @@
 use crate::{Db, Uuid, XTimestamp, XUuid};
 use catsquad_log::prelude::*;
-use catsquad_shared::UUID_ZERO;
+use catsquad_shared::{UUID_ZERO, UserState};
 
 #[derive(Debug, Clone, PartialEq, sqlx::FromRow)]
 pub struct DbSession {
@@ -21,6 +21,9 @@ pub struct DbSession {
 pub enum DbSessionAddErr {
     #[error("user {0} not found")]
     UserNotFound(String),
+
+    #[error("user suspended")]
+    UserSuspended,
 
     #[error("db error {0}")]
     Db(#[from] sqlx::Error),
@@ -58,7 +61,38 @@ impl Db {
             .await
             .inspect_err(|err| error!("follow_add {err}"))?;
 
-        let query = "
+        // get user
+        {
+            let query = "
+                SELECT
+                    user_state
+                FROM users
+                WHERE user_email = $1
+            ";
+
+            let result = sqlx::query_as(query).bind(&email).fetch_one(&mut *tx).await;
+
+            debug!("query {query}, result {result:#?}");
+
+            let (user_state,): (String,) = match result {
+                Ok(v) => v,
+                Err(sqlx::Error::RowNotFound) => {
+                    return Err(DbSessionAddErr::UserNotFound(email));
+                }
+                Err(err) => {
+                    error!("unexpected db error {err}");
+                    return Err(DbSessionAddErr::Db(err));
+                }
+            };
+
+            if user_state == UserState::Suspended {
+                return Err(DbSessionAddErr::UserSuspended);
+            }
+        }
+
+        // insert session
+        let (session_token, session_user_id) = {
+            let query = "
             INSERT INTO sessions (
                     session_user_id,
                     session_modified_at,
@@ -71,25 +105,29 @@ impl Db {
                     FROM users
                     WHERE user_email = $1
                 RETURNING session_token, session_user_id
-        ";
+            ";
+            // TODO prevent suspended users from logging in
 
-        let result = sqlx::query_as(query)
-            .bind(&email)
-            .bind(XTimestamp(time as i64))
-            .fetch_one(&mut *tx)
-            .await;
+            let result = sqlx::query_as(query)
+                .bind(&email)
+                .bind(XTimestamp(time as i64))
+                .fetch_one(&mut *tx)
+                .await;
 
-        debug!("query {query}, result {result:#?}");
+            debug!("query {query}, result {result:#?}");
 
-        let (XUuid(session_token), session_user_id): (XUuid, i64) = match result {
-            Ok(v) => v,
-            Err(sqlx::Error::RowNotFound) => {
-                return Err(DbSessionAddErr::UserNotFound(email));
-            }
-            Err(err) => {
-                error!("unexpected db error {err}");
-                return Err(DbSessionAddErr::Db(err));
-            }
+            let (XUuid(session_token), session_user_id): (XUuid, i64) = match result {
+                Ok(v) => v,
+                Err(sqlx::Error::RowNotFound) => {
+                    return Err(DbSessionAddErr::UserNotFound(email));
+                }
+                Err(err) => {
+                    error!("unexpected db error {err}");
+                    return Err(DbSessionAddErr::Db(err));
+                }
+            };
+
+            (session_token, session_user_id)
         };
 
         tx.commit()
@@ -120,12 +158,32 @@ async fn test_session_add() {
         .await
         .unwrap();
 
-    let session1 = db.session_add(0, "hey@hey.com").await.unwrap();
-    assert_eq!(session1.user_id, user1.id);
+    // assert success
+    {
+        let session1 = db.session_add(0, "hey@hey.com").await.unwrap();
+        assert_eq!(session1.user_id, user1.id);
 
-    let session2 = db.session_add(0, "hey@hey.com").await.unwrap();
-    assert_eq!(session2.user_id, user1.id);
+        let session2 = db.session_add(0, "hey@hey.com").await.unwrap();
+        assert_eq!(session2.user_id, user1.id);
+    }
 
-    let result = db.session_add(0, "hey2@hey.com").await;
-    assert!(matches!(result, Err(DbSessionAddErr::UserNotFound(_))));
+    // assert errors
+    {
+        use catsquad_shared::SessionTokenKind;
+
+        let result = db.session_add(0, "hey2@hey.com").await;
+        assert!(matches!(result, Err(DbSessionAddErr::UserNotFound(_))));
+
+        db.user_update_state(
+            0,
+            SessionTokenKind::Root,
+            user1.username.clone(),
+            UserState::Suspended,
+        )
+        .await
+        .unwrap();
+
+        let result = db.session_add(0, "hey@hey.com").await;
+        assert!(matches!(result, Err(DbSessionAddErr::UserSuspended)));
+    }
 }

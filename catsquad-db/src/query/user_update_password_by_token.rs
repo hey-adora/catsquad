@@ -110,7 +110,7 @@ async fn test_user_update_password_by_token() {
 
         db.session_add(0, &user.email).await.unwrap();
         db.session_add(1, &user2.email).await.unwrap();
-        let sessions = db.sessoin_get_all().await.unwrap();
+        let sessions = db.session_get_all().await.unwrap();
         assert_eq!(sessions.len(), 2);
         assert_eq!(sessions[0].user_id, user2.id);
         assert_eq!(sessions[1].user_id, user.id);
@@ -147,7 +147,7 @@ async fn test_user_update_password_by_token() {
 
     // assert that old sessions got deleted
     {
-        let sessions = db.sessoin_get_all().await.unwrap();
+        let sessions = db.session_get_all().await.unwrap();
         assert_eq!(sessions.len(), 1);
         assert_eq!(sessions[0].user_id, user2.id);
     }

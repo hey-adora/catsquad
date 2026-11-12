@@ -379,7 +379,7 @@ async fn test_user_remove() {
         let posts = db.post_get_all().await.unwrap();
         let comments = db.comment_get_all().await.unwrap();
         let likes = db.post_like_get_all().await.unwrap();
-        let sessions = db.sessoin_get_all().await.unwrap();
+        let sessions = db.session_get_all().await.unwrap();
         let email_change = db.email_change_get_all().await.unwrap();
         let emails_sents = db.email_sent_get_all().await.unwrap();
         let images = db.file_image_get_all().await.unwrap();
@@ -421,7 +421,7 @@ async fn test_user_remove() {
         let posts = db.post_get_all().await.unwrap();
         let comments = db.comment_get_all().await.unwrap();
         let likes = db.post_like_get_all().await.unwrap();
-        let sessions = db.sessoin_get_all().await.unwrap();
+        let sessions = db.session_get_all().await.unwrap();
         let email_change = db.email_change_get_all().await.unwrap();
         let emails_sents = db.email_sent_get_all().await.unwrap();
         let images = db.file_image_get_all().await.unwrap();

@@ -42,6 +42,7 @@ pub use query::email_sent_add::*;
 pub use query::file_image_get_all::*;
 pub use query::post_image_get_by_hash::*;
 pub use query::session_get_all::*;
+pub use query::user_update_state::*;
 // pub use query::email_sent_get_all;
 pub use query::confirm_token_add::*;
 pub use query::confirm_token_get_all::*;

@@ -31,6 +31,9 @@ pub enum SessionAddErr {
     #[error("email or password is wrong")]
     InvalidCredentials,
 
+    #[error("user suspended")]
+    UserSuspended,
+
     #[error("bad request {0}")]
     BadRequest(String),
 

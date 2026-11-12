@@ -302,10 +302,15 @@ pub async fn app(state: AppState) -> Router {
             auth_middleware,
         ));
 
-    let router_advanced_auth = Router::new().route(
-        catsquad_shared::LINK_API_ROLE,
-        post(api::role_add).delete(api::role_remove),
-    );
+    let router_advanced_auth = Router::new()
+        .route(
+            catsquad_shared::LINK_API_ROLE,
+            post(api::role_add).delete(api::role_remove),
+        )
+        .route(
+            catsquad_shared::LINK_API_USER_UPDATE_STATE,
+            post(api::user_update_state),
+        );
 
     let app = Router::new()
         .merge(test_backdoors)

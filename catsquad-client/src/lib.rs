@@ -1,7 +1,7 @@
 use catsquad_log::prelude::*;
 use catsquad_shared::{
     self as cs, FileImage, Order, PostSearchParams, PostState, TimeRange, ToForm, UserSearchParams,
-    Uuid, link_relative_invite_get_by_key, link_relative_post_get_by_key,
+    UserState, Uuid, link_relative_invite_get_by_key, link_relative_post_get_by_key,
     link_relative_post_remove, link_relative_post_search, uuid_to_str,
 };
 use http::{HeaderMap, HeaderName, StatusCode, header};
@@ -598,6 +598,14 @@ where
         };
         let sender = self.sender.clone();
         Builder::new(sender, params)
+    }
+
+    pub fn user_update_state(
+        &self,
+        username: impl Display,
+        new_state: UserState,
+    ) -> Builder<TSender, cs::UserUpdateStateRes, cs::UserUpdateStateErr> {
+        self.post_form_empty(cs::link_relative_api_user_update_state(username, new_state))
     }
 
     pub fn user_update_username(

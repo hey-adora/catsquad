@@ -33,6 +33,7 @@ fn from_db_get_by_email_err(value: DbUserGetByEmailErr) -> SessionAddErr {
 fn from_db_session_add_err(value: DbSessionAddErr) -> SessionAddErr {
     match value {
         DbSessionAddErr::UserNotFound(_) => SessionAddErr::InvalidCredentials,
+        DbSessionAddErr::UserSuspended => SessionAddErr::UserSuspended,
         DbSessionAddErr::Db(_) => SessionAddErr::InternalServer,
     }
 }
@@ -41,6 +42,7 @@ fn status_code(result: &Result<SensitiveUserRes, SessionAddErr>) -> StatusCode {
     match result {
         Ok(_) => StatusCode::OK,
         Err(SessionAddErr::InvalidCredentials) => StatusCode::UNAUTHORIZED,
+        Err(SessionAddErr::UserSuspended) => StatusCode::UNAUTHORIZED,
         Err(SessionAddErr::BadRequest(_)) => StatusCode::BAD_REQUEST,
         Err(SessionAddErr::InternalServer) => StatusCode::INTERNAL_SERVER_ERROR,
     }

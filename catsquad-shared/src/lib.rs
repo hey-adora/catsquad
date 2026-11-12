@@ -80,6 +80,7 @@ pub use api::user_search::*;
 pub use api::user_update_aboutme::*;
 pub use api::user_update_password_by_token::*;
 pub use api::user_update_pfp::*;
+pub use api::user_update_state::*;
 pub use api::user_update_support::*;
 pub use api::user_update_username::*;
 
@@ -110,6 +111,24 @@ pub use uuid::*;
 //     let time = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
 //     time.as_micros()
 // }
+
+fn serde_from_user_state<S: serde::Serializer>(
+    v: &UserState,
+    serializer: S,
+) -> Result<S::Ok, S::Error> {
+    use serde::Serialize;
+    let output = v.as_str();
+    output.serialize(serializer)
+}
+
+fn serde_to_user_state<'de, D: serde::Deserializer<'de>>(
+    deserializer: D,
+) -> Result<UserState, D::Error> {
+    use serde::Deserialize;
+
+    String::deserialize(deserializer)
+        .and_then(|v| UserState::try_from(v).map_err(serde::de::Error::custom))
+}
 
 fn serde_from_string_vec<S: serde::Serializer>(
     v: &Vec<String>,
