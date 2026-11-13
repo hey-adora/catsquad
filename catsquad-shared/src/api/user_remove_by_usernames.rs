@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-pub const LINK_API_USER_REMOVE_BY_USERNAMES: &str = "/api/remove_by_usernames";
+pub const LINK_API_USER_REMOVE_BY_USERNAMES: &str = "/api/user/remove";
 
 pub fn link_relative_user_remove_by_usernames() -> &'static str {
     LINK_API_USER_REMOVE_BY_USERNAMES

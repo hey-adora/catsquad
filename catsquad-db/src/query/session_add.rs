@@ -158,6 +158,8 @@ async fn test_session_add() {
         .await
         .unwrap();
 
+    let email_send_fn = async move |_| "foo".to_string();
+
     // assert success
     {
         let session1 = db.session_add(0, "hey@hey.com").await.unwrap();
@@ -175,9 +177,10 @@ async fn test_session_add() {
         assert!(matches!(result, Err(DbSessionAddErr::UserNotFound(_))));
 
         db.user_update_state(
+            email_send_fn,
             0,
             SessionTokenKind::Root,
-            user1.username.clone(),
+            vec![user1.username.clone()],
             UserState::Suspended,
         )
         .await

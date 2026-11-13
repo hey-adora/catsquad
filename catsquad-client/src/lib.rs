@@ -602,10 +602,16 @@ where
 
     pub fn user_update_state(
         &self,
-        username: impl Display,
+        usernames: Vec<String>,
         new_state: UserState,
-    ) -> Builder<TSender, cs::UserUpdateStateRes, cs::UserUpdateStateErr> {
-        self.post_form_empty(cs::link_relative_api_user_update_state(username, new_state))
+    ) -> Builder<TSender, Vec<cs::UserUpdateStateRes>, cs::UserUpdateStateErr> {
+        self.post_form(
+            cs::link_relative_api_user_update_state(),
+            cs::UserUpdateStateReq {
+                usernames,
+                state: new_state,
+            },
+        )
     }
 
     pub fn user_update_username(

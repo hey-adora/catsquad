@@ -17,6 +17,7 @@ pub fn from_db_user_search(value: Vec<DbUserSearch>) -> Vec<UserSearchRes> {
         .into_iter()
         .map(|value| UserSearchRes {
             username: value.username,
+            state: value.state,
             email: value.email,
             pfp_hash: value.pfp_image_hash,
             pfp_proccesed: value.pfp_image_proccesed,

@@ -1,9 +1,9 @@
 mod server;
 
-mod api;
-mod api_config;
-mod assets;
-mod state;
+pub mod api;
+pub mod api_config;
+pub mod assets;
+pub mod state;
 
 pub mod auth;
 pub mod proccess_images;

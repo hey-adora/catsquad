@@ -4,7 +4,7 @@ use catsquad_client::{Client, Response, Sender};
 use catsquad_log::prelude::*;
 #[cfg(test)]
 use catsquad_shared::Uuid;
-use catsquad_shared::{Order, TimeRange, UserSearchFields, UserSearchRes};
+use catsquad_shared::{Order, TimeRange, UserSearchFields, UserSearchRes, UserState};
 use leptos::prelude::*;
 use std::fmt::Debug;
 
@@ -16,6 +16,7 @@ where
 {
     pub err_fetch: RwSignal<String>,
     pub err_remove: RwSignal<String>,
+    pub err_suspend: RwSignal<String>,
     pub users: RwSignal<Vec<UserSearchRes>>,
     pub param_search_order: RwSignal<Order>,
     pub param_search_limit: RwSignal<usize>,
@@ -45,6 +46,7 @@ where
         Self {
             err_fetch: RwSignal::new(String::new()),
             err_remove: RwSignal::new(String::new()),
+            err_suspend: RwSignal::new(String::new()),
             users: RwSignal::new(Vec::new()),
             param_search_order: RwSignal::new(Order::ThreeTwoOne),
             param_search_limit: RwSignal::new(100),
@@ -156,10 +158,49 @@ where
             }
         });
     }
+
+    pub async fn suspend_users(&self) {
+        let client = self.client.get_value();
+
+        let usernames = self.get_checked_usernames();
+
+        self.err_suspend.update(|v| v.clear());
+
+        let result = client
+            .user_update_state(usernames.clone(), catsquad_shared::UserState::Suspended)
+            .send()
+            .await
+            .into_json()
+            .await;
+
+        let suspended_users = match result {
+            Ok(v) => v,
+            Err(err) => {
+                let err = format!("user_state error {err}");
+                error!("{err}");
+                self.err_remove.set(err);
+                return;
+            }
+        };
+
+        // TODO compare returned users, see if all got suspended, report that were not found
+
+        self.users.try_update(|v| {
+            for user in suspended_users {
+                let username = user.username;
+                if let Some(pos) = v.iter().position(|v| v.username == username) {
+                    let Some(user) = v.get_mut(pos) else {
+                        break;
+                    };
+                    user.state = UserState::Suspended.to_string();
+                }
+            }
+        });
+    }
 }
 
 #[cfg(test)]
-async fn test_user_state_remove_setup(
+async fn test_user_state_setup(
     db_name: &str,
 ) -> (
     Owner,
@@ -172,6 +213,7 @@ async fn test_user_state_remove_setup(
     let server = catsquad_api::TestServer::new(0, db_name).await;
 
     let create_user = async |i: usize| {
+        server.state.set_time(i as u64);
         let (user, session) = server
             .user_add_full(
                 format!("prime{i}"),
@@ -186,6 +228,7 @@ async fn test_user_state_remove_setup(
     let (_user0, token0) = create_user(0).await;
     let (_user1, _token1) = create_user(10).await;
     let (_user2, _token2) = create_user(20).await;
+    server.state.set_time(4);
 
     let user_state = UsersState::new(server.client.clone());
 
@@ -194,9 +237,81 @@ async fn test_user_state_remove_setup(
 
 #[cfg(test)]
 #[tokio::test]
+async fn test_user_state_suspend_checked() {
+    let (_owner, server, user_state, token0) =
+        test_user_state_setup("test_user_state_suspend_checked").await;
+
+    // TODO assert errors
+
+    // assert success
+    {
+        use catsquad_api::{auth::create_auth_cookie_str, promote_admin};
+        use catsquad_shared::uuid_to_str;
+        use http::header;
+
+        server.state.set_admin_username("prime0").await;
+        promote_admin(server.state.clone()).await.unwrap();
+
+        server
+            .inject_header(header::COOKIE, create_auth_cookie_str(uuid_to_str(token0)))
+            .await;
+
+        user_state.fetch().await;
+
+        let users_in_state = user_state.users.get_untracked();
+        let users_in_db = server.state.db.user_get_all().await.unwrap();
+        assert_eq!(users_in_state.len(), 3);
+        assert_eq!(users_in_db.len(), 3);
+
+        assert_eq!(users_in_state[0].state, UserState::Active.as_str());
+        assert_eq!(users_in_state[1].state, UserState::Active.as_str());
+        assert_eq!(users_in_state[2].state, UserState::Active.as_str());
+
+        assert_eq!(users_in_state[0].username, "prime20");
+        assert_eq!(users_in_state[1].username, "prime10");
+        assert_eq!(users_in_state[2].username, "prime0");
+
+        assert_eq!(users_in_db[0].state, UserState::Active.as_str());
+        assert_eq!(users_in_db[1].state, UserState::Active.as_str());
+        assert_eq!(users_in_db[2].state, UserState::Active.as_str());
+
+        assert_eq!(users_in_db[0].username, "prime20");
+        assert_eq!(users_in_db[1].username, "prime10");
+        assert_eq!(users_in_db[2].username, "prime0");
+
+        user_state.add_checked_username("prime10");
+        user_state.add_checked_username("prime20");
+
+        user_state.suspend_users().await;
+
+        let users_in_state = user_state.users.get_untracked();
+        let users_in_db = server.state.db.user_get_all().await.unwrap();
+        assert_eq!(users_in_state.len(), 3);
+        assert_eq!(users_in_db.len(), 3);
+
+        assert_eq!(users_in_state[0].state, UserState::Suspended.as_str());
+        assert_eq!(users_in_state[1].state, UserState::Suspended.as_str());
+        assert_eq!(users_in_state[2].state, UserState::Active.as_str());
+
+        assert_eq!(users_in_state[0].username, "prime20");
+        assert_eq!(users_in_state[1].username, "prime10");
+        assert_eq!(users_in_state[2].username, "prime0");
+
+        assert_eq!(users_in_db[0].state, UserState::Suspended.as_str());
+        assert_eq!(users_in_db[1].state, UserState::Suspended.as_str());
+        assert_eq!(users_in_db[2].state, UserState::Active.as_str());
+
+        assert_eq!(users_in_db[0].username, "prime20");
+        assert_eq!(users_in_db[1].username, "prime10");
+        assert_eq!(users_in_db[2].username, "prime0");
+    }
+}
+
+#[cfg(test)]
+#[tokio::test]
 async fn test_user_state_remove_checked() {
     let (_owner, server, user_state, token0) =
-        test_user_state_remove_setup("test_user_state_remove_checked").await;
+        test_user_state_setup("test_user_state_remove_checked").await;
 
     // TODO assert errors
 
@@ -237,7 +352,7 @@ async fn test_user_state_remove_checked() {
 #[tokio::test]
 async fn test_user_state_remove_all() {
     let (_owner, server, user_state, token0) =
-        test_user_state_remove_setup("test_user_state_remove_all").await;
+        test_user_state_setup("test_user_state_remove_all").await;
     // TODO assert errors
 
     // assert success

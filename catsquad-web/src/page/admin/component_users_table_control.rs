@@ -59,7 +59,7 @@ pub fn UserTableControls(spawner: Spawner, user_state: UsersState<XMLSender>) ->
         search();
     };
 
-    let modal_text = move || {
+    let remove_users_modal_text = move || {
         let mut usernames = user_state.get_checked_usernames().join(",");
         if usernames.is_empty() {
             usernames.push_str("<none>");
@@ -67,10 +67,23 @@ pub fn UserTableControls(spawner: Spawner, user_state: UsersState<XMLSender>) ->
         format!("remove users {} ?", usernames)
     };
 
+    let suspend_users_modal_text = move || {
+        let mut usernames = user_state.get_checked_usernames().join(",");
+        if usernames.is_empty() {
+            usernames.push_str("<none>");
+        }
+        format!("suspend users {} ?", usernames)
+    };
+
     let on_delete = move |_| {
         spawner.spawn(async move {
             user_state.remove_users().await;
-            user_state.fetch().await;
+        });
+    };
+
+    let on_suspend = move |_| {
+        spawner.spawn(async move {
+            user_state.suspend_users().await;
         });
     };
 
@@ -105,13 +118,19 @@ pub fn UserTableControls(spawner: Spawner, user_state: UsersState<XMLSender>) ->
             </div>
 
             <p class="font-bold text-base06">"Actions"</p>
-            <div>
+            <div class="flex flex-wrap gap-2">
                 <BtnDelete
                     on_click=on_delete
                     modal_enable=true
                     modal_title="delete users"
-                    modal_text=modal_text
+                    modal_text=remove_users_modal_text
                 >"delete"</BtnDelete>
+                <BtnDelete
+                    on_click=on_suspend
+                    modal_enable=true
+                    modal_title="suspend users"
+                    modal_text=suspend_users_modal_text
+                >"suspend"</BtnDelete>
             </div>
         </div>
     }

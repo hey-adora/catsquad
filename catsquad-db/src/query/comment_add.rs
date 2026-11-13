@@ -52,6 +52,7 @@ pub enum DbCommentAddErr {
 }
 
 impl Db {
+    /// Create table Comments and indexes
     pub async fn comment_define(&self) {
         let pool = &self.db;
         let query = "
@@ -72,6 +73,8 @@ impl Db {
         let _result = sqlx::raw_sql(query).execute(pool).await.unwrap();
     }
 
+    /// Insert comment.
+    /// Targets self.
     pub async fn comment_add(
         &self,
         time: u64,

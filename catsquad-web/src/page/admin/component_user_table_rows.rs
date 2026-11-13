@@ -2,7 +2,6 @@ use super::UsersState;
 use crate::hook::Spawner;
 use catsquad_client::XMLSender;
 use catsquad_log::prelude::*;
-use catsquad_shared::UserSearchRes;
 use leptos::prelude::*;
 use wasm_bindgen::JsCast;
 use web_sys::HtmlInputElement;
@@ -35,13 +34,24 @@ pub fn UserTableRow(
     // user: UserSearchRes,
 ) -> impl IntoView {
     // TODO instead of bool, check array directly if the user is added
-    let checked = RwSignal::new(false);
-    let is_checked = move || checked.get() || user_state.check_all.get();
+    // let checked = RwSignal::new(false);
 
-    let username = move || {
+    let username_tracked = move || {
         user_state
             .users
             .with(|v| v.get(index).map(|v| v.username.clone()))
+            .unwrap_or_default()
+    };
+    let username_untracked = move || {
+        user_state
+            .users
+            .with_untracked(|v| v.get(index).map(|v| v.username.clone()))
+            .unwrap_or_default()
+    };
+    let state = move || {
+        user_state
+            .users
+            .with(|v| v.get(index).map(|v| v.state.clone()))
             .unwrap_or_default()
     };
     let email = move || {
@@ -80,18 +90,25 @@ pub fn UserTableRow(
             .with(|v| v.get(index).map(|v| v.aboutme.clone()))
             .unwrap_or_default()
     };
-    let id = move || format!("{}_checkbox", username());
+
+    let id = move || format!("{}_checkbox", username_tracked());
+    let row_is_checked_tracked = move || {
+        user_state.checked_usernames.with(|v| {
+            let username = username_tracked();
+            v.iter().any(|v| *v == username)
+        })
+    };
+    let is_checked = move || row_is_checked_tracked() || user_state.check_all.get();
 
     let on_check_fn = move |_event| {
-        checked.update(|v| *v = !*v);
-        let is_checked = checked.get_untracked();
+        let username = username_untracked();
+        let is_checked = user_state
+            .checked_usernames
+            .with_untracked(|v| v.iter().any(|v| *v == username));
 
-        let username = user_state
-            .users
-            .with_untracked(|v| v.get(index).map(|v| v.username.clone()))
-            .unwrap_or_default();
+        trace!("on_check_fn {username} {is_checked}");
 
-        if is_checked {
+        if !is_checked {
             user_state.add_checked_username(username);
         } else {
             user_state.remove_checked_username(username);
@@ -125,7 +142,8 @@ pub fn UserTableRow(
             <td>
                 <input on:change=on_check_fn type="checkbox" id=id.clone() name=id />
             </td>
-            <td>{username}</td>
+            <td>{username_tracked}</td>
+            <td>{state}</td>
             <td>{email}</td>
             <td>{likes}</td>
             <td>{followers}</td>

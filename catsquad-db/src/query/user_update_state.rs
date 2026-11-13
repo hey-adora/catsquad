@@ -7,14 +7,19 @@ use catsquad_shared::{ROLE_VALUE_PERMISSION_USER_UPDATE_STATE, SessionTokenKind,
 
 #[derive(Debug, thiserror::Error)]
 pub enum DbUserUpdateStateErr {
-    #[error("user not found")]
-    UserNotFound,
-
     #[error("unauthorized")]
     Unauthorized(String),
 
     #[error("DB error {0}")]
     Db(#[from] sqlx::Error),
+}
+
+#[derive(Debug, Clone, PartialEq, sqlx::FromRow)]
+pub struct DbUserUpdateState {
+    #[sqlx(rename = "user_username")]
+    pub username: String,
+    #[sqlx(rename = "user_email")]
+    pub email: String,
 }
 
 fn from_user_get_by_session_and_roles_err(
@@ -35,14 +40,13 @@ fn from_user_get_by_session_and_roles_err(
 impl Db {
     pub async fn user_update_state(
         &self,
-        email_sent_callback: impl AsyncFnOnce() -> String,
+        mut email_sent_callback: impl AsyncFnMut(DbUserUpdateState) -> String,
         time: u64,
         auth_session_token: SessionTokenKind,
-        username: impl Into<String>,
+        usernames: Vec<String>,
         state: UserState,
-    ) -> Result<(), DbUserUpdateStateErr> {
+    ) -> Result<Vec<DbUserUpdateState>, DbUserUpdateStateErr> {
         let pool = &self.db;
-        let username = username.into();
 
         let mut tx = pool
             .begin()
@@ -59,35 +63,32 @@ impl Db {
             .map_err(from_user_get_by_session_and_roles_err)?;
 
         // update user
-        let user_email = {
+        let output_data = {
             let query = "UPDATE users SET
                             user_state = $3,
                             user_modified_at = $1
-                            WHERE user_username = $2
-                            RETURNING user_email
+                            WHERE user_username = ANY($2)
+                            RETURNING user_username, user_email
                             ";
 
             let result = sqlx::query_as(query)
                 .bind(XTimestamp(time as i64))
-                .bind(&username)
+                .bind(&usernames)
                 .bind(state.as_str())
-                .fetch_one(pool)
+                .fetch_all(pool)
                 .await;
 
             debug!("query {query}\nresults {result:?}");
 
-            let (user_email,): (String,) = match result {
+            let data_for_email: Vec<DbUserUpdateState> = match result {
                 Ok(v) => v,
-                Err(sqlx::Error::RowNotFound) => {
-                    return Err(DbUserUpdateStateErr::UserNotFound);
-                }
                 Err(err) => {
                     error!("unexpected db error {err}");
                     return Err(DbUserUpdateStateErr::Db(err));
                 }
             };
 
-            user_email
+            data_for_email
         };
 
         tx.commit()
@@ -99,14 +100,9 @@ impl Db {
             let query = "DELETE FROM sessions 
                                 USING users
                                 WHERE session_user_id=user_id
-                                    AND user_username = $2";
+                                    AND user_username = ANY($1)";
 
-            let result = sqlx::query(query)
-                .bind(XTimestamp(time as i64))
-                .bind(username)
-                .bind(state.as_str())
-                .execute(pool)
-                .await;
+            let result = sqlx::query(query).bind(usernames).execute(pool).await;
 
             let _result = match result {
                 Ok(v) => v,
@@ -119,13 +115,16 @@ impl Db {
 
         // add email_sent
         {
-            let body = email_sent_callback().await;
-            let _ = self
-                .email_sent_add(time, DbEmailSentReason::UserStateChanged, user_email, body)
-                .await;
+            for data in output_data.clone() {
+                let to_email = data.email.clone();
+                let body = email_sent_callback(data).await;
+                let _ = self
+                    .email_sent_add(time, DbEmailSentReason::UserStateChanged, to_email, body)
+                    .await;
+            }
         }
 
-        Ok(())
+        Ok(output_data)
     }
 }
 
@@ -162,7 +161,21 @@ async fn test_user_update_state() {
     )
     .await;
 
-    let email_send_fn = async move || "foo".to_string();
+    let (user3, user3_session) = user_add_with_roles(
+        &db,
+        2,
+        10,
+        10,
+        "hey3",
+        "pss",
+        "hey3@heyadora.com",
+        vec![] as Vec<String>,
+    )
+    .await;
+
+    let email_send_fn = async move |_| "foo".to_string();
+
+    // TODO maybe better auth check test
 
     // assert error
     {
@@ -171,7 +184,7 @@ async fn test_user_update_state() {
                 email_send_fn,
                 0,
                 user2_session,
-                "hey2",
+                vec!["hey2".to_string(), "hey3".to_string()],
                 UserState::Suspended,
             )
             .await;
@@ -181,25 +194,30 @@ async fn test_user_update_state() {
     // assert success
     {
         let sessions = db.session_get_all().await.unwrap();
-        assert_eq!(sessions.len(), 2);
-        assert_eq!(sessions[0].user_id, user2.id);
-        assert_eq!(sessions[1].user_id, user1.id);
+        assert_eq!(sessions.len(), 3);
+        assert_eq!(sessions[0].user_id, user3.id);
+        assert_eq!(sessions[1].user_id, user2.id);
+        assert_eq!(sessions[2].user_id, user1.id);
 
         let result = db
             .user_update_state(
                 email_send_fn,
                 0,
                 user1_session,
-                "hey2",
+                vec!["hey2".to_string(), "hey3".to_string()],
                 UserState::Suspended,
             )
             .await;
 
+        let user1 = db.user_get_by_username("", "hey1").await.unwrap();
         let user2 = db.user_get_by_username("", "hey2").await.unwrap();
+        let user3 = db.user_get_by_username("", "hey3").await.unwrap();
         let sessions = db.session_get_all().await.unwrap();
 
         assert!(matches!(result, Ok(_)));
+        assert_eq!(user1.state, UserState::Active);
         assert_eq!(user2.state, UserState::Suspended);
+        assert_eq!(user3.state, UserState::Suspended);
         assert_eq!(sessions.len(), 1);
         assert_eq!(sessions[0].user_id, user1.id);
     }

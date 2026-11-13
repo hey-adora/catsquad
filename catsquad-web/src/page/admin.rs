@@ -60,6 +60,7 @@ pub fn Admin() -> impl IntoView {
                                     <input on:change=on_check_all_fn type="checkbox" id="user_table_checkbox" name="user_table_checkbox" checked=user_state.check_all />
                                 </th>
                                 <th>"username"</th>
+                                <th>"state"</th>
                                 <th>"email"</th>
                                 <th>"likes"</th>
                                 <th>"followers"</th>

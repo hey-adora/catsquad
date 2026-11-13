@@ -221,6 +221,8 @@ impl Db {
     }
 }
 
+// TODO test user suspend
+
 #[cfg(test)]
 #[tokio::test]
 async fn test_user_get_by_session_and_roles() {

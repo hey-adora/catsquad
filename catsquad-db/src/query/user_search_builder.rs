@@ -13,6 +13,8 @@ pub enum DbUserSearchBuilderErr {
 pub struct DbUserSearch {
     #[sqlx(rename = "user_username")]
     pub username: String,
+    #[sqlx(rename = "user_state")]
+    pub state: String,
     #[sqlx(rename = "user_email")]
     pub email: String,
     #[sqlx(rename = "user_support")]
@@ -113,6 +115,7 @@ impl Db {
         } else {
             "
              user_username,
+             user_state,
              user_email,
              user_support,
              user_aboutme,
