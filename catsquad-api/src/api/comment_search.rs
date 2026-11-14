@@ -1,14 +1,13 @@
 use axum::{
-    Extension, Form, Json,
+    Json,
     extract::{Query, State},
     http::StatusCode,
     response::IntoResponse,
 };
-use catsquad_db::{DbComment, DbCommentSearchErr, DbUser};
-use catsquad_log::prelude::*;
-use catsquad_shared::{CommentRes, CommentSearchErr, CommentSearchParams, TimeRange};
+use catsquad_db::{DbComment, DbCommentSearchErr};
+use catsquad_shared::{CommentRes, CommentSearchErr, CommentSearchParams};
 
-use crate::{api::comment_add::from_db_comment, state::AppState};
+use crate::{api::comment_add::from_db_comment, auth::SessionTokenV2, state::AppState};
 
 fn from_db_comments(comments: Vec<DbComment>) -> Vec<CommentRes> {
     comments.into_iter().map(from_db_comment).collect()
@@ -16,6 +15,7 @@ fn from_db_comments(comments: Vec<DbComment>) -> Vec<CommentRes> {
 
 fn from_db_comment_search_err(value: DbCommentSearchErr) -> CommentSearchErr {
     match value {
+        DbCommentSearchErr::Unauthorized(err) => CommentSearchErr::Unauthorized(err),
         DbCommentSearchErr::Db(_) => CommentSearchErr::InternalServer,
     }
 }
@@ -23,21 +23,23 @@ fn from_db_comment_search_err(value: DbCommentSearchErr) -> CommentSearchErr {
 fn status_code(result: &Result<Vec<CommentRes>, CommentSearchErr>) -> StatusCode {
     match result {
         Ok(_) => StatusCode::OK,
+        Err(CommentSearchErr::Unauthorized(_)) => StatusCode::UNAUTHORIZED,
         Err(CommentSearchErr::InternalServer) => StatusCode::INTERNAL_SERVER_ERROR,
     }
 }
 
 pub async fn comment_search(
+    auth_session_token: SessionTokenV2,
     State(app): State<AppState>,
     Query(req): Query<CommentSearchParams>,
 ) -> impl IntoResponse {
-    let time = app.get_time_micro();
+    // let time = app.get_time_micro();
 
     let inner = async || -> Result<Vec<CommentRes>, CommentSearchErr> {
         let result = app
             .db
             .comment_search(
-                String::new(), // TODO get Option<DbUser> with auth
+                auth_session_token.into(),
                 // time,
                 req.post_id,
                 if req.comment_id == 0 {
@@ -65,10 +67,8 @@ pub async fn comment_search(
 
 #[cfg(test)]
 mod test_utils {
-    use axum::http::header;
+    use crate::TestServer;
     use catsquad_shared::{self as cs, Order, TimeRange};
-
-    use crate::{TestServer, auth::create_auth_cookie_str};
 
     impl TestServer {
         pub async fn comment_search(
@@ -94,6 +94,7 @@ mod test_utils {
 #[cfg(test)]
 #[tokio::test]
 async fn test_api_comment_search() {
+    use catsquad_log::prelude::*;
     use catsquad_shared::PostState;
 
     init_log();

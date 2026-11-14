@@ -109,10 +109,6 @@ pub async fn app(state: AppState) -> Router {
             get(api::user_pfp_get_bytes),
         )
         .route(
-            catsquad_shared::LINK_API_COMMENT_SEARCH,
-            get(api::comment_search),
-        )
-        .route(
             catsquad_shared::LINK_API_POST_FILE_STATUS_GET_BY_HASH,
             get(api::file_image_status_get_by_hash),
         )
@@ -310,6 +306,10 @@ pub async fn app(state: AppState) -> Router {
         .route(
             catsquad_shared::LINK_API_USER_UPDATE_STATE,
             post(api::user_update_state),
+        )
+        .route(
+            catsquad_shared::LINK_API_COMMENT_SEARCH,
+            get(api::comment_search),
         );
 
     let app = Router::new()

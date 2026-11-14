@@ -45,6 +45,11 @@ pub struct UserAddReq {
     pub invite_token: Uuid,
 }
 
+pub const USER_STATE_HIDE_ON: &'static [&str] = &[UserState::Suspended.as_str()];
+pub const USER_STATE_SHOW_ON: &'static [&str] = &[UserState::Active.as_str()];
+pub const USER_STATE_ALL: &'static [&str] =
+    &[UserState::Active.as_str(), UserState::Suspended.as_str()];
+
 #[derive(Debug, Copy, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum UserState {
     Active,
@@ -52,7 +57,7 @@ pub enum UserState {
 }
 
 impl UserState {
-    pub fn as_str(&self) -> &'static str {
+    pub const fn as_str(&self) -> &'static str {
         match self {
             UserState::Active => USER_STATE_ACTIVE,
             UserState::Suspended => USER_STATE_SUSPENDED,

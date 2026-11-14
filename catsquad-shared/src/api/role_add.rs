@@ -12,6 +12,7 @@ pub const ROLE_VALUE_PERMISSION_USER_SEARCH: &'static str = "permission_user_sea
 pub const ROLE_VALUE_PERMISSION_USER_UPDATE_STATE: &'static str = "permission_user_update_state";
 pub const ROLE_VALUE_PERMISSION_USER_REMOVE_BY_USERNAMES: &'static str =
     "permission_user_remove_by_usernames";
+pub const ROLE_VALUE_PERMISSION_SEE_HIDDEN: &'static str = "permission_see_hidden";
 
 pub fn link_relative_role_add(role_name: impl Display) -> String {
     format!("/api/role/{role_name}")
@@ -30,6 +31,7 @@ pub enum RoleValue {
     PermissionUserSearch,
     PermissionUserUserUpdateState,
     PermissionUserRemoveByUsername,
+    PermissionSeeHidden,
 }
 
 pub fn contains_roles<T1, T2>(expected_roles: &[T1], roles_values: &[T2]) -> bool
@@ -139,6 +141,7 @@ impl RoleValue {
             Self::PermissionUserSearch => ROLE_VALUE_PERMISSION_USER_SEARCH,
             Self::PermissionUserUserUpdateState => ROLE_VALUE_PERMISSION_USER_UPDATE_STATE,
             Self::PermissionUserRemoveByUsername => ROLE_VALUE_PERMISSION_USER_REMOVE_BY_USERNAMES,
+            Self::PermissionSeeHidden => ROLE_VALUE_PERMISSION_SEE_HIDDEN,
         }
     }
 }
@@ -159,6 +162,7 @@ impl TryFrom<&str> for RoleValue {
             ROLE_VALUE_PERMISSION_USER_SEARCH => Self::PermissionUserSearch,
             ROLE_VALUE_PERMISSION_USER_UPDATE_STATE => Self::PermissionUserUserUpdateState,
             ROLE_VALUE_PERMISSION_USER_REMOVE_BY_USERNAMES => Self::PermissionUserRemoveByUsername,
+            ROLE_VALUE_PERMISSION_SEE_HIDDEN => Self::PermissionSeeHidden,
             _ => return Err(anyhow!("invalid value {value}")),
         };
 

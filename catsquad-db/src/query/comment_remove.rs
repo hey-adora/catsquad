@@ -75,9 +75,13 @@ impl Db {
 
             let post_state = PostState::from(post_state);
             match post_state {
-                PostState::Hidden if post_user_username == user_username => (),
+                PostState::Hidden => {
+                    if post_user_username != user_username {
+                        return Err(DbCommentRemoveErr::Unauthorized);
+                    }
+                }
                 PostState::Active => (),
-                _ => return Err(DbCommentRemoveErr::Unauthorized),
+                PostState::Draft => return Err(DbCommentRemoveErr::Unauthorized),
             }
 
             comment_parents

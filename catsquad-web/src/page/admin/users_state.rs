@@ -16,7 +16,7 @@ where
 {
     pub err_fetch: RwSignal<String>,
     pub err_remove: RwSignal<String>,
-    pub err_suspend: RwSignal<String>,
+    pub err_state: RwSignal<String>,
     pub users: RwSignal<Vec<UserSearchRes>>,
     pub param_search_order: RwSignal<Order>,
     pub param_search_limit: RwSignal<usize>,
@@ -46,7 +46,7 @@ where
         Self {
             err_fetch: RwSignal::new(String::new()),
             err_remove: RwSignal::new(String::new()),
-            err_suspend: RwSignal::new(String::new()),
+            err_state: RwSignal::new(String::new()),
             users: RwSignal::new(Vec::new()),
             param_search_order: RwSignal::new(Order::ThreeTwoOne),
             param_search_limit: RwSignal::new(100),
@@ -96,6 +96,10 @@ where
             }
         };
         self.users.set(users);
+    }
+
+    pub fn clear_checked(&self) {
+        self.checked_usernames.update(|v| v.clear());
     }
 
     pub fn add_checked_username(&self, username: impl Into<String>) {
@@ -160,20 +164,26 @@ where
     }
 
     pub async fn suspend_users(&self) {
+        self.update_users_state(UserState::Suspended).await;
+    }
+    pub async fn active_users(&self) {
+        self.update_users_state(UserState::Active).await;
+    }
+    pub async fn update_users_state(&self, new_state: UserState) {
         let client = self.client.get_value();
 
         let usernames = self.get_checked_usernames();
 
-        self.err_suspend.update(|v| v.clear());
+        self.err_state.update(|v| v.clear());
 
         let result = client
-            .user_update_state(usernames.clone(), catsquad_shared::UserState::Suspended)
+            .user_update_state(usernames.clone(), new_state)
             .send()
             .await
             .into_json()
             .await;
 
-        let suspended_users = match result {
+        let users = match result {
             Ok(v) => v,
             Err(err) => {
                 let err = format!("user_state error {err}");
@@ -183,16 +193,16 @@ where
             }
         };
 
-        // TODO compare returned users, see if all got suspended, report that were not found
+        // TODO compare returned users, see if all got updated, report that were not found
 
         self.users.try_update(|v| {
-            for user in suspended_users {
+            for user in users {
                 let username = user.username;
                 if let Some(pos) = v.iter().position(|v| v.username == username) {
                     let Some(user) = v.get_mut(pos) else {
                         break;
                     };
-                    user.state = UserState::Suspended.to_string();
+                    user.state = new_state.to_string();
                 }
             }
         });
@@ -237,9 +247,9 @@ async fn test_user_state_setup(
 
 #[cfg(test)]
 #[tokio::test]
-async fn test_user_state_suspend_checked() {
+async fn test_user_state_update_checked() {
     let (_owner, server, user_state, token0) =
-        test_user_state_setup("test_user_state_suspend_checked").await;
+        test_user_state_setup("test_user_state_update_checked").await;
 
     // TODO assert errors
 

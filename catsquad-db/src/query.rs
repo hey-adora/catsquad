@@ -4,7 +4,7 @@ pub mod comment_add; // targets self
 pub mod comment_get_all; // targets none
 pub mod comment_get_by_id; // targets none
 pub mod comment_remove;
-pub mod comment_search;
+pub mod comment_search; // auth_v2
 pub mod comment_update_text;
 pub mod confirm_token_add; // maybe rename to confirm_token
 pub mod confirm_token_get_all;
@@ -53,10 +53,10 @@ pub mod post_update_order;
 pub mod post_update_state;
 pub mod post_update_tags;
 pub mod post_update_title;
-pub mod role_add;
+pub mod role_add; // auth_v2
 pub mod role_get_all;
 pub mod role_get_by_role_tx;
-pub mod role_remove;
+pub mod role_remove; // auth_v2
 pub mod role_update_value;
 pub mod session_add;
 pub mod session_get_all;
@@ -83,7 +83,7 @@ pub mod user_update_password_by_username;
 pub mod user_update_pfp;
 pub mod user_update_role_add;
 pub mod user_update_role_remove;
-pub mod user_update_state;
+pub mod user_update_state; // auth_v2
 pub mod user_update_storage;
 pub mod user_update_support;
 pub mod user_update_username; // TODO cascade update, update foreign keys

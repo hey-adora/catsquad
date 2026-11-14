@@ -1,6 +1,8 @@
 use crate::{
     Db, Uuid, XTimestamp, XUuid,
-    query::user_get_by_session_and_roles::DbUserGetBySessionAndRolesErr,
+    query::user_get_by_session_and_roles::{
+        DbUserGetBySessionAndRolesErr, DbUserGetBySessionAndRolesSimpleErr,
+    },
 };
 use catsquad_log::prelude::*;
 use catsquad_shared::{
@@ -36,15 +38,9 @@ pub enum DbRoleAddErr {
 }
 
 fn from_user_get_by_session_and_roles_err(value: DbUserGetBySessionAndRolesErr) -> DbRoleAddErr {
-    match value {
-        DbUserGetBySessionAndRolesErr::UnauthorizedNoCookie
-        | DbUserGetBySessionAndRolesErr::UnauthorizedSuspended
-        | DbUserGetBySessionAndRolesErr::UnauthorizedNoSession
-        | DbUserGetBySessionAndRolesErr::InvalidPermissionValue(_)
-        | DbUserGetBySessionAndRolesErr::UnauthorizedMissingRoles { .. } => {
-            DbRoleAddErr::Unauthorized(value.to_string())
-        }
-        DbUserGetBySessionAndRolesErr::Db(err) => DbRoleAddErr::Db(err),
+    match DbUserGetBySessionAndRolesSimpleErr::from(value) {
+        DbUserGetBySessionAndRolesSimpleErr::Unauthorized(err) => DbRoleAddErr::Unauthorized(err),
+        DbUserGetBySessionAndRolesSimpleErr::Db(err) => DbRoleAddErr::Db(err),
     }
 }
 

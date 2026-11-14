@@ -35,7 +35,6 @@ fn status_code(result: &Result<RoleRes, RoleAddErr>) -> StatusCode {
 
 pub async fn role_add(
     auth_session_token: SessionTokenV2,
-    // db_user: Extension<DbUserGet>,
     State(app): State<AppState>,
     Path(params): Path<RoleAddPrams>,
     Form(req): Form<RoleAddReq>,

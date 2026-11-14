@@ -1,7 +1,7 @@
 // TODO email change id should not be incremental
 mod comment_add;
 mod comment_remove;
-mod comment_search;
+mod comment_search; // this - done
 mod comment_update_text;
 mod confirm_token_password_change_add;
 mod confirm_token_user_remove_add;
@@ -19,13 +19,13 @@ mod follow_remove;
 mod invite_add;
 mod invite_get_by_id;
 mod post_add;
-mod post_get_by_id;
-mod post_image_bytes_get_by_hash;
+mod post_get_by_id; // this
+mod post_image_bytes_get_by_hash; // this
 mod post_like_add;
 mod post_like_get_by_post;
 mod post_like_remove;
 mod post_remove;
-mod post_search;
+mod post_search; // this
 mod post_thumbnail_get_by_hash;
 mod post_update_description;
 mod post_update_image_add;
@@ -39,10 +39,10 @@ mod role_remove;
 mod session_add;
 mod session_remove;
 mod user_add;
-mod user_get_by_session_id;
-mod user_get_by_username;
-mod user_pfp_get_bytes;
-mod user_remove_by_token;
+mod user_get_by_session_id; // this
+mod user_get_by_username; // this
+mod user_pfp_get_bytes; // this
+mod user_remove_by_token; // this
 mod user_remove_by_usernames;
 mod user_search;
 mod user_update_aboutme;

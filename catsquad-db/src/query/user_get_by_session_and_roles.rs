@@ -1,9 +1,8 @@
-use std::fmt::Debug;
-
 use crate::{Db, XUuid, query::role_get_by_role_tx::DbRoleGetTxErr};
 use catsquad_log::prelude::*;
 use catsquad_shared::{RoleValue, SessionTokenKind, UserState, Uuid, contains_roles};
 use sqlx::PgConnection;
+use std::fmt::Debug;
 
 #[derive(Debug, thiserror::Error)]
 pub enum DbUserGetBySessionAndRolesErr {
@@ -30,6 +29,30 @@ pub enum DbUserGetBySessionAndRolesErr {
 
     #[error("invalid permission value {0}")]
     InvalidPermissionValue(String),
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum DbUserGetBySessionAndRolesSimpleErr {
+    #[error("DB error {0}")]
+    Db(#[from] sqlx::Error),
+
+    #[error("unauthorized")]
+    Unauthorized(String),
+}
+
+impl From<DbUserGetBySessionAndRolesErr> for DbUserGetBySessionAndRolesSimpleErr {
+    fn from(value: DbUserGetBySessionAndRolesErr) -> Self {
+        match value {
+            DbUserGetBySessionAndRolesErr::UnauthorizedNoCookie
+            | DbUserGetBySessionAndRolesErr::UnauthorizedSuspended
+            | DbUserGetBySessionAndRolesErr::UnauthorizedNoSession
+            | DbUserGetBySessionAndRolesErr::InvalidPermissionValue(_)
+            | DbUserGetBySessionAndRolesErr::UnauthorizedMissingRoles { .. } => {
+                DbUserGetBySessionAndRolesSimpleErr::Unauthorized(value.to_string())
+            }
+            DbUserGetBySessionAndRolesErr::Db(err) => DbUserGetBySessionAndRolesSimpleErr::Db(err),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, sqlx::FromRow)]
@@ -102,6 +125,7 @@ impl Db {
     }
 
     /// returns optional user or root, doesn't throws error
+    // pub async fn auth_optional<'c, TDb, TConnection, TPermissions>(
     pub async fn auth_optional<TPermissions>(
         &self,
         tx: &mut PgConnection,
@@ -109,6 +133,7 @@ impl Db {
         expected_permissions: &[TPermissions],
     ) -> Result<Option<DbUserGetBySessionAndRoles>, DbUserGetBySessionAndRolesErr>
     where
+        // TConnection: Executor<'c, Database = TDb>,
         TPermissions: TryInto<RoleValue> + Clone + Debug,
         TPermissions::Error: ToString,
     {

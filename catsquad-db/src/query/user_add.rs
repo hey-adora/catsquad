@@ -277,7 +277,7 @@ where
     let email = email.into();
     let role_name = format!("{}_role", username);
 
-    let (user1, user1_session) = {
+    let (mut user1, user1_session) = {
         let invite1 = db.invite_add(time, &email, time).await.unwrap();
 
         let user1 = db
@@ -297,13 +297,16 @@ where
         (user1, SessionTokenKind::User(user1_session.token))
     };
 
-    db.role_add(time, SessionTokenKind::Root, &role_name, permissions)
+    let user_role = db
+        .role_add(time, SessionTokenKind::Root, &role_name, permissions)
         .await
         .unwrap();
 
     db.user_update_role_add(time, user1.username.clone(), role_name)
         .await
         .unwrap();
+
+    user1.roles.push(user_role.id);
 
     (user1, user1_session)
 }
