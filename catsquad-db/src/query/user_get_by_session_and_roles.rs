@@ -1,6 +1,6 @@
 use crate::{Db, XUuid, query::role_get_by_role_tx::DbRoleGetTxErr};
 use catsquad_log::prelude::*;
-use catsquad_shared::{RoleValue, SessionTokenKind, UserState, Uuid, contains_roles};
+use catsquad_shared::{RoleValue, SessionTokenKind, UserState, Uuid, contains_perms};
 use sqlx::PgConnection;
 use std::fmt::Debug;
 
@@ -67,6 +67,20 @@ pub struct DbUserGetBySessionAndRoles {
     pub roles: Vec<i64>,
     #[sqlx(default)]
     pub roles_values: Vec<String>,
+}
+
+pub fn auth_perms(value: &Option<DbUserGetBySessionAndRoles>) -> Vec<String> {
+    value
+        .as_ref()
+        .map(|v| v.roles_values.clone())
+        .unwrap_or_default()
+}
+
+pub fn auth_username(value: &Option<DbUserGetBySessionAndRoles>) -> String {
+    value
+        .as_ref()
+        .map(|v| v.username.clone())
+        .unwrap_or_default()
 }
 
 impl Db {
@@ -229,7 +243,7 @@ impl Db {
                     DbUserGetBySessionAndRolesErr::InvalidPermissionValue(err.to_string())
                 })?;
 
-            let has_permissions = contains_roles(&expected_permissions, &user_permissions);
+            let has_permissions = contains_perms(&expected_permissions, &user_permissions);
 
             if !has_permissions {
                 return Err(DbUserGetBySessionAndRolesErr::UnauthorizedMissingRoles {

@@ -12,7 +12,7 @@ use axum::{
     routing::{delete, get, post},
 };
 use catsquad_log::prelude::*;
-use catsquad_shared::{DEFAULT_GLOBAL_MAX_UPLOAD_SIZE, FILE_IMAGE_THUMBNAIL_SIZE};
+use catsquad_shared::{self as cs, DEFAULT_GLOBAL_MAX_UPLOAD_SIZE, FILE_IMAGE_THUMBNAIL_SIZE};
 use std::time::Duration;
 
 pub mod promote_admin;
@@ -147,10 +147,6 @@ pub async fn app(state: AppState) -> Router {
         .route(
             catsquad_shared::LINK_API_USER_UPDATE_PASSWORD_BY_TOKEN,
             post(api::user_update_password_by_token),
-        )
-        .route(
-            catsquad_shared::LINK_API_POST_GET_BY_ID,
-            get(api::post_get_by_id),
         )
         .route(
             catsquad_shared::LINK_API_POST_IMAGE_BYTES_GET_BY_HASH,
@@ -299,18 +295,13 @@ pub async fn app(state: AppState) -> Router {
         ));
 
     let router_advanced_auth = Router::new()
+        .route(cs::LINK_API_POST_GET_BY_ID, get(api::post_get_by_id))
         .route(
-            catsquad_shared::LINK_API_ROLE,
+            cs::LINK_API_ROLE,
             post(api::role_add).delete(api::role_remove),
         )
-        .route(
-            catsquad_shared::LINK_API_USER_UPDATE_STATE,
-            post(api::user_update_state),
-        )
-        .route(
-            catsquad_shared::LINK_API_COMMENT_SEARCH,
-            get(api::comment_search),
-        );
+        .route(cs::LINK_API_USER_UPDATE_STATE, post(api::user_update_state))
+        .route(cs::LINK_API_COMMENT_SEARCH, get(api::comment_search));
 
     let app = Router::new()
         .merge(test_backdoors)

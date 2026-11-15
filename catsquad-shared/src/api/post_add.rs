@@ -1,6 +1,7 @@
 use std::fmt::Display;
 
 use crate::{FileImage, MAX_POST_DESCRIPTION_LENGTH, MAX_POST_TAGS_LENGTH, MAX_POST_TITLE_LENGTH};
+use anyhow::anyhow;
 use catsquad_log::prelude::*;
 
 pub const LINK_API_POST_ADD: &str = "/api/post";
@@ -65,7 +66,9 @@ impl PostState {
 impl PartialEq<&str> for PostState {
     fn eq(&self, other: &&str) -> bool {
         let other = *other;
-        let other = PostState::from(other);
+        let Ok(other) = PostState::try_from(other) else {
+            return false;
+        };
         *self == other
     }
 }
@@ -73,25 +76,31 @@ impl PartialEq<&str> for PostState {
 impl PartialEq<String> for PostState {
     fn eq(&self, other: &String) -> bool {
         let other = other.as_str();
-        let other = PostState::from(other);
+        let Ok(other) = PostState::try_from(other) else {
+            return false;
+        };
         *self == other
     }
 }
 
-impl From<String> for PostState {
-    fn from(value: String) -> Self {
+impl TryFrom<String> for PostState {
+    type Error = anyhow::Error;
+
+    fn try_from(value: String) -> Result<Self, Self::Error> {
         let value = value.as_str();
-        From::<&str>::from(value)
+        TryFrom::<&str>::try_from(value)
     }
 }
 
-impl From<&str> for PostState {
-    fn from(value: &str) -> Self {
+impl TryFrom<&str> for PostState {
+    type Error = anyhow::Error;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
         match value {
-            POST_STATE_DRAFT => Self::Draft,
-            POST_STATE_ACTIVE => Self::Active,
-            POST_STATE_HIDDEN => Self::Hidden,
-            _ => unreachable!("database has invalid state"),
+            POST_STATE_DRAFT => Ok(Self::Draft),
+            POST_STATE_ACTIVE => Ok(Self::Active),
+            POST_STATE_HIDDEN => Ok(Self::Hidden),
+            _ => Err(anyhow!("database has invalid state")),
         }
     }
 }

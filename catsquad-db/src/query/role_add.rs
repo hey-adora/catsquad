@@ -6,7 +6,7 @@ use crate::{
 };
 use catsquad_log::prelude::*;
 use catsquad_shared::{
-    ROLE_VALUE_PERMISSION_ROLE_ADD, RoleValue, SessionTokenKind, contains_roles,
+    ROLE_VALUE_PERMISSION_ROLE_ADD, RoleValue, SessionTokenKind, contains_perms,
 };
 
 #[derive(Debug, Clone, PartialEq, sqlx::FromRow)]

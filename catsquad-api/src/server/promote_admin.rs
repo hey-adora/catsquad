@@ -1,7 +1,7 @@
 use crate::state::AppState;
 use catsquad_db::DbUserGetByUsernameErr;
 use catsquad_log::prelude::*;
-use catsquad_shared::{ADMIN_ROLE_NAME, RoleValue, SessionTokenKind, contains_roles};
+use catsquad_shared::{ADMIN_ROLE_NAME, RoleValue, SessionTokenKind, contains_perms};
 
 const ADMIN_ROLES: [RoleValue; 6] = [
     RoleValue::PermissionRoleAdd,
@@ -46,7 +46,7 @@ pub async fn promote_admin(state: AppState) -> Result<i64, PromoteAdminErr> {
             let admin_role_exists = roles.iter().find(|v| v.name == ADMIN_ROLE_NAME);
             let admin_role_id = if let Some(admin_role) = admin_role_exists {
                 // check if contains correct permissions
-                let contains_expected_roles = contains_roles(&ADMIN_ROLES, &admin_role.values);
+                let contains_expected_roles = contains_perms(&ADMIN_ROLES, &admin_role.values);
                 if !contains_expected_roles {
                     let result = state
                         .db
@@ -188,7 +188,7 @@ async fn test_promote_admin_empty() {
         assert!(!keep_checking);
         assert_eq!(user1.roles_ids.len(), 1); // we added only 1 role
         trace!(" {ADMIN_ROLES:#?} {:#?}", admin_role.values);
-        assert!(contains_roles(&ADMIN_ROLES, &admin_role.values));
+        assert!(contains_perms(&ADMIN_ROLES, &admin_role.values));
     }
 }
 
@@ -242,6 +242,6 @@ async fn test_promote_admin_update_role() {
 
         assert!(!keep_checking);
         assert_eq!(user1.roles_ids.len(), 1); // we added only 1 role
-        assert!(contains_roles(&ADMIN_ROLES, &admin_role.values));
+        assert!(contains_perms(&ADMIN_ROLES, &admin_role.values));
     }
 }

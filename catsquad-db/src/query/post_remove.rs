@@ -17,6 +17,9 @@ pub enum DbPostRemoveErr {
 
     #[error(transparent)]
     Image(#[from] DbFileImageRemoveTxErr),
+
+    #[error("internal server error")]
+    InternalServerError,
 }
 
 impl Db {
@@ -68,7 +71,10 @@ impl Db {
                 return Err(DbPostRemoveErr::Unauthorized);
             }
 
-            let post_state = PostState::from(post_state);
+            // TODO add better err msg
+            let post_state = PostState::try_from(post_state)
+                .map_err(|err| DbPostRemoveErr::InternalServerError)?;
+
             match post_state {
                 PostState::Draft => return Err(DbPostRemoveErr::Unauthorized),
                 PostState::Hidden => (),

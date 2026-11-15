@@ -24,21 +24,35 @@ impl Db {
 async fn test_post_update_title() {
     use catsquad_log::prelude::*;
     use catsquad_shared::PostState;
+
+    use crate::user_add_with_roles;
     init_log();
 
     let db = Db::test_db(0, "test_post_update_title").await;
 
-    let invite1 = db.invite_add(0, "hey@heyadora.com", 1).await.unwrap();
-    let user = db
-        .user_add(0, "hey", "hey", invite1.token, 10, 10)
-        .await
-        .unwrap();
+    let (user, user_token) = user_add_with_roles(
+        &db,
+        0,
+        10,
+        10,
+        "hey",
+        "pss",
+        "hey@heyadora.com",
+        vec![] as Vec<&'static str>,
+    )
+    .await;
 
-    let invite1 = db.invite_add(0, "hey2@heyadora.com", 1).await.unwrap();
-    let user2 = db
-        .user_add(0, "hey2", "hey", invite1.token, 10, 10)
-        .await
-        .unwrap();
+    let (user2, user2_token) = user_add_with_roles(
+        &db,
+        1,
+        10,
+        10,
+        "hey2",
+        "pss",
+        "hey2@heyadora.com",
+        vec![] as Vec<&'static str>,
+    )
+    .await;
 
     let post1 = {
         let post1 = db
@@ -56,10 +70,7 @@ async fn test_post_update_title() {
         db.post_update_title(0, user.username.clone(), post1.id, "title2")
             .await
             .unwrap();
-        let post1 = db
-            .post_get_by_id(user.username.clone(), post1.id)
-            .await
-            .unwrap();
+        let post1 = db.post_get_by_id(user_token, post1.id).await.unwrap();
         assert_eq!(post1.title, "title2");
         post1
     };

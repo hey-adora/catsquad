@@ -63,6 +63,16 @@ impl UserState {
             UserState::Suspended => USER_STATE_SUSPENDED,
         }
     }
+
+    pub fn contains_hide(&self) -> bool {
+        let self_str = self.as_str();
+        USER_STATE_HIDE_ON.iter().any(|v| *v == self_str)
+    }
+
+    pub fn contains_show(&self) -> bool {
+        let self_str = self.as_str();
+        USER_STATE_SHOW_ON.iter().any(|v| *v == self_str)
+    }
 }
 
 impl Display for UserState {

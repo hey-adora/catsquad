@@ -416,7 +416,7 @@ pub mod tests {
     use crate::{init_owner, page::post::post_api::PostApi};
     use catsquad_api::{TestServer, auth::create_auth_cookie_str};
     use catsquad_log::prelude::*;
-    use catsquad_shared::{PostState, uuid_to_str};
+    use catsquad_shared::{PostState, UUID_ZERO, uuid_to_str};
     use http::header;
     use leptos::prelude::*;
 
@@ -582,26 +582,31 @@ pub mod tests {
         let post_api = PostApi::new();
         post_api.init(&app.client, post_id).await;
 
-        assert_eq!(post_api.post_state.get_untracked(), Some(PostState::Active));
+        // assert success
+        {
+            assert_eq!(post_api.post_state.get_untracked(), Some(PostState::Active));
 
-        post_api.toggle_state(&app.client, post_id).await.unwrap();
+            post_api.toggle_state(&app.client, post_id).await.unwrap();
 
-        assert_eq!(post_api.post_state.get_untracked(), Some(PostState::Hidden));
+            assert_eq!(post_api.post_state.get_untracked(), Some(PostState::Hidden));
 
-        assert!(post_api.err_general.get_untracked().is_empty());
+            assert!(post_api.err_general.get_untracked().is_empty());
 
-        let result = post_api
-            .update_state(&app.client, post_id, PostState::Hidden)
-            .await;
+            post_api.toggle_state(&app.client, post_id).await.unwrap();
 
-        assert!(result.is_none());
-        assert!(!post_api.err_general.get_untracked().is_empty());
-        assert_eq!(post_api.post_state.get_untracked(), Some(PostState::Hidden));
+            assert!(post_api.err_general.get_untracked().is_empty());
+            assert_eq!(post_api.post_state.get_untracked(), Some(PostState::Active));
+        }
 
-        post_api.toggle_state(&app.client, post_id).await.unwrap();
+        // assert error
+        {
+            app.remove_header(header::COOKIE).await;
 
-        assert!(post_api.err_general.get_untracked().is_empty());
-        assert_eq!(post_api.post_state.get_untracked(), Some(PostState::Active));
+            let result = post_api.toggle_state(&app.client, post_id).await;
+
+            assert!(result.is_none());
+            assert!(!post_api.err_general.get_untracked().is_empty());
+        }
     }
 
     #[tokio::test]

@@ -95,7 +95,7 @@ mod test_utils {
 #[tokio::test]
 async fn test_api_comment_search() {
     use catsquad_log::prelude::*;
-    use catsquad_shared::PostState;
+    use catsquad_shared::{PostState, TimeRange};
 
     init_log();
 
@@ -118,23 +118,6 @@ async fn test_api_comment_search() {
         .post_update_state(post1.id, PostState::Active, session_key1)
         .await
         .unwrap();
-
-    // use catsquad_shared::ToForm;
-
-    // #[derive(serde::Serialize, Clone)]
-    // struct Test1 {
-    //     foo: usize,
-    //     bar: Option<usize>,
-    // }
-
-    // let a = Test1 {
-    //     foo: 1,
-    //     bar: None::<usize>,
-    // };
-
-    // let result = a.to_form().unwrap();
-
-    // assert_eq!(result, "");
 
     let comment1 = server
         .comment_add(post1.id, 0, "text1", session_key1.clone())

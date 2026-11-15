@@ -8,13 +8,11 @@ use catsquad_db::{DbFileImage, DbPostGet, DbPostGetByKeyErr, DbUser, DbUserGet};
 use catsquad_log::prelude::*;
 use catsquad_shared::{FileImage, PostGetByKeyErr, PostGetByKeyParams, PostRes, PostState};
 
-use crate::state::AppState;
+use crate::{auth::SessionTokenV2, state::AppState};
 
 pub fn from_db_post_get_by_key_err(value: DbPostGetByKeyErr) -> PostGetByKeyErr {
     match value {
-        DbPostGetByKeyErr::Unauthorized => {
-            PostGetByKeyErr::Unauthorized("unauthorized".to_string())
-        }
+        DbPostGetByKeyErr::Unauthorized(err) => PostGetByKeyErr::Unauthorized(err),
         DbPostGetByKeyErr::PostNotFound => PostGetByKeyErr::PostNotFound,
         DbPostGetByKeyErr::Db(_) => PostGetByKeyErr::InternalServerErr,
     }
@@ -74,20 +72,14 @@ pub fn status_code(result: &Result<PostRes, PostGetByKeyErr>) -> StatusCode {
 }
 
 pub async fn post_get_by_id(
-    db_user: Extension<Option<DbUserGet>>,
+    auth_session_token: SessionTokenV2,
     State(app): State<AppState>,
     Path(params): Path<PostGetByKeyParams>,
 ) -> impl IntoResponse {
     let inner = async || -> Result<PostRes, PostGetByKeyErr> {
-        // let req = params_req(params)?;
-        let user_userame = db_user
-            .as_ref()
-            .map(|v| v.username.clone())
-            .unwrap_or_default();
-
         let post = app
             .db
-            .post_get_by_id(user_userame, params.post_id)
+            .post_get_by_id(auth_session_token.into(), params.post_id)
             .await
             .map_err(from_db_post_get_by_key_err)?;
 

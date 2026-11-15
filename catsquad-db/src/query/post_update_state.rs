@@ -4,9 +4,8 @@ use catsquad_shared::PostState;
 
 #[derive(Debug, thiserror::Error)]
 pub enum DbPostUpdateStateErr {
-    #[error("same state")]
-    SameState,
-
+    // #[error("same state")]
+    // SameState,
     #[error("cant set draft")]
     CantSetDraft,
 
@@ -63,9 +62,9 @@ impl Db {
 
         let (post_state, post_user_username): (String, String) = result;
 
-        if new_state == post_state {
-            return Err(DbPostUpdateStateErr::SameState);
-        }
+        // if new_state == post_state {
+        //     return Err(DbPostUpdateStateErr::SameState);
+        // }
 
         if user_username != post_user_username {
             return Err(DbPostUpdateStateErr::Unauthorized);
@@ -113,25 +112,35 @@ impl Db {
 #[cfg(test)]
 #[tokio::test]
 async fn test_post_update_state() {
+    use crate::user_add_with_roles;
+
     init_log();
 
     let db = Db::test_db(0, "test_post_update_state").await;
 
-    let (user1, user2) = {
-        let invite1 = db.invite_add(0, "hey@heyadora.com", 1).await.unwrap();
-        let user1 = db
-            .user_add(0, "hey", "hey", invite1.token.clone(), 10, 10)
-            .await
-            .unwrap();
+    let (user1, user1_token) = user_add_with_roles(
+        &db,
+        0,
+        10,
+        10,
+        "hey",
+        "pss",
+        "hey@heyadora.com",
+        vec![] as Vec<&'static str>,
+    )
+    .await;
 
-        let invite1 = db.invite_add(0, "hey2@heyadora.com", 1).await.unwrap();
-        let user2 = db
-            .user_add(0, "hey2", "hey", invite1.token.clone(), 10, 10)
-            .await
-            .unwrap();
-
-        (user1, user2)
-    };
+    let (user2, user2_token) = user_add_with_roles(
+        &db,
+        1,
+        10,
+        10,
+        "hey2",
+        "pss",
+        "hey2@heyadora.com",
+        vec![] as Vec<&'static str>,
+    )
+    .await;
 
     let post1 = db
         .post_add(0, user1.username.clone(), "title", "description", "")
@@ -168,10 +177,7 @@ async fn test_post_update_state() {
         db.post_update_state(0, user1.username.clone(), post1.id, PostState::Active)
             .await
             .unwrap();
-        let post1 = db
-            .post_get_by_id(user1.username.clone(), post1.id)
-            .await
-            .unwrap();
+        let post1 = db.post_get_by_id(user1_token, post1.id).await.unwrap();
         assert_eq!(post1.state, PostState::Active.to_string());
 
         post1
@@ -194,16 +200,13 @@ async fn test_post_update_state() {
             .await
             .unwrap();
         let post1 = db
-            .post_get_by_id(user1.username.clone(), post1.id.clone())
+            .post_get_by_id(user1_token, post1.id.clone())
             .await
             .unwrap();
 
         // make sure only 1 row was updated
         {
-            let post2 = db
-                .post_get_by_id(user1.username.clone(), post2.id)
-                .await
-                .unwrap();
+            let post2 = db.post_get_by_id(user1_token, post2.id).await.unwrap();
 
             assert_eq!(post2.state, PostState::Active.to_string());
         }
@@ -219,13 +222,13 @@ async fn test_post_update_state() {
         assert!(matches!(result, Err(DbPostUpdateStateErr::CantSetDraft)));
     }
 
-    // error assert
-    {
-        let result = db
-            .post_update_state(0, user1.username.clone(), post1.id, PostState::Hidden)
-            .await;
-        assert!(matches!(result, Err(DbPostUpdateStateErr::SameState)));
-    }
+    // // error assert
+    // {
+    //     let result = db
+    //         .post_update_state(0, user1.username.clone(), post1.id, PostState::Hidden)
+    //         .await;
+    //     assert!(matches!(result, Err(DbPostUpdateStateErr::SameState)));
+    // }
 
     // success assert
     {

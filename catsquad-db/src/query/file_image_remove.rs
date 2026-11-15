@@ -200,18 +200,23 @@ async fn test_calc_user_used_storage() {
 #[cfg(test)]
 #[tokio::test]
 async fn test_file_image_remove() {
+    use crate::user_add_with_roles;
+
     init_log();
 
     let db = Db::test_db(0, "test_file_image_remove").await;
 
-    let user = {
-        let invite1 = db.invite_add(0, "hey@heyadora.com", 1).await.unwrap();
-        let user = db
-            .user_add(0, "hey", "hey", invite1.token, 35, 15)
-            .await
-            .unwrap();
-        user
-    };
+    let (user, user_token) = user_add_with_roles(
+        &db,
+        0,
+        35,
+        15,
+        "hey",
+        "pss",
+        "hey@heyadora.com",
+        vec![] as Vec<&'static str>,
+    )
+    .await;
 
     let (post1, post2) = {
         use catsquad_shared::PostState;
@@ -252,15 +257,9 @@ async fn test_file_image_remove() {
     {
         db.file_image_remove(0, 12).await.unwrap();
 
-        let post1 = db
-            .post_get_by_id(user.username.clone(), post1.id)
-            .await
-            .unwrap();
+        let post1 = db.post_get_by_id(user_token, post1.id).await.unwrap();
 
-        let post2 = db
-            .post_get_by_id(user.username.clone(), post2.id)
-            .await
-            .unwrap();
+        let post2 = db.post_get_by_id(user_token, post2.id).await.unwrap();
 
         let file_img1 = db.file_image_get_by_hash(12).await;
 

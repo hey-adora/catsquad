@@ -1,18 +1,22 @@
 use crate::{
-    Db, DbComment, XTimestamp, join_str,
+    Db, DbComment, XTimestamp,
     query::user_get_by_session_and_roles::{
-        DbUserGetBySessionAndRolesErr, DbUserGetBySessionAndRolesSimpleErr,
+        DbUserGetBySessionAndRolesErr, DbUserGetBySessionAndRolesSimpleErr, auth_perms,
+        auth_username,
     },
 };
 use catsquad_log::prelude::*;
 use catsquad_shared::{
-    Order, PostState, ROLE_VALUE_PERMISSION_ROLE_ADD, ROLE_VALUE_PERMISSION_SEE_HIDDEN,
-    SessionTokenKind, TimeRange, USER_STATE_ALL, USER_STATE_SHOW_ON, UserState,
+    Order, PostState, ROLE_VALUE_PERMISSION_SEE_HIDDEN, SessionTokenKind, TimeRange,
+    USER_STATE_ALL, USER_STATE_SHOW_ON, UserState, contains_perms_or_is_root,
 };
 use sqlx::AssertSqlSafe;
 
 #[derive(Debug, thiserror::Error)]
 pub enum DbCommentSearchErr {
+    #[error("internal server error")]
+    InternalServerErr(String),
+
     #[error("unauthorized")]
     Unauthorized(String),
 
@@ -57,20 +61,21 @@ impl Db {
             .auth_optional(&mut *tx, auth_session_token, &[] as &[String])
             .await
             .map_err(from_user_get_by_session_and_roles_err)?;
-        let user_permissions = user
-            .as_ref()
-            .map(|v| v.roles_values.clone())
-            .unwrap_or_default();
-        let user_username = user.map(|v| v.username.clone()).unwrap_or_default();
-        let can_see_hidden = user_permissions
-            .into_iter()
-            .any(|perm| perm == ROLE_VALUE_PERMISSION_SEE_HIDDEN);
+
+        let user_permissions = auth_perms(&user);
+        let user_username = auth_username(&user);
+        let can_see_hidden = contains_perms_or_is_root(
+            auth_session_token,
+            &[ROLE_VALUE_PERMISSION_SEE_HIDDEN],
+            &user_permissions,
+        );
 
         // get post
         {
             let query = "SELECT
                                 user_username as post_user_username,
-                                post_state
+                                post_state,
+                                user_state
                                FROM posts
                                JOIN users ON post_user_id = user_id
                                WHERE post_id = $1";
@@ -90,10 +95,18 @@ impl Db {
                 }
             };
 
-            let (post_user_username, post_state): (String, String) = result;
+            let (post_user_username, post_state, post_user_state): (String, String, String) =
+                result;
 
-            let post_state = PostState::from(post_state);
-            let can_see_the_post = (user_username == post_user_username) || can_see_hidden;
+            let post_state = PostState::try_from(post_state)
+                .map_err(|err| DbCommentSearchErr::InternalServerErr(err.to_string()))?;
+
+            let user_state = UserState::try_from(post_user_state)
+                .map_err(|err| DbCommentSearchErr::InternalServerErr(err.to_string()))?;
+
+            let can_see_the_post = ((user_username == post_user_username)
+                && user_state.contains_show())
+                || can_see_hidden;
 
             match post_state {
                 PostState::Active => (),
@@ -125,7 +138,6 @@ impl Db {
                 TimeRange::More => "AND comment_created_at > $1",
                 TimeRange::MoreOrEqual => "AND comment_created_at >= $1",
             };
-            // .to_string();
 
             let q_parent = match (&parent_id, flatten) {
                 (Some(_), true) => "AND $2 = ANY(comment_parents)",
@@ -198,15 +210,15 @@ impl Db {
 #[cfg(test)]
 #[tokio::test]
 async fn test_comment_search() {
-    use catsquad_shared::PostState;
-
     use crate::user_add_with_roles;
+    use catsquad_shared::PostState;
+    use catsquad_shared::UserState;
 
     init_log();
 
     let db = Db::test_db(0, "test_comment_search").await;
 
-    let (user, user_token) = user_add_with_roles(
+    let (user, mut user_token) = user_add_with_roles(
         &db,
         0,
         19,
@@ -280,65 +292,109 @@ async fn test_comment_search() {
             )
             .await
         };
-        let comments = get_comments_fn(user_token).await.unwrap();
-        assert_eq!(comments.len(), 1);
 
-        db.post_update_state(0, user.username.clone(), post0.id, PostState::Hidden)
+        // post active - user active
+        {
+            let comments = get_comments_fn(user_token).await.unwrap();
+            assert_eq!(comments.len(), 1);
+
+            let comments = get_comments_fn(user2_token).await.unwrap();
+            assert_eq!(comments.len(), 1);
+
+            let comments = get_comments_fn(SessionTokenKind::None).await.unwrap();
+            assert_eq!(comments.len(), 1);
+
+            let comments = get_comments_fn(SessionTokenKind::Root).await.unwrap();
+            assert_eq!(comments.len(), 1);
+        }
+
+        // post hidden - user active
+        {
+            db.post_update_state(0, user.username.clone(), post0.id, PostState::Hidden)
+                .await
+                .unwrap();
+
+            let comments = get_comments_fn(user_token).await.unwrap();
+            assert_eq!(comments.len(), 1);
+
+            let result = get_comments_fn(user2_token).await;
+            assert!(matches!(result, Err(DbCommentSearchErr::Unauthorized(_))));
+
+            let result = get_comments_fn(SessionTokenKind::None).await;
+            assert!(matches!(result, Err(DbCommentSearchErr::Unauthorized(_))));
+
+            let result = get_comments_fn(SessionTokenKind::Root).await;
+            assert!(matches!(result, Ok(_)));
+        }
+
+        // post active - user hidden
+        {
+            db.post_update_state(0, user.username.clone(), post0.id, PostState::Active)
+                .await
+                .unwrap();
+
+            db.user_update_state(
+                async move |_| String::new(),
+                0,
+                SessionTokenKind::Root,
+                vec!["hey".to_string()],
+                UserState::Suspended,
+            )
             .await
             .unwrap();
 
-        let comments = get_comments_fn(user_token).await.unwrap();
-        assert_eq!(comments.len(), 1);
+            let result = get_comments_fn(user_token).await.unwrap();
+            assert_eq!(result.len(), 0);
 
-        let result = get_comments_fn(user2_token).await;
-        assert!(matches!(result, Err(DbCommentSearchErr::Unauthorized(_))));
+            let result = get_comments_fn(user2_token).await.unwrap();
+            assert_eq!(result.len(), 0);
 
-        db.role_update_value(0, user2.roles[0], vec![ROLE_VALUE_PERMISSION_SEE_HIDDEN])
+            let result = get_comments_fn(SessionTokenKind::None).await.unwrap();
+            assert_eq!(result.len(), 0);
+
+            let result = get_comments_fn(SessionTokenKind::Root).await.unwrap();
+            assert_eq!(result.len(), 1);
+        }
+
+        // post hidden - user hidden - perms_see_hidden
+        {
+            db.post_update_state(0, user.username.clone(), post0.id, PostState::Hidden)
+                .await
+                .unwrap();
+
+            db.role_update_value(0, user2.roles[0], vec![ROLE_VALUE_PERMISSION_SEE_HIDDEN])
+                .await
+                .unwrap();
+
+            let result = get_comments_fn(user_token).await;
+            assert!(matches!(result, Err(DbCommentSearchErr::Unauthorized(_))));
+
+            let result = get_comments_fn(user2_token).await.unwrap();
+            assert_eq!(result.len(), 1);
+
+            let result = get_comments_fn(SessionTokenKind::None).await;
+            assert!(matches!(result, Err(DbCommentSearchErr::Unauthorized(_))));
+
+            let result = get_comments_fn(SessionTokenKind::Root).await.unwrap();
+            assert_eq!(result.len(), 1);
+
+            db.post_update_state(0, user.username.clone(), post0.id, PostState::Active)
+                .await
+                .unwrap();
+
+            db.user_update_state(
+                async move |_| String::new(),
+                0,
+                SessionTokenKind::Root,
+                vec!["hey".to_string()],
+                UserState::Active,
+            )
             .await
             .unwrap();
 
-        let comments = get_comments_fn(user2_token).await.unwrap();
-        assert_eq!(comments.len(), 1);
-
-        db.user_update_state(
-            async move |_| String::new(),
-            0,
-            SessionTokenKind::Root,
-            vec!["hey".to_string()],
-            UserState::Suspended,
-        )
-        .await
-        .unwrap();
-
-        let comments = get_comments_fn(user2_token).await.unwrap();
-        assert_eq!(comments.len(), 1);
-
-        db.post_update_state(0, user.username.clone(), post0.id, PostState::Active)
-            .await
-            .unwrap();
-
-        let comments = get_comments_fn(user2_token).await.unwrap();
-        assert_eq!(comments.len(), 1);
-
-        db.role_update_value(0, user2.roles[0], vec![] as Vec<String>)
-            .await
-            .unwrap();
-
-        let comments = get_comments_fn(user2_token).await.unwrap();
-        assert_eq!(comments.len(), 0);
-
-        db.user_update_state(
-            async move |_| String::new(),
-            0,
-            SessionTokenKind::Root,
-            vec!["hey".to_string()],
-            UserState::Active,
-        )
-        .await
-        .unwrap();
-
-        let comments = get_comments_fn(user2_token).await.unwrap();
-        assert_eq!(comments.len(), 1);
+            let session = db.session_add(0, "hey@heyadora.com").await.unwrap();
+            user_token = SessionTokenKind::User(session.token);
+        }
     }
 
     let comment0_r0 = db

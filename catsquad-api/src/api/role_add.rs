@@ -6,7 +6,7 @@ use axum::{
     response::IntoResponse,
 };
 use catsquad_db::{DbRole, DbRoleAddErr, DbUserGet};
-use catsquad_shared::{RoleAddErr, RoleAddPrams, RoleAddReq, RoleRes, RoleValue, contains_roles};
+use catsquad_shared::{RoleAddErr, RoleAddPrams, RoleAddReq, RoleRes, RoleValue, contains_perms};
 
 pub fn from_db_role(value: DbRole) -> RoleRes {
     RoleRes {

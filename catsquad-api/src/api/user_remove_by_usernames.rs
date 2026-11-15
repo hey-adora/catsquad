@@ -6,7 +6,7 @@ use axum::{Extension, Form, Json, extract::State, http::StatusCode, response::In
 use catsquad_db::{DbUserGet, DbUserRemoveByUsernamesErr};
 use catsquad_shared::{
     ROLE_VALUE_PERMISSION_USER_REMOVE_BY_USERNAMES, RoleValue, UserRemoveByUsernamesErr,
-    UserRemoveByUsernamesReq, contains_roles,
+    UserRemoveByUsernamesReq, contains_perms,
 };
 
 fn from_db_user_remove_by_usernames_err(
@@ -35,7 +35,7 @@ pub async fn user_remove_by_usernames(
     Form(req): Form<UserRemoveByUsernamesReq>,
 ) -> impl IntoResponse {
     let inner = async || -> Result<(), UserRemoveByUsernamesErr> {
-        let has_permission = contains_roles(
+        let has_permission = contains_perms(
             &[RoleValue::PermissionUserRemoveByUsername],
             &db_user.roles_values,
         );

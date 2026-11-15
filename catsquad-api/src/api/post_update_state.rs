@@ -7,7 +7,7 @@ use crate::state::AppState;
 
 fn from_db_post_update_state_err(value: DbPostUpdateStateErr) -> PostUpdateStateErr {
     match value {
-        DbPostUpdateStateErr::SameState => PostUpdateStateErr::SameState,
+        // DbPostUpdateStateErr::SameState => PostUpdateStateErr::SameState,
         // DbPostUpdateStateErr::PostNotActive => PostUpdateStateErr::PostNotActive,
         DbPostUpdateStateErr::CantSetDraft => PostUpdateStateErr::CantSetDraft,
         DbPostUpdateStateErr::PostNotFound => PostUpdateStateErr::PostNotFound,
@@ -22,7 +22,7 @@ fn from_db_post_update_state_err(value: DbPostUpdateStateErr) -> PostUpdateState
 fn status_code(result: &Result<(), PostUpdateStateErr>) -> StatusCode {
     match result {
         Ok(_) => StatusCode::OK,
-        Err(PostUpdateStateErr::SameState) => StatusCode::BAD_REQUEST,
+        // Err(PostUpdateStateErr::SameState) => StatusCode::BAD_REQUEST,
         Err(PostUpdateStateErr::CantSetDraft) => StatusCode::BAD_REQUEST,
         Err(PostUpdateStateErr::PostNotActive) => StatusCode::BAD_REQUEST,
         Err(PostUpdateStateErr::Unauthorized(_)) => StatusCode::UNAUTHORIZED,

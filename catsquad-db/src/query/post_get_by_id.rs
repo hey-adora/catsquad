@@ -1,6 +1,15 @@
-use crate::{Db, DbFileImage, XTimestamp, run_if_not_empty};
+use crate::{
+    Db, DbFileImage, XTimestamp,
+    query::user_get_by_session_and_roles::{
+        DbUserGetBySessionAndRolesErr, DbUserGetBySessionAndRolesSimpleErr, auth_perms,
+        auth_username,
+    },
+};
 use catsquad_log::prelude::*;
-use catsquad_shared::POST_STATE_HIDDEN;
+use catsquad_shared::{
+    POST_STATE_HIDDEN, ROLE_VALUE_PERMISSION_SEE_HIDDEN, SessionTokenKind, UserState,
+    contains_perms_or_is_root,
+};
 use sqlx::{AssertSqlSafe, FromRow};
 
 #[derive(Debug, thiserror::Error)]
@@ -8,8 +17,8 @@ pub enum DbPostGetByKeyErr {
     #[error("post not found")]
     PostNotFound,
 
-    #[error("unauthorized")]
-    Unauthorized,
+    #[error("unauthorized {0}")]
+    Unauthorized(String),
 
     #[error("DB error {0}")]
     Db(#[from] sqlx::Error),
@@ -58,13 +67,44 @@ pub struct DbPostGet {
     pub created_at: u64,
 }
 
+fn from_user_get_by_session_and_roles_err(
+    value: DbUserGetBySessionAndRolesErr,
+) -> DbPostGetByKeyErr {
+    match DbUserGetBySessionAndRolesSimpleErr::from(value) {
+        DbUserGetBySessionAndRolesSimpleErr::Unauthorized(err) => {
+            DbPostGetByKeyErr::Unauthorized(err)
+        }
+        DbUserGetBySessionAndRolesSimpleErr::Db(err) => DbPostGetByKeyErr::Db(err),
+    }
+}
+
 impl Db {
     pub async fn post_get_by_id(
         &self,
-        user_username: String,
+        auth_session_token: SessionTokenKind,
         post_id: i64,
     ) -> Result<DbPostGet, DbPostGetByKeyErr> {
         let pool = &self.db;
+
+        let mut tx = pool
+            .begin()
+            .await
+            .inspect_err(|err| error!("comment_search {err}"))?;
+
+        let user = self
+            .auth_optional(&mut *tx, auth_session_token, &[] as &[String])
+            .await
+            .map_err(from_user_get_by_session_and_roles_err)?;
+
+        let user_permissions = auth_perms(&user);
+
+        let user_username = auth_username(&user);
+
+        let can_see_hidden = contains_perms_or_is_root(
+            auth_session_token,
+            &[ROLE_VALUE_PERMISSION_SEE_HIDDEN],
+            &user_permissions,
+        );
 
         let (
             q_join_my_user,
@@ -99,50 +139,50 @@ impl Db {
         let (images_hashes, mut post) = {
             let query_str = format!(
                 "
-                            SELECT
-                                    post_images_hashes,
+                SELECT
+                        post_images_hashes,
+                        post_user.user_state,
 
-                                    post_user.user_pfp_image_hash as post_user_pfp_hash,
-                                    coalesce(image_processed, false) as post_user_pfp_proccesed,
+                        post_user.user_pfp_image_hash as post_user_pfp_hash,
+                        coalesce(image_processed, false) as post_user_pfp_proccesed,
 
-                                    {q_liked_by_me_field},
+                        {q_liked_by_me_field},
 
-                                    post_user.user_followers_count as post_user_followers,
-                                    {q_followed_by_me_field},
+                        post_user.user_followers_count as post_user_followers,
+                        {q_followed_by_me_field},
 
-                                    post_id,
-                                    post_user_id,
-                                    post_user.user_username as post_user_username,
-                                    post_state,
-                                    post_title,
-                                    post_description,
-                                    post_tags,
-                                    post_likes_count,
-                                    post_size_bytes,
-                                    post_modified_at,
-                                    post_created_at
-                                FROM posts
+                        post_id,
+                        post_user_id,
+                        post_user.user_username as post_user_username,
+                        post_state,
+                        post_title,
+                        post_description,
+                        post_tags,
+                        post_likes_count,
+                        post_size_bytes,
+                        post_modified_at,
+                        post_created_at
+                    FROM posts
 
-                                JOIN users post_user ON post_user_id=post_user.user_id
-                                LEFT JOIN files_images ON user_pfp_image_hash=image_hash
+                    JOIN users post_user ON post_user_id=post_user.user_id
+                    LEFT JOIN files_images ON user_pfp_image_hash=image_hash
 
-                                {q_join_my_user}
-                                {q_liked_by_me_join}
-                                {q_followed_by_me_join}
+                    {q_join_my_user}
+                    {q_liked_by_me_join}
+                    {q_followed_by_me_join}
 
-                                WHERE post_id = $1 AND post_state != 'draft'"
+                    WHERE post_id = $1 AND post_state != 'draft'
+                "
             );
-
+            // AND post_user.user_state = ANY($3)
             let query = AssertSqlSafe(query_str.as_str());
-            let builder = sqlx::query(query).bind(post_id);
-            let builder = if !user_username.is_empty() {
-                builder.bind(user_username.clone())
-            } else {
-                builder
-            };
-            let result = builder.fetch_one(pool).await;
+            let result = sqlx::query(query)
+                .bind(post_id)
+                .bind(user_username.clone())
+                .fetch_one(&mut *tx)
+                .await;
 
-            debug!("query {query_str}\nresults {result:?}");
+            debug!("query {query_str}\nresults {result:#?}");
 
             let pg_row = match result {
                 Ok(v) => v,
@@ -164,17 +204,29 @@ impl Db {
                 }
             };
 
-            let images_hashes = <(Vec<i64>,)>::from_row(&pg_row);
-            let images_hashes = match images_hashes {
-                Ok((images_hashes,)) => images_hashes,
+            let images_hashes = <(Vec<i64>, String)>::from_row(&pg_row);
+            let (images_hashes, post_user_state) = match images_hashes {
+                Ok((images_hashes, post_user_state)) => (
+                    images_hashes,
+                    UserState::try_from(post_user_state)
+                        .inspect_err(|err| {
+                            error!("invalid user_state {err} for {}", post.user_username)
+                        })
+                        .map_err(|_| DbPostGetByKeyErr::PostNotFound)?,
+                ),
                 Err(err) => {
                     error!("unexpected db error {err}");
                     return Err(DbPostGetByKeyErr::Db(err));
                 }
             };
 
-            if post.state == POST_STATE_HIDDEN && post.user_username != user_username {
-                return Err(DbPostGetByKeyErr::Unauthorized);
+            let post_is_mine = post.user_username == user_username;
+            let post_is_hidden = post.state == POST_STATE_HIDDEN || post_user_state.contains_hide();
+
+            if post_is_hidden && (!post_is_mine && !can_see_hidden) {
+                return Err(DbPostGetByKeyErr::Unauthorized(
+                    "post is hidden".to_string(),
+                ));
             }
 
             (images_hashes, post)
@@ -203,7 +255,7 @@ impl Db {
             let result = sqlx::query_as(query)
                 .bind(post_id) // TODO i think this is useless
                 .bind(&images_hashes)
-                .fetch_all(pool)
+                .fetch_all(&mut *tx)
                 .await;
 
             let images: Vec<DbFileImage> = match result {
@@ -224,6 +276,10 @@ impl Db {
             post.images = images_sorted;
         }
 
+        tx.commit()
+            .await
+            .inspect_err(|err| error!("comment_search {err}"))?;
+
         Ok(post)
     }
 }
@@ -231,28 +287,37 @@ impl Db {
 #[cfg(test)]
 #[tokio::test]
 async fn test_post_get_by_id() {
+    use crate::user_add_with_roles;
     use catsquad_shared::PostState;
+    use catsquad_shared::UserState;
 
     init_log();
 
     let db = Db::test_db(0, "test_post_get_by_id").await;
 
-    // register user1 and user2
-    let (user1, user2) = {
-        let invite1 = db.invite_add(0, "hey@heyadora.com", 1).await.unwrap();
-        let user1 = db
-            .user_add(0, "hey", "hey", invite1.token.clone(), 10, 10)
-            .await
-            .unwrap();
+    let (user1, mut user1_token) = user_add_with_roles(
+        &db,
+        0,
+        10,
+        10,
+        "hey",
+        "pss",
+        "hey@heyadora.com",
+        vec![] as Vec<&'static str>,
+    )
+    .await;
 
-        let invite2 = db.invite_add(0, "hey2@heyadora.com", 1).await.unwrap();
-        let user2 = db
-            .user_add(0, "hey2", "hey", invite2.token.clone(), 10, 10)
-            .await
-            .unwrap();
-
-        (user1, user2)
-    };
+    let (user2, user2_token) = user_add_with_roles(
+        &db,
+        1,
+        10,
+        10,
+        "hey2",
+        "pss",
+        "hey2@heyadora.com",
+        vec![] as Vec<&'static str>,
+    )
+    .await;
 
     // create post
     let post1 = {
@@ -268,64 +333,140 @@ async fn test_post_get_by_id() {
         post1
     };
 
-    // asssert error
-    {
-        let result = db
-            .post_get_by_id(user1.username.clone(), post1.id.clone())
-            .await;
-        assert!(matches!(result, Err(DbPostGetByKeyErr::PostNotFound)));
-
-        let result = db
-            .post_get_by_id(user2.username.clone(), post1.id.clone())
-            .await;
-        assert!(matches!(result, Err(DbPostGetByKeyErr::PostNotFound)));
-    }
-
-    // assert success when post is active
-    {
-        db.post_update_state(
+    let user_state_fn = async |username: &str, state: UserState| {
+        db.user_update_state(
+            async |_| String::new(),
             0,
-            user1.username.clone(),
-            post1.id.clone(),
-            PostState::Active,
+            SessionTokenKind::Root,
+            vec![username.to_string()],
+            state,
         )
         .await
         .unwrap();
 
-        let result = db
-            .post_get_by_id(user1.username.clone(), post1.id.clone())
-            .await;
-        assert!(matches!(result, Ok(_)));
+        let user_email = match username {
+            "hey" => "hey@heyadora.com",
+            "hey2" => "hey2@heyadora.com",
+            _ => unreachable!(),
+        };
 
-        let result = db
-            .post_get_by_id(user2.username.clone(), post1.id.clone())
-            .await;
-        assert!(matches!(result, Ok(_)));
-    }
+        if state == UserState::Active {
+            let session = db.session_add(0, user_email).await.unwrap();
+            SessionTokenKind::User(session.token)
+        } else {
+            SessionTokenKind::None
+        }
+    };
 
-    // asssert succuess/error when post is hidden
-    {
-        db.post_update_state(
-            0,
-            user1.username.clone(),
-            post1.id.clone(),
-            PostState::Hidden,
-        )
-        .await
-        .unwrap();
-
-        let post1 = db
-            .post_get_by_id(user1.username.clone(), post1.id.clone())
+    let post_state_fn = async |username: &str, state: PostState| {
+        db.post_update_state(0, username.to_string(), post1.id.clone(), state)
             .await
             .unwrap();
-        assert_eq!(post1.title, "title1");
-        assert_eq!(post1.images[0].hash, 555);
+    };
+
+    let user_see_hidden_fn = async |username: &str, see_hidden: bool| {
+        let user_role_id = match username {
+            "hey" => user1.roles[0],
+            "hey2" => user2.roles[0],
+            _ => unreachable!(),
+        };
+        let permissions = if see_hidden {
+            vec![ROLE_VALUE_PERMISSION_SEE_HIDDEN]
+        } else {
+            vec![]
+        };
+        db.role_update_value(0, user_role_id, permissions)
+            .await
+            .unwrap();
+    };
+
+    // asssert error not found
+    {
+        let result = db.post_get_by_id(user1_token, post1.id.clone()).await;
+        assert!(matches!(result, Err(DbPostGetByKeyErr::PostNotFound)));
+
+        let result = db.post_get_by_id(user2_token, post1.id.clone()).await;
+        assert!(matches!(result, Err(DbPostGetByKeyErr::PostNotFound)));
+    }
+
+    // assert - post active - user active
+    {
+        user1_token = user_state_fn("hey", UserState::Active).await;
+        post_state_fn("hey", PostState::Active).await;
+
+        let result = db.post_get_by_id(user1_token, post1.id.clone()).await;
+        assert!(matches!(result, Ok(_)));
+
+        let result = db.post_get_by_id(user2_token, post1.id.clone()).await;
+        assert!(matches!(result, Ok(_)));
 
         let result = db
-            .post_get_by_id(user2.username.clone(), post1.id.clone())
+            .post_get_by_id(SessionTokenKind::None, post1.id.clone())
             .await;
-        assert!(matches!(result, Err(DbPostGetByKeyErr::Unauthorized)));
+        assert!(matches!(result, Ok(_)));
+
+        let result = db
+            .post_get_by_id(SessionTokenKind::Root, post1.id.clone())
+            .await;
+        assert!(matches!(result, Ok(_)));
     }
+
+    // assert - post hidden - user active
+    {
+        user1_token = user_state_fn("hey", UserState::Active).await;
+        post_state_fn("hey", PostState::Hidden).await;
+
+        let result = db.post_get_by_id(user1_token, post1.id.clone()).await;
+        assert!(matches!(result, Ok(_)));
+
+        let result = db.post_get_by_id(user2_token, post1.id.clone()).await;
+        assert!(matches!(result, Err(DbPostGetByKeyErr::Unauthorized(_))));
+
+        let result = db
+            .post_get_by_id(SessionTokenKind::None, post1.id.clone())
+            .await;
+        assert!(matches!(result, Err(DbPostGetByKeyErr::Unauthorized(_))));
+
+        let result = db
+            .post_get_by_id(SessionTokenKind::Root, post1.id.clone())
+            .await;
+        assert!(matches!(result, Ok(_)));
+    }
+
+    // assert - post hidden - user hidden
+    {
+        user_state_fn("hey", UserState::Suspended).await;
+        post_state_fn("hey", PostState::Hidden).await;
+
+        let result = db.post_get_by_id(user1_token, post1.id.clone()).await;
+        assert!(matches!(result, Err(DbPostGetByKeyErr::Unauthorized(_))));
+
+        let result = db.post_get_by_id(user2_token, post1.id.clone()).await;
+        assert!(matches!(result, Err(DbPostGetByKeyErr::Unauthorized(_))));
+
+        let result = db
+            .post_get_by_id(SessionTokenKind::None, post1.id.clone())
+            .await;
+        assert!(matches!(result, Err(DbPostGetByKeyErr::Unauthorized(_))));
+
+        let result = db
+            .post_get_by_id(SessionTokenKind::Root, post1.id.clone())
+            .await;
+        assert!(matches!(result, Ok(_)));
+    }
+
+    // assert - post hidden - user hidden - see_hidden_perms
+    {
+        user_see_hidden_fn("hey2", true).await;
+
+        let result = db.post_get_by_id(user2_token, post1.id.clone()).await;
+        assert!(matches!(result, Ok(_)));
+
+        user_see_hidden_fn("hey2", false).await;
+    }
+
+    user1_token = user_state_fn("hey", UserState::Active).await;
+    post_state_fn("hey", PostState::Active).await;
 
     // assert pfp state of post author
     {
@@ -355,7 +496,7 @@ async fn test_post_get_by_id() {
         .unwrap();
 
         let post1 = db
-            .post_get_by_id(user2.username.clone(), post1.id.clone())
+            .post_get_by_id(user2_token, post1.id.clone())
             .await
             .unwrap();
 
@@ -365,7 +506,7 @@ async fn test_post_get_by_id() {
         db.file_image_update_proccsed(0, 666).await.unwrap();
 
         let post1 = db
-            .post_get_by_id(user2.username.clone(), post1.id.clone())
+            .post_get_by_id(user2_token, post1.id.clone())
             .await
             .unwrap();
 
@@ -376,7 +517,7 @@ async fn test_post_get_by_id() {
     // assert post like state
     {
         let post1 = db
-            .post_get_by_id(user2.username.clone(), post1.id.clone())
+            .post_get_by_id(user2_token, post1.id.clone())
             .await
             .unwrap();
 
@@ -387,21 +528,21 @@ async fn test_post_get_by_id() {
             .unwrap();
 
         let post1 = db
-            .post_get_by_id(user2.username.clone(), post1.id.clone())
+            .post_get_by_id(user2_token, post1.id.clone())
             .await
             .unwrap();
 
         assert_eq!(post1.liked, true);
 
         let post1 = db
-            .post_get_by_id(user1.username.clone(), post1.id.clone())
+            .post_get_by_id(user1_token, post1.id.clone())
             .await
             .unwrap();
 
         assert_eq!(post1.liked, false);
 
         let post1 = db
-            .post_get_by_id("".to_string(), post1.id.clone())
+            .post_get_by_id(SessionTokenKind::None, post1.id.clone())
             .await
             .unwrap();
 
@@ -411,7 +552,7 @@ async fn test_post_get_by_id() {
     // assert follow state
     {
         let post1 = db
-            .post_get_by_id(user2.username.clone(), post1.id.clone())
+            .post_get_by_id(user2_token, post1.id.clone())
             .await
             .unwrap();
 
@@ -422,7 +563,7 @@ async fn test_post_get_by_id() {
             .unwrap();
 
         let post1 = db
-            .post_get_by_id(user2.username.clone(), post1.id.clone())
+            .post_get_by_id(user2_token, post1.id.clone())
             .await
             .unwrap();
 
@@ -430,14 +571,14 @@ async fn test_post_get_by_id() {
         assert_eq!(post1.followed, true);
 
         let post1 = db
-            .post_get_by_id(user1.username.clone(), post1.id.clone())
+            .post_get_by_id(user1_token, post1.id.clone())
             .await
             .unwrap();
 
         assert_eq!(post1.followed, false);
 
         let post1 = db
-            .post_get_by_id("".to_string(), post1.id.clone())
+            .post_get_by_id(SessionTokenKind::None, post1.id.clone())
             .await
             .unwrap();
 

@@ -12,9 +12,8 @@ pub struct PostUpdateStateReq {
     Default, Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq, thiserror::Error,
 )]
 pub enum PostUpdateStateErr {
-    #[error("same state")]
-    SameState,
-
+    // #[error("same state")]
+    // SameState,
     #[error("cant set draft")]
     CantSetDraft,
 

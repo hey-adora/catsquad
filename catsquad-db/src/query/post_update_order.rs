@@ -118,27 +118,35 @@ impl Db {
 #[cfg(test)]
 #[tokio::test]
 async fn test_post_update_order() {
-    use crate::DbPostGet;
+    use crate::{DbPostGet, user_add_with_roles};
 
     init_log();
 
     let db = Db::test_db(0, "test_post_update_order").await;
 
-    let (user, user2) = {
-        let invite1 = db.invite_add(0, "hey@heyadora.com", 1).await.unwrap();
-        let user = db
-            .user_add(0, "hey", "hey", invite1.token, 10, 10)
-            .await
-            .unwrap();
+    let (user, user_token) = user_add_with_roles(
+        &db,
+        0,
+        10,
+        10,
+        "hey",
+        "pss",
+        "hey@heyadora.com",
+        vec![] as Vec<&'static str>,
+    )
+    .await;
 
-        let invite1 = db.invite_add(0, "hey2@heyadora.com", 1).await.unwrap();
-        let user2 = db
-            .user_add(0, "hey2", "hey", invite1.token, 10, 10)
-            .await
-            .unwrap();
-
-        (user, user2)
-    };
+    let (user2, user2_token) = user_add_with_roles(
+        &db,
+        1,
+        10,
+        10,
+        "hey2",
+        "pss",
+        "hey2@heyadora.com",
+        vec![] as Vec<&'static str>,
+    )
+    .await;
 
     let post = {
         use catsquad_shared::PostState;
@@ -165,10 +173,7 @@ async fn test_post_update_order() {
         add_post_file_fn(&post, 20, 1).await.unwrap();
         add_post_file_fn(&post, 30, 1).await.unwrap();
         add_post_file_fn(&post, 40, 1).await.unwrap();
-        let post = db
-            .post_get_by_id(user.username.clone(), post.id)
-            .await
-            .unwrap();
+        let post = db.post_get_by_id(user_token, post.id).await.unwrap();
 
         assert_eq!(post.images.len(), 4);
         assert_eq!(post.images[0].hash, 10);
@@ -182,10 +187,7 @@ async fn test_post_update_order() {
         db.post_update_order(0, user.username.clone(), post.id, 2, 0)
             .await
             .unwrap();
-        let post = db
-            .post_get_by_id(user.username.clone(), post.id)
-            .await
-            .unwrap();
+        let post = db.post_get_by_id(user_token, post.id).await.unwrap();
         assert_eq!(post.images.len(), 4);
         assert_eq!(post.images[0].hash, 30);
         assert_eq!(post.images[1].hash, 10);
@@ -195,10 +197,7 @@ async fn test_post_update_order() {
         db.post_update_order(0, user.username.clone(), post.id, 0, 2)
             .await
             .unwrap();
-        let post = db
-            .post_get_by_id(user.username.clone(), post.id)
-            .await
-            .unwrap();
+        let post = db.post_get_by_id(user_token, post.id).await.unwrap();
         assert_eq!(post.images.len(), 4);
         assert_eq!(post.images[0].hash, 10);
         assert_eq!(post.images[1].hash, 20);
@@ -208,10 +207,7 @@ async fn test_post_update_order() {
         db.post_update_order(0, user.username.clone(), post.id, 0, 3)
             .await
             .unwrap();
-        let post = db
-            .post_get_by_id(user.username.clone(), post.id)
-            .await
-            .unwrap();
+        let post = db.post_get_by_id(user_token, post.id).await.unwrap();
         assert_eq!(post.images.len(), 4);
         assert_eq!(post.images[0].hash, 20);
         assert_eq!(post.images[1].hash, 30);

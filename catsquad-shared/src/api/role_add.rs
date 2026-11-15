@@ -3,6 +3,8 @@ use std::fmt::Display;
 
 use anyhow::anyhow;
 
+use crate::SessionTokenKind;
+
 /// also used in /shared/src/api/role_remove.rs
 pub const LINK_API_ROLE: &str = "/api/role/{role_name}";
 
@@ -34,37 +36,53 @@ pub enum RoleValue {
     PermissionSeeHidden,
 }
 
-pub fn contains_roles<T1, T2>(expected_roles: &[T1], roles_values: &[T2]) -> bool
+pub fn contains_perms<T1, T2>(expected_perms: &[T1], perms: &[T2]) -> bool
 where
     T1: TryInto<RoleValue> + Clone,
     T2: TryInto<RoleValue> + Clone,
 {
-    expected_roles.iter().all(|expected_role| {
-        let Ok(expected_role): Result<RoleValue, T1::Error> = expected_role.clone().try_into()
+    expected_perms.iter().all(|expected_perm| {
+        let Ok(expected_perm): Result<RoleValue, T1::Error> = expected_perm.clone().try_into()
         else {
             debug!("invalid expected");
             return false;
         };
 
-        roles_values.iter().any(|role_value| {
-            let Ok(role_value): Result<RoleValue, T2::Error> = role_value.clone().try_into() else {
+        perms.iter().any(|perm| {
+            let Ok(perm): Result<RoleValue, T2::Error> = perm.clone().try_into() else {
                 debug!("invalid value");
                 return false;
             };
             trace!(
-                "expected {expected_role} == {role_value } = {}",
-                expected_role == role_value
+                "expected {expected_perm} == {perm} = {}",
+                expected_perm == perm
             );
-            role_value == expected_role
+            perm == expected_perm
         })
     })
+}
+
+pub fn contains_perms_or_is_root<T1, T2>(
+    session_token_kind: SessionTokenKind,
+    expected_perms: &[T1],
+    perms: &[T2],
+) -> bool
+where
+    T1: TryInto<RoleValue> + Clone,
+    T2: TryInto<RoleValue> + Clone,
+{
+    contains_perms(expected_perms, perms)
+        || match session_token_kind {
+            SessionTokenKind::None | SessionTokenKind::User(_) => false,
+            SessionTokenKind::Root => true,
+        }
 }
 
 #[test]
 fn test_contains_roles() {
     init_log();
 
-    assert!(contains_roles(
+    assert!(contains_perms(
         &[
             RoleValue::PermissionRoleAdd,
             RoleValue::PermissionRoleRemove,
@@ -79,17 +97,17 @@ fn test_contains_roles() {
         ],
     ));
 
-    assert!(contains_roles(
+    assert!(contains_perms(
         &[RoleValue::PermissionRoleAdd],
         &[RoleValue::PermissionRoleAdd],
     ));
 
-    assert!(!contains_roles(
+    assert!(!contains_perms(
         &[RoleValue::PermissionRoleAdd],
         &[RoleValue::PermissionRoleRemove],
     ));
 
-    assert!(contains_roles(
+    assert!(contains_perms(
         &[RoleValue::PermissionRoleAdd],
         &[
             RoleValue::PermissionRoleRemove,
@@ -97,7 +115,7 @@ fn test_contains_roles() {
         ],
     ));
 
-    assert!(!contains_roles(
+    assert!(!contains_perms(
         &[
             RoleValue::PermissionRoleAdd,
             RoleValue::PermissionUserSearch
@@ -108,7 +126,7 @@ fn test_contains_roles() {
         ],
     ));
 
-    assert!(contains_roles(
+    assert!(contains_perms(
         &[
             RoleValue::PermissionRoleAdd,
             RoleValue::PermissionUserSearch
