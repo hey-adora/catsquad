@@ -106,6 +106,12 @@ pub fn Post() -> impl IntoView {
                 </div>
             </Show>
 
+            // <Show when=when_post_deleted >
+            //     <div class="grid place-items-center text-[1.5rem] ">
+            //         "error"
+            //     </div>
+            // </Show>
+
             <Show when=when_post_show >
                 <div class="flex flex-col lg:grid grid-rows-[auto_1fr] grid-cols-[2fr_1fr] lg:max-h-[calc(100vh-3rem)] gap-2">
                     <PostControls spawner=spawner_post post_api post_id/>

@@ -7,7 +7,7 @@ use crate::{
 };
 use catsquad_log::prelude::*;
 use catsquad_shared::{
-    POST_STATE_HIDDEN, ROLE_VALUE_PERMISSION_SEE_HIDDEN, SessionTokenKind, UserState,
+    POST_STATE_HIDDEN, PostState, ROLE_VALUE_PERMISSION_SEE_HIDDEN, SessionTokenKind, UserState,
     contains_perms_or_is_root,
 };
 use sqlx::{AssertSqlSafe, FromRow};
@@ -22,6 +22,9 @@ pub enum DbPostGetByKeyErr {
 
     #[error("DB error {0}")]
     Db(#[from] sqlx::Error),
+
+    #[error("internal server error")]
+    InternalServerErr,
 }
 
 #[derive(Debug, Clone, PartialEq, sqlx::FromRow)]
@@ -206,27 +209,37 @@ impl Db {
 
             let images_hashes = <(Vec<i64>, String)>::from_row(&pg_row);
             let (images_hashes, post_user_state) = match images_hashes {
-                Ok((images_hashes, post_user_state)) => (
-                    images_hashes,
-                    UserState::try_from(post_user_state)
-                        .inspect_err(|err| {
-                            error!("invalid user_state {err} for {}", post.user_username)
-                        })
-                        .map_err(|_| DbPostGetByKeyErr::PostNotFound)?,
-                ),
+                Ok(v) => v,
                 Err(err) => {
                     error!("unexpected db error {err}");
                     return Err(DbPostGetByKeyErr::Db(err));
                 }
             };
 
-            let post_is_mine = post.user_username == user_username;
-            let post_is_hidden = post.state == POST_STATE_HIDDEN || post_user_state.contains_hide();
+            // auth
+            {
+                let post_state = PostState::try_from(post.state.as_str())
+                    .inspect_err(|err| error!("{err}"))
+                    .map_err(|_err| DbPostGetByKeyErr::InternalServerErr)?;
 
-            if post_is_hidden && (!post_is_mine && !can_see_hidden) {
-                return Err(DbPostGetByKeyErr::Unauthorized(
-                    "post is hidden".to_string(),
-                ));
+                let post_user_state = UserState::try_from(post_user_state)
+                    .inspect_err(|err| {
+                        error!("invalid user_state {err} for {}", post.user_username)
+                    })
+                    .map_err(|_| DbPostGetByKeyErr::PostNotFound)?;
+
+                let post_is_mine = post.user_username == user_username;
+                let post_user_is_active = post_user_state.is_active();
+                let post_is_active = post_state.is_active();
+
+                let can_get_post =
+                    (post_is_active && post_user_is_active) || (post_is_mine || can_see_hidden);
+
+                if !can_get_post {
+                    return Err(DbPostGetByKeyErr::Unauthorized(
+                        "post is hidden".to_string(),
+                    ));
+                }
             }
 
             (images_hashes, post)

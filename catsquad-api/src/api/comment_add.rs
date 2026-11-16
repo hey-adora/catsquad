@@ -23,7 +23,8 @@ fn from_db_comment_add_err(value: DbCommentAddErr) -> CommentAddErr {
         DbCommentAddErr::ParentNotFound(err) => CommentAddErr::ReplyCommentNotFound(err),
         DbCommentAddErr::PostNotFound(err) => CommentAddErr::PostNotFound(err),
         DbCommentAddErr::UserNotFound(_) => CommentAddErr::InternalServer,
-        DbCommentAddErr::Unauthorized => CommentAddErr::Unauthorized("unauthorized".to_string()),
+        DbCommentAddErr::Unauthorized(err) => CommentAddErr::Unauthorized(err),
+        DbCommentAddErr::InternalServerErr => CommentAddErr::InternalServer,
         DbCommentAddErr::Db(_) => CommentAddErr::InternalServer,
     }
 }

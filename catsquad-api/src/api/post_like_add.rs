@@ -25,6 +25,7 @@ fn from_db_post_like_add_err(value: DbPostLikeAddErr) -> PostLikeAddErr {
         DbPostLikeAddErr::PostNotFound(_) => PostLikeAddErr::PostNotFound,
         DbPostLikeAddErr::Unauthorized => PostLikeAddErr::PostNotFound,
         DbPostLikeAddErr::Db(_) => PostLikeAddErr::InternalServer,
+        DbPostLikeAddErr::InternalServerError => PostLikeAddErr::InternalServer,
     }
 }
 

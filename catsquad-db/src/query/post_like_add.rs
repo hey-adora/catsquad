@@ -36,6 +36,9 @@ pub enum DbPostLikeAddErr {
 
     #[error("DB error {0}")]
     Db(#[from] sqlx::Error),
+
+    #[error("internal server error")]
+    InternalServerError,
 }
 
 impl Db {
@@ -99,11 +102,16 @@ impl Db {
 
             let (post_user_username, post_state): (String, String) = result;
 
-            if user_username == post_user_username {
+            let post_is_mine = user_username == post_user_username;
+
+            if post_is_mine {
                 return Err(DbPostLikeAddErr::CantLikeYourself);
             }
 
-            let post_state = PostState::from(post_state);
+            let post_state = PostState::try_from(post_state)
+                .inspect_err(|err| error!("{err}"))
+                .map_err(|_| DbPostLikeAddErr::InternalServerError)?;
+
             match post_state {
                 PostState::Draft => return Err(DbPostLikeAddErr::Unauthorized),
                 PostState::Hidden => return Err(DbPostLikeAddErr::Unauthorized),

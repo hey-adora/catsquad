@@ -14,6 +14,7 @@ fn from_db_post_remove_err(value: DbPostRemoveErr) -> PostRemoveErr {
         DbPostRemoveErr::Unauthorized => PostRemoveErr::Unauthorized("unauthorized".to_string()),
         DbPostRemoveErr::Db(_) => PostRemoveErr::InternalServer,
         DbPostRemoveErr::Image(_) => PostRemoveErr::InternalServer,
+        DbPostRemoveErr::InternalServerError => PostRemoveErr::InternalServer,
     }
 }
 

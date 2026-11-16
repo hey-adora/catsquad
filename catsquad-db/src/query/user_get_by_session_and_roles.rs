@@ -1,6 +1,6 @@
 use crate::{Db, XUuid, query::role_get_by_role_tx::DbRoleGetTxErr};
 use catsquad_log::prelude::*;
-use catsquad_shared::{RoleValue, SessionTokenKind, UserState, Uuid, contains_perms};
+use catsquad_shared::{PostState, RoleValue, SessionTokenKind, UserState, Uuid, contains_perms};
 use sqlx::PgConnection;
 use std::fmt::Debug;
 
@@ -81,6 +81,15 @@ pub fn auth_username(value: &Option<DbUserGetBySessionAndRoles>) -> String {
         .as_ref()
         .map(|v| v.username.clone())
         .unwrap_or_default()
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum DbAuthErr {
+    #[error("unauthorized")]
+    Unauthorized(String),
+
+    #[error("internal server err")]
+    InternalServerErr,
 }
 
 impl Db {

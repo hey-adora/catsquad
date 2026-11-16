@@ -1,4 +1,4 @@
-use crate::{Db, XTimestamp};
+use crate::{Db, DbAuthErr, XTimestamp};
 use catsquad_log::prelude::*;
 use catsquad_shared::PostState;
 
@@ -47,8 +47,18 @@ pub enum DbCommentAddErr {
     #[error("reply_comment \"{0}\" was not found")]
     ParentNotFound(i64),
 
-    #[error("unauthorized")]
-    Unauthorized,
+    #[error("unauthorized {0}")]
+    Unauthorized(String),
+
+    #[error("internal server error")]
+    InternalServerErr,
+}
+
+fn from_db_auth_err(value: DbAuthErr) -> DbCommentAddErr {
+    match value {
+        DbAuthErr::Unauthorized(err) => DbCommentAddErr::Unauthorized(err),
+        DbAuthErr::InternalServerErr => DbCommentAddErr::InternalServerErr,
+    }
 }
 
 impl Db {
@@ -121,11 +131,21 @@ impl Db {
                 }
             };
 
-            let post_state = PostState::from(post_state);
-            match post_state {
-                PostState::Hidden if post_user_username == user_username => (),
-                PostState::Active => (),
-                _ => return Err(DbCommentAddErr::Unauthorized),
+            // auth
+            {
+                let post_state = PostState::try_from(post_state)
+                    .inspect_err(|err| error!("{err}"))
+                    .map_err(|_err| DbCommentAddErr::InternalServerErr)?;
+
+                let post_is_mine = user_username == post_user_username;
+                let post_is_active = post_state.is_active();
+                let post_is_draft = post_state.is_draft();
+
+                let can_read_post = !post_is_draft && (post_is_active || post_is_mine);
+
+                if !can_read_post {
+                    return Err(DbCommentAddErr::Unauthorized("unauthorized".to_string()));
+                }
             }
         }
 

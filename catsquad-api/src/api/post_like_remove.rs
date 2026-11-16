@@ -12,6 +12,7 @@ fn from_db_post_like_remove_err(value: DbPostLikeRemoveErr) -> PostLikeRemoveErr
             PostLikeRemoveErr::Unauthorized("unauthorized".to_string())
         }
         DbPostLikeRemoveErr::Db(_) => PostLikeRemoveErr::InternalServer,
+        DbPostLikeRemoveErr::InternalServerError => PostLikeRemoveErr::InternalServer,
     }
 }
 

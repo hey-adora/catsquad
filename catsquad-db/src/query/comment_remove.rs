@@ -1,4 +1,4 @@
-use crate::{Db, XTimestamp};
+use crate::{Db, DbAuthErr, XTimestamp};
 use catsquad_log::prelude::*;
 use catsquad_shared::PostState;
 
@@ -13,7 +13,17 @@ pub enum DbCommentRemoveErr {
     // #[error("user \"{0}\" was not found")]
     // UserNotFound(String),
     #[error("unauthorized")]
-    Unauthorized,
+    Unauthorized(String),
+
+    #[error("internal server error")]
+    InternalServerErr,
+}
+
+fn from_db_auth_err(value: DbAuthErr) -> DbCommentRemoveErr {
+    match value {
+        DbAuthErr::Unauthorized(err) => DbCommentRemoveErr::Unauthorized(err),
+        DbAuthErr::InternalServerErr => DbCommentRemoveErr::InternalServerErr,
+    }
 }
 
 impl Db {
@@ -67,21 +77,23 @@ impl Db {
                 }
             };
 
-            let post_state = PostState::from(post_state);
+            // auth
+            {
+                let post_state = PostState::try_from(post_state)
+                    .inspect_err(|err| error!("{err}"))
+                    .map_err(|_err| DbCommentRemoveErr::InternalServerErr)?;
 
-            if user_username != commet_user_username {
-                return Err(DbCommentRemoveErr::Unauthorized);
-            }
+                let post_is_mine = user_username == post_user_username;
+                let comment_is_mine = user_username == commet_user_username;
+                let post_is_active = post_state.is_active();
+                let post_is_draft = post_state.is_draft();
 
-            let post_state = PostState::from(post_state);
-            match post_state {
-                PostState::Hidden => {
-                    if post_user_username != user_username {
-                        return Err(DbCommentRemoveErr::Unauthorized);
-                    }
+                let can_remove_comment =
+                    !post_is_draft && ((post_is_active || post_is_mine) && comment_is_mine);
+
+                if !can_remove_comment {
+                    return Err(DbCommentRemoveErr::Unauthorized("unauthorized".to_string()));
                 }
-                PostState::Active => (),
-                PostState::Draft => return Err(DbCommentRemoveErr::Unauthorized),
             }
 
             comment_parents
@@ -180,7 +192,7 @@ async fn test_comment_remove() {
     let result = db
         .comment_remove(0, user2.username.clone(), comment1.id)
         .await;
-    assert!(matches!(result, Err(DbCommentRemoveErr::Unauthorized)));
+    assert!(matches!(result, Err(DbCommentRemoveErr::Unauthorized(_))));
 
     let comments = db.comment_get_all().await.unwrap();
     assert_eq!(comments.len(), 1);

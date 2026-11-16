@@ -44,7 +44,7 @@ pub struct PostRes {
 #[derive(Debug, Copy, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum PostState {
     Draft,
-    Active, // TODO maybe rename to public
+    Active,
     Hidden,
 }
 
@@ -53,13 +53,36 @@ pub const POST_STATE_DRAFT: &'static str = "draft";
 pub const POST_STATE_ACTIVE: &'static str = "active";
 pub const POST_STATE_HIDDEN: &'static str = "hidden";
 
+pub const POST_STATE_HIDE_ON: &'static [&str] =
+    &[PostState::Draft.as_str(), PostState::Draft.as_str()];
+pub const POST_STATE_SHOW_ON: &'static [&str] = &[PostState::Active.as_str()];
+pub const POST_STATE_ALL: &'static [&str] = &[
+    PostState::Active.as_str(),
+    PostState::Hidden.as_str(),
+    PostState::Draft.as_str(),
+];
+
 impl PostState {
-    pub fn as_str(&self) -> &'static str {
+    pub const fn as_str(&self) -> &'static str {
         match self {
             PostState::Draft => POST_STATE_DRAFT,
             PostState::Active => POST_STATE_ACTIVE,
             PostState::Hidden => POST_STATE_HIDDEN,
         }
+    }
+
+    pub fn is_draft(&self) -> bool {
+        *self == PostState::Draft
+    }
+
+    pub fn is_inactive(&self) -> bool {
+        let self_str = self.as_str();
+        POST_STATE_HIDE_ON.iter().any(|v| *v == self_str)
+    }
+
+    pub fn is_active(&self) -> bool {
+        let self_str = self.as_str();
+        POST_STATE_SHOW_ON.iter().any(|v| *v == self_str)
     }
 }
 

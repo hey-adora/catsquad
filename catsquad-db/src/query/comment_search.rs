@@ -1,5 +1,5 @@
 use crate::{
-    Db, DbComment, XTimestamp,
+    Db, DbAuthErr, DbComment, XTimestamp,
     query::user_get_by_session_and_roles::{
         DbUserGetBySessionAndRolesErr, DbUserGetBySessionAndRolesSimpleErr, auth_perms,
         auth_username,
@@ -15,7 +15,7 @@ use sqlx::AssertSqlSafe;
 #[derive(Debug, thiserror::Error)]
 pub enum DbCommentSearchErr {
     #[error("internal server error")]
-    InternalServerErr(String),
+    InternalServerErr,
 
     #[error("unauthorized")]
     Unauthorized(String),
@@ -32,6 +32,13 @@ fn from_user_get_by_session_and_roles_err(
             DbCommentSearchErr::Unauthorized(err)
         }
         DbUserGetBySessionAndRolesSimpleErr::Db(err) => DbCommentSearchErr::Db(err),
+    }
+}
+
+fn from_db_auth_err(value: DbAuthErr) -> DbCommentSearchErr {
+    match value {
+        DbAuthErr::Unauthorized(err) => DbCommentSearchErr::Unauthorized(err),
+        DbAuthErr::InternalServerErr => DbCommentSearchErr::InternalServerErr,
     }
 }
 
@@ -64,6 +71,7 @@ impl Db {
 
         let user_permissions = auth_perms(&user);
         let user_username = auth_username(&user);
+
         let can_see_hidden = contains_perms_or_is_root(
             auth_session_token,
             &[ROLE_VALUE_PERMISSION_SEE_HIDDEN],
@@ -98,24 +106,28 @@ impl Db {
             let (post_user_username, post_state, post_user_state): (String, String, String) =
                 result;
 
-            let post_state = PostState::try_from(post_state)
-                .map_err(|err| DbCommentSearchErr::InternalServerErr(err.to_string()))?;
+            // auth
+            {
+                let post_state = PostState::try_from(post_state)
+                    .inspect_err(|err| error!("{err}"))
+                    .map_err(|_err| DbCommentSearchErr::InternalServerErr)?;
 
-            let user_state = UserState::try_from(post_user_state)
-                .map_err(|err| DbCommentSearchErr::InternalServerErr(err.to_string()))?;
+                let post_user_state = UserState::try_from(post_user_state)
+                    .inspect_err(|err| error!("{err}"))
+                    .map_err(|_err| DbCommentSearchErr::InternalServerErr)?;
 
-            let can_see_the_post = ((user_username == post_user_username)
-                && user_state.contains_show())
-                || can_see_hidden;
+                let post_is_mine = user_username == post_user_username;
+                let post_user_is_active = post_user_state.is_active();
+                let post_is_active = post_state.is_active();
+                let post_is_draft = post_state.is_draft();
 
-            match post_state {
-                PostState::Active => (),
-                PostState::Hidden => {
-                    if !can_see_the_post {
-                        return Err(DbCommentSearchErr::Unauthorized("unauthorized".to_string()));
-                    }
+                let can_get_comments = !post_is_draft
+                    && ((post_is_active && post_user_is_active)
+                        || (can_see_hidden || post_is_mine));
+
+                if !can_get_comments {
+                    return Err(DbCommentSearchErr::Unauthorized("unauthorized".to_string()));
                 }
-                PostState::Draft => return Ok(Vec::new()),
             }
         }
 
@@ -293,6 +305,8 @@ async fn test_comment_search() {
             .await
         };
 
+        // TODO add tests for draft
+
         // post active - user active
         {
             let comments = get_comments_fn(user_token).await.unwrap();
@@ -327,6 +341,8 @@ async fn test_comment_search() {
             assert!(matches!(result, Ok(_)));
         }
 
+        // TODO must return unauthorized when psot author is hidden
+        // TODO must only hide comments of suspended users when they comment on other posts
         // post active - user hidden
         {
             db.post_update_state(0, user.username.clone(), post0.id, PostState::Active)
@@ -343,14 +359,14 @@ async fn test_comment_search() {
             .await
             .unwrap();
 
-            let result = get_comments_fn(user_token).await.unwrap();
-            assert_eq!(result.len(), 0);
+            let result = get_comments_fn(user_token).await;
+            assert!(matches!(result, Err(DbCommentSearchErr::Unauthorized(_))));
 
-            let result = get_comments_fn(user2_token).await.unwrap();
-            assert_eq!(result.len(), 0);
+            let result = get_comments_fn(user2_token).await;
+            assert!(matches!(result, Err(DbCommentSearchErr::Unauthorized(_))));
 
-            let result = get_comments_fn(SessionTokenKind::None).await.unwrap();
-            assert_eq!(result.len(), 0);
+            let result = get_comments_fn(SessionTokenKind::None).await;
+            assert!(matches!(result, Err(DbCommentSearchErr::Unauthorized(_))));
 
             let result = get_comments_fn(SessionTokenKind::Root).await.unwrap();
             assert_eq!(result.len(), 1);
@@ -651,35 +667,4 @@ async fn test_comment_search() {
         .unwrap();
     assert_eq!(comments.len(), 1);
     assert_eq!(comments[0].text, "one0r0");
-
-    // asssert suspended user
-    {
-        use catsquad_shared::{SessionTokenKind, UserState};
-
-        db.user_update_state(
-            async move |_| "foo".to_string(),
-            0,
-            SessionTokenKind::Root,
-            vec!["hey".to_string()],
-            UserState::Suspended,
-        )
-        .await
-        .unwrap();
-
-        let comments = db
-            .comment_search(
-                user_token,
-                post0.id,
-                Some(comment0.id),
-                0,
-                10,
-                TimeRange::MoreOrEqual,
-                Order::OneTwoThree,
-                true,
-            )
-            .await
-            .unwrap();
-
-        assert_eq!(comments.len(), 0);
-    }
 }

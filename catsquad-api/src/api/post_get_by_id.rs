@@ -15,6 +15,7 @@ pub fn from_db_post_get_by_key_err(value: DbPostGetByKeyErr) -> PostGetByKeyErr 
         DbPostGetByKeyErr::Unauthorized(err) => PostGetByKeyErr::Unauthorized(err),
         DbPostGetByKeyErr::PostNotFound => PostGetByKeyErr::PostNotFound,
         DbPostGetByKeyErr::Db(_) => PostGetByKeyErr::InternalServerErr,
+        DbPostGetByKeyErr::InternalServerErr => PostGetByKeyErr::InternalServerErr,
     }
 }
 
@@ -24,7 +25,9 @@ pub fn from_db_post_get(value: DbPostGet) -> PostRes {
         user_username: value.user_username,
         user_pfp_hash: value.user_pfp_hash,
         user_pfp_proccesed: value.user_pfp_proccesed,
-        state: PostState::from(value.state),
+        state: PostState::try_from(value.state)
+            .inspect_err(|err| error!("{err}"))
+            .unwrap_or(PostState::Active),
         title: value.title,
         tags: value.tags,
         followers: value.followers,

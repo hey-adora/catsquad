@@ -64,12 +64,12 @@ impl UserState {
         }
     }
 
-    pub fn contains_hide(&self) -> bool {
+    pub fn is_inactive(&self) -> bool {
         let self_str = self.as_str();
         USER_STATE_HIDE_ON.iter().any(|v| *v == self_str)
     }
 
-    pub fn contains_show(&self) -> bool {
+    pub fn is_active(&self) -> bool {
         let self_str = self.as_str();
         USER_STATE_SHOW_ON.iter().any(|v| *v == self_str)
     }

@@ -17,6 +17,7 @@ fn from_db_comment_search_err(value: DbCommentSearchErr) -> CommentSearchErr {
     match value {
         DbCommentSearchErr::Unauthorized(err) => CommentSearchErr::Unauthorized(err),
         DbCommentSearchErr::Db(_) => CommentSearchErr::InternalServer,
+        DbCommentSearchErr::InternalServerErr => CommentSearchErr::InternalServer,
     }
 }
 

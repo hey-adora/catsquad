@@ -1,4 +1,4 @@
-use crate::{Db, XTimestamp};
+use crate::{Db, DbAuthErr, XTimestamp};
 use catsquad_log::prelude::*;
 use catsquad_shared::PostState;
 
@@ -7,11 +7,21 @@ pub enum DbCommentUpdateTextErr {
     #[error("comment not found")]
     NotFound,
 
-    #[error("unauthorized")]
-    Unauthorized,
+    #[error("unauthorized {0}")]
+    Unauthorized(String),
 
     #[error("DB error {0}")]
     Db(#[from] sqlx::Error),
+
+    #[error("internal server err")]
+    InternalServerErr,
+}
+
+fn from_db_auth_err(value: DbAuthErr) -> DbCommentUpdateTextErr {
+    match value {
+        DbAuthErr::Unauthorized(err) => DbCommentUpdateTextErr::Unauthorized(err),
+        DbAuthErr::InternalServerErr => DbCommentUpdateTextErr::InternalServerErr,
+    }
 }
 
 impl Db {
@@ -62,17 +72,29 @@ impl Db {
                     }
                 };
 
-            let post_state = PostState::from(post_state);
+            let post_state = PostState::try_from(post_state)
+                .inspect_err(|err| error!("{err}"))
+                .map_err(|_| DbCommentUpdateTextErr::InternalServerErr)?;
 
-            if user_username != commet_user_username {
-                return Err(DbCommentUpdateTextErr::Unauthorized);
-            }
+            // auth
+            {
+                let post_state = PostState::try_from(post_state)
+                    .inspect_err(|err| error!("{err}"))
+                    .map_err(|_err| DbCommentUpdateTextErr::InternalServerErr)?;
 
-            let post_state = PostState::from(post_state);
-            match post_state {
-                PostState::Hidden if post_user_username == user_username => (),
-                PostState::Active => (),
-                _ => return Err(DbCommentUpdateTextErr::Unauthorized),
+                let post_is_mine = user_username == post_user_username;
+                let comment_is_mine = user_username == commet_user_username;
+                let post_is_active = post_state.is_active();
+                let post_is_draft = post_state.is_draft();
+
+                let can_remove_comment =
+                    !post_is_draft && ((post_is_active || post_is_mine) && comment_is_mine);
+
+                if !can_remove_comment {
+                    return Err(DbCommentUpdateTextErr::Unauthorized(
+                        "unauthorized".to_string(),
+                    ));
+                }
             }
         }
 
@@ -171,5 +193,14 @@ async fn test_comment_update_text() {
     let result = db
         .comment_update_text(0, user2.username.clone(), comment1.id, "one1")
         .await;
-    assert!(matches!(result, Err(DbCommentUpdateTextErr::Unauthorized)));
+    assert!(matches!(
+        result,
+        Err(DbCommentUpdateTextErr::Unauthorized(_))
+    ));
+
+    let result = db.comment_update_text(0, "", comment1.id, "one1").await;
+    assert!(matches!(
+        result,
+        Err(DbCommentUpdateTextErr::Unauthorized(_))
+    ));
 }

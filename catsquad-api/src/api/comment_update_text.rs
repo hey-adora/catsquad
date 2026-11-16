@@ -10,9 +10,8 @@ use catsquad_shared::{
 fn from_db_comment_update_text_err(value: DbCommentUpdateTextErr) -> CommentUpdateTextErr {
     match value {
         DbCommentUpdateTextErr::NotFound => CommentUpdateTextErr::PostNotFound,
-        DbCommentUpdateTextErr::Unauthorized => {
-            CommentUpdateTextErr::Unauthorized("unauthorized".to_string())
-        }
+        DbCommentUpdateTextErr::Unauthorized(err) => CommentUpdateTextErr::Unauthorized(err),
+        DbCommentUpdateTextErr::InternalServerErr => CommentUpdateTextErr::InternalServer,
         DbCommentUpdateTextErr::Db(_) => CommentUpdateTextErr::InternalServer,
     }
 }

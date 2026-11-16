@@ -24,6 +24,9 @@ fn from_post_image_get_by_hash_err(value: DbPostImageGetByHashErr) -> PostImageB
             PostImageBytesGetByHashErr::Unauthorized("unauthorized".to_string())
         }
         DbPostImageGetByHashErr::Db(_) => PostImageBytesGetByHashErr::InternalServerErr,
+        DbPostImageGetByHashErr::InternalServerError => {
+            PostImageBytesGetByHashErr::InternalServerErr
+        }
     }
 }
 

@@ -8,10 +8,9 @@ use crate::state::AppState;
 fn from_db_comment_remove(value: DbCommentRemoveErr) -> CommentRemoveErr {
     match value {
         DbCommentRemoveErr::CommentNotFound(_) => CommentRemoveErr::CommentNotFound,
-        DbCommentRemoveErr::Unauthorized => {
-            CommentRemoveErr::Unauthorized("unauthorized".to_string())
-        }
+        DbCommentRemoveErr::Unauthorized(err) => CommentRemoveErr::Unauthorized(err),
         DbCommentRemoveErr::Db(_) => CommentRemoveErr::InternalServer,
+        DbCommentRemoveErr::InternalServerErr => CommentRemoveErr::InternalServer,
     }
 }
 

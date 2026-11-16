@@ -406,6 +406,7 @@ impl PostApi {
                 let err = format!("unexpected err {:#?}", { err });
                 error!(err);
                 self.err_general.set(err);
+                self.api_state.set(PostApiState::NotFound);
             }
         }
     }

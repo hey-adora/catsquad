@@ -68,6 +68,7 @@ pub use query::user_add::*;
 pub use query::user_get_all::*;
 pub use query::user_get_by_email::*;
 pub use query::user_get_by_session::*;
+pub use query::user_get_by_session_and_roles::*;
 pub use query::user_get_by_username::*;
 pub use query::user_get_password::*;
 pub use query::user_remove_by_token::*;

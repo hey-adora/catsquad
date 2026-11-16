@@ -13,6 +13,9 @@ pub enum DbPostImageGetByHashErr {
 
     #[error("DB error {0}")]
     Db(#[from] sqlx::Error),
+
+    #[error("internal server error")]
+    InternalServerError,
 }
 
 impl Db {
@@ -79,11 +82,18 @@ impl Db {
 
         // row
 
-        let post_state = PostState::from(post_state);
+        let post_is_mine = post_user_username == user_username;
+        let post_state = PostState::try_from(post_state)
+            .inspect_err(|err| error!("{err}"))
+            .map_err(|_| DbPostImageGetByHashErr::InternalServerError)?;
+
         match post_state {
-            PostState::Draft | PostState::Hidden if post_user_username == user_username => (),
+            PostState::Draft | PostState::Hidden => {
+                if !post_is_mine {
+                    return Err(DbPostImageGetByHashErr::Unauthorized);
+                }
+            }
             PostState::Active => (),
-            _ => return Err(DbPostImageGetByHashErr::Unauthorized),
         }
 
         let image = DbFileImage::from_row(&row)
