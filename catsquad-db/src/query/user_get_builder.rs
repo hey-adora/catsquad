@@ -1,6 +1,6 @@
 use crate::{Db, DbUserGet, XUuid, query::role_get_by_role_tx::DbRoleGetTxErr};
 use catsquad_log::prelude::*;
-use catsquad_shared::Uuid;
+use catsquad_shared::{SessionTokenKind, Uuid};
 use sqlx::AssertSqlSafe;
 
 #[derive(Debug, thiserror::Error)]
@@ -19,12 +19,11 @@ impl Db {
     /// provide only session_token or only username
     pub async fn user_get_builder(
         &self,
-        user_username: impl Into<String>,
+        auth_session_token: SessionTokenKind,
         session_token: Uuid,
         username: impl Into<String>,
         email: impl Into<String>,
     ) -> Result<DbUserGet, DbUserGetBuilderErr> {
-        // TODO can combine get by username/email
         let pool = &self.db;
         let user_username = user_username.into();
         let username = username.into();

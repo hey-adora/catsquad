@@ -1,28 +1,23 @@
+use crate::{
+    api::post_image_bytes_get_by_hash::get_file_image, auth::SessionTokenV2, state::AppState,
+};
 use axum::{
-    Extension,
     extract::{Path, State},
     response::IntoResponse,
 };
-use catsquad_db::{DbUser, DbUserGet};
 use catsquad_shared::PostImageBytesGetByHashParams;
 
-use crate::{api::post_image_bytes_get_by_hash::get_file_image, state::AppState};
-
 pub async fn post_thumbnail_bytes_get_by_hash(
-    db_user: Extension<Option<DbUserGet>>,
+    auth_session_token: SessionTokenV2,
     State(app): State<AppState>,
     Path(params): Path<PostImageBytesGetByHashParams>,
 ) -> impl IntoResponse {
     //TODO optimize this nonsense
 
-    let user_username = db_user
-        .as_ref()
-        .map(|v| v.username.clone())
-        .unwrap_or_default();
     let post_id = params.post_id;
     let file_hash = params.file_hash;
 
-    get_file_image(app, user_username, post_id, file_hash, true).await
+    get_file_image(app, auth_session_token, post_id, file_hash, true).await
 }
 
 #[cfg(test)]
@@ -58,7 +53,6 @@ async fn test_api_post_thumbnail_bytes_by_hash() {
     use crate::{get_file_hash_for_testing_by_path, proccess_images::proccess_images_all};
     use catsquad_log::prelude::*;
     use catsquad_shared::{PostImageBytesGetByHashErr, PostState};
-    use tokio::fs::set_permissions;
 
     init_log();
     let server = crate::TestServer::new(0, "test_api_post_thumbnail_bytes_by_hash").await;

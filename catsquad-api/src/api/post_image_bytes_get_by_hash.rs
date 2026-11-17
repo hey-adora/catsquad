@@ -1,15 +1,15 @@
 use crate::{
     api::user_pfp_get_bytes::img_or_json_result,
+    auth::SessionTokenV2,
     proccess_images::{storage_file_path, thumbnail_file_path},
     state::AppState,
 };
 use axum::{
-    Extension,
     extract::{Path, State},
     http::StatusCode,
     response::IntoResponse,
 };
-use catsquad_db::{DbPostImageGetByHashErr, DbUser, DbUserGet};
+use catsquad_db::DbPostImageGetByHashErr;
 use catsquad_log::prelude::*;
 use catsquad_shared::{
     FILE_IMAGE_THUMBNAIL_EXTENSION, PostImageBytesGetByHashErr, PostImageBytesGetByHashParams,
@@ -20,9 +20,7 @@ use tokio::fs;
 fn from_post_image_get_by_hash_err(value: DbPostImageGetByHashErr) -> PostImageBytesGetByHashErr {
     match value {
         DbPostImageGetByHashErr::NotFound => PostImageBytesGetByHashErr::FileNotFound,
-        DbPostImageGetByHashErr::Unauthorized => {
-            PostImageBytesGetByHashErr::Unauthorized("unauthorized".to_string())
-        }
+        DbPostImageGetByHashErr::Unauthorized(err) => PostImageBytesGetByHashErr::Unauthorized(err),
         DbPostImageGetByHashErr::Db(_) => PostImageBytesGetByHashErr::InternalServerErr,
         DbPostImageGetByHashErr::InternalServerError => {
             PostImageBytesGetByHashErr::InternalServerErr
@@ -45,7 +43,7 @@ fn status_code(result: &Result<(Vec<u8>, String), PostImageBytesGetByHashErr>) -
 
 pub async fn get_file_image(
     app: AppState,
-    user_username: impl Into<String>,
+    auth_session_token: SessionTokenV2,
     post_id: i64,
     file_hash: i64,
     thumbnail: bool,
@@ -53,7 +51,7 @@ pub async fn get_file_image(
     let inner = async || -> Result<(Vec<u8>, String), PostImageBytesGetByHashErr> {
         let image = app
             .db
-            .post_image_get_by_hash(user_username.into(), post_id, file_hash)
+            .post_image_get_by_hash(auth_session_token.into(), post_id, file_hash)
             .await
             .map_err(from_post_image_get_by_hash_err)?;
 
@@ -89,21 +87,17 @@ pub async fn get_file_image(
 }
 
 pub async fn post_file_bytes_get_by_hash(
-    db_user: Extension<Option<DbUserGet>>,
+    auth_session_token: SessionTokenV2,
     State(app): State<AppState>,
     Path(params): Path<PostImageBytesGetByHashParams>,
 ) -> impl IntoResponse {
     //TODO optimize this nonsense, simplify db query
     //the string manipulation at the end is -100000% performance
 
-    let user_username = db_user
-        .as_ref()
-        .map(|v| v.username.clone())
-        .unwrap_or_default();
     let post_id = params.post_id;
     let file_hash = params.file_hash;
 
-    get_file_image(app, user_username, post_id, file_hash, false).await
+    get_file_image(app, auth_session_token, post_id, file_hash, false).await
 }
 
 #[cfg(test)]

@@ -148,14 +148,6 @@ pub async fn app(state: AppState) -> Router {
             catsquad_shared::LINK_API_USER_UPDATE_PASSWORD_BY_TOKEN,
             post(api::user_update_password_by_token),
         )
-        .route(
-            catsquad_shared::LINK_API_POST_IMAGE_BYTES_GET_BY_HASH,
-            get(api::post_file_bytes_get_by_hash),
-        )
-        .route(
-            catsquad_shared::LINK_API_POST_THUMBNAIL_BYTES_GET_BY_HASH,
-            get(api::post_thumbnail_bytes_get_by_hash),
-        )
         .route_layer(middleware::from_fn_with_state(
             state.clone(),
             auth_optional_middleware,
@@ -301,7 +293,15 @@ pub async fn app(state: AppState) -> Router {
             post(api::role_add).delete(api::role_remove),
         )
         .route(cs::LINK_API_USER_UPDATE_STATE, post(api::user_update_state))
-        .route(cs::LINK_API_COMMENT_SEARCH, get(api::comment_search));
+        .route(cs::LINK_API_COMMENT_SEARCH, get(api::comment_search))
+        .route(
+            cs::LINK_API_POST_IMAGE_BYTES_GET_BY_HASH,
+            get(api::post_file_bytes_get_by_hash),
+        )
+        .route(
+            cs::LINK_API_POST_THUMBNAIL_BYTES_GET_BY_HASH,
+            get(api::post_thumbnail_bytes_get_by_hash),
+        );
 
     let app = Router::new()
         .merge(test_backdoors)

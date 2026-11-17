@@ -19,14 +19,14 @@ mod follow_remove;
 mod invite_add;
 mod invite_get_by_id;
 mod post_add;
-mod post_get_by_id; // this
-mod post_image_bytes_get_by_hash; // this
+mod post_get_by_id; // this - done
+mod post_image_bytes_get_by_hash; // this - done
 mod post_like_add;
 mod post_like_get_by_post;
 mod post_like_remove;
 mod post_remove;
 mod post_search; // this
-mod post_thumbnail_get_by_hash;
+mod post_thumbnail_get_by_hash; // this - done
 mod post_update_description;
 mod post_update_image_add;
 mod post_update_image_ord;
@@ -39,7 +39,7 @@ mod role_remove;
 mod session_add;
 mod session_remove;
 mod user_add;
-mod user_get_by_session_id; // this
+mod user_get_by_session_id;
 mod user_get_by_username; // this
 mod user_pfp_get_bytes; // this
 mod user_remove_by_token; // this

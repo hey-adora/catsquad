@@ -296,37 +296,33 @@ async fn test_comment_add() {
     init_log();
     let db = Db::test_db(0, "test_comment_add").await;
 
-    let invite1 = db.invite_add(0, "hey@heyadora.com", 1).await.unwrap();
-    let user = db
-        .user_add(0, "hey", "hey", invite1.token, 10, 10)
-        .await
-        .unwrap();
+    // create user
+    let user = {
+        let invite1 = db.invite_add(0, "hey@heyadora.com", 1).await.unwrap();
+        let user = db
+            .user_add(0, "hey", "hey", invite1.token, 10, 10)
+            .await
+            .unwrap();
+        user
+    };
 
-    let post1 = db
-        .post_add(0, user.username.clone(), "title", "description", "tags")
-        .await
-        .unwrap();
-    db.post_update_state(0, user.username.clone(), post1.id, PostState::Active)
-        .await
-        .unwrap();
+    // create post
+    let post1 = {
+        let post1 = db
+            .post_add(0, user.username.clone(), "title", "description", "tags")
+            .await
+            .unwrap();
+        db.post_update_state(0, user.username.clone(), post1.id, PostState::Active)
+            .await
+            .unwrap();
+
+        post1
+    };
 
     let comment1 = db
         .comment_add(0, user.username.clone(), post1.id, None, "one")
         .await
         .unwrap();
-
-    let result = db
-        .comment_add(0, user.username.clone(), 0, None, "one1")
-        .await;
-    assert!(matches!(result, Err(DbCommentAddErr::PostNotFound(_))));
-
-    let result = db.comment_add(0, "invalid", post1.id, None, "one2").await;
-    assert!(matches!(result, Err(DbCommentAddErr::UserNotFound(_))));
-
-    let result = db
-        .comment_add(0, user.username.clone(), post1.id, Some(0), "one2")
-        .await;
-    assert!(matches!(result, Err(DbCommentAddErr::ParentNotFound(_))));
 
     db.user_update_pfp(
         0,
@@ -341,54 +337,73 @@ async fn test_comment_add() {
     .await
     .unwrap();
 
-    let comment2 = db
-        .comment_add(
-            1,
-            user.username.clone(),
-            post1.id,
-            Some(comment1.id),
-            "one3",
-        )
-        .await
-        .unwrap();
+    // assert success
+    {
+        let comment2 = db
+            .comment_add(
+                1,
+                user.username.clone(),
+                post1.id,
+                Some(comment1.id),
+                "one3",
+            )
+            .await
+            .unwrap();
 
-    db.file_image_update_proccsed(0, 666).await.unwrap();
+        db.file_image_update_proccsed(0, 666).await.unwrap();
 
-    let comment3 = db
-        .comment_add(
-            2,
-            user.username.clone(),
-            post1.id,
-            Some(comment2.id),
-            "one4",
-        )
-        .await
-        .unwrap();
+        let comment3 = db
+            .comment_add(
+                2,
+                user.username.clone(),
+                post1.id,
+                Some(comment2.id),
+                "one4",
+            )
+            .await
+            .unwrap();
 
-    let comments = db.comment_get_all().await.unwrap();
+        let comments = db.comment_get_all().await.unwrap();
 
-    assert_eq!(comment1.user_pfp_hash, 0);
-    assert_eq!(comment1.user_pfp_proccesed, false);
+        assert_eq!(comment1.user_pfp_hash, 0);
+        assert_eq!(comment1.user_pfp_proccesed, false);
 
-    assert_eq!(comment2.user_pfp_hash, 666);
-    assert_eq!(comment2.user_pfp_proccesed, false);
+        assert_eq!(comment2.user_pfp_hash, 666);
+        assert_eq!(comment2.user_pfp_proccesed, false);
 
-    assert_eq!(comment3.user_pfp_hash, 666);
-    assert_eq!(comment3.user_pfp_proccesed, true);
+        assert_eq!(comment3.user_pfp_hash, 666);
+        assert_eq!(comment3.user_pfp_proccesed, true);
 
-    assert_eq!(comments.len(), 3);
-    assert_eq!(comments[0].parents.len(), 2);
-    assert_eq!(comments[0].user_pfp_hash, 666);
-    assert_eq!(comments[0].user_pfp_proccesed, true);
-    assert_eq!(comments[0].parent_id, Some(comment2.id));
-    assert_eq!(comments[0].parents[0], comment1.id);
-    assert_eq!(comments[0].parents[1], comment2.id);
-    assert_eq!(comments[0].text, "one4");
-    assert_eq!(comments[1].parents.len(), 1);
-    assert_eq!(comments[1].parent_id, Some(comment1.id));
-    assert_eq!(comments[1].parents[0], comment1.id);
-    assert_eq!(comments[1].text, "one3");
-    assert_eq!(comments[2].parents.len(), 0);
-    assert_eq!(comments[2].parent_id, None);
-    assert_eq!(comments[2].text, "one");
+        assert_eq!(comments.len(), 3);
+        assert_eq!(comments[0].parents.len(), 2);
+        assert_eq!(comments[0].user_pfp_hash, 666);
+        assert_eq!(comments[0].user_pfp_proccesed, true);
+        assert_eq!(comments[0].parent_id, Some(comment2.id));
+        assert_eq!(comments[0].parents[0], comment1.id);
+        assert_eq!(comments[0].parents[1], comment2.id);
+        assert_eq!(comments[0].text, "one4");
+        assert_eq!(comments[1].parents.len(), 1);
+        assert_eq!(comments[1].parent_id, Some(comment1.id));
+        assert_eq!(comments[1].parents[0], comment1.id);
+        assert_eq!(comments[1].text, "one3");
+        assert_eq!(comments[2].parents.len(), 0);
+        assert_eq!(comments[2].parent_id, None);
+        assert_eq!(comments[2].text, "one");
+    }
+
+    // assert errors
+    {
+        let result = db
+            .comment_add(0, user.username.clone(), 0, None, "one1")
+            .await;
+        assert!(matches!(result, Err(DbCommentAddErr::PostNotFound(_))));
+
+        let result = db.comment_add(0, "invalid", post1.id, None, "one2").await;
+        assert!(matches!(result, Err(DbCommentAddErr::UserNotFound(_))));
+
+        let result = db
+            .comment_add(0, user.username.clone(), post1.id, Some(0), "one2")
+            .await;
+        assert!(matches!(result, Err(DbCommentAddErr::ParentNotFound(_))));
+    }
 }
