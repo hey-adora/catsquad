@@ -240,9 +240,9 @@ impl Db {
 #[cfg(test)]
 #[tokio::test]
 async fn test_post_like_add() {
-    use catsquad_shared::PostState;
-
     use crate::user_add_with_roles;
+    use catsquad_shared::PostState;
+    use catsquad_shared::SessionTokenKind;
 
     init_log();
     let db = Db::test_db(0, "test_post_like_add").await;
@@ -332,12 +332,12 @@ async fn test_post_like_add() {
         let post1 = db.post_get_by_id(user1_token, post1.id).await.unwrap();
 
         let user1 = db
-            .user_get_by_username("", user1.username.clone())
+            .user_get_by_username(SessionTokenKind::None, user1.username.clone())
             .await
             .unwrap();
 
         let user2 = db
-            .user_get_by_username("", user2.username.clone())
+            .user_get_by_username(SessionTokenKind::None, user2.username.clone())
             .await
             .unwrap();
 
@@ -372,17 +372,17 @@ async fn test_post_like_add() {
         let post2 = db.post_get_by_id(user3_token, post2.id).await.unwrap();
 
         let user1 = db
-            .user_get_by_username("", user1.username.clone())
+            .user_get_by_username(SessionTokenKind::None, user1.username.clone())
             .await
             .unwrap();
 
         let user2 = db
-            .user_get_by_username("", user2.username.clone())
+            .user_get_by_username(SessionTokenKind::None, user2.username.clone())
             .await
             .unwrap();
 
         let user3 = db
-            .user_get_by_username("", user3.username.clone())
+            .user_get_by_username(SessionTokenKind::None, user3.username.clone())
             .await
             .unwrap();
 

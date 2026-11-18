@@ -125,19 +125,31 @@ async fn test_user_update_role_add() {
 
         db.user_update_role_add(0, "hey", "one").await.unwrap();
 
-        let user = db.user_get_by_username("", "hey").await.unwrap();
+        let user = db
+            .user_get_by_username(SessionTokenKind::None, "hey")
+            .await
+            .unwrap();
         assert_eq!(user.roles, vec![1]);
 
         db.user_update_role_add(0, "hey", "two").await.unwrap();
 
-        let user = db.user_get_by_username("", "hey").await.unwrap();
+        let user = db
+            .user_get_by_username(SessionTokenKind::None, "hey")
+            .await
+            .unwrap();
         assert_eq!(user.roles, vec![1, 2]);
         assert_eq!(user.roles_values, vec!["foo", "bar"]);
 
         db.user_update_role_add(0, "hey", "three").await.unwrap();
 
-        let user1 = db.user_get_by_username("", "hey").await.unwrap();
-        let user2 = db.user_get_by_username("", "hey2").await.unwrap();
+        let user1 = db
+            .user_get_by_username(SessionTokenKind::None, "hey")
+            .await
+            .unwrap();
+        let user2 = db
+            .user_get_by_username(SessionTokenKind::None, "hey2")
+            .await
+            .unwrap();
         assert_eq!(user1.roles, vec![1, 2, 3]);
         assert_eq!(user1.roles_values, vec!["foo", "bar", "bar"]);
         assert_eq!(user2.roles, vec![] as Vec<i64>);

@@ -187,6 +187,8 @@ async fn test_email_change_update_finish() {
         .unwrap();
 
     {
+        use catsquad_shared::SessionTokenKind;
+
         use crate::query::email_change_get_by_id::DbEmailChangeGetByIdErr;
 
         let email_change = db
@@ -251,7 +253,7 @@ async fn test_email_change_update_finish() {
             .await;
         // .unwrap();
         let user = db
-            .user_get_by_username("", user.username.clone())
+            .user_get_by_username(SessionTokenKind::None, user.username.clone())
             .await
             .unwrap();
 

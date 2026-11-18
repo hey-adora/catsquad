@@ -169,6 +169,7 @@ impl Db {
 #[tokio::test]
 async fn test_post_update_file_remove() {
     use crate::user_add_with_roles;
+    use catsquad_shared::SessionTokenKind;
 
     init_log();
 
@@ -238,7 +239,7 @@ async fn test_post_update_file_remove() {
 
         let post1 = db.post_get_by_id(user_token, post1.id).await.unwrap();
         let user1 = db
-            .user_get_by_username("", user.username.clone())
+            .user_get_by_username(SessionTokenKind::None, user.username.clone())
             .await
             .unwrap();
         let img1 = db.file_image_get_by_hash(11).await.unwrap();
@@ -291,7 +292,7 @@ async fn test_post_update_file_remove() {
 
         let post1 = db.post_get_by_id(user_token, post1.id).await.unwrap();
         let user1 = db
-            .user_get_by_username("", user.username.clone())
+            .user_get_by_username(SessionTokenKind::None, user.username.clone())
             .await
             .unwrap();
         let img1 = db.file_image_get_by_hash(11).await;
@@ -317,7 +318,7 @@ async fn test_post_update_file_remove() {
 
         let post1 = db.post_get_by_id(user_token, post1.id).await.unwrap();
         let user1 = db
-            .user_get_by_username("", user.username.clone())
+            .user_get_by_username(SessionTokenKind::None, user.username.clone())
             .await
             .unwrap();
         let img1 = db.file_image_get_by_hash(11).await;

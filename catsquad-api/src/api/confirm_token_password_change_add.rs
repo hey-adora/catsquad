@@ -23,6 +23,7 @@ fn status_code(
     match result {
         Ok(_) => StatusCode::OK,
         Err(ConfirmTokenPasswordChangeAddErr::InvalidEmail(_)) => StatusCode::BAD_REQUEST,
+        Err(ConfirmTokenPasswordChangeAddErr::UserIsSuspended) => StatusCode::UNAUTHORIZED,
         Err(ConfirmTokenPasswordChangeAddErr::BadRequest(_)) => StatusCode::BAD_REQUEST,
         Err(ConfirmTokenPasswordChangeAddErr::InternalServer) => StatusCode::INTERNAL_SERVER_ERROR,
     }
@@ -64,14 +65,24 @@ pub async fn confirm_token_password_change_add(
                 .map_err(|err| ConfirmTokenPasswordChangeAddErr::InvalidEmail(err))?;
 
             // TODO maybe combine both quries into one
+            // TODO add test for suspended user
 
-            let result = app.db.user_get_by_email(&email).await;
+            let result = app
+                .db
+                .user_get_by_email(SessionTokenKind::None, &email)
+                .await;
             let username = match result {
                 Ok(v) => v.username,
                 Err(DbUserGetByEmailErr::NotFound) => {
                     return Ok(ConfirmTokenPasswordChangeRes { expires });
                 }
+                Err(DbUserGetByEmailErr::Unauthorized(_)) => {
+                    return Err(ConfirmTokenPasswordChangeAddErr::UserIsSuspended);
+                }
                 Err(DbUserGetByEmailErr::Db(_)) => {
+                    return Err(ConfirmTokenPasswordChangeAddErr::InternalServer);
+                }
+                Err(DbUserGetByEmailErr::InternalServerErr) => {
                     return Err(ConfirmTokenPasswordChangeAddErr::InternalServer);
                 }
             };

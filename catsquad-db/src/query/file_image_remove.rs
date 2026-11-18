@@ -201,6 +201,7 @@ async fn test_calc_user_used_storage() {
 #[tokio::test]
 async fn test_file_image_remove() {
     use crate::user_add_with_roles;
+    use catsquad_shared::SessionTokenKind;
 
     init_log();
 
@@ -264,7 +265,7 @@ async fn test_file_image_remove() {
         let file_img1 = db.file_image_get_by_hash(12).await;
 
         let user1 = db
-            .user_get_by_username("", user.username.clone())
+            .user_get_by_username(SessionTokenKind::None, user.username.clone())
             .await
             .unwrap();
 

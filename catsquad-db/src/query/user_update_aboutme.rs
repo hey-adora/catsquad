@@ -55,6 +55,8 @@ impl Db {
 #[cfg(test)]
 #[tokio::test]
 async fn test_user_update_aboutme() {
+    use catsquad_shared::SessionTokenKind;
+
     init_log();
 
     let db = Db::test_db(0, "test_user_update_aboutme").await;
@@ -70,7 +72,10 @@ async fn test_user_update_aboutme() {
         .await
         .unwrap();
 
-    let user = db.user_get_by_username("", "hey").await.unwrap();
+    let user = db
+        .user_get_by_username(SessionTokenKind::None, "hey")
+        .await
+        .unwrap();
 
     assert_eq!(user.aboutme, "one two three");
 }

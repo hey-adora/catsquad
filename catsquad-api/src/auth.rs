@@ -204,7 +204,7 @@ pub async fn check_auth(app: &AppState, headers: &HeaderMap) -> Result<(Uuid, Db
     trace!("CHECKING AUTH SESSION");
     let user = app
         .db
-        .user_get_by_session("", token)
+        .user_get_by_session(SessionTokenKind::None, token)
         .await
         .map_err(|err| match err {
             DbUserGetBySessionErr::NotFound => AuthErr::Unauthorized(ERR_MSG_SESSION.to_string()),

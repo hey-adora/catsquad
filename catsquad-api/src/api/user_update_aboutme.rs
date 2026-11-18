@@ -101,7 +101,7 @@ async fn test_api_user_update_aboutme() {
     let user = server
         .state
         .db
-        .user_get_by_email("hey@heyadora.com")
+        .user_get_by_email(SessionTokenKind::None, "hey@heyadora.com")
         .await
         .unwrap();
 
@@ -112,7 +112,7 @@ async fn test_api_user_update_aboutme() {
     let user = server
         .state
         .db
-        .user_get_by_email("hey@heyadora.com")
+        .user_get_by_email(SessionTokenKind::None, "hey@heyadora.com")
         .await
         .unwrap();
 

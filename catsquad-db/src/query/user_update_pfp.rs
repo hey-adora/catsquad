@@ -151,6 +151,8 @@ async fn test_user_update_pfp() {
     // try setting same pfp twice
     {
         for _ in 0..2 {
+            use catsquad_shared::SessionTokenKind;
+
             let _result = db
                 .user_update_pfp(
                     0,
@@ -169,7 +171,7 @@ async fn test_user_update_pfp() {
             assert_eq!(image.used_count, 1);
 
             let user1 = db
-                .user_get_by_username("", user1.username.clone())
+                .user_get_by_username(SessionTokenKind::None, user1.username.clone())
                 .await
                 .unwrap();
 

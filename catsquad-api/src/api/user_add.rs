@@ -265,7 +265,12 @@ mod test_utils {
 
             // let session_key = res.get_auth_token().unwrap();
             // let res = res.into_res().await;
-            let user = self.state.db.user_get_by_email(email).await.unwrap();
+            let user = self
+                .state
+                .db
+                .user_get_by_email(SessionTokenKind::None, email)
+                .await
+                .unwrap();
             (user, session_token)
         }
     }

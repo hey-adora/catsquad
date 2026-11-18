@@ -235,6 +235,7 @@ impl Db {
 #[tokio::test]
 async fn test_post_update_file_add() {
     use catsquad_shared::PostState;
+    use catsquad_shared::SessionTokenKind;
 
     use crate::user_add_with_roles;
     init_log();
@@ -296,7 +297,7 @@ async fn test_post_update_file_add() {
             .unwrap();
         let post1 = db.post_get_by_id(user1_token, post1.id).await.unwrap();
         let user1 = db
-            .user_get_by_username("", user1.username.clone())
+            .user_get_by_username(SessionTokenKind::None, user1.username.clone())
             .await
             .unwrap();
 
@@ -354,7 +355,7 @@ async fn test_post_update_file_add() {
             .unwrap();
         let post1 = db.post_get_by_id(user1_token, post1.id).await.unwrap();
         let user1 = db
-            .user_get_by_username("", user1.username.clone())
+            .user_get_by_username(SessionTokenKind::None, user1.username.clone())
             .await
             .unwrap();
 
@@ -388,6 +389,7 @@ async fn test_post_update_file_add() {
     // second post
     {
         // 200 gets ignored, original file size is used
+
         let post_img2 = db
             .post_update_image_add(0, user1.username.clone(), post2.id, 200, 20, "png", 10, 8)
             .await
@@ -395,7 +397,7 @@ async fn test_post_update_file_add() {
         let post1 = db.post_get_by_id(user1_token, post1.id).await.unwrap();
         let post2 = db.post_get_by_id(user1_token, post2.id).await.unwrap();
         let user1 = db
-            .user_get_by_username("", user1.username.clone())
+            .user_get_by_username(SessionTokenKind::None, user1.username.clone())
             .await
             .unwrap();
 

@@ -1,5 +1,5 @@
 use crate::{
-    Db, DbAuthErr, DbComment, XTimestamp, ,
+    Db, DbAuthErr, DbComment, XTimestamp,
     query::user_get_by_session_and_roles::{
         DbUserGetBySessionAndRolesErr, DbUserGetBySessionAndRolesSimpleErr, auth_perms,
         auth_username,

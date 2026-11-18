@@ -209,9 +209,18 @@ async fn test_user_update_state() {
             )
             .await;
 
-        let user1 = db.user_get_by_username("", "hey1").await.unwrap();
-        let user2 = db.user_get_by_username("", "hey2").await.unwrap();
-        let user3 = db.user_get_by_username("", "hey3").await.unwrap();
+        let user1 = db
+            .user_get_by_username(SessionTokenKind::Root, "hey1")
+            .await
+            .unwrap();
+        let user2 = db
+            .user_get_by_username(SessionTokenKind::Root, "hey2")
+            .await
+            .unwrap();
+        let user3 = db
+            .user_get_by_username(SessionTokenKind::Root, "hey3")
+            .await
+            .unwrap();
         let sessions = db.session_get_all().await.unwrap();
 
         assert!(matches!(result, Ok(_)));

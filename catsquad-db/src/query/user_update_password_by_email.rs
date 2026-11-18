@@ -51,6 +51,8 @@ impl Db {
 #[cfg(test)]
 #[tokio::test]
 async fn test_user_update_password_by_email() {
+    use catsquad_shared::SessionTokenKind;
+
     init_log();
 
     let db = Db::test_db(0, "test_user_update_password_by_email").await;
@@ -64,6 +66,9 @@ async fn test_user_update_password_by_email() {
     db.user_update_password_by_email(0, "hey@hey.com", "hey2")
         .await
         .unwrap();
-    let user = db.user_get_by_email("hey@hey.com").await.unwrap();
+    let user = db
+        .user_get_by_email(SessionTokenKind::None, "hey@hey.com")
+        .await
+        .unwrap();
     assert_eq!(user.password, "hey2");
 }

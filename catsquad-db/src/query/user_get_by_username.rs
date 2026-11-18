@@ -1,3 +1,5 @@
+use catsquad_shared::SessionTokenKind;
+
 use crate::{Db, XTimestamp, query::user_get_builder::DbUserGetBuilderErr};
 
 #[derive(Debug, thiserror::Error)]
@@ -7,6 +9,12 @@ pub enum DbUserGetByUsernameErr {
 
     #[error("user not found")]
     NotFound,
+
+    #[error("unauthorized")]
+    Unauthorized(String),
+
+    #[error("internal server error")]
+    InternalServerErr,
 }
 
 #[derive(Debug, Clone, PartialEq, sqlx::FromRow)]
@@ -63,6 +71,8 @@ pub struct DbUserGet {
 
 fn from_user_get_builder(value: DbUserGetBuilderErr) -> DbUserGetByUsernameErr {
     match value {
+        DbUserGetBuilderErr::Unauthorized(err) => DbUserGetByUsernameErr::Unauthorized(err),
+        DbUserGetBuilderErr::InternalServerErr => DbUserGetByUsernameErr::InternalServerErr,
         DbUserGetBuilderErr::NotFound => DbUserGetByUsernameErr::NotFound,
         DbUserGetBuilderErr::Db(err) => DbUserGetByUsernameErr::Db(err),
         DbUserGetBuilderErr::InvalidInput => unreachable!("invalid quary input"),
@@ -72,11 +82,16 @@ fn from_user_get_builder(value: DbUserGetBuilderErr) -> DbUserGetByUsernameErr {
 impl Db {
     pub async fn user_get_by_username(
         &self,
-        user_username: impl Into<String>,
+        auth_session_token: SessionTokenKind,
         username: impl Into<String>,
     ) -> Result<DbUserGet, DbUserGetByUsernameErr> {
-        self.user_get_builder(user_username, 0_u128.to_be_bytes(), username, String::new())
-            .await
-            .map_err(from_user_get_builder)
+        self.user_get_builder(
+            auth_session_token,
+            0_u128.to_be_bytes(),
+            username,
+            String::new(),
+        )
+        .await
+        .map_err(from_user_get_builder)
     }
 }

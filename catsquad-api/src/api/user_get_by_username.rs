@@ -25,7 +25,9 @@ pub fn from_db_user_get(value: DbUserGet) -> UserGetRes {
 fn from_db_user_get_by_username(value: DbUserGetByUsernameErr) -> UserGetByUsernameErr {
     match value {
         DbUserGetByUsernameErr::NotFound => UserGetByUsernameErr::NotFound,
+        DbUserGetByUsernameErr::Unauthorized(err) => UserGetByUsernameErr::Unauthorized(err),
         DbUserGetByUsernameErr::Db(_) => UserGetByUsernameErr::InternalServer,
+        DbUserGetByUsernameErr::InternalServerErr => UserGetByUsernameErr::InternalServer,
     }
 }
 
@@ -33,25 +35,22 @@ fn status_code(result: &Result<UserGetRes, UserGetByUsernameErr>) -> StatusCode 
     match result {
         Ok(_) => StatusCode::OK,
         Err(UserGetByUsernameErr::NotFound) => StatusCode::NOT_FOUND,
+        Err(UserGetByUsernameErr::Unauthorized(_)) => StatusCode::INTERNAL_SERVER_ERROR,
         Err(UserGetByUsernameErr::InternalServer) => StatusCode::INTERNAL_SERVER_ERROR,
     }
 }
 
 pub async fn user_get_by_username(
-    db_user: Extension<Option<DbUserGet>>,
+    auth_session_token: SessionTokenV2,
     State(app): State<AppState>,
     Path(params): Path<UserGetByUsernameParams>,
 ) -> impl IntoResponse {
-    let user_username = db_user
-        .as_ref()
-        .map(|v| v.username.clone())
-        .unwrap_or_default();
     let username = params.username;
 
     let inner = async || -> Result<UserGetRes, UserGetByUsernameErr> {
         let user = app
             .db
-            .user_get_by_username(user_username, username)
+            .user_get_by_username(auth_session_token.into(), username)
             .await
             .map_err(from_db_user_get_by_username)?;
 

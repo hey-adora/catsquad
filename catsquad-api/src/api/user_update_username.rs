@@ -2,7 +2,8 @@ use axum::{Extension, Form, Json, extract::State, http::StatusCode, response::In
 use catsquad_db::{DbUser, DbUserGet, DbUserUpdateUsernameErr};
 use catsquad_log::prelude::*;
 use catsquad_shared::{
-    UserUpdateUsernameErr, UserUpdateUsernameReq, UserUpdateUsernameRes, validate_username,
+    SessionTokenKind, UserUpdateUsernameErr, UserUpdateUsernameReq, UserUpdateUsernameRes,
+    validate_username,
 };
 
 use crate::{auth::verify_password, state::AppState};
@@ -153,7 +154,7 @@ async fn test_api_user_update_username() {
     let user = server
         .state
         .db
-        .user_get_by_email("hey@heyadora.com")
+        .user_get_by_email(SessionTokenKind::None, "hey@heyadora.com")
         .await
         .unwrap();
     assert_eq!(user.username, "hey3");

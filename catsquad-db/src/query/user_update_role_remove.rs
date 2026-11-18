@@ -63,6 +63,7 @@ impl Db {
 #[cfg(test)]
 #[tokio::test]
 async fn test_user_update_role_remove() {
+    use catsquad_shared::SessionTokenKind;
     init_log();
 
     let db = Db::test_db(0, "test_user_update_role_remove").await;
@@ -83,8 +84,6 @@ async fn test_user_update_role_remove() {
 
     // assert success
     {
-        use catsquad_shared::SessionTokenKind;
-
         let _role_one = db
             .role_add(0, SessionTokenKind::Root, "one", vec!["foo".to_string()])
             .await
@@ -104,16 +103,28 @@ async fn test_user_update_role_remove() {
 
         db.user_update_role_add(0, "hey2", "two").await.unwrap();
 
-        let user = db.user_get_by_username("", "hey").await.unwrap();
-        let user2 = db.user_get_by_username("", "hey2").await.unwrap();
+        let user = db
+            .user_get_by_username(SessionTokenKind::None, "hey")
+            .await
+            .unwrap();
+        let user2 = db
+            .user_get_by_username(SessionTokenKind::None, "hey2")
+            .await
+            .unwrap();
 
         assert_eq!(user2.roles, vec![2]);
         assert_eq!(user.roles, vec![1, 2, 3]);
 
         db.user_update_role_remove(0, "hey", "two").await.unwrap();
 
-        let user = db.user_get_by_username("", "hey").await.unwrap();
-        let user2 = db.user_get_by_username("", "hey2").await.unwrap();
+        let user = db
+            .user_get_by_username(SessionTokenKind::None, "hey")
+            .await
+            .unwrap();
+        let user2 = db
+            .user_get_by_username(SessionTokenKind::None, "hey2")
+            .await
+            .unwrap();
 
         assert_eq!(user.roles, vec![1, 3]);
         assert_eq!(user2.roles, vec![2]);
@@ -127,8 +138,14 @@ async fn test_user_update_role_remove() {
             Err(DbUserUpdateRoleRemoveErr::RoleNotFound { .. })
         ));
 
-        let user = db.user_get_by_username("", "hey").await.unwrap();
-        let user2 = db.user_get_by_username("", "hey2").await.unwrap();
+        let user = db
+            .user_get_by_username(SessionTokenKind::None, "hey")
+            .await
+            .unwrap();
+        let user2 = db
+            .user_get_by_username(SessionTokenKind::None, "hey2")
+            .await
+            .unwrap();
 
         assert_eq!(user.roles, vec![1, 3]);
         assert_eq!(user2.roles, vec![2]);

@@ -35,4 +35,7 @@ pub enum UserGetByUsernameErr {
     #[default]
     #[error("internal server err")]
     InternalServer,
+
+    #[error("unauthorized")]
+    Unauthorized(String),
 }

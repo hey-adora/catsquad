@@ -265,6 +265,8 @@ async fn test_post_like_remove() {
 
     // assert success
     {
+        use catsquad_shared::SessionTokenKind;
+
         db.post_like_add(0, user2.username.clone(), post1.id)
             .await
             .unwrap();
@@ -272,7 +274,7 @@ async fn test_post_like_remove() {
         let post1 = db.post_get_by_id(user1_token, post1.id).await.unwrap();
         let post2 = db.post_get_by_id(user1_token, post2.id).await.unwrap();
         let user1 = db
-            .user_get_by_username("", user1.username.clone())
+            .user_get_by_username(SessionTokenKind::None, user1.username.clone())
             .await
             .unwrap();
 
@@ -287,7 +289,7 @@ async fn test_post_like_remove() {
         let post1 = db.post_get_by_id(user1_token, post1.id).await.unwrap();
         let post2 = db.post_get_by_id(user1_token, post2.id).await.unwrap();
         let user1 = db
-            .user_get_by_username("", user1.username.clone())
+            .user_get_by_username(SessionTokenKind::None, user1.username.clone())
             .await
             .unwrap();
 

@@ -135,10 +135,6 @@ pub async fn app(state: AppState) -> Router {
         ));
 
     let router_optionanl_auth = Router::new()
-        .route(
-            catsquad_shared::LINK_API_USER_GET_BY_USERNAME,
-            get(api::user_get_by_username),
-        )
         .route(catsquad_shared::LINK_API_POST_SEARCH, get(api::post_search))
         .route(
             catsquad_shared::LINK_API_CONFIRM_TOKEN_PASSWORD_CHANGE_ADD,
@@ -301,6 +297,10 @@ pub async fn app(state: AppState) -> Router {
         .route(
             cs::LINK_API_POST_THUMBNAIL_BYTES_GET_BY_HASH,
             get(api::post_thumbnail_bytes_get_by_hash),
+        )
+        .route(
+            cs::LINK_API_USER_GET_BY_USERNAME,
+            get(api::user_get_by_username),
         );
 
     let app = Router::new()

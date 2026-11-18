@@ -54,6 +54,8 @@ impl Db {
 #[cfg(test)]
 #[tokio::test]
 async fn test_user_update_password_by_username() {
+    use catsquad_shared::SessionTokenKind;
+
     init_log();
 
     let db = Db::test_db(0, "test_user_update_password_by_id").await;
@@ -67,6 +69,9 @@ async fn test_user_update_password_by_username() {
     db.user_update_password_by_username(0, user.username.clone(), "hey2")
         .await
         .unwrap();
-    let user = db.user_get_by_username("", "hey").await.unwrap();
+    let user = db
+        .user_get_by_username(SessionTokenKind::None, "hey")
+        .await
+        .unwrap();
     assert_eq!(user.password, "hey2");
 }

@@ -61,6 +61,8 @@ impl Db {
 #[cfg(test)]
 #[tokio::test]
 async fn test_user_update_storage() {
+    use catsquad_shared::SessionTokenKind;
+
     init_log();
 
     let db = Db::test_db(0, "test_user_update_storage").await;
@@ -77,7 +79,10 @@ async fn test_user_update_storage() {
         .await
         .unwrap();
 
-    let user = db.user_get_by_username("", "hey").await.unwrap();
+    let user = db
+        .user_get_by_username(SessionTokenKind::None, "hey")
+        .await
+        .unwrap();
 
     assert_eq!(user.max_storage_bytes, 10);
     assert_eq!(user.max_storage_per_image_bytes, 5);

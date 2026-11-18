@@ -18,6 +18,9 @@ pub enum ConfirmTokenPasswordChangeAddErr {
     #[error("email is invalid")]
     InvalidEmail(String),
 
+    #[error("user is suspended")]
+    UserIsSuspended,
+
     #[error("bad request {0}")]
     BadRequest(String),
 

@@ -25,6 +25,8 @@ use catsquad_shared::{SensitiveUserRes, SessionAddErr, SessionAddReq};
 
 fn from_db_get_by_email_err(value: DbUserGetByEmailErr) -> SessionAddErr {
     match value {
+        DbUserGetByEmailErr::InternalServerErr => SessionAddErr::InternalServer,
+        DbUserGetByEmailErr::Unauthorized(err) => SessionAddErr::UserSuspended,
         DbUserGetByEmailErr::NotFound => SessionAddErr::InvalidCredentials,
         DbUserGetByEmailErr::Db(_) => SessionAddErr::InternalServer,
     }
@@ -65,7 +67,7 @@ pub async fn session_add(
 
         let user = app
             .db
-            .user_get_by_email(&email)
+            .user_get_by_email(SessionTokenKind::None, &email)
             .await
             .map_err(from_db_get_by_email_err)?;
 

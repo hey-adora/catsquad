@@ -55,6 +55,8 @@ impl Db {
 #[cfg(test)]
 #[tokio::test]
 async fn test_user_username_change() {
+    use catsquad_shared::SessionTokenKind;
+
     init_log();
 
     let db = Db::test_db(0, "test_user_username_change").await;
@@ -130,12 +132,18 @@ async fn test_user_username_change() {
     db.user_update_username(0, user1.username.clone(), "hey3")
         .await
         .unwrap();
-    let user1 = db.user_get_by_email("hey@heyadora.com").await.unwrap();
+    let user1 = db
+        .user_get_by_email(SessionTokenKind::None, "hey@heyadora.com")
+        .await
+        .unwrap();
     assert_eq!(user1.username, "hey3");
 
     db.user_update_username(0, user2.username.clone(), "hey4")
         .await
         .unwrap();
-    let user2 = db.user_get_by_email("hey2@heyadora.com").await.unwrap();
+    let user2 = db
+        .user_get_by_email(SessionTokenKind::None, "hey2@heyadora.com")
+        .await
+        .unwrap();
     assert_eq!(user2.username, "hey4");
 }

@@ -136,11 +136,16 @@ async fn test_user_update_password_by_token() {
 
     // assert success
     {
+        use catsquad_shared::SessionTokenKind;
+
         let result = db
             .user_update_password_by_token(0, token.id, "hey2")
             .await
             .unwrap();
-        let user = db.user_get_by_email(user1.email.clone()).await.unwrap();
+        let user = db
+            .user_get_by_email(SessionTokenKind::None, user1.email.clone())
+            .await
+            .unwrap();
         assert_eq!(result, user.username);
         assert_eq!(user.password, "hey2");
     }

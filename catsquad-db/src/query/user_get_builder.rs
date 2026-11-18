@@ -1,6 +1,11 @@
-use crate::{Db, DbUserGet, XUuid, query::role_get_by_role_tx::DbRoleGetTxErr};
+use crate::{
+    Db, DbUserGet, DbUserGetBySessionAndRolesErr, DbUserGetBySessionAndRolesSimpleErr, XUuid,
+    auth_perms, auth_username, query::role_get_by_role_tx::DbRoleGetTxErr,
+};
 use catsquad_log::prelude::*;
-use catsquad_shared::{SessionTokenKind, Uuid};
+use catsquad_shared::{
+    ROLE_VALUE_PERMISSION_SEE_HIDDEN, SessionTokenKind, UserState, Uuid, contains_perms_or_is_root,
+};
 use sqlx::AssertSqlSafe;
 
 #[derive(Debug, thiserror::Error)]
@@ -13,6 +18,23 @@ pub enum DbUserGetBuilderErr {
 
     #[error("must provide only username or only session_token")]
     InvalidInput,
+
+    #[error("unauthorized")]
+    Unauthorized(String),
+
+    #[error("internal server error")]
+    InternalServerErr,
+}
+
+fn from_user_get_by_session_and_roles_err(
+    value: DbUserGetBySessionAndRolesErr,
+) -> DbUserGetBuilderErr {
+    match DbUserGetBySessionAndRolesSimpleErr::from(value) {
+        DbUserGetBySessionAndRolesSimpleErr::Unauthorized(err) => {
+            DbUserGetBuilderErr::Unauthorized(err)
+        }
+        DbUserGetBySessionAndRolesSimpleErr::Db(err) => DbUserGetBuilderErr::Db(err),
+    }
 }
 
 impl Db {
@@ -25,7 +47,7 @@ impl Db {
         email: impl Into<String>,
     ) -> Result<DbUserGet, DbUserGetBuilderErr> {
         let pool = &self.db;
-        let user_username = user_username.into();
+        // let user_username = user_username.into();
         let username = username.into();
         let email = email.into();
         let session_token_is_empty = u128::from_be_bytes(session_token) == 0;
@@ -34,6 +56,21 @@ impl Db {
             .begin()
             .await
             .inspect_err(|err| error!("follow_add {err}"))?;
+
+        // check auth
+        let user = self
+            .auth_optional(&mut *tx, auth_session_token, &[] as &[String])
+            .await
+            .map_err(from_user_get_by_session_and_roles_err)?;
+
+        let user_permissions = auth_perms(&user);
+        let user_username = auth_username(&user);
+
+        let can_see_hidden = contains_perms_or_is_root(
+            auth_session_token,
+            &[ROLE_VALUE_PERMISSION_SEE_HIDDEN],
+            &user_permissions,
+        );
 
         // get user
         let mut user = {
@@ -136,7 +173,7 @@ impl Db {
                 }
             }
             if !user_username.is_empty() {
-                builder = builder.bind(user_username);
+                builder = builder.bind(&user_username);
             }
             let result = builder.fetch_one(&mut *tx).await;
 
@@ -152,6 +189,26 @@ impl Db {
                     return Err(DbUserGetBuilderErr::Db(err));
                 }
             };
+
+            // auth
+            {
+                let target_user_state = UserState::try_from(user.state.clone())
+                    .inspect_err(|err| error!("{err}"))
+                    .map_err(|_err| DbUserGetBuilderErr::InternalServerErr)?;
+
+                let target_is_me = user_username == user.username;
+                let target_user_is_active = target_user_state.is_active();
+
+                let allow_to_get_user = target_user_is_active || (target_is_me || can_see_hidden);
+
+                if !allow_to_get_user {
+                    return Err(DbUserGetBuilderErr::Unauthorized(
+                        "unauthorized".to_string(),
+                    ));
+                }
+
+                // let post_is_mine = user_username == post_user_username;
+            }
 
             user
         };
@@ -179,39 +236,68 @@ impl Db {
 #[cfg(test)]
 #[tokio::test]
 async fn test_user_get_builder() {
+    use crate::user_add_with_roles;
+
     init_log();
 
     let db = Db::test_db(0, "test_user_get_builder").await;
-    let invite = db.invite_add(0, "hey@hey.com", 10).await.unwrap();
-    let invite2 = db.invite_add(0, "hey2@hey.com", 10).await.unwrap();
+    // let invite = db.invite_add(0, "hey@hey.com", 10).await.unwrap();
+    // let invite2 = db.invite_add(0, "hey2@hey.com", 10).await.unwrap();
 
-    db.user_add(0, "hey", "hey", invite.token.clone(), 10, 10)
-        .await
-        .unwrap();
-    db.user_add(0, "hey2", "hey", invite2.token.clone(), 10, 10)
-        .await
-        .unwrap();
+    // db.user_add(0, "hey", "hey", invite.token.clone(), 10, 10)
+    //     .await
+    //     .unwrap();
+    // db.user_add(0, "hey2", "hey", invite2.token.clone(), 10, 10)
+    //     .await
+    //     .unwrap();
+
+    let (user, mut user_token) = user_add_with_roles(
+        &db,
+        0,
+        10,
+        10,
+        "hey",
+        "pss",
+        "hey@hey.com",
+        Vec::<String>::new(),
+    )
+    .await;
+
+    let (user2, user2_token) = user_add_with_roles(
+        &db,
+        0,
+        10,
+        10,
+        "hey2",
+        "pss",
+        "hey2@hey.com",
+        Vec::<String>::new(),
+    )
+    .await;
 
     // assert success
     {
-        let user = db.user_get_by_username("", "hey2").await.unwrap();
+        let user = db
+            .user_get_by_username(SessionTokenKind::None, "hey2")
+            .await
+            .unwrap();
         assert_eq!(user.username, "hey2");
     }
 
     // assert errors
     {
         let user = db
-            .user_get_builder("", 0_u128.to_be_bytes(), "hey3", "")
+            .user_get_builder(SessionTokenKind::None, 0_u128.to_be_bytes(), "hey3", "")
             .await;
         assert!(matches!(user, Err(DbUserGetBuilderErr::NotFound)));
 
         let user = db
-            .user_get_builder("", 1_u128.to_be_bytes(), "hey3", "")
+            .user_get_builder(SessionTokenKind::None, 1_u128.to_be_bytes(), "hey3", "")
             .await;
         assert!(matches!(user, Err(DbUserGetBuilderErr::InvalidInput)));
 
         let user = db
-            .user_get_builder("", 1_u128.to_be_bytes(), "", "hey3")
+            .user_get_builder(SessionTokenKind::None, 1_u128.to_be_bytes(), "", "hey3")
             .await;
         assert!(matches!(user, Err(DbUserGetBuilderErr::InvalidInput)));
     }
@@ -219,13 +305,13 @@ async fn test_user_get_builder() {
     // assert followed field
     {
         let user = db
-            .user_get_builder("", 0_u128.to_be_bytes(), "hey2", "")
+            .user_get_builder(SessionTokenKind::None, 0_u128.to_be_bytes(), "hey2", "")
             .await
             .unwrap();
         assert_eq!(user.followed, false);
 
         let user = db
-            .user_get_builder("hey", 0_u128.to_be_bytes(), "hey2", "")
+            .user_get_builder(user_token, 0_u128.to_be_bytes(), "hey2", "")
             .await
             .unwrap();
         assert_eq!(user.followed, false);
@@ -233,19 +319,19 @@ async fn test_user_get_builder() {
         db.follow_add(0, "hey", "hey2").await.unwrap();
 
         let user = db
-            .user_get_builder("", 0_u128.to_be_bytes(), "hey2", "")
+            .user_get_builder(SessionTokenKind::None, 0_u128.to_be_bytes(), "hey2", "")
             .await
             .unwrap();
         assert_eq!(user.followed, false);
 
         let user = db
-            .user_get_builder("hey", 0_u128.to_be_bytes(), "hey2", "")
+            .user_get_builder(user_token, 0_u128.to_be_bytes(), "hey2", "")
             .await
             .unwrap();
         assert_eq!(user.followed, true);
 
         let user = db
-            .user_get_builder("hey2", 0_u128.to_be_bytes(), "hey2", "")
+            .user_get_builder(user2_token, 0_u128.to_be_bytes(), "hey2", "")
             .await
             .unwrap();
         assert_eq!(user.followed, false);
@@ -256,7 +342,7 @@ async fn test_user_get_builder() {
         use catsquad_shared::SessionTokenKind;
 
         let user = db
-            .user_get_builder("", 0_u128.to_be_bytes(), "hey2", "")
+            .user_get_builder(SessionTokenKind::None, 0_u128.to_be_bytes(), "hey2", "")
             .await
             .unwrap();
         assert_eq!(user.roles_values, vec![] as Vec<String>);
@@ -268,7 +354,7 @@ async fn test_user_get_builder() {
         db.user_update_role_add(0, "hey2", "one").await.unwrap();
 
         let user = db
-            .user_get_builder("", 0_u128.to_be_bytes(), "hey2", "")
+            .user_get_builder(SessionTokenKind::None, 0_u128.to_be_bytes(), "hey2", "")
             .await
             .unwrap();
         assert_eq!(user.roles_values, vec!["foo".to_string()]);
@@ -280,10 +366,11 @@ async fn test_user_get_builder() {
         db.user_update_role_add(0, "hey2", "two").await.unwrap();
 
         let user = db
-            .user_get_builder("", 0_u128.to_be_bytes(), "hey2", "")
+            .user_get_builder(SessionTokenKind::None, 0_u128.to_be_bytes(), "hey2", "")
             .await
             .unwrap();
-        assert_eq!(user.roles.len(), 2);
+        assert_eq!(user.roles.len(), 3);
+        assert_eq!(user.roles_values.len(), 2);
         assert!(user.roles_values.contains(&"foo".to_string()));
         assert!(user.roles_values.contains(&"bar".to_string()));
     }
@@ -293,7 +380,7 @@ async fn test_user_get_builder() {
         let session_token = db.session_add(0, "hey2@hey.com").await.unwrap();
 
         let user = db
-            .user_get_builder("", session_token.token, "", "")
+            .user_get_builder(SessionTokenKind::None, session_token.token, "", "")
             .await
             .unwrap();
 
@@ -303,7 +390,12 @@ async fn test_user_get_builder() {
     // assert get by email
     {
         let user = db
-            .user_get_builder("", 0_u128.to_be_bytes(), "", "hey2@hey.com")
+            .user_get_builder(
+                SessionTokenKind::None,
+                0_u128.to_be_bytes(),
+                "",
+                "hey2@hey.com",
+            )
             .await
             .unwrap();
 
@@ -313,7 +405,7 @@ async fn test_user_get_builder() {
     // assert pfp field
     {
         let user = db
-            .user_get_builder("", 0_u128.to_be_bytes(), "hey2", "")
+            .user_get_builder(SessionTokenKind::None, 0_u128.to_be_bytes(), "hey2", "")
             .await
             .unwrap();
 
@@ -326,7 +418,7 @@ async fn test_user_get_builder() {
             .unwrap();
 
         let user = db
-            .user_get_builder("", 0_u128.to_be_bytes(), "hey2", "")
+            .user_get_builder(SessionTokenKind::None, 0_u128.to_be_bytes(), "hey2", "")
             .await
             .unwrap();
         assert_eq!(user.email, "hey2@hey.com");
@@ -336,7 +428,7 @@ async fn test_user_get_builder() {
         db.file_image_update_proccsed(0, 666).await.unwrap();
 
         let user = db
-            .user_get_builder("", 0_u128.to_be_bytes(), "hey2", "")
+            .user_get_builder(SessionTokenKind::None, 0_u128.to_be_bytes(), "hey2", "")
             .await
             .unwrap();
         assert_eq!(user.email, "hey2@hey.com");
