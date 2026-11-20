@@ -40,9 +40,9 @@ mod session_add;
 mod session_remove;
 mod user_add;
 mod user_get_by_session_id;
-mod user_get_by_username; // this
-mod user_pfp_get_bytes; // this
-mod user_remove_by_token; // this
+mod user_get_by_username; // this - done
+mod user_pfp_get_bytes; // this - done
+mod user_remove_by_token;
 mod user_remove_by_usernames;
 mod user_search;
 mod user_update_aboutme;

@@ -6,8 +6,9 @@ use catsquad_db::{
 };
 use catsquad_shared::{
     ConfirmTokenPasswordChangeAddErr, ConfirmTokenPasswordChangeAddReq,
-    ConfirmTokenPasswordChangeRes, Uuid, link_absolute_login_password_reset_confirm,
-    link_absolute_settings_password_change_confirm, uuid_to_str, validate_email,
+    ConfirmTokenPasswordChangeRes, SessionTokenKind, Uuid,
+    link_absolute_login_password_reset_confirm, link_absolute_settings_password_change_confirm,
+    uuid_to_str, validate_email,
 };
 use url::Url;
 

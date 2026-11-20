@@ -2,7 +2,8 @@ use crate::{state::AppState, utils::rng_str};
 use axum::{Extension, Form, Json, extract::State, http::StatusCode, response::IntoResponse};
 use catsquad_db::{DbUser, DbUserGet, DbUserUpdateSupportErr};
 use catsquad_shared::{
-    MAX_SUPPORT_LENGTH, UserUpdateSupportErr, UserUpdateSupportReq, validate_user_support,
+    MAX_SUPPORT_LENGTH, SessionTokenKind, UserUpdateSupportErr, UserUpdateSupportReq,
+    validate_user_support,
 };
 
 fn from_db_user_update_support_err(value: DbUserUpdateSupportErr) -> UserUpdateSupportErr {

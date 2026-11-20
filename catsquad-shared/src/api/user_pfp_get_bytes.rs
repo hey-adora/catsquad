@@ -20,6 +20,9 @@ pub enum UserPfpGetBytesErr {
     #[error("user not found")]
     UserNotFound,
 
+    #[error("unauthorized {0}")]
+    Unauthorized(String),
+
     #[default]
     #[error("internal server err")]
     InternalServerErr,

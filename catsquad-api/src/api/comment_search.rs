@@ -68,8 +68,9 @@ pub async fn comment_search(
 
 #[cfg(test)]
 mod test_utils {
-    use crate::TestServer;
-    use catsquad_shared::{self as cs, Order, TimeRange};
+    use crate::{TestServer, auth::create_auth_cookie_str};
+    use axum::http::header;
+    use catsquad_shared::{self as cs, Order, TimeRange, Uuid, uuid_to_str};
 
     impl TestServer {
         pub async fn comment_search(
@@ -81,9 +82,14 @@ mod test_utils {
             range: TimeRange,
             order: Order,
             flatten: bool,
+            session_token: Uuid,
         ) -> Result<Vec<cs::CommentRes>, cs::CommentSearchErr> {
             self.client
                 .comment_search(post_id, comment_id, time, limit, range, order, flatten)
+                .header_add(
+                    header::COOKIE,
+                    create_auth_cookie_str(uuid_to_str(session_token)),
+                )
                 .send()
                 .await
                 .into_json()
@@ -96,7 +102,7 @@ mod test_utils {
 #[tokio::test]
 async fn test_api_comment_search() {
     use catsquad_log::prelude::*;
-    use catsquad_shared::{PostState, TimeRange};
+    use catsquad_shared::{TimeRange, UUID_ZERO, Uuid};
 
     init_log();
 
@@ -115,28 +121,47 @@ async fn test_api_comment_search() {
         .await
         .unwrap();
 
-    server
-        .post_update_state(post1.id, PostState::Active, session_key1)
-        .await
-        .unwrap();
+    server.post_state_active("prime", post1.id).await;
 
     let comment1 = server
         .comment_add(post1.id, 0, "text1", session_key1.clone())
         .await
         .unwrap();
 
-    let comments = server
-        .comment_search(
-            post1.id,
-            0,
-            0,
-            10,
-            TimeRange::None,
-            catsquad_shared::Order::ThreeTwoOne,
-            false,
-        )
-        .await
-        .unwrap();
+    let search = async |token: Uuid| {
+        server
+            .comment_search(
+                post1.id,
+                0,
+                0,
+                10,
+                TimeRange::None,
+                catsquad_shared::Order::ThreeTwoOne,
+                false,
+                token,
+            )
+            .await
+    };
 
-    assert_eq!(comments.len(), 1);
+    // assert success
+    {
+        let comments = search(session_key1).await.unwrap();
+        assert_eq!(comments.len(), 1);
+    }
+
+    // TODO finish the tests
+    // assert error - post hidden - user active
+    {
+        server.post_state_hidden("prime", post1.id).await;
+        // server.user_state("prime", UserState::Active);
+
+        let result = search(UUID_ZERO).await;
+        assert!(matches!(result, Err(CommentSearchErr::Unauthorized(_))));
+
+        let result = search(session_key1).await;
+        assert!(matches!(result, Ok(_)));
+
+        let result = search(session_key2).await;
+        assert!(matches!(result, Err(CommentSearchErr::Unauthorized(_))));
+    }
 }

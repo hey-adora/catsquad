@@ -22,6 +22,9 @@ pub enum PromoteAdminErr {
 
     #[error("internal server err")]
     InternalServer,
+
+    #[error("unauthorized")]
+    Unauthorized(String),
 }
 
 /// returns true if admin is promoted succesfully or admin_username in conf not set
@@ -89,10 +92,20 @@ pub async fn promote_admin(state: AppState) -> Result<i64, PromoteAdminErr> {
 
         // promote user if not admin already
         {
-            let result = state.db.user_get_by_username("", &admin_username).await;
+            let result = state
+                .db
+                .user_get_by_username(SessionTokenKind::None, &admin_username)
+                .await;
             let admin_user = match result {
                 Ok(v) => v,
                 Err(DbUserGetByUsernameErr::NotFound) => return Err(PromoteAdminErr::UserNotFound),
+                Err(DbUserGetByUsernameErr::Unauthorized(err)) => {
+                    return Err(PromoteAdminErr::Unauthorized(err));
+                }
+                Err(DbUserGetByUsernameErr::InternalServerErr) => {
+                    error!("something exploded in promote_admin");
+                    return Err(PromoteAdminErr::InternalServer);
+                }
                 Err(DbUserGetByUsernameErr::Db(err)) => {
                     error!("something exploded in promote_admin {err}");
                     return Err(PromoteAdminErr::InternalServer);
@@ -124,6 +137,9 @@ pub async fn promote_admin(state: AppState) -> Result<i64, PromoteAdminErr> {
     match result {
         Err(PromoteAdminErr::UserNotFound) => {
             *keep_checking = true;
+        }
+        Err(PromoteAdminErr::Unauthorized(_)) => {
+            *keep_checking = false;
         }
         Err(PromoteAdminErr::InternalServer) | Err(PromoteAdminErr::OptionNotSet) | Ok(_) => {
             *keep_checking = false;

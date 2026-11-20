@@ -11,7 +11,7 @@ use axum::{
 };
 use catsquad_db::{DbSession, DbSessionAddErr, DbUserGet, DbUserGetByEmailErr};
 use catsquad_log::prelude::*;
-use catsquad_shared::{SensitiveUserRes, SessionAddErr, SessionAddReq};
+use catsquad_shared::{SensitiveUserRes, SessionAddErr, SessionAddReq, SessionTokenKind};
 
 // fn from_db_session(value: DbUser) -> SensitiveUserRes {
 //     SensitiveUserRes {

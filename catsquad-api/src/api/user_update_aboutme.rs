@@ -1,7 +1,8 @@
 use axum::{Extension, Form, Json, extract::State, http::StatusCode, response::IntoResponse};
 use catsquad_db::{DbUser, DbUserGet, DbUserUpdateAboutmeErr};
 use catsquad_shared::{
-    MAX_ABOUTME_LENGTH, UserUpdateAboutmeErr, UserUpdateAboutmeReq, validate_user_aboutme,
+    MAX_ABOUTME_LENGTH, SessionTokenKind, UserUpdateAboutmeErr, UserUpdateAboutmeReq,
+    validate_user_aboutme,
 };
 
 use crate::{auth::verify_password, state::AppState, utils::rng_str};

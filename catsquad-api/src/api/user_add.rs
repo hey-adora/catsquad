@@ -185,7 +185,7 @@ mod test_utils {
         header::{self, SET_COOKIE},
     };
     use catsquad_db::{DbUser, DbUserGet};
-    use catsquad_shared::{self as cs, Uuid, str_to_uuid};
+    use catsquad_shared::{self as cs, SessionTokenKind, Uuid, str_to_uuid};
 
     use crate::{
         TestServer,
@@ -353,10 +353,12 @@ async fn test_api_user_add() {
 
     // check if encrypted
     {
+        use catsquad_shared::SessionTokenKind;
+
         let user = server
             .state
             .db
-            .user_get_by_username("", "prime")
+            .user_get_by_username(SessionTokenKind::None, "prime")
             .await
             .unwrap();
         assert_ne!(user.password, "hello1111111@1P");

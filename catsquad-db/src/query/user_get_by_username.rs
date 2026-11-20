@@ -10,7 +10,7 @@ pub enum DbUserGetByUsernameErr {
     #[error("user not found")]
     NotFound,
 
-    #[error("unauthorized")]
+    #[error("unauthorized {0}")]
     Unauthorized(String),
 
     #[error("internal server error")]

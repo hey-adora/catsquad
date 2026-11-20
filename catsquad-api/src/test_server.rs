@@ -1,8 +1,8 @@
-use crate::{proccess_images::storage_file_path, server::app, state::AppState};
+use crate::{proccess_images::storage_file_path, promote_admin, server::app, state::AppState};
 use axum::http::HeaderName;
 use catsquad_client::{AxumTestSender, Client};
 use catsquad_db::{DbEmailSent, DbEmailSentReason};
-use catsquad_shared::i64_to_str;
+use catsquad_shared::{PostState, SessionTokenKind, UUID_ZERO, UserState, Uuid, i64_to_str};
 use std::{path::PathBuf, sync::Arc};
 use tokio::sync::RwLock;
 
@@ -106,5 +106,66 @@ impl TestServer {
             storage_path: input_storage_path,
             thumbnail_path: input_thumbnail_path,
         }
+    }
+
+    pub async fn user_state(&self, username: impl Into<String>, user_state: UserState) -> Uuid {
+        let username = username.into();
+
+        self.state
+            .db
+            .user_update_state(
+                async |_| String::new(),
+                0,
+                SessionTokenKind::Root,
+                vec![username.clone()],
+                user_state,
+            )
+            .await
+            .unwrap();
+
+        let user = self
+            .state
+            .db
+            .user_get_by_username(SessionTokenKind::Root, &username)
+            .await
+            .unwrap();
+
+        if user_state == UserState::Active {
+            let token = self
+                .state
+                .db
+                .session_add(0, user.email.clone())
+                .await
+                .unwrap();
+
+            return token.token;
+        }
+
+        UUID_ZERO
+    }
+
+    pub async fn post_state_active(&self, username: impl Into<String>, post_id: i64) {
+        let username = username.into();
+
+        self.state
+            .db
+            .post_update_state(0, username.clone(), post_id, PostState::Active)
+            .await
+            .unwrap();
+    }
+
+    pub async fn post_state_hidden(&self, username: impl Into<String>, post_id: i64) {
+        let username = username.into();
+
+        self.state
+            .db
+            .post_update_state(0, username.clone(), post_id, PostState::Hidden)
+            .await
+            .unwrap();
+    }
+
+    pub async fn admin(&self, username: impl Into<String>) {
+        self.state.set_admin_username(username).await;
+        promote_admin(self.state.clone()).await.unwrap();
     }
 }

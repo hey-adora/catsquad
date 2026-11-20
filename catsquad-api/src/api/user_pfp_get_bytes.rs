@@ -1,4 +1,4 @@
-use crate::{proccess_images::thumbnail_file_path, state::AppState};
+use crate::{auth::SessionTokenV2, proccess_images::thumbnail_file_path, state::AppState};
 use axum::{
     extract::{Path, State},
     http::{
@@ -17,7 +17,9 @@ use tokio::fs;
 
 fn from_post_image_get_by_hash_err(value: DbUserGetByUsernameErr) -> UserPfpGetBytesErr {
     match value {
+        DbUserGetByUsernameErr::Unauthorized(err) => UserPfpGetBytesErr::Unauthorized(err),
         DbUserGetByUsernameErr::NotFound => UserPfpGetBytesErr::UserNotFound,
+        DbUserGetByUsernameErr::InternalServerErr => UserPfpGetBytesErr::InternalServerErr,
         DbUserGetByUsernameErr::Db(_) => UserPfpGetBytesErr::InternalServerErr,
     }
 }
@@ -33,6 +35,7 @@ fn from_io_err(value: std::io::Error) -> UserPfpGetBytesErr {
 fn status_code(result: &Result<Vec<u8>, UserPfpGetBytesErr>) -> StatusCode {
     match result {
         Ok(_) => StatusCode::OK,
+        Err(UserPfpGetBytesErr::Unauthorized(_)) => StatusCode::UNAUTHORIZED,
         Err(UserPfpGetBytesErr::StillProccesing) => StatusCode::NOT_FOUND,
         Err(UserPfpGetBytesErr::PfpNotFound) => StatusCode::NOT_FOUND,
         Err(UserPfpGetBytesErr::UserNotFound) => StatusCode::NOT_FOUND,
@@ -76,19 +79,17 @@ where
 }
 
 pub async fn user_pfp_get_bytes(
-    // db_user: Extension<Option<DbUser>>,
+    auth_session_token: SessionTokenV2,
     State(app): State<AppState>,
     Path(params): Path<UserPfpGetBytesParams>,
 ) -> impl IntoResponse {
-    // TODO add check if suspended acc in the future
-
     let username = params.username;
     let storage_path = app.get_storage_path().await;
 
     let inner = async || -> Result<Vec<u8>, UserPfpGetBytesErr> {
         let user = app
             .db
-            .user_get_by_username("", username)
+            .user_get_by_username(auth_session_token.into(), username)
             .await
             .map_err(from_post_image_get_by_hash_err)?;
 
@@ -117,17 +118,23 @@ pub async fn user_pfp_get_bytes(
 
 #[cfg(test)]
 mod test_utils {
-    use crate::TestServer;
-    use catsquad_shared::{self as cs};
+    use crate::{TestServer, auth::create_auth_cookie_str};
+    use axum::http::header;
+    use catsquad_shared::{self as cs, Uuid, uuid_to_str};
     use std::fmt::Display;
 
     impl TestServer {
         pub async fn user_pfp_get_bytes(
             &self,
             username: impl Display,
+            session_token: Uuid,
         ) -> Result<Vec<u8>, cs::UserPfpGetBytesErr> {
             self.client
                 .user_pfp_get_bytes(username)
+                .header_add(
+                    header::COOKIE,
+                    create_auth_cookie_str(uuid_to_str(session_token)),
+                )
                 .send()
                 .await
                 .into_bytes()
@@ -140,6 +147,9 @@ mod test_utils {
 #[tokio::test]
 async fn test_api_user_pfp_get_bytes() {
     use crate::proccess_images::proccess_images_all;
+    use catsquad_shared::SessionTokenKind;
+    use catsquad_shared::UUID_ZERO;
+    use catsquad_shared::UserState;
 
     init_log();
     let server = crate::TestServer::new(0, "test_api_user_pfp_get_bytes").await;
@@ -150,21 +160,70 @@ async fn test_api_user_pfp_get_bytes() {
         .user_add_full("prime", "prime@heyadora.com", "1234567890111GGd11$")
         .await;
 
-    let result = server.user_pfp_get_bytes("prime").await;
-    assert!(matches!(result, Err(UserPfpGetBytesErr::PfpNotFound)));
+    let (_user2, session_key2) = server
+        .user_add_full("prime2", "prime2@heyadora.com", "1234567890111GGd11$")
+        .await;
 
-    server
-        .user_update_pfp(&[input1_img.saved_path.to_str().unwrap()], session_key1)
-        .await
-        .unwrap();
+    // assert error
+    {
+        let result = server.user_pfp_get_bytes("prime", UUID_ZERO).await;
+        assert!(matches!(result, Err(UserPfpGetBytesErr::PfpNotFound)));
 
-    let result = server.user_pfp_get_bytes("prime").await;
-    assert!(matches!(result, Err(UserPfpGetBytesErr::StillProccesing)));
+        server
+            .user_update_pfp(&[input1_img.saved_path.to_str().unwrap()], session_key1)
+            .await
+            .unwrap();
 
-    proccess_images_all(0, server.state.db.clone(), storage_path, 1280)
-        .await
-        .unwrap();
+        let result = server.user_pfp_get_bytes("prime", UUID_ZERO).await;
+        assert!(matches!(result, Err(UserPfpGetBytesErr::StillProccesing)));
 
-    let result = server.user_pfp_get_bytes("prime").await;
-    assert!(matches!(result, Ok(_)));
+        let result = server.user_pfp_get_bytes("prime9", UUID_ZERO).await;
+        assert!(matches!(result, Err(UserPfpGetBytesErr::UserNotFound)));
+    }
+
+    // assert success
+    {
+        proccess_images_all(0, server.state.db.clone(), storage_path, 1280)
+            .await
+            .unwrap();
+
+        let result = server.user_pfp_get_bytes("prime", UUID_ZERO).await;
+        assert!(matches!(result, Ok(_)));
+    }
+
+    // assert error unauthorized
+    {
+        use crate::promote_admin;
+
+        server
+            .state
+            .db
+            .user_update_state(
+                async |_| String::new(),
+                0,
+                SessionTokenKind::Root,
+                vec!["prime".to_string()],
+                UserState::Suspended,
+            )
+            .await
+            .unwrap();
+
+        let result = server.user_pfp_get_bytes("prime", UUID_ZERO).await;
+        assert!(matches!(result, Err(UserPfpGetBytesErr::Unauthorized(_))));
+
+        let result = server.user_pfp_get_bytes("prime", session_key2).await;
+        assert!(matches!(result, Err(UserPfpGetBytesErr::Unauthorized(_))));
+
+        let result = server.user_pfp_get_bytes("prime", session_key1).await;
+        assert!(matches!(result, Err(UserPfpGetBytesErr::Unauthorized(_))));
+
+        server.state.set_admin_username("prime2").await;
+        promote_admin(server.state.clone()).await.unwrap();
+
+        let result = server.user_pfp_get_bytes("prime", session_key1).await;
+        assert!(matches!(result, Err(UserPfpGetBytesErr::Unauthorized(_))));
+
+        let result = server.user_pfp_get_bytes("prime", session_key2).await;
+        assert!(matches!(result, Ok(_)));
+    }
 }

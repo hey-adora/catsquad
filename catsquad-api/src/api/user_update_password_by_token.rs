@@ -133,6 +133,7 @@ mod test_utils {
 async fn test_api_user_update_password_by_token() {
     use crate::auth::verify_password;
     use catsquad_db::DbEmailSentReason;
+    use catsquad_shared::SessionTokenKind;
 
     init_log();
     let server = crate::TestServer::new(0, "test_api_user_update_password_by_token").await;
@@ -171,7 +172,7 @@ async fn test_api_user_update_password_by_token() {
     let db_user = server
         .state
         .db
-        .user_get_by_username("", "hey")
+        .user_get_by_username(SessionTokenKind::None, "hey")
         .await
         .unwrap();
     verify_password("hello1111111@2P", db_user.password).unwrap();
@@ -209,7 +210,7 @@ async fn test_api_user_update_password_by_token() {
     let db_user = server
         .state
         .db
-        .user_get_by_username("", "hey")
+        .user_get_by_username(SessionTokenKind::None, "hey")
         .await
         .unwrap();
     let result = verify_password("hello1111111@3P", db_user.password);

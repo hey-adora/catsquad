@@ -1,4 +1,4 @@
-use crate::state::AppState;
+use crate::{auth::SessionTokenV2, state::AppState};
 use axum::{
     Extension, Json,
     extract::{Path, State},
@@ -65,17 +65,23 @@ pub async fn user_get_by_username(
 
 #[cfg(any(test, feature = "test_server"))]
 mod test_utils {
-    use crate::TestServer;
-    use catsquad_shared::{self as cs};
+    use crate::{TestServer, auth::create_auth_cookie_str};
+    use axum::http::header;
+    use catsquad_shared::{self as cs, Uuid, uuid_to_str};
     use std::fmt::Display;
 
     impl TestServer {
         pub async fn user_get_by_username(
             &self,
             username: impl Display,
+            session_token: Uuid,
         ) -> Result<cs::UserGetRes, cs::UserGetByUsernameErr> {
             self.client
                 .user_get_by_username(username)
+                .header_add(
+                    header::COOKIE,
+                    create_auth_cookie_str(uuid_to_str(session_token)),
+                )
                 .send()
                 .await
                 .into_json()
@@ -87,17 +93,66 @@ mod test_utils {
 #[cfg(test)]
 #[tokio::test]
 async fn test_api_user_get_by_username() {
+    use crate::promote_admin;
     use catsquad_log::prelude::*;
+    use catsquad_shared::UUID_ZERO;
+    use catsquad_shared::{SessionTokenKind, UserState};
+
     init_log();
+
     let server = crate::TestServer::new(0, "test_api_user_get_by_username").await;
 
-    let (user_add, _session_key) = server
+    let (user1_add, session1_key) = server
         .user_add_full("hey", "prime@heyadora.com", "PAss$ord11111")
         .await;
 
-    let result = server.user_get_by_username("hey").await.unwrap();
-    assert_eq!(user_add.username, result.username);
+    let (user2_add, session2_key) = server
+        .user_add_full("hey2", "prime2@heyadora.com", "PAss$ord11111")
+        .await;
 
-    let result = server.user_get_by_username("hey1").await;
-    assert_eq!(result, Err(UserGetByUsernameErr::NotFound));
+    // assert error
+    {
+        let result = server.user_get_by_username("hey1", UUID_ZERO).await;
+        assert_eq!(result, Err(UserGetByUsernameErr::NotFound));
+    }
+
+    // assert success
+    {
+        let result = server.user_get_by_username("hey", UUID_ZERO).await.unwrap();
+        assert_eq!(user1_add.username, result.username);
+    }
+
+    // assert error unauthoirized
+    {
+        server
+            .state
+            .db
+            .user_update_state(
+                async |_| String::new(),
+                0,
+                SessionTokenKind::Root,
+                vec!["hey".to_string()],
+                UserState::Suspended,
+            )
+            .await
+            .unwrap();
+
+        let result = server.user_get_by_username("hey", UUID_ZERO).await;
+        assert!(matches!(result, Err(UserGetByUsernameErr::Unauthorized(_))));
+
+        let result = server.user_get_by_username("hey", session2_key).await;
+        assert!(matches!(result, Err(UserGetByUsernameErr::Unauthorized(_))));
+
+        let result = server.user_get_by_username("hey", session1_key).await;
+        assert!(matches!(result, Err(UserGetByUsernameErr::Unauthorized(_))));
+
+        server.state.set_admin_username("hey2").await;
+        promote_admin(server.state.clone()).await.unwrap();
+
+        let result = server.user_get_by_username("hey", session1_key).await;
+        assert!(matches!(result, Err(UserGetByUsernameErr::Unauthorized(_))));
+
+        let result = server.user_get_by_username("hey", session2_key).await;
+        assert!(matches!(result, Ok(_)));
+    }
 }

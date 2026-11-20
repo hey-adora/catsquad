@@ -1,14 +1,13 @@
+use crate::{auth::SessionTokenV2, state::AppState};
 use axum::{
-    Extension, Json,
-    extract::{Path, Query, RawPathParams, State},
-    http::{StatusCode, header},
+    Json,
+    extract::{Path, State},
+    http::StatusCode,
     response::IntoResponse,
 };
-use catsquad_db::{DbFileImage, DbPostGet, DbPostGetByKeyErr, DbUser, DbUserGet};
+use catsquad_db::{DbFileImage, DbPostGet, DbPostGetByKeyErr};
 use catsquad_log::prelude::*;
 use catsquad_shared::{FileImage, PostGetByKeyErr, PostGetByKeyParams, PostRes, PostState};
-
-use crate::{auth::SessionTokenV2, state::AppState};
 
 pub fn from_db_post_get_by_key_err(value: DbPostGetByKeyErr) -> PostGetByKeyErr {
     match value {
@@ -121,8 +120,12 @@ mod test_utils {
     }
 }
 
+#[cfg(test)]
 #[tokio::test]
 async fn test_api_post_get_by_key() {
+    use crate::promote_admin;
+    use catsquad_shared::{SessionTokenKind, UUID_ZERO, UserState};
+
     init_log();
     let server = crate::TestServer::new(0, "test_api_post_get_by_key").await;
 
@@ -139,6 +142,7 @@ async fn test_api_post_get_by_key() {
         .await
         .unwrap();
 
+    // assert error
     {
         let result = server.post_get_by_id(0, 0_u128.to_be_bytes()).await;
         assert_eq!(result, Err(PostGetByKeyErr::PostNotFound));
@@ -153,12 +157,34 @@ async fn test_api_post_get_by_key() {
         assert!(matches!(result, Err(PostGetByKeyErr::PostNotFound)));
     }
 
-    server
-        .post_update_state(post1.id, catsquad_shared::PostState::Active, session_key1)
-        .await
-        .unwrap();
+    let post_state = async |state: PostState| {
+        server
+            .state
+            .db
+            .post_update_state(0, "prime".to_string(), post1.id.clone(), state)
+            .await
+            .unwrap();
+    };
 
+    let user_state = async |user_state: UserState| {
+        server
+            .state
+            .db
+            .user_update_state(
+                async |_| String::new(),
+                0,
+                SessionTokenKind::Root,
+                vec!["prime".to_string()],
+                user_state,
+            )
+            .await
+            .unwrap();
+    };
+
+    // assert success
     {
+        post_state(PostState::Active).await;
+
         let result = server
             .post_get_by_id(post1.id, 0_u128.to_be_bytes())
             .await
@@ -166,20 +192,62 @@ async fn test_api_post_get_by_key() {
         assert_eq!(result.id, post1.id);
     }
 
-    server
-        .post_update_state(
-            post1.id.clone(),
-            catsquad_shared::PostState::Hidden,
-            session_key1,
-        )
-        .await
-        .unwrap();
-
+    // assert - post hidden - user active
     {
+        post_state(PostState::Hidden).await;
+
         let result = server.post_get_by_id(post1.id.clone(), session_key1).await;
         assert!(matches!(result, Ok(_)));
 
         let result = server.post_get_by_id(post1.id, session_key2).await;
+        assert!(matches!(result, Err(PostGetByKeyErr::Unauthorized(_))));
+
+        let result = server.post_get_by_id(post1.id.clone(), UUID_ZERO).await;
+        assert!(matches!(result, Err(PostGetByKeyErr::Unauthorized(_))));
+    }
+
+    // assert - post active - user suspended
+    {
+        post_state(PostState::Active).await;
+        user_state(UserState::Suspended).await;
+
+        let result = server.post_get_by_id(post1.id.clone(), session_key1).await;
+        assert!(matches!(result, Err(PostGetByKeyErr::Unauthorized(_))));
+
+        let result = server.post_get_by_id(post1.id, session_key2).await;
+        assert!(matches!(result, Err(PostGetByKeyErr::Unauthorized(_))));
+
+        let result = server.post_get_by_id(post1.id, UUID_ZERO).await;
+        assert!(matches!(result, Err(PostGetByKeyErr::Unauthorized(_))));
+    }
+
+    // assert - post hidden - user suspended
+    {
+        post_state(PostState::Hidden).await;
+        user_state(UserState::Suspended).await;
+
+        let result = server.post_get_by_id(post1.id.clone(), session_key1).await;
+        assert!(matches!(result, Err(PostGetByKeyErr::Unauthorized(_))));
+
+        let result = server.post_get_by_id(post1.id, session_key2).await;
+        assert!(matches!(result, Err(PostGetByKeyErr::Unauthorized(_))));
+
+        let result = server.post_get_by_id(post1.id, UUID_ZERO).await;
+        assert!(matches!(result, Err(PostGetByKeyErr::Unauthorized(_))));
+    }
+
+    // assert - post hidden - user suspended -- perms see hidden
+    {
+        server.state.set_admin_username("prime2").await;
+        promote_admin(server.state.clone()).await.unwrap();
+
+        let result = server.post_get_by_id(post1.id.clone(), session_key1).await;
+        assert!(matches!(result, Err(PostGetByKeyErr::Unauthorized(_))));
+
+        let result = server.post_get_by_id(post1.id, session_key2).await;
+        assert!(matches!(result, Ok(_)));
+
+        let result = server.post_get_by_id(post1.id, UUID_ZERO).await;
         assert!(matches!(result, Err(PostGetByKeyErr::Unauthorized(_))));
     }
 }

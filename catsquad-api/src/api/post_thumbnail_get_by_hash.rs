@@ -50,15 +50,22 @@ mod test_utils {
 #[cfg(test)]
 #[tokio::test]
 async fn test_api_post_thumbnail_bytes_by_hash() {
+    use crate::promote_admin;
     use crate::{get_file_hash_for_testing_by_path, proccess_images::proccess_images_all};
     use catsquad_log::prelude::*;
+    use catsquad_shared::UUID_ZERO;
     use catsquad_shared::{PostImageBytesGetByHashErr, PostState};
+    use catsquad_shared::{SessionTokenKind, UserState};
 
     init_log();
     let server = crate::TestServer::new(0, "test_api_post_thumbnail_bytes_by_hash").await;
 
     let (_user1, session_key1) = server
         .user_add_full("prime", "prime@heyadora.com", "1234567890111GGd11$")
+        .await;
+
+    let (_user2, session_key2) = server
+        .user_add_full("prime2", "prime2@heyadora.com", "1234567890111GGd11$")
         .await;
 
     let post1 = server
@@ -68,53 +75,120 @@ async fn test_api_post_thumbnail_bytes_by_hash() {
 
     let file_hash = get_file_hash_for_testing_by_path("../assets/favicon.ico").await;
 
-    let result = server
-        .post_thumbnail_bytes_get_by_hash(post1.id, file_hash, session_key1)
-        .await;
-    assert!(matches!(
-        result,
-        Err(PostImageBytesGetByHashErr::FileNotFound)
-    ));
+    // assert error
+    {
+        let result = server
+            .post_thumbnail_bytes_get_by_hash(post1.id, file_hash, session_key1)
+            .await;
+        assert!(matches!(
+            result,
+            Err(PostImageBytesGetByHashErr::FileNotFound)
+        ));
 
-    server
-        .post_update_state(post1.id, PostState::Active, session_key1)
+        server
+            .post_update_state(post1.id, PostState::Active, session_key1)
+            .await
+            .unwrap();
+
+        let result = server
+            .post_thumbnail_bytes_get_by_hash(post1.id, file_hash, session_key1)
+            .await;
+        assert!(matches!(
+            result,
+            Err(PostImageBytesGetByHashErr::FileNotFound)
+        ));
+
+        let _result = server
+            .post_update_image_add(post1.id, &["../assets/favicon.ico"], session_key1)
+            .await
+            .unwrap();
+
+        let result = server
+            .post_thumbnail_bytes_get_by_hash(post1.id, file_hash, session_key1)
+            .await;
+
+        assert!(matches!(
+            result,
+            Err(PostImageBytesGetByHashErr::FileNotFound)
+        ));
+    }
+
+    // assert success
+    {
+        proccess_images_all(
+            0,
+            server.state.db.clone(),
+            server.state.get_storage_path().await,
+            1280,
+        )
         .await
         .unwrap();
 
-    let result = server
-        .post_thumbnail_bytes_get_by_hash(post1.id, file_hash, session_key1)
-        .await;
-    assert!(matches!(
-        result,
-        Err(PostImageBytesGetByHashErr::FileNotFound)
-    ));
+        let result = server
+            .post_thumbnail_bytes_get_by_hash(post1.id, file_hash, session_key1)
+            .await
+            .unwrap();
+        assert!(result.len() > 0);
+    }
 
-    let _result = server
-        .post_update_image_add(post1.id, &["../assets/favicon.ico"], session_key1)
-        .await
-        .unwrap();
+    // assert error unauthorized
+    {
+        server
+            .state
+            .db
+            .user_update_state(
+                async |_| String::new(),
+                0,
+                SessionTokenKind::Root,
+                vec!["prime".to_string()],
+                UserState::Suspended,
+            )
+            .await
+            .unwrap();
 
-    let result = server
-        .post_thumbnail_bytes_get_by_hash(post1.id, file_hash, session_key1)
-        .await;
+        let result = server
+            .post_thumbnail_bytes_get_by_hash(post1.id, file_hash, session_key1)
+            .await;
 
-    assert!(matches!(
-        result,
-        Err(PostImageBytesGetByHashErr::FileNotFound)
-    ));
+        assert!(matches!(
+            result,
+            Err(PostImageBytesGetByHashErr::Unauthorized(_))
+        ));
 
-    proccess_images_all(
-        0,
-        server.state.db.clone(),
-        server.state.get_storage_path().await,
-        1280,
-    )
-    .await
-    .unwrap();
+        let result = server
+            .post_thumbnail_bytes_get_by_hash(post1.id, file_hash, session_key2)
+            .await;
 
-    let result = server
-        .post_thumbnail_bytes_get_by_hash(post1.id, file_hash, session_key1)
-        .await
-        .unwrap();
-    assert!(result.len() > 0);
+        assert!(matches!(
+            result,
+            Err(PostImageBytesGetByHashErr::Unauthorized(_))
+        ));
+
+        let result = server
+            .post_thumbnail_bytes_get_by_hash(post1.id, file_hash, UUID_ZERO)
+            .await;
+
+        assert!(matches!(
+            result,
+            Err(PostImageBytesGetByHashErr::Unauthorized(_))
+        ));
+
+        server.state.set_admin_username("prime2").await;
+        promote_admin(server.state.clone()).await.unwrap();
+
+        let result = server
+            .post_thumbnail_bytes_get_by_hash(post1.id, file_hash, session_key2)
+            .await;
+
+        assert!(matches!(result, Ok(_)));
+
+        let result = server
+            .post_thumbnail_bytes_get_by_hash(post1.id, file_hash, session_key1)
+            .await;
+
+        assert!(matches!(
+            result,
+            Err(PostImageBytesGetByHashErr::Unauthorized(_))
+        ));
+    }
 }

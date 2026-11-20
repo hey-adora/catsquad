@@ -187,6 +187,7 @@ mod test_utils {
 async fn test_api_user_update_pfp() {
     use crate::proccess_images::proccess_images_all;
     use catsquad_db::DbFileImageGetByHashErr;
+    use catsquad_shared::UUID_ZERO;
     use tokio::fs;
 
     init_log();
@@ -226,7 +227,7 @@ async fn test_api_user_update_pfp() {
             .file_image_get_by_hash(input2_img.hash)
             .await;
 
-        let user1 = server.user_get_by_username("hey").await.unwrap();
+        let user1 = server.user_get_by_username("hey", UUID_ZERO).await.unwrap();
 
         assert_eq!(user1.pfp_hash, input1_img.hash);
 
