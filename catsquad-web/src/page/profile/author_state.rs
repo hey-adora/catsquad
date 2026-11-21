@@ -1,7 +1,7 @@
 use catsquad_client::{Client, Response, Sender};
 use catsquad_log::prelude::*;
-use catsquad_shared::UserGetByUsernameErr;
-use leptos::prelude::{RwSignal, Set, Update};
+use catsquad_shared::{UserGetByUsernameErr, UserState};
+use leptos::prelude::{GetValue, LocalStorage, RwSignal, Set, StoredValue, Update};
 use std::fmt::Debug;
 
 #[derive(Clone)]
@@ -11,7 +11,9 @@ where
     TSender::TResponse: Response + Debug,
 {
     pub stage: RwSignal<AuthorStage>,
+
     pub username: RwSignal<String>,
+    pub user_state: RwSignal<UserState>,
     pub pfp_hash: RwSignal<i64>,
     pub pfp_proccesed: RwSignal<bool>,
 
@@ -31,7 +33,14 @@ where
 
     pub created_at: RwSignal<u64>,
     pub err_general: RwSignal<String>,
-    client: Client<TSender>,
+    client: StoredValue<Client<TSender>, LocalStorage>,
+}
+
+impl<TSender> Copy for AuthorState<TSender>
+where
+    TSender: Sender + Debug + Clone,
+    TSender::TResponse: Response + Debug,
+{
 }
 
 #[derive(Clone, Copy, PartialEq, PartialOrd, Debug)]
@@ -39,18 +48,20 @@ pub enum AuthorStage {
     Loading,
     Normal,
     NotFound,
+    Suspended,
     Error,
 }
 
 impl<TSender> AuthorState<TSender>
 where
-    TSender: Sender + Debug + Clone,
+    TSender: Sender + Debug + Clone + 'static,
     TSender::TResponse: Response + Debug,
 {
     pub fn new(client: Client<TSender>) -> Self {
         Self {
             stage: RwSignal::new(AuthorStage::Loading),
             username: RwSignal::new(String::new()),
+            user_state: RwSignal::new(UserState::Active),
             pfp_hash: RwSignal::new(0),
             pfp_proccesed: RwSignal::new(false),
 
@@ -70,15 +81,16 @@ where
 
             err_general: RwSignal::new(String::new()),
             created_at: RwSignal::new(0),
-            client,
+            client: StoredValue::new_local(client),
         }
     }
 
     pub async fn init(&self, username: impl Into<String>) {
         let username = username.into();
 
-        let result = self
-            .client
+        let client = self.client.get_value();
+
+        let result = client
             .user_get_by_username(&username)
             .send()
             .await
@@ -95,6 +107,14 @@ where
                 self.stage.set(AuthorStage::NotFound);
                 return;
             }
+            Err(UserGetByUsernameErr::Unauthorized(err)) => {
+                self.username.set(username);
+                self.support.update(|v| v.clear());
+                self.aboutme.update(|v| v.clear());
+                self.err_general.set(err);
+                self.stage.set(AuthorStage::Suspended);
+                return;
+            }
             Err(err) => {
                 self.stage.set(AuthorStage::Error);
                 self.err_general.set(err.to_string());
@@ -107,6 +127,7 @@ where
         self.followers.set(user.followers);
         self.likes.set(user.likes);
         self.username.set(user.username);
+        self.user_state.set(user.state);
         self.pfp_hash.set(user.pfp_hash);
         self.pfp_proccesed.set(user.pfp_proccesed);
         self.live_support_length.set(user.support.len());
@@ -120,10 +141,11 @@ where
     pub async fn update_support(&self, new_support: impl Into<String>) {
         let new_support = new_support.into();
         let new_support_len = new_support.len();
+        let client = self.client.get_value();
+
         self.err_support.update(|v| v.clear());
 
-        let result = self
-            .client
+        let result = client
             .user_update_support(new_support.clone())
             .send()
             .await
@@ -147,10 +169,11 @@ where
     pub async fn update_aboutme(&self, new_aboutme: impl Into<String>) {
         let new_aboutme = new_aboutme.into();
         let new_aboutme_len = new_aboutme.len();
+        let client = self.client.get_value();
+
         self.err_aboutme.update(|v| v.clear());
 
-        let result = self
-            .client
+        let result = client
             .user_update_aboutme(new_aboutme.clone())
             .send()
             .await

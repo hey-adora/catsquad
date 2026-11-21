@@ -1,26 +1,16 @@
 use std::fmt::Debug;
 
+use crate::hook::ParsedPostImage;
 use catsquad_client::{Client, Response, Sender};
 use catsquad_log::prelude::*;
 use catsquad_shared::{
     LINK_WEB_INDEX, PostGetByKeyErr, PostRemoveErr, PostState, PostUpdateDescriptionErr,
-    PostUpdateStateErr, PostUpdateTagsErr, PostUpdateTitleErr, i64_to_str,
+    PostUpdateStateErr, PostUpdateTagsErr, PostUpdateTitleErr, UserState, i64_to_str,
     link_relative_post_image_bytes_get_by_hash, link_relative_profile_gallery, proccess_tags,
 };
 use catsquad_web_utils::prelude::*;
 use leptos::prelude::*;
 
-use crate::hook::{ParsedPostImage, ParsedPostImageState};
-// use crate::{
-//     api::{Api, Server404Err, ServerErr, ServerUpdatePostDescriptionErr},
-//     path::{link_home, link_img, link_user},
-// };
-// use tracing::{error, info, trace, warn};
-
-// pub struct PostApi<TSender>
-// where
-//     TSender: Sender + Debug + Clone,
-//     TSender::TResponse: Response + Debug,
 #[derive(Clone, Copy)]
 pub struct PostApi {
     // ui
@@ -36,6 +26,7 @@ pub struct PostApi {
     // pub imgs_links: RwSignal<Vec<(String, f64)>>,
     pub title: RwSignal<String>,
     pub author_username: RwSignal<String>,
+    pub author_state: RwSignal<UserState>,
     pub author_pfp_hash: RwSignal<i64>,
     pub author_pfp_proccesed: RwSignal<bool>,
     // pub author_key: RwSignal<String, LocalStorage>,
@@ -77,6 +68,7 @@ pub enum PostApiState {
     Normal,
     NotFound,
     Deleted,
+    Suspended,
 }
 
 impl PostApi {
@@ -87,6 +79,7 @@ impl PostApi {
             // imgs_links: RwSignal::new(Vec::<(String, f64)>::new()),
             title: RwSignal::new(String::new()),
             author_username: RwSignal::new(String::new()),
+            author_state: RwSignal::new(UserState::Active),
             author_pfp_hash: RwSignal::new(0),
             author_pfp_proccesed: RwSignal::new(false),
             // author_key: RwSignal::new_local(String::new()),
@@ -361,6 +354,8 @@ impl PostApi {
                 self.live_title_length.set(post.title.len());
                 self.title.set(post.title);
                 self.author_username.set(post.user_username.clone());
+                self.author_state
+                    .set(UserState::try_from(post.user_state).unwrap_or(UserState::Active));
                 self.author_pfp_hash.set(post.user_pfp_hash);
                 self.author_pfp_proccesed.set(post.user_pfp_proccesed);
                 self.author_link
@@ -401,6 +396,10 @@ impl PostApi {
             Err(PostGetByKeyErr::PostNotFound) => {
                 self.api_state.set(PostApiState::NotFound);
                 self.err_general.set(PostApiState::NotFound.to_string());
+            }
+            Err(PostGetByKeyErr::Unauthorized(err)) => {
+                self.api_state.set(PostApiState::Suspended);
+                self.err_general.set(err);
             }
             Err(err) => {
                 let err = format!("unexpected err {:#?}", { err });

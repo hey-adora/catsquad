@@ -82,6 +82,8 @@ pub fn Post() -> impl IntoView {
 
     let when_post_not_found = move || post_api.api_state.get().is_not_found();
     let when_post_deleted = move || post_api.api_state.get().is_deleted();
+    let when_post_suspended = move || post_api.api_state.get().is_suspended();
+
     let when_post_show = move || {
         let state = post_api.api_state.get();
         state.is_normal() || state.is_loading()
@@ -106,11 +108,11 @@ pub fn Post() -> impl IntoView {
                 </div>
             </Show>
 
-            // <Show when=when_post_deleted >
-            //     <div class="grid place-items-center text-[1.5rem] ">
-            //         "error"
-            //     </div>
-            // </Show>
+            <Show when=when_post_suspended >
+                <div class="grid place-items-center text-[1.5rem] ">
+                    "suspended"
+                </div>
+            </Show>
 
             <Show when=when_post_show >
                 <div class="flex flex-col lg:grid grid-rows-[auto_1fr] grid-cols-[2fr_1fr] lg:max-h-[calc(100vh-3rem)] gap-2">

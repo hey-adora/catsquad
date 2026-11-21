@@ -1,4 +1,4 @@
-use crate::{Order, PostState, TimeRange, ToForm, serde_from_option_u128, serde_to_option_u128};
+use crate::{Order, PostState, TimeRange, ToForm, UserState};
 use catsquad_log::prelude::*;
 
 pub const LINK_API_POST_SEARCH: &str = "/api/posts";
@@ -7,6 +7,7 @@ pub const LINK_API_POST_SEARCH: &str = "/api/posts";
 pub struct PostSearchRes {
     pub id: i64,
     pub user_username: String,
+    pub user_state: UserState,
     pub pfp_hash: i64,
     pub pfp_proccesed: bool,
     pub state: PostState,
@@ -68,6 +69,9 @@ impl Default for PostSearchParams {
     Default, Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq, thiserror::Error,
 )]
 pub enum PostSearchErr {
+    #[error("unauthorized {0}")]
+    Unauthorized(String),
+
     #[default]
     #[error("internal server err")]
     InternalServer,

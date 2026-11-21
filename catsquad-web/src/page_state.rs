@@ -3,8 +3,8 @@ use catsquad_client::{Client, Response, Sender, XMLSender};
 use catsquad_log::prelude::*;
 use catsquad_shared::{
     MATCH_ADMIN, MATCH_FOLLOWED, MATCH_INDEX, MATCH_PROFILE, MATCH_PROFILE_ABOUTME,
-    MATCH_PROFILE_PAWS, MATCH_PROFILE_SUPPORT, SensitiveUserRes, SessionRemoveErr,
-    UserGetBySessionKeyErr,
+    MATCH_PROFILE_PAWS, MATCH_PROFILE_SUPPORT, RoleValue, SensitiveUserRes, SessionRemoveErr,
+    UserGetBySessionKeyErr, contains_perms,
 };
 use catsquad_web_utils::time::time_now_micro;
 use leptos::prelude::*;
@@ -21,6 +21,7 @@ where
 {
     pub client: StoredValue<Client<TSender>, LocalStorage>,
     pub acc_username: RwSignal<String>,
+    pub acc_perms: RwSignal<Vec<RoleValue>>,
     pub acc_pfp_hash: RwSignal<i64>,
     pub acc_pfp_proccesed: RwSignal<bool>,
     pub acc_max_storage_bytes: RwSignal<u32>, // TODO add max per image and add that to UI
@@ -66,6 +67,7 @@ where
             client: StoredValue::new_local(client),
             time: RwSignal::new(time_now_micro()),
             acc_username: RwSignal::new(String::new()),
+            acc_perms: RwSignal::new(Vec::new()),
             acc_pfp_hash: RwSignal::new(0),
             acc_pfp_proccesed: RwSignal::new(false),
             acc_max_storage_bytes: RwSignal::new(0), // TODO add max per image and add that to UI
@@ -164,6 +166,13 @@ where
         self.acc_email.get()
     }
 
+    pub fn acc_contains_perm<TPerm>(&self, perm: TPerm) -> bool
+    where
+        TPerm: TryInto<RoleValue> + Clone,
+    {
+        self.acc_perms.with(|v| contains_perms(&[perm], v))
+    }
+
     pub fn acc_clear(&self) {
         self.acc_username.try_update(|v| v.clear());
         self.acc_email.try_update(|v| v.clear());
@@ -186,7 +195,18 @@ where
             .await;
         match result {
             Ok(user) => {
-                page.acc_username.set(user.username);
+                page.acc_username.set(user.username.clone());
+                page.acc_perms.set(
+                    user.roles_values
+                        .clone()
+                        .into_iter()
+                        .map(|v| RoleValue::try_from(v))
+                        .collect::<Result<Vec<RoleValue>, _>>()
+                        .inspect_err(|err| {
+                            error!("something exploded, invalid role values, {err}, {user:#?}")
+                        })
+                        .unwrap_or_default(),
+                );
                 page.acc_pfp_hash.set(user.pfp_hash);
                 page.acc_pfp_proccesed.set(user.pfp_proccesed);
                 page.acc_email.set(user.email);

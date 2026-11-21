@@ -1,5 +1,7 @@
 use std::fmt::Display;
 
+use crate::UserState;
+
 pub const LINK_API_USER_GET_BY_USERNAME: &str = "/api/user/{username}";
 
 pub fn link_relative_user_get_by_username(username: impl Display) -> String {
@@ -10,6 +12,7 @@ pub fn link_relative_user_get_by_username(username: impl Display) -> String {
 pub struct UserGetRes {
     // pub key: i64,
     pub username: String,
+    pub state: UserState,
     pub pfp_hash: i64,
     pub pfp_proccesed: bool,
     pub likes: u32,

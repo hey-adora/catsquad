@@ -36,7 +36,7 @@ pub enum DbUserGetBySessionAndRolesSimpleErr {
     #[error("DB error {0}")]
     Db(#[from] sqlx::Error),
 
-    #[error("unauthorized")]
+    #[error("unauthorized {0}")]
     Unauthorized(String),
 }
 

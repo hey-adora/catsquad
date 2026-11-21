@@ -2,7 +2,7 @@ use std::fmt::Display;
 
 use crate::{
     MAX_EMAIL_LENGTH, MAX_PASSWORD_LENGTH, MAX_USERNAME_LENGTH, MIN_EMAIL_LENGTH,
-    MIN_PASSWORD_LENGTH, MIN_USERNAME_LENGTH, Uuid,
+    MIN_PASSWORD_LENGTH, MIN_USERNAME_LENGTH, RoleValue, Uuid,
 };
 use anyhow::anyhow;
 use catsquad_log::prelude::*;
@@ -29,6 +29,7 @@ pub struct SensitiveUserRes {
     pub pfp_hash: i64,
     pub pfp_proccesed: bool,
     pub roles_ids: Vec<i64>,
+    pub roles_values: Vec<String>,
     pub max_storage_bytes: u32, // TODO add max per image and add that to UI
     pub email: String,
     pub created_at: u64,

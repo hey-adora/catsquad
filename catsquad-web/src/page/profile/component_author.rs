@@ -91,6 +91,8 @@ pub fn ProfileAuthor(
     let class_top_link_support = move || format!("{}", when_tab_support().or("underline"));
     let class_top_link_aboutme = move || format!("{}", when_tab_aboutme().or("underline"));
 
+    let when_user_suspended = move || author_state.user_state.get().is_inactive();
+
     view! {
         <div class=" sm:hidden grid grid-rows-[auto_auto] gap-2 max-w-full overflow-hidden ">
             <div class="grid grid-cols-[auto_1fr] justify-start  px-2 gap-2 mb-2 " >
@@ -104,6 +106,9 @@ pub fn ProfileAuthor(
                     <div class="grid grid-cols-[auto_auto] max-w-[calc(100%-3.5rem)] justify-start items-center gap-[1.5rem] ">
                         <p class="text-ellipsis overflow-hidden shrink-0 text-[1.2rem] leading-[1.2rem] font-medium text-base0F">
                             {author_username}
+                            <Show when=when_user_suspended>
+                                <span class="ml-[0.5rem] rounded-md px-[0.30rem] py-[0.15rem] bg-base0A text-base01 text-[0.8rem] font-black">"suspended"</span>
+                            </Show>
                         </p>
                         <FollowBtn spawner followed=author_followed post_user_username=author_username />
                         // <BtnSecondary size=BtnSize::Small class="grid grid-cols-[auto_auto] gap-2 place-items-center ">"Follow"<SVGBell class="size-4"/></BtnSecondary>
@@ -130,7 +135,12 @@ pub fn ProfileAuthor(
                 <div class="place-items-center grid grid-cols-[auto_auto] gap-4 ">
                     <Pfp username=author_username proccesed=author_pfp_proccesed hash=author_pfp_hash class="self-start size-[5rem] shrink-0"/>
                     <div class="grid grid-rows-[auto_auto_auto] gap-2 place-items-start" >
-                        <p class="text-[1.2rem] leading-[1.2rem] font-medium text-base0F max-w-[10rem] break-all ">{ author_username }</p>
+                        <p class="text-[1.2rem] leading-[1.2rem] font-medium text-base0F max-w-[10rem] break-all ">
+                                { author_username }
+                                <Show when=when_user_suspended>
+                                    <span class="ml-[0.5rem] rounded-md px-[0.30rem] py-[0.15rem] bg-base0A text-base01 text-[0.8rem] font-black">"suspended"</span>
+                                </Show>
+                        </p>
                         <FollowBtn spawner followed=author_followed post_user_username=author_username />
                         // <BtnSecondary size=BtnSize::Normal class="grid grid-cols-[auto_auto] gap-2 place-items-center ">"Follow"<SVGBell class="size-4"/></BtnSecondary>
                         <ul class="ml-[1rem] whitespace-nowrap gap-[1.5rem] text-[1rem] list-disc">

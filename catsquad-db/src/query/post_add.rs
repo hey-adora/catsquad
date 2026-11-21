@@ -1,7 +1,7 @@
 use crate::Db;
 use crate::{DbFileImage, DbPostGet, XTimestamp};
 use catsquad_log::prelude::*;
-use catsquad_shared::{POST_STATE_DRAFT, proccess_tags};
+use catsquad_shared::{POST_STATE_DRAFT, UserState, proccess_tags};
 use sqlx::{AssertSqlSafe, FromRow};
 
 #[derive(Debug, Clone, PartialEq, sqlx::FromRow)]
@@ -170,7 +170,8 @@ impl Db {
             let query = "
                 SELECT
                     user_pfp_image_hash,
-                    coalesce(image_processed, false) as user_pfp_image_proccesed
+                    coalesce(image_processed, false) as user_pfp_image_proccesed,
+                    user_state
                 FROM users
                 LEFT JOIN files_images ON user_pfp_image_hash=image_hash
                 WHERE user_username = $1
@@ -183,7 +184,7 @@ impl Db {
 
             debug!("query: {query}\n$1={input_user_username}\nresult: {result:#?}");
 
-            let (pfp_hash, pfp_proccesed): (i64, bool) = match result {
+            let (pfp_hash, pfp_proccesed, user_state): (i64, bool, String) = match result {
                 Ok(v) => v,
                 Err(sqlx::Error::RowNotFound) => {
                     return Err(DbPostAddErr::UserNotFound);
@@ -246,6 +247,7 @@ impl Db {
                 id: post_id,
                 user_id,
                 user_username: input_user_username,
+                user_state: user_state,
                 state: POST_STATE_DRAFT.to_string(),
                 title: input_title,
                 tags: input_tags,

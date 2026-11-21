@@ -1,5 +1,6 @@
 use super::{FollowBtn, LikeBtn};
 use crate::{BtnSize, Pfp, hook::Spawner, page::post::post_api::PostApi};
+use catsquad_shared::UserState;
 use leptos::prelude::*;
 
 #[component]
@@ -16,6 +17,8 @@ pub fn PostProfile(
     let liked = post_api.liked;
     let followed = post_api.followed;
 
+    let when_user_suspended = move || post_api.author_state.get().is_inactive();
+
     view! {
         <div class="grid gap-2 justify-start grid-cols-[auto_auto_1fr] grid-rows-[auto]">
             <Pfp class="h-[3rem] w-[3rem] shrink-0" username=author_username.clone() proccesed=pfp_proccesed hash=pfp_hash />
@@ -23,6 +26,9 @@ pub fn PostProfile(
                 <a class="overflow-hidden whitespace-nowrap text-ellipsis max-w-full" href=author_link >
                     <span class="text-base03">"by "</span>
                     <span class="text-base0B font-bold">{ author_username }</span>
+                    <Show when=when_user_suspended>
+                        <span class="ml-[0.5rem] rounded-md px-[0.30rem] py-[0.15rem] bg-base0A text-base01 text-[0.8rem] font-black">"suspended"</span>
+                    </Show>
                 </a>
                 <p class="overflow-hidden whitespace-nowrap text-ellipsis max-w-full">{followers}" followers"</p>
             </div>

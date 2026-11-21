@@ -7,10 +7,10 @@ use axum::{
 use catsquad_db::{DbPostSearch, DbPostSearchErr, DbUser, DbUserGet};
 use catsquad_log::prelude::*;
 use catsquad_shared::{
-    Order, PostSearchErr, PostSearchParams, PostSearchRes, PostState, TimeRange,
+    Order, PostSearchErr, PostSearchParams, PostSearchRes, PostState, TimeRange, UserState,
 };
 
-use crate::state::AppState;
+use crate::{auth::SessionTokenV2, state::AppState};
 
 pub fn from_db_posts(value: Vec<DbPostSearch>) -> Vec<PostSearchRes> {
     value.into_iter().map(from_db_post_search).collect()
@@ -22,6 +22,9 @@ pub fn from_db_post_search(value: DbPostSearch) -> PostSearchRes {
         user_username: value.user_username,
         pfp_hash: value.user_pfp_hash,
         pfp_proccesed: value.user_pfp_proccesed,
+        user_state: UserState::try_from(value.user_state)
+            .inspect_err(|err| error!("{err}"))
+            .unwrap_or(UserState::Active),
         state: PostState::try_from(value.state)
             .inspect_err(|err| error!("{err}"))
             .unwrap_or(PostState::Active),
@@ -41,6 +44,7 @@ pub fn from_db_post_search(value: DbPostSearch) -> PostSearchRes {
 
 fn from_db_post_search_err(value: DbPostSearchErr) -> PostSearchErr {
     match value {
+        DbPostSearchErr::Unauthorized(err) => PostSearchErr::Unauthorized(err),
         DbPostSearchErr::Db(_) => PostSearchErr::InternalServer,
     }
 }
@@ -60,20 +64,18 @@ fn from_db_post_search_err(value: DbPostSearchErr) -> PostSearchErr {
 pub fn status_code(result: &Result<Vec<PostSearchRes>, PostSearchErr>) -> StatusCode {
     match result {
         Ok(_) => StatusCode::OK,
+        Err(PostSearchErr::Unauthorized(_)) => StatusCode::UNAUTHORIZED,
         Err(PostSearchErr::InternalServer) => StatusCode::INTERNAL_SERVER_ERROR,
     }
 }
 
 pub async fn post_search(
-    db_user: Extension<Option<DbUserGet>>,
+    auth_session_token: SessionTokenV2,
+    // db_user: Extension<Option<DbUserGet>>,
     State(app): State<AppState>,
     Query(req): Query<PostSearchParams>,
 ) -> impl IntoResponse {
     let tags = req.tags.unwrap_or_default();
-    let user_username = db_user
-        .as_ref()
-        .map(|v| v.username.clone())
-        .unwrap_or_default();
     let author_username = req.author_username.unwrap_or_default();
     let search_time = req.time.unwrap_or_default();
     let liked_by_username = req.liked_by_username.unwrap_or_default();
@@ -89,7 +91,7 @@ pub async fn post_search(
             .post_search(
                 PostState::Active,
                 tags,
-                user_username,
+                auth_session_token.into(),
                 author_username,
                 liked_by_username,
                 followed_by_username,

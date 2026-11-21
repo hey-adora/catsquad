@@ -1,6 +1,12 @@
-use crate::{Db, XTimestamp, join_str, run_if_not_empty};
+use crate::{
+    Db, DbUserGetBySessionAndRolesErr, DbUserGetBySessionAndRolesSimpleErr, XTimestamp, auth_perms,
+    auth_username, join_str, run_if_not_empty,
+};
 use catsquad_log::prelude::*;
-use catsquad_shared::{Order, PostState, TimeRange};
+use catsquad_shared::{
+    Order, PostState, ROLE_VALUE_PERMISSION_SEE_HIDDEN, SessionTokenKind, TimeRange, UserState,
+    contains_perms_or_is_root,
+};
 use sqlx::AssertSqlSafe;
 
 #[derive(Debug, Clone, PartialEq, sqlx::FromRow)]
@@ -11,6 +17,8 @@ pub struct DbPostSearch {
     pub user_id: i64,
     #[sqlx(rename = "post_user_username")]
     pub user_username: String,
+    #[sqlx(rename = "post_user_state")]
+    pub user_state: String,
     #[sqlx(rename = "post_user_pfp_hash")]
     pub user_pfp_hash: i64,
     #[sqlx(rename = "post_user_pfp_proccesed")]
@@ -55,6 +63,9 @@ pub struct DbPostSearch {
 pub enum DbPostSearchErr {
     #[error("DB error {0}")]
     Db(#[from] sqlx::Error),
+
+    #[error("unauthorized {0}")]
+    Unauthorized(String),
 }
 
 pub fn split_tags(tags: impl Into<String>) -> Vec<String> {
@@ -73,12 +84,21 @@ pub fn split_tags(tags: impl Into<String>) -> Vec<String> {
     tags
 }
 
+fn from_user_get_by_session_and_roles_err(value: DbUserGetBySessionAndRolesErr) -> DbPostSearchErr {
+    match DbUserGetBySessionAndRolesSimpleErr::from(value) {
+        DbUserGetBySessionAndRolesSimpleErr::Unauthorized(err) => {
+            DbPostSearchErr::Unauthorized(err)
+        }
+        DbUserGetBySessionAndRolesSimpleErr::Db(err) => DbPostSearchErr::Db(err),
+    }
+}
+
 impl Db {
     pub async fn post_search(
         &self,
         state: PostState,
         tags: impl Into<String>,
-        user_username: impl Into<String>,
+        auth_session_token: SessionTokenKind,
         author_username: impl Into<String>,
         liked_by_username: impl Into<String>,
         followed_by_username: impl Into<String>,
@@ -88,7 +108,26 @@ impl Db {
         order: Order,
     ) -> Result<Vec<DbPostSearch>, DbPostSearchErr> {
         let pool = &self.db;
-        let user_username = user_username.into();
+
+        let mut tx = pool
+            .begin()
+            .await
+            .inspect_err(|err| error!("post_search {err}"))?;
+
+        // check auth
+        let user = self
+            .auth_optional(&mut *tx, auth_session_token, &[] as &[String])
+            .await
+            .map_err(from_user_get_by_session_and_roles_err)?;
+
+        let user_permissions = auth_perms(&user);
+        let user_username = auth_username(&user);
+        let can_see_hidden = contains_perms_or_is_root(
+            auth_session_token,
+            &[ROLE_VALUE_PERMISSION_SEE_HIDDEN],
+            &user_permissions,
+        );
+
         let author_username = author_username.into();
         let liked_by_username = liked_by_username.into();
         let followed_by_username = followed_by_username.into();
@@ -102,9 +141,6 @@ impl Db {
             Order::OneTwoThree => "ASC",
             Order::ThreeTwoOne => "DESC",
         };
-        // filter - state
-
-        let q_state = "post_state = $2";
 
         // filter - time
 
@@ -132,6 +168,13 @@ impl Db {
         let (q_user_filter,) = match author_username.is_empty() {
             true => ("",),
             false => ("post_user.user_username = $5",),
+        };
+
+        // filter - state
+
+        let (q_state, q_user_state_filter) = match can_see_hidden {
+            true => ("", ""),
+            false => ("post_state = $2", "post_user.user_state = $9"),
         };
 
         //
@@ -181,7 +224,13 @@ impl Db {
             ),
         };
 
-        let filters = [q_tags.as_str(), q_time_after, q_user_filter, q_state];
+        let filters = [
+            q_tags.as_str(),
+            q_time_after,
+            q_user_filter,
+            q_state,
+            q_user_state_filter,
+        ];
         let q_where = join_str(filters, " AND ", |v| v);
         let q_where = if !q_where.is_empty() {
             format!("WHERE {q_where}")
@@ -196,6 +245,7 @@ impl Db {
                 post_id,
                 post_user_id,
                 post_user.user_username as post_user_username,
+                post_user.user_state as post_user_state,
                 post_user.user_pfp_image_hash as post_user_pfp_hash,
                 coalesce(f2.image_processed, false) as post_user_pfp_proccesed,
                 post_state,
@@ -243,9 +293,10 @@ impl Db {
             .bind(&author_username)
             .bind(&liked_by_username)
             .bind(&user_username)
-            .bind(&followed_by_username);
+            .bind(&followed_by_username)
+            .bind(UserState::Active.to_string());
 
-        let result = builder.fetch_all(pool).await;
+        let result = builder.fetch_all(&mut *tx).await;
 
         trace!(
             "
@@ -269,6 +320,10 @@ impl Db {
             }
         };
 
+        tx.commit()
+            .await
+            .inspect_err(|err| error!("post_search {err}"))?;
+
         Ok(posts)
     }
 }
@@ -276,25 +331,47 @@ impl Db {
 #[cfg(test)]
 #[tokio::test]
 async fn test_post_search() {
-    use crate::DbUser;
+    use crate::{DbUser, user_add_with_roles};
 
     init_log();
 
     let db = Db::test_db(0, "test_post_search").await;
 
-    let invite1 = db.invite_add(0, "hey@heyadora.com", 1).await.unwrap();
-    let invite2 = db.invite_add(0, "hey2@heyadora.com", 1).await.unwrap();
-    let invite3 = db.invite_add(0, "hey3@heyadora.com", 1).await.unwrap();
-    let user1 = db
-        .user_add(0, "hey", "hey", invite1.token, 10, 10)
-        .await
-        .unwrap();
-    db.user_add(0, "hey2", "hey2", invite2.token, 10, 10)
-        .await
-        .unwrap();
-    db.user_add(0, "hey3", "hey3", invite3.token, 10, 10)
-        .await
-        .unwrap();
+    let (user1, session1) = user_add_with_roles(
+        &db,
+        0,
+        10,
+        10,
+        "hey",
+        "pss",
+        "hey@heyadora.com",
+        vec![] as Vec<String>,
+    )
+    .await;
+
+    let (user2, session2) = user_add_with_roles(
+        &db,
+        0,
+        10,
+        10,
+        "hey2",
+        "pss",
+        "hey2@heyadora.com",
+        vec![] as Vec<String>,
+    )
+    .await;
+
+    let (user3, session3) = user_add_with_roles(
+        &db,
+        0,
+        10,
+        10,
+        "hey3",
+        "pss",
+        "hey3@heyadora.com",
+        vec![] as Vec<String>,
+    )
+    .await;
 
     let add_post = async |time: u64, user: &DbUser, title: &str, description: &str, tags: &str| {
         db.post_add(time, user.username.clone(), title, description, tags)
@@ -324,7 +401,7 @@ async fn test_post_search() {
             .post_search(
                 PostState::Active,
                 tags,
-                "",
+                SessionTokenKind::None,
                 author_user,
                 "",
                 "",
@@ -424,7 +501,7 @@ async fn test_post_search() {
         .post_search(
             PostState::Active,
             "",
-            "",
+            SessionTokenKind::None,
             "",
             "hey2",
             "",
@@ -443,7 +520,7 @@ async fn test_post_search() {
         .post_search(
             PostState::Active,
             "",
-            "hey2",
+            session2,
             "",
             "hey2",
             "",
@@ -462,7 +539,7 @@ async fn test_post_search() {
         .post_search(
             PostState::Active,
             "",
-            "hey3",
+            session3,
             "",
             "hey2",
             "",
@@ -487,7 +564,7 @@ async fn test_post_search() {
         .post_search(
             PostState::Active,
             "",
-            "hey",
+            session1,
             "",
             "hey2",
             "",
@@ -510,7 +587,7 @@ async fn test_post_search() {
         .post_search(
             PostState::Active,
             "",
-            "hey2",
+            session2,
             "",
             "",
             "",
@@ -537,7 +614,7 @@ async fn test_post_search() {
             .post_search(
                 PostState::Active,
                 "",
-                "hey2",
+                session2,
                 "",
                 "",
                 "hey2",
@@ -557,7 +634,7 @@ async fn test_post_search() {
             .post_search(
                 PostState::Active,
                 "",
-                "hey2",
+                session2,
                 "",
                 "",
                 "hey2",
@@ -569,6 +646,28 @@ async fn test_post_search() {
             .await
             .unwrap();
 
+        assert_eq!(result.len(), 3);
+    }
+
+    // assert error unauthorized
+    {
+        let search = async move |token: SessionTokenKind| {
+            db.post_search(
+                PostState::Active,
+                "",
+                token,
+                "",
+                "",
+                "",
+                0,
+                10,
+                TimeRange::MoreOrEqual,
+                Order::OneTwoThree,
+            )
+            .await
+        };
+
+        let result = search(SessionTokenKind::None).await.unwrap();
         assert_eq!(result.len(), 3);
     }
 }

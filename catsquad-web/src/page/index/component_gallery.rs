@@ -5,8 +5,8 @@ use crate::page::post::post_like_state::{LikeState, PostLikeState};
 use crate::{PageState, Pfp, SVGPawHollow};
 use catsquad_log::prelude::*;
 use catsquad_shared::{
-    FileImage, PostSearchRes, link_relative_post, link_relative_post_image_bytes_get_by_hash,
-    link_relative_profile_gallery,
+    FileImage, PostSearchRes, PostState, UserState, link_relative_post,
+    link_relative_post_image_bytes_get_by_hash, link_relative_profile_gallery,
 };
 use catsquad_web_utils::prelude::*;
 use catsquad_web_utils::time::time_now_micro;
@@ -428,6 +428,8 @@ pub fn GalleryImg(img: Img) -> impl IntoView {
     let author_pfp_proccesed = img.pfp_proccesed;
     let image_exists = img.image_exists;
     let likes = img.likes;
+    let post_state = img.post_state;
+    let user_state = img.user_state;
 
     let value_left = format!("{view_left}px");
     let value_top = format!("{view_top}px");
@@ -467,6 +469,21 @@ pub fn GalleryImg(img: Img) -> impl IntoView {
             }
         )
     };
+
+    let container_border_color = move || match (user_state.is_inactive(), post_state.is_inactive())
+    {
+        (true, _) => "border-4 border-base08",
+        (_, true) => "border-4 border-base0A",
+        _ => "",
+    };
+
+    let class_container = move || {
+        format!(
+            "w-full h-full relative group z-[13] {}",
+            container_border_color()
+        )
+    };
+
     let on_like = move |_| {
         spawner.spawn(async move {
             post_like_state.toggle_like().await;
@@ -482,7 +499,7 @@ pub fn GalleryImg(img: Img) -> impl IntoView {
            style:width=value_width
            style:height=value_height
         >
-            <div class="w-full h-full relative group z-[13] ">
+            <div class=class_container>
                 <a id=elm_id_img_link(img_post_id) href=link_post class="opacity-0 flex-col place-content-end absolute left-0 top-0 w-full h-full group-hover:opacity-100 group-hover:bg-linear-to-t from-base01 to-base01/0 z-[11]"></a>
                 <div class="opacity-0 group-hover:opacity-100 z-[12] absolute left-0 bottom-0 w-full grid grid-cols-[auto_1fr_auto] gap-2 px-2 pb-2">
                     <Pfp username=author_username.clone() proccesed=author_pfp_proccesed hash=author_pfp_hash class="size-10 shrink-0"/>
@@ -531,6 +548,8 @@ pub fn GalleryImg(img: Img) -> impl IntoView {
 pub struct Img {
     pub post_id: i64,
     pub username: String,
+    pub user_state: UserState,
+    pub post_state: PostState,
     pub pfp_hash: i64,
     pub pfp_proccesed: bool,
     pub hash: i64,
@@ -574,6 +593,8 @@ impl From<PostSearchRes> for Img {
         Self {
             post_id: post.id,
             username: post.user_username,
+            user_state: post.user_state,
+            post_state: post.state,
             pfp_hash: post.pfp_hash,
             pfp_proccesed: post.pfp_proccesed,
             width,
@@ -664,6 +685,8 @@ impl Img {
         Self {
             post_id: id as i64,
             username: "bot".to_string(),
+            user_state: UserState::Active,
+            post_state: PostState::Active,
             pfp_hash: 0,
             pfp_proccesed: false,
             hash: 0,
@@ -689,6 +712,8 @@ impl Img {
             post_id: id,
             username: "bot".to_string(),
             hash: 0,
+            user_state: UserState::Active,
+            post_state: PostState::Active,
             pfp_hash: 0,
             pfp_proccesed: false,
             extension: "webp".to_string(),

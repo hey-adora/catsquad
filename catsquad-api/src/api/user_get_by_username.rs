@@ -6,11 +6,15 @@ use axum::{
     response::IntoResponse,
 };
 use catsquad_db::{DbUser, DbUserGet, DbUserGetByUsernameErr};
-use catsquad_shared::{UserGetByUsernameErr, UserGetByUsernameParams, UserGetRes};
+use catsquad_log::prelude::*;
+use catsquad_shared::{UserGetByUsernameErr, UserGetByUsernameParams, UserGetRes, UserState};
 
 pub fn from_db_user_get(value: DbUserGet) -> UserGetRes {
     UserGetRes {
         username: value.username,
+        state: UserState::try_from(value.state)
+            .inspect_err(|err| error!("{err}"))
+            .unwrap_or(UserState::Active),
         pfp_hash: value.pfp_image_hash,
         pfp_proccesed: value.pfp_image_proccesed,
         followers: value.followers_count,

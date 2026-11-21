@@ -1,7 +1,7 @@
 use super::index::component_gallery::Gallery;
 use crate::hook::Spawner;
 use crate::page::create_client;
-use crate::page::profile::author_state::AuthorState;
+use crate::page::profile::author_state::{AuthorStage, AuthorState};
 use crate::page_state::CurrentRoute;
 use crate::{ModalConfirm, Nav, PageState};
 use leptos::prelude::*;
@@ -53,16 +53,13 @@ pub fn Profile() -> impl IntoView {
 
     let author_state = AuthorState::new(create_client());
     let author_state_clone1 = author_state.clone();
-    Effect::new({
+    Effect::new(move || {
+        let username = username();
         let author_state = author_state.clone();
-        move || {
-            let username = username();
-            let author_state = author_state.clone();
 
-            spawner.spawn(async move {
-                author_state.init(username).await;
-            });
-        }
+        spawner.spawn(async move {
+            author_state.init(username).await;
+        });
     });
 
     let class_gallery = move || {
@@ -75,30 +72,56 @@ pub fn Profile() -> impl IntoView {
         )
     };
 
+    let err = move || author_state.err_general.get();
+    let when_is_loading = move || author_state.stage.get() == AuthorStage::Loading;
+    let when_show_profile = move || author_state.stage.get() == AuthorStage::Normal;
+    let when_show_error = move || match author_state.stage.get() {
+        AuthorStage::Loading | AuthorStage::Normal => false,
+        AuthorStage::NotFound | AuthorStage::Error | AuthorStage::Suspended => true,
+    };
+
     view! {
         <main class="grid grid-rows-[auto_1fr] h-screen">
             <Nav />
             <ModalConfirm/>
-            <div class="grid grid-rows-[auto_1fr] sm:grid-rows-[1fr] sm:grid-cols-[1fr_auto] ">
-                <ProfileAuthor author_state=author_state.clone() spawner user_username=username />
-                <Show when=when_tab_support>
-                    <Support
-                        class="mt-4 px-2 sm:col-start-1 sm:col-row-1 sm:hidden"
-                        user_username=username
-                        spawner
-                        author_state=author_state.clone()
-                    />
-                </Show>
-                <Show when=when_tab_aboutme>
-                    <Aboutme
-                        class="mt-4 px-2 sm:col-start-1 sm:col-row-1 sm:hidden"
-                        user_username=username
-                        spawner
-                        author_state=author_state_clone1.clone()
-                    />
-                </Show>
-                <Gallery class=class_gallery liked_by_username author_username row_height=250 />
-            </div>
+
+            <Show when=when_is_loading>
+                <div class="grid place-items-center text-[1.5rem] ">
+                    "loading..."
+                </div>
+            </Show>
+
+            <Show when=when_show_error>
+                <div class="grid place-items-center text-[1.5rem] ">
+                    {err}
+                </div>
+            </Show>
+
+            <Show when=when_show_profile>
+
+                <div class="grid grid-rows-[auto_1fr] sm:grid-rows-[1fr] sm:grid-cols-[1fr_auto] ">
+                    <ProfileAuthor author_state=author_state.clone() spawner user_username=username />
+                    <Show when=when_tab_support>
+                        <Support
+                            class="mt-4 px-2 sm:col-start-1 sm:col-row-1 sm:hidden"
+                            user_username=username
+                            spawner
+                            author_state=author_state.clone()
+                        />
+                    </Show>
+                    <Show when=when_tab_aboutme>
+                        <Aboutme
+                            class="mt-4 px-2 sm:col-start-1 sm:col-row-1 sm:hidden"
+                            user_username=username
+                            spawner
+                            author_state=author_state_clone1.clone()
+                        />
+                    </Show>
+                    <Gallery class=class_gallery liked_by_username author_username row_height=250 />
+                </div>
+
+            </Show>
+
         </main>
     }
 }

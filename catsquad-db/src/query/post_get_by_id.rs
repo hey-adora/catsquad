@@ -35,6 +35,8 @@ pub struct DbPostGet {
     pub user_id: i64,
     #[sqlx(rename = "post_user_username")]
     pub user_username: String,
+    #[sqlx(rename = "post_user_state")]
+    pub user_state: String,
     #[sqlx(rename = "post_user_pfp_hash")]
     pub user_pfp_hash: i64,
     #[sqlx(rename = "post_user_pfp_proccesed")]
@@ -157,6 +159,7 @@ impl Db {
                         post_id,
                         post_user_id,
                         post_user.user_username as post_user_username,
+                        post_user.user_state as post_user_state,
                         post_state,
                         post_title,
                         post_description,
