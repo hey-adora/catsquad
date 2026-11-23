@@ -131,7 +131,6 @@ pub async fn app(state: AppState) -> Router {
         ));
 
     let router_optionanl_auth = Router::new()
-        .route(catsquad_shared::LINK_API_POST_SEARCH, get(api::post_search))
         .route(
             catsquad_shared::LINK_API_CONFIRM_TOKEN_PASSWORD_CHANGE_ADD,
             post(api::confirm_token_password_change_add),
@@ -272,7 +271,6 @@ pub async fn app(state: AppState) -> Router {
             catsquad_shared::LINK_API_USER_GET_BY_SESSION_KEY,
             get(api::user_get_by_session_token),
         )
-        .route(catsquad_shared::LINK_API_USER_SEARCH, get(api::user_search))
         .route_layer(middleware::from_fn_with_state(
             state.clone(),
             auth_middleware,
@@ -301,6 +299,12 @@ pub async fn app(state: AppState) -> Router {
         .route(
             catsquad_shared::LINK_API_USER_PFP_GET_BYTES,
             get(api::user_pfp_get_bytes),
+        )
+        .route(catsquad_shared::LINK_API_POST_SEARCH, get(api::post_search))
+        .route(catsquad_shared::LINK_API_USER_SEARCH, get(api::user_search))
+        .route(
+            catsquad_shared::LINK_API_USER_PAGINATION,
+            get(api::user_pagination),
         );
 
     let app = Router::new()

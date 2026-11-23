@@ -1,11 +1,11 @@
 use crate::{
     Db, DbUserGetBySessionAndRolesErr, DbUserGetBySessionAndRolesSimpleErr, XTimestamp, auth_perms,
-    auth_username, join_str, run_if_not_empty,
+    auth_username, join_str,
 };
 use catsquad_log::prelude::*;
 use catsquad_shared::{
-    Order, PostState, ROLE_VALUE_PERMISSION_SEE_HIDDEN, SessionTokenKind, TimeRange, UserState,
-    contains_perms_or_is_root,
+    Order, PostState, ROLE_VALUE_PERMISSION_SEE_HIDDEN, RoleValue, SessionTokenKind, TimeRange,
+    UserState, contains_perms_or_is_root,
 };
 use sqlx::AssertSqlSafe;
 
@@ -66,6 +66,9 @@ pub enum DbPostSearchErr {
 
     #[error("unauthorized {0}")]
     Unauthorized(String),
+
+    #[error("internal server error")]
+    InternalServerErr,
 }
 
 pub fn split_tags(tags: impl Into<String>) -> Vec<String> {
@@ -96,7 +99,6 @@ fn from_user_get_by_session_and_roles_err(value: DbUserGetBySessionAndRolesErr) 
 impl Db {
     pub async fn post_search(
         &self,
-        state: PostState,
         tags: impl Into<String>,
         auth_session_token: SessionTokenKind,
         author_username: impl Into<String>,
@@ -108,6 +110,10 @@ impl Db {
         order: Order,
     ) -> Result<Vec<DbPostSearch>, DbPostSearchErr> {
         let pool = &self.db;
+
+        let author_username = author_username.into();
+        let liked_by_username = liked_by_username.into();
+        let followed_by_username = followed_by_username.into();
 
         let mut tx = pool
             .begin()
@@ -124,16 +130,48 @@ impl Db {
         let user_username = auth_username(&user);
         let can_see_hidden = contains_perms_or_is_root(
             auth_session_token,
-            &[ROLE_VALUE_PERMISSION_SEE_HIDDEN],
+            &[RoleValue::PermissionSeeHidden],
             &user_permissions,
         );
-
-        let author_username = author_username.into();
-        let liked_by_username = liked_by_username.into();
-        let followed_by_username = followed_by_username.into();
+        let is_my_posts = !user_username.is_empty() && user_username == author_username;
+        let can_see_hidden = can_see_hidden || is_my_posts;
 
         let is_liked_by_and_user_same =
             !user_username.is_empty() && user_username == liked_by_username;
+
+        // auth
+        {
+            if !author_username.is_empty() && !can_see_hidden {
+                let query = "SELECT user_state FROM users WHERE user_username = $1";
+                let result = sqlx::query_as(query)
+                    .bind(&author_username)
+                    .fetch_one(&mut *tx)
+                    .await;
+
+                let (author_user_state,): (String,) = match result {
+                    Ok(v) => v,
+                    Err(err) => {
+                        error!("unexpected db error {err}");
+                        return Err(DbPostSearchErr::Db(err));
+                    }
+                };
+
+                let author_user_state = match UserState::try_from(author_user_state.as_str()) {
+                    Ok(v) => v,
+                    Err(_err) => {
+                        error!(
+                            "something exploded, user {} has invalid state {}",
+                            author_username, author_user_state
+                        );
+                        return Err(DbPostSearchErr::InternalServerErr);
+                    }
+                };
+
+                if author_user_state.is_inactive() {
+                    return Err(DbPostSearchErr::Unauthorized("suspended".to_string()));
+                }
+            }
+        }
 
         // order
 
@@ -172,9 +210,9 @@ impl Db {
 
         // filter - state
 
-        let (q_state, q_user_state_filter) = match can_see_hidden {
-            true => ("", ""),
-            false => ("post_state = $2", "post_user.user_state = $9"),
+        let q_state = match can_see_hidden {
+            true => "post_state != $2",
+            false => "post_state = $10 AND post_user.user_state = $9",
         };
 
         //
@@ -224,13 +262,7 @@ impl Db {
             ),
         };
 
-        let filters = [
-            q_tags.as_str(),
-            q_time_after,
-            q_user_filter,
-            q_state,
-            q_user_state_filter,
-        ];
+        let filters = [q_tags.as_str(), q_time_after, q_user_filter, q_state];
         let q_where = join_str(filters, " AND ", |v| v);
         let q_where = if !q_where.is_empty() {
             format!("WHERE {q_where}")
@@ -287,14 +319,15 @@ impl Db {
 
         let builder = sqlx::query_as(query)
             .bind(XTimestamp(search_time as i64))
-            .bind(state.as_str())
+            .bind(PostState::Draft.as_str())
             .bind(limit as i64)
             .bind(&tags)
             .bind(&author_username)
             .bind(&liked_by_username)
             .bind(&user_username)
             .bind(&followed_by_username)
-            .bind(UserState::Active.to_string());
+            .bind(UserState::Active.as_str())
+            .bind(PostState::Active.as_str());
 
         let result = builder.fetch_all(&mut *tx).await;
 
@@ -302,14 +335,19 @@ impl Db {
             "
             query {query_str}
             $1 = {search_time}
-            $2 = {state}
+            $2 = {}
             $3 = {limit}
             $4 = {tags:?}
             $5 = {author_username}
             $6 = {liked_by_username}
             $7 = {user_username}
             $8 = {followed_by_username}
-            result {result:#?}"
+            $9 = {}
+            $10 = {}
+            result {result:#?}",
+            PostState::Draft.as_str(),
+            UserState::Active.as_str(),
+            PostState::Active.as_str()
         );
 
         let posts = match result {
@@ -332,12 +370,13 @@ impl Db {
 #[tokio::test]
 async fn test_post_search() {
     use crate::{DbUser, user_add_with_roles};
+    use catsquad_shared::UUID_ZERO;
 
     init_log();
 
     let db = Db::test_db(0, "test_post_search").await;
 
-    let (user1, session1) = user_add_with_roles(
+    let (user1, mut session1) = user_add_with_roles(
         &db,
         0,
         10,
@@ -399,7 +438,6 @@ async fn test_post_search() {
                         order: bool| {
         let result = db
             .post_search(
-                PostState::Active,
                 tags,
                 SessionTokenKind::None,
                 author_user,
@@ -499,7 +537,6 @@ async fn test_post_search() {
 
     let result = db
         .post_search(
-            PostState::Active,
             "",
             SessionTokenKind::None,
             "",
@@ -518,7 +555,6 @@ async fn test_post_search() {
 
     let result = db
         .post_search(
-            PostState::Active,
             "",
             session2,
             "",
@@ -537,7 +573,6 @@ async fn test_post_search() {
 
     let result = db
         .post_search(
-            PostState::Active,
             "",
             session3,
             "",
@@ -562,7 +597,6 @@ async fn test_post_search() {
 
     let result = db
         .post_search(
-            PostState::Active,
             "",
             session1,
             "",
@@ -585,7 +619,6 @@ async fn test_post_search() {
 
     let result = db
         .post_search(
-            PostState::Active,
             "",
             session2,
             "",
@@ -612,7 +645,6 @@ async fn test_post_search() {
     {
         let result = db
             .post_search(
-                PostState::Active,
                 "",
                 session2,
                 "",
@@ -632,7 +664,6 @@ async fn test_post_search() {
 
         let result = db
             .post_search(
-                PostState::Active,
                 "",
                 session2,
                 "",
@@ -651,12 +682,36 @@ async fn test_post_search() {
 
     // assert error unauthorized
     {
-        let search = async move |token: SessionTokenKind| {
+        let post_state = async |post_state: PostState| {
+            db.post_update_state(0, "hey".to_string(), post0.id, post_state)
+                .await
+                .unwrap();
+        };
+
+        let user_state = async |user_state: UserState| {
+            db.user_update_state(
+                async |_| String::new(),
+                0,
+                SessionTokenKind::Root,
+                vec!["hey".to_string()],
+                user_state,
+            )
+            .await
+            .unwrap();
+
+            if user_state == UserState::Active {
+                let token = db.session_add(0, "hey@heyadora.com").await.unwrap().token;
+                return SessionTokenKind::User(token);
+            }
+
+            SessionTokenKind::None
+        };
+
+        let search = async |token: SessionTokenKind, author_username: &str| {
             db.post_search(
-                PostState::Active,
                 "",
                 token,
-                "",
+                author_username,
                 "",
                 "",
                 0,
@@ -667,7 +722,88 @@ async fn test_post_search() {
             .await
         };
 
-        let result = search(SessionTokenKind::None).await.unwrap();
-        assert_eq!(result.len(), 3);
+        let results = async |user1_token: SessionTokenKind, author: &str| {
+            let result1 = search(SessionTokenKind::None, author).await;
+            let result2 = search(user1_token, author).await;
+            let result3 = search(session2, author).await;
+            let result4 = search(SessionTokenKind::Root, author).await;
+
+            (result1, result2, result3, result4)
+        };
+
+        // home page
+        {
+            // count posts returned for each type of user
+            let results = async || {
+                let result = results(session1, "").await;
+                [
+                    result.0.unwrap().len(),
+                    result.1.unwrap().len(),
+                    result.2.unwrap().len(),
+                    result.3.unwrap().len(),
+                ]
+            };
+
+            // post0 active - user1 active
+            {
+                let result = results().await;
+                assert_eq!(result, [3, 3, 3, 3]);
+            }
+
+            // post0 hidden - user1 active
+            {
+                post_state(PostState::Hidden).await;
+
+                let result = results().await;
+                assert_eq!(result, [2, 2, 2, 3]);
+            }
+
+            // post0 active - user1 suspended
+            {
+                post_state(PostState::Active).await;
+                user_state(UserState::Suspended).await;
+
+                let result = results().await;
+                assert_eq!(result, [0, 0, 0, 3]);
+            }
+
+            // post0 active - user1 suspended - see hidden
+            {
+                db.role_update_value(0, user2.roles[0], vec![ROLE_VALUE_PERMISSION_SEE_HIDDEN])
+                    .await
+                    .unwrap();
+
+                let result = results().await;
+                assert_eq!(result, [0, 0, 3, 3]);
+            }
+        }
+
+        // profile page
+        {
+            // post0 active - user1 active
+            {
+                session1 = user_state(UserState::Active).await;
+
+                let result = results(session1, "hey").await;
+                assert!(matches!(result, (Ok(_), Ok(_), Ok(_), Ok(_))));
+            }
+
+            // post0 active - user1 suspended
+            {
+                user_state(UserState::Suspended).await;
+
+                let result = results(session1, "hey").await;
+                trace!("{result:#?}");
+                assert!(matches!(
+                    result,
+                    (
+                        Err(DbPostSearchErr::Unauthorized(_)),
+                        Err(DbPostSearchErr::Unauthorized(_)),
+                        Ok(_),
+                        Ok(_)
+                    )
+                ));
+            }
+        }
     }
 }

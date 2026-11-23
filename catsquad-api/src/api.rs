@@ -25,7 +25,7 @@ mod post_like_add;
 mod post_like_get_by_post;
 mod post_like_remove;
 mod post_remove;
-mod post_search; // this
+mod post_search; // this - done
 mod post_thumbnail_get_by_hash; // this - done
 mod post_update_description;
 mod post_update_image_add;
@@ -41,6 +41,7 @@ mod session_remove;
 mod user_add;
 mod user_get_by_session_id;
 mod user_get_by_username; // this - done
+mod user_pagination;
 mod user_pfp_get_bytes; // this - done
 mod user_remove_by_token;
 mod user_remove_by_usernames;
@@ -96,6 +97,7 @@ pub use session_remove::session_remove;
 pub use user_add::user_add;
 pub use user_get_by_session_id::user_get_by_session_token;
 pub use user_get_by_username::user_get_by_username;
+pub use user_pagination::user_pagination;
 pub use user_pfp_get_bytes::user_pfp_get_bytes;
 pub use user_remove_by_token::user_remove_by_token;
 pub use user_remove_by_usernames::user_remove_by_usernames;

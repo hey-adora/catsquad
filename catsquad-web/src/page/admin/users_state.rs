@@ -24,6 +24,9 @@ where
     pub param_search_field_email: RwSignal<bool>,
     pub param_search_query: RwSignal<String>,
 
+    pub page_offset: RwSignal<usize>,
+    pub page_total: RwSignal<usize>,
+
     pub check_all: RwSignal<bool>,
     pub checked_usernames: RwSignal<Vec<String>>,
 
@@ -55,6 +58,8 @@ where
             param_search_query: RwSignal::new(String::new()),
             check_all: RwSignal::new(false),
             checked_usernames: RwSignal::new(Vec::new()),
+            page_offset: RwSignal::new(0),
+            page_total: RwSignal::new(0),
             client: StoredValue::new_local(client),
         }
     }
@@ -72,30 +77,62 @@ where
         let param_search_query = self.param_search_query.get_untracked();
 
         self.err_fetch.update(|v| v.clear());
-        let result = client
-            .user_search(
-                0,
-                param_search_limit,
-                0,
-                TimeRange::MoreOrEqual,
-                param_search_order,
-                param_search_field,
-                param_search_query,
-            )
-            .send()
-            .await
-            .into_json()
-            .await;
-        let users = match result {
-            Ok(v) => v,
-            Err(err) => {
-                let err = format!("user_state error {err}");
-                error!("{err}");
-                self.err_fetch.set(err);
-                return;
-            }
-        };
-        self.users.set(users);
+
+        // get users
+        {
+            let result = client
+                .user_search(
+                    0,
+                    param_search_limit,
+                    0,
+                    TimeRange::MoreOrEqual,
+                    param_search_order.clone(),
+                    param_search_field.clone(),
+                    param_search_query.clone(),
+                )
+                .send()
+                .await
+                .into_json()
+                .await;
+            let users = match result {
+                Ok(v) => v,
+                Err(err) => {
+                    let err = format!("user_state error {err}");
+                    error!("{err}");
+                    self.err_fetch.set(err);
+                    return;
+                }
+            };
+            self.users.set(users);
+        }
+
+        // get pagination
+        {
+            let result = client
+                .user_pagination(
+                    0,
+                    param_search_limit,
+                    0,
+                    TimeRange::MoreOrEqual,
+                    param_search_order,
+                    param_search_field,
+                    param_search_query,
+                )
+                .send()
+                .await
+                .into_json()
+                .await;
+            let pagination = match result {
+                Ok(v) => v,
+                Err(err) => {
+                    let err = format!("user_state error {err}");
+                    error!("{err}");
+                    self.err_fetch.set(err);
+                    return;
+                }
+            };
+            self.page_total.set(pagination.total_count);
+        }
     }
 
     pub fn clear_checked(&self) {
@@ -402,7 +439,7 @@ async fn test_user_state_remove_all() {
 async fn test_user_state_fetch() {
     use catsquad_api::auth::create_auth_cookie_str;
     use catsquad_api::promote_admin;
-    use catsquad_shared::{PostState, uuid_to_str};
+    use catsquad_shared::uuid_to_str;
     use http::header;
 
     catsquad_log::init_log();
@@ -447,6 +484,7 @@ async fn test_user_state_fetch() {
 
         assert!(!user_state.err_fetch.get_untracked().is_empty());
         assert_eq!(user_state.users.get_untracked().len(), 0);
+        assert_eq!(user_state.page_total.get_untracked(), 0);
     }
 
     // assert success
@@ -458,6 +496,7 @@ async fn test_user_state_fetch() {
 
         assert_eq!(user_state.err_fetch.get_untracked(), "");
         assert_eq!(user_state.users.get_untracked().len(), 1);
+        assert_eq!(user_state.page_total.get_untracked(), 1);
         assert_eq!(user_state.users.get_untracked()[0].username, "prime1");
     }
 }

@@ -73,6 +73,7 @@ pub use api::test_backdoor_email_sent_get_all::*;
 pub use api::user_add::*;
 pub use api::user_get_by_session_key::*;
 pub use api::user_get_by_username::*;
+pub use api::user_pagination::*;
 pub use api::user_pfp_get_bytes::*;
 pub use api::user_remove_by_token::*;
 pub use api::user_remove_by_usernames::*;
@@ -164,6 +165,25 @@ fn serde_from_role_value<S: serde::Serializer>(
     for v in iter {
         output.push(',');
         output.push_str(v.as_str());
+    }
+
+    output.serialize(serializer)
+}
+
+fn serde_from_role_value2<S: serde::Serializer>(
+    v: &Vec<RoleValue>,
+    serializer: S,
+) -> Result<S::Ok, S::Error> {
+    use serde::Serialize;
+
+    let mut output = String::new();
+    let len = v.len();
+
+    for (i, v) in v.into_iter().enumerate() {
+        output.push_str(v.as_str());
+        if i - 1 == len {
+            output.push(',');
+        }
     }
 
     output.serialize(serializer)

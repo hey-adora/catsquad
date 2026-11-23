@@ -1,8 +1,9 @@
 use catsquad_log::prelude::*;
 use catsquad_shared::{
-    self as cs, FileImage, Order, PostSearchParams, PostState, TimeRange, ToForm, UserSearchParams,
-    UserState, Uuid, link_relative_invite_get_by_key, link_relative_post_get_by_key,
-    link_relative_post_remove, link_relative_post_search, uuid_to_str,
+    self as cs, FileImage, Order, PostSearchParams, PostState, TimeRange, ToForm,
+    UserPaginationRes, UserSearchParams, UserState, Uuid, link_relative_invite_get_by_key,
+    link_relative_post_get_by_key, link_relative_post_remove, link_relative_post_search,
+    uuid_to_str,
 };
 use http::{HeaderMap, HeaderName, StatusCode, header};
 use std::{
@@ -847,10 +848,6 @@ where
 
     pub fn user_search(
         &self,
-        // tags: impl Into<String>,
-        // author_username: impl Into<String>,
-        // liked_by_username: impl Into<String>,
-        // followed_by_username: impl Into<String>,
         time: u64,
         limit: usize,
         offset: usize,
@@ -860,6 +857,29 @@ where
         search_quary: impl Into<String>,
     ) -> Builder<TSender, Vec<cs::UserSearchRes>, cs::UserSearchErr> {
         self.get(cs::link_relative_user_search(UserSearchParams {
+            time: Some(time),
+            offset: Some(offset),
+            range: Some(range),
+            order: Some(order),
+            limit: Some(limit),
+            // search_fields: Some(search_fields),
+            search_field_username: Some(search_fields.username),
+            search_field_email: Some(search_fields.username),
+            search_query: Some(search_quary.into()),
+        }))
+    }
+
+    pub fn user_pagination(
+        &self,
+        time: u64,
+        limit: usize,
+        offset: usize,
+        range: TimeRange,
+        order: Order,
+        search_fields: cs::UserSearchFields,
+        search_quary: impl Into<String>,
+    ) -> Builder<TSender, cs::UserPaginationRes, cs::UserPaginationErr> {
+        self.get(cs::link_relative_user_pagination(UserSearchParams {
             time: Some(time),
             offset: Some(offset),
             range: Some(range),

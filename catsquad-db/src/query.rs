@@ -44,7 +44,7 @@ pub mod post_like_exists_by_post;
 pub mod post_like_get_all;
 pub mod post_like_remove;
 pub mod post_remove;
-pub mod post_search;
+pub mod post_search; // auth_v2
 pub mod post_update_builder_text;
 pub mod post_update_description;
 pub mod post_update_file_add;

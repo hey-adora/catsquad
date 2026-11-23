@@ -294,18 +294,6 @@ where
     output
 }
 
-pub fn run_if_not_empty(input: impl AsRef<str>, callback: impl FnOnce() -> String) -> String {
-    let input = input.as_ref();
-
-    let result = if !input.is_empty() {
-        callback()
-    } else {
-        "".to_string()
-    };
-
-    result
-}
-
 #[test]
 pub fn test_join_str() {
     let filters = ["a", "", "b", ""];

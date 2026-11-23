@@ -1,15 +1,14 @@
-use crate::state::AppState;
+use crate::{auth::SessionTokenV2, state::AppState};
 use axum::{
-    Extension, Json,
-    extract::{Path, Query, State},
+    Json,
+    extract::{Query, State},
     http::StatusCode,
     response::IntoResponse,
 };
-use catsquad_db::{DbUserGet, DbUserSearch, DbUserSearchBuilderErr};
+use catsquad_db::{DbUserSearch, DbUserSearchBuilderErr};
 use catsquad_log::prelude::*;
 use catsquad_shared::{
-    Order, ROLE_VALUE_PERMISSION_USER_SEARCH, TimeRange, UserSearchErr, UserSearchFields,
-    UserSearchParams, UserSearchRes, role_extract_permission_user_search,
+    Order, TimeRange, UserSearchErr, UserSearchFields, UserSearchParams, UserSearchRes,
 };
 
 pub fn from_db_user_search(value: Vec<DbUserSearch>) -> Vec<UserSearchRes> {
@@ -33,6 +32,8 @@ pub fn from_db_user_search(value: Vec<DbUserSearch>) -> Vec<UserSearchRes> {
 
 fn from_db_user_search_err(value: DbUserSearchBuilderErr) -> UserSearchErr {
     match value {
+        DbUserSearchBuilderErr::Unauthorized(err) => UserSearchErr::Unauthorized(err),
+        DbUserSearchBuilderErr::InternalServerErr => UserSearchErr::InternalServer,
         DbUserSearchBuilderErr::Db(_) => UserSearchErr::InternalServer,
     }
 }
@@ -45,47 +46,64 @@ fn status_code(result: &Result<Vec<UserSearchRes>, UserSearchErr>) -> StatusCode
     }
 }
 
+pub fn prepare_user_search_params(
+    params: UserSearchParams,
+) -> (
+    u64,
+    usize,
+    usize,
+    TimeRange,
+    Order,
+    UserSearchFields,
+    String,
+) {
+    let time_range_value = params.time.unwrap_or(0);
+    let time_range = params.range.unwrap_or(TimeRange::MoreOrEqual);
+    let order = params.order.unwrap_or(Order::ThreeTwoOne);
+    let limit = params.limit.unwrap_or(100);
+    let offset = params.offset.unwrap_or(0);
+
+    let mut search_fields = UserSearchFields::default();
+    if let Some(search_field_username) = params.search_field_username {
+        search_fields.username = search_field_username;
+    };
+    if let Some(search_field_email) = params.search_field_email {
+        search_fields.email = search_field_email;
+    };
+    let search_query = params.search_query.unwrap_or_default();
+    let search_query = search_query.trim();
+
+    (
+        time_range_value,
+        limit,
+        offset,
+        time_range,
+        order,
+        search_fields,
+        search_query.to_string(), // TODO optimize this ugly thing
+    )
+}
+
 pub async fn user_search(
-    db_user: Extension<DbUserGet>,
+    auth_session_token: SessionTokenV2,
     State(app): State<AppState>,
     Query(params): Query<UserSearchParams>,
 ) -> impl IntoResponse {
     trace!("user_search received params {params:#?}");
     let inner = async || -> Result<Vec<UserSearchRes>, UserSearchErr> {
-        let permission_role_add = role_extract_permission_user_search(&db_user.roles_values);
-        if !permission_role_add {
-            return Err(UserSearchErr::Unauthorized(format!(
-                "user {} doesnt have permission {}",
-                db_user.username, ROLE_VALUE_PERMISSION_USER_SEARCH
-            )));
-        }
-
-        let time_range_value = params.time.unwrap_or(0);
-        let time_range = params.range.unwrap_or(TimeRange::MoreOrEqual);
-        let order = params.order.unwrap_or(Order::ThreeTwoOne);
-        let limit = params.limit.unwrap_or(100);
-        let offset = params.offset.unwrap_or(0);
-
-        let mut search_fields = UserSearchFields::default();
-        if let Some(search_field_username) = params.search_field_username {
-            search_fields.username = search_field_username;
-        };
-        if let Some(search_field_email) = params.search_field_email {
-            search_fields.email = search_field_email;
-        };
-        let search_query = params.search_query.unwrap_or_default();
-        let search_query = search_query.trim();
+        let params = prepare_user_search_params(params);
 
         let users = app
             .db
             .user_search_users(
-                time_range_value,
-                limit,
-                offset,
-                time_range,
-                order,
-                search_fields,
-                search_query,
+                auth_session_token.into(),
+                params.0,
+                params.1,
+                params.2,
+                params.3,
+                params.4,
+                params.5,
+                params.6,
             )
             .await
             .map_err(from_db_user_search_err)?;
@@ -143,18 +161,14 @@ mod test_utils {
 #[tokio::test]
 async fn test_api_user_search() {
     use catsquad_log::prelude::*;
-    use catsquad_shared::UserSearchFields;
+    use catsquad_shared::{UUID_ZERO, UserSearchFields, Uuid};
 
     init_log();
     let server = crate::TestServer::new(0, "test_api_user_search").await;
 
-    server.state.set_admin_username("hey0").await;
-
-    let (user_one, session_key) = server
+    let (_user_one, session_key) = server
         .user_add_full("hey0", "hey0@heyadora.com", "PAss$ord11111")
         .await;
-
-    // server.state.db.role_update_value(0, role_id, values);
 
     for i in 1..10 {
         let username = format!("hey{i}");
@@ -163,9 +177,31 @@ async fn test_api_user_search() {
             server.user_add_full(username, email, "PAss$ord11111").await;
     }
 
-    // assert error
+    // assert unauthorized
     {
+        let search = async |token: Uuid| {
+            server
+                .user_search(
+                    0,
+                    10,
+                    0,
+                    TimeRange::MoreOrEqual,
+                    Order::OneTwoThree,
+                    UserSearchFields::default(),
+                    "",
+                    token,
+                )
+                .await
+        };
+
+        let result = search(UUID_ZERO).await;
+        assert!(matches!(result, Err(UserSearchErr::Unauthorized(_))));
+
+        let result = search(session_key).await;
+        assert!(matches!(result, Err(UserSearchErr::Unauthorized(_))));
+
         let result = server
+            .client
             .user_search(
                 0,
                 10,
@@ -174,12 +210,15 @@ async fn test_api_user_search() {
                 Order::OneTwoThree,
                 UserSearchFields::default(),
                 "",
-                0_u128.to_be_bytes(),
             )
+            .send()
+            .await
+            .into_json()
             .await;
-
         assert!(matches!(result, Err(UserSearchErr::Unauthorized(_))));
     }
+
+    server.admin("hey0").await;
 
     // assert success
     {

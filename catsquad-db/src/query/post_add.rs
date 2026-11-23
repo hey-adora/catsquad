@@ -107,6 +107,7 @@ impl Db {
 
                         post_id,
                         post_user_id,
+                        user_state as post_user_state,
                         user_username as post_user_username,
                         post_state,
                         post_title,

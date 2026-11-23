@@ -1,7 +1,4 @@
-use crate::{
-    BtnDelete, BtnSize, ErrGeneral, Errs, ModalConfirm, Nav, hook::Spawner, page::create_client,
-};
-use catsquad_shared::UserSearchRes;
+use crate::{Errs, ModalConfirm, Nav, hook::Spawner, page::create_client};
 use leptos::prelude::*;
 
 mod component_user_table_rows;

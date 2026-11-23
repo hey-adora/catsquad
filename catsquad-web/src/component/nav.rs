@@ -1,6 +1,7 @@
 use catsquad_log::prelude::*;
 use catsquad_shared::{
-    LINK_WEB_ADMIN, LINK_WEB_FOLLOWED, LINK_WEB_INDEX, LINK_WEB_LOGIN, link_relative_index_search,
+    LINK_WEB_ADMIN, LINK_WEB_FOLLOWED, LINK_WEB_INDEX, LINK_WEB_LOGIN, RoleValue,
+    link_relative_index_search,
 };
 use catsquad_web_utils::prelude::*;
 use leptos::{html, prelude::*};
@@ -28,18 +29,34 @@ pub fn Nav() -> impl IntoView {
 
     let is_loading = move || page_state.acc_pending() || spawner.is_busy.get();
     let is_logged_in = move || page_state.is_logged_in().unwrap_or_default();
+    let is_perms_see_admin_controls =
+        move || page_state.acc_contains_perm(RoleValue::PermissionSeeAdminControls);
 
     let when_guest = move || !is_logged_in() && !is_loading();
     let when_user = move || is_logged_in() && !is_loading();
 
-    let class_link_index_underline =
-        move || move || (current_route.get() == CurrentRoute::Index).or("underline");
+    let class_link_index_underline = move || {
+        format!(
+            "{}",
+            (current_route.get() == CurrentRoute::Index).or("underline")
+        )
+    };
 
-    let class_link_followed_underline =
-        move || (current_route.get() == CurrentRoute::Followed).or("underline");
+    let class_link_followed_underline = move || {
+        format!(
+            "hidden sm:block {}",
+            (current_route.get() == CurrentRoute::Followed).or("underline")
+        )
+    };
 
-    let class_link_admin_underline =
-        move || (current_route.get() == CurrentRoute::Admin).or("underline");
+    let class_link_admin_underline = move || {
+        format!(
+            "hidden sm:block {}",
+            (current_route.get() == CurrentRoute::Admin).or("underline")
+        )
+    };
+
+    // let when_lo
 
     view! {
         <nav class="text-gray-200 flex gap-2 px-4 h-[3rem] items-center justify-between">
@@ -58,18 +75,22 @@ pub fn Nav() -> impl IntoView {
                     >
                     "Home"
                 </a>
-                <a
-                    class=class_link_followed_underline
-                    href=LINK_WEB_FOLLOWED
-                    >
-                    "Followed"
-                </a>
-                <a
-                    class=class_link_admin_underline
-                    href=LINK_WEB_ADMIN
-                    >
-                    "Admin"
-                </a>
+                <Show when=is_logged_in >
+                    <a
+                        class=class_link_followed_underline
+                        href=LINK_WEB_FOLLOWED
+                        >
+                        "Followed"
+                    </a>
+                </Show>
+                <Show when=is_perms_see_admin_controls>
+                    <a
+                        class=class_link_admin_underline
+                        href=LINK_WEB_ADMIN
+                        >
+                        "Admin"
+                    </a>
+                </Show>
             </div>
             <SearchBar/>
             <Show when=is_loading>

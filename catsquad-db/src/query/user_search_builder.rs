@@ -1,12 +1,20 @@
-use crate::{Db, XTimestamp, join_str};
+use crate::{
+    Db, DbUserGetBySessionAndRolesErr, DbUserGetBySessionAndRolesSimpleErr, XTimestamp, join_str,
+};
 use catsquad_log::prelude::*;
-use catsquad_shared::{Order, TimeRange, UserSearchFields};
+use catsquad_shared::{Order, RoleValue, SessionTokenKind, TimeRange, UserSearchFields};
 use sqlx::AssertSqlSafe;
 
 #[derive(Debug, thiserror::Error)]
 pub enum DbUserSearchBuilderErr {
     #[error("DB error {0}")]
     Db(#[from] sqlx::Error),
+
+    #[error("unauthorized {0}")]
+    Unauthorized(String),
+
+    #[error("internal server error")]
+    InternalServerErr,
 }
 
 #[derive(Debug, Clone, PartialEq, sqlx::FromRow)]
@@ -44,9 +52,21 @@ pub enum DbUserSearchBuilder {
     PageCount(u32),
 }
 
+fn from_user_get_by_session_and_roles_err(
+    value: DbUserGetBySessionAndRolesErr,
+) -> DbUserSearchBuilderErr {
+    match DbUserGetBySessionAndRolesSimpleErr::from(value) {
+        DbUserGetBySessionAndRolesSimpleErr::Unauthorized(err) => {
+            DbUserSearchBuilderErr::Unauthorized(err)
+        }
+        DbUserGetBySessionAndRolesSimpleErr::Db(err) => DbUserSearchBuilderErr::Db(err),
+    }
+}
+
 impl Db {
     pub async fn user_search_builder(
         &self,
+        auth_session_token: SessionTokenKind,
         pagination: bool,
         time_range_value: u64,
         limit: usize,
@@ -61,6 +81,21 @@ impl Db {
 
         let pool = &self.db;
         let search_query = search_query.into();
+
+        let mut tx = pool
+            .begin()
+            .await
+            .inspect_err(|err| error!("user_search {err}"))?;
+
+        // check auth
+        let _user = self
+            .auth_required(
+                &mut *tx,
+                auth_session_token,
+                &[RoleValue::PermissionUserSearch],
+            )
+            .await
+            .map_err(from_user_get_by_session_and_roles_err)?;
 
         let q_order = match order {
             Order::OneTwoThree => "ASC",
@@ -150,7 +185,7 @@ impl Db {
                 .bind(limit as i64)
                 .bind(offset as i64)
                 .bind(search_query)
-                .fetch_one(pool)
+                .fetch_one(&mut *tx)
                 .await;
 
             debug!("query {query_str}\nresult {result:#?}");
@@ -163,6 +198,10 @@ impl Db {
                 }
             };
 
+            tx.commit()
+                .await
+                .inspect_err(|err| error!("user_search {err}"))?;
+
             return Ok(DbUserSearchBuilder::PageCount(page_count as u32));
         }
 
@@ -171,7 +210,7 @@ impl Db {
             .bind(limit as i64)
             .bind(offset as i64)
             .bind(search_query)
-            .fetch_all(pool)
+            .fetch_all(&mut *tx)
             .await;
 
         debug!("query {query_str}\nresult {result:#?}");
@@ -183,6 +222,10 @@ impl Db {
                 return Err(DbUserSearchBuilderErr::Db(err));
             }
         };
+
+        tx.commit()
+            .await
+            .inspect_err(|err| error!("user_search {err}"))?;
 
         Ok(DbUserSearchBuilder::Users(users))
     }

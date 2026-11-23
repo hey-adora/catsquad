@@ -1,16 +1,15 @@
+use crate::{auth::SessionTokenV2, state::AppState};
 use axum::{
-    Extension, Json,
+    Json,
     extract::{Query, State},
-    http::{StatusCode, header},
+    http::StatusCode,
     response::IntoResponse,
 };
-use catsquad_db::{DbPostSearch, DbPostSearchErr, DbUser, DbUserGet};
+use catsquad_db::{DbPostSearch, DbPostSearchErr};
 use catsquad_log::prelude::*;
 use catsquad_shared::{
     Order, PostSearchErr, PostSearchParams, PostSearchRes, PostState, TimeRange, UserState,
 };
-
-use crate::{auth::SessionTokenV2, state::AppState};
 
 pub fn from_db_posts(value: Vec<DbPostSearch>) -> Vec<PostSearchRes> {
     value.into_iter().map(from_db_post_search).collect()
@@ -45,21 +44,10 @@ pub fn from_db_post_search(value: DbPostSearch) -> PostSearchRes {
 fn from_db_post_search_err(value: DbPostSearchErr) -> PostSearchErr {
     match value {
         DbPostSearchErr::Unauthorized(err) => PostSearchErr::Unauthorized(err),
+        DbPostSearchErr::InternalServerErr => PostSearchErr::InternalServer,
         DbPostSearchErr::Db(_) => PostSearchErr::InternalServer,
     }
 }
-
-// fn params_req(value: RawPathParams) -> Result<PostGetByKeyParams, PostGetByKeyErr> {
-//     value
-//         .iter()
-//         .find(|(name, _)| *name == POST_GET_BY_KEY_REQ_FIELD_POST_KEY)
-//         .ok_or(PostGetByKeyErr::BadRequest(
-//             "missing post_key param".to_string(),
-//         ))
-//         .map(|(_, value)| PostGetByKeyParams {
-//             post_key: value.to_string(),
-//         })
-// }
 
 pub fn status_code(result: &Result<Vec<PostSearchRes>, PostSearchErr>) -> StatusCode {
     match result {
@@ -71,7 +59,6 @@ pub fn status_code(result: &Result<Vec<PostSearchRes>, PostSearchErr>) -> Status
 
 pub async fn post_search(
     auth_session_token: SessionTokenV2,
-    // db_user: Extension<Option<DbUserGet>>,
     State(app): State<AppState>,
     Query(req): Query<PostSearchParams>,
 ) -> impl IntoResponse {
@@ -89,7 +76,6 @@ pub async fn post_search(
         let posts = app
             .db
             .post_search(
-                PostState::Active,
                 tags,
                 auth_session_token.into(),
                 author_username,
@@ -210,14 +196,4 @@ async fn test_api_post_search() {
         .unwrap();
 
     assert_eq!(posts.len(), 1);
-
-    // server.sea
-
-    // let result = server.post_get_by_key("invalid").await;
-
-    // assert_eq!(result, Err(PostGetByKeyErr::PostNotFound));
-
-    // let result = server.post_get_by_key(post1.key.clone()).await.unwrap();
-
-    // assert_eq!(result.key, post1.key);
 }

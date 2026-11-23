@@ -1,5 +1,7 @@
 use crate::{BtnPrimary, PageState, PfpAcc, SVGGear, SVGTriangle, hook::Spawner};
-use catsquad_shared::{LINK_WEB_INDEX, LINK_WEB_SETTINGS, link_relative_profile_gallery};
+use catsquad_shared::{
+    LINK_WEB_ADMIN, LINK_WEB_FOLLOWED, LINK_WEB_SETTINGS, RoleValue, link_relative_profile_gallery,
+};
 use leptos::prelude::*;
 
 #[component]
@@ -25,9 +27,17 @@ pub fn Profile(spawner: Spawner) -> impl IntoView {
     let username = move || page.acc_username();
     let link_profile = move || link_relative_profile_gallery(username());
 
+    let is_logged_in = move || page.is_logged_in().unwrap_or_default();
+    let is_perms_see_admin_controls =
+        move || page.acc_contains_perm(RoleValue::PermissionSeeAdminControls);
+
     view! {
+        <Show when=when_dropdown >
+            <div on:click=on_open class="z-[99] w-[100dvw] h-[100dvh] bg-base01/30 absolute left-0 top-0">
+            </div>
+        </Show>
         <div class="flex relative">
-            <button id="profile_btn" on:click=on_open >
+            <button class="z-[100]" id="profile_btn" on:click=on_open >
                 <PfpAcc class="size-8" no_link=true />
             </button>
             <Show when=when_dropdown >
@@ -41,6 +51,25 @@ pub fn Profile(spawner: Spawner) -> impl IntoView {
                         <SVGGear class="size-6"/>
                         "Settings"
                     </a>
+                    <Show when=is_logged_in >
+                        <a
+                            class="pl-[2.2rem]"
+                            href=LINK_WEB_FOLLOWED
+                            >
+                            "Followed"
+                        </a>
+                    </Show>
+                    <Show when=is_perms_see_admin_controls>
+                        <a
+                            class="pl-[2.2rem]"
+                            href=LINK_WEB_ADMIN
+                            >
+                            "Admin"
+                        </a>
+                    </Show>
+                    <div class="text-center">
+                        "---------"
+                    </div>
                     <BtnPrimary
                         modal_enable=true
                         modal_title="logout"
