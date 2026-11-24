@@ -51,23 +51,21 @@ impl Db {
 #[cfg(test)]
 #[tokio::test]
 async fn test_user_update_password_by_email() {
+    use crate::user_add_for_testing;
     use catsquad_shared::SessionTokenKind;
 
     init_log();
 
     let db = Db::test_db(0, "test_user_update_password_by_email").await;
 
-    let invite = db.invite_add(0, "hey@hey.com", 10).await.unwrap();
-    let user = db
-        .user_add(0, "hey", "hey", invite.token.clone(), 10, 10)
-        .await
-        .unwrap();
+    let user = user_add_for_testing(&db, 0, "hey", "hey", "hey@heyadora.com", 10, 10).await;
     assert_eq!(user.password, "hey");
-    db.user_update_password_by_email(0, "hey@hey.com", "hey2")
+
+    db.user_update_password_by_email(0, "hey@heyadora.com", "hey2")
         .await
         .unwrap();
     let user = db
-        .user_get_by_email(SessionTokenKind::None, "hey@hey.com")
+        .user_get_by_email(SessionTokenKind::None, "hey@heyadora.com")
         .await
         .unwrap();
     assert_eq!(user.password, "hey2");

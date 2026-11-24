@@ -1,13 +1,11 @@
 use crate::{
-    Db, Uuid, XTimestamp, XUuid,
+    Db, XTimestamp,
     query::user_get_by_session_and_roles::{
         DbUserGetBySessionAndRolesErr, DbUserGetBySessionAndRolesSimpleErr,
     },
 };
 use catsquad_log::prelude::*;
-use catsquad_shared::{
-    ROLE_VALUE_PERMISSION_ROLE_ADD, RoleValue, SessionTokenKind, contains_perms,
-};
+use catsquad_shared::{ROLE_VALUE_PERMISSION_ROLE_ADD, SessionTokenKind};
 
 #[derive(Debug, Clone, PartialEq, sqlx::FromRow)]
 pub struct DbRole {

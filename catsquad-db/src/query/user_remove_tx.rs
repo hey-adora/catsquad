@@ -159,30 +159,15 @@ impl Db {
 #[cfg(test)]
 #[tokio::test]
 async fn test_user_remove() {
+    use crate::user_add_for_testing;
     use catsquad_shared::PostState;
 
     init_log();
     let db = Db::test_db(0, "test_user_remove").await;
 
-    let (user, user2, user3) = {
-        let invite1 = db.invite_add(0, "hey@heyadora.com", 100).await.unwrap();
-        let invite2 = db.invite_add(0, "hey2@heyadora.com", 100).await.unwrap();
-        let invite3 = db.invite_add(0, "hey3@heyadora.com", 100).await.unwrap();
-        let user = db
-            .user_add(0, "hey", "hey", invite1.token, 100, 10)
-            .await
-            .unwrap();
-        let user2 = db
-            .user_add(1, "hey2", "hey", invite2.token, 100, 10)
-            .await
-            .unwrap();
-        let user3 = db
-            .user_add(2, "hey3", "hey", invite3.token, 100, 10)
-            .await
-            .unwrap();
-
-        (user, user2, user3)
-    };
+    let user = user_add_for_testing(&db, 0, "hey", "pss", "hey@heyadora.com", 100, 10).await;
+    let user2 = user_add_for_testing(&db, 0, "hey2", "pss", "hey2@heyadora.com", 100, 10).await;
+    let user3 = user_add_for_testing(&db, 0, "hey3", "pss", "hey3@heyadora.com", 100, 10).await;
 
     let callback_remove = async move |_hash: i64, _extension: &str| {
         //

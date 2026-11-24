@@ -54,17 +54,15 @@ impl Db {
 #[cfg(test)]
 #[tokio::test]
 async fn test_user_update_password_by_username() {
+    use crate::user_add_for_testing;
     use catsquad_shared::SessionTokenKind;
 
     init_log();
 
     let db = Db::test_db(0, "test_user_update_password_by_id").await;
 
-    let invite = db.invite_add(0, "hey@hey.com", 10).await.unwrap();
-    let user = db
-        .user_add(0, "hey", "hey", invite.token.clone(), 10, 10)
-        .await
-        .unwrap();
+    let user = user_add_for_testing(&db, 0, "hey", "hey", "hey@hey.com", 10, 10).await;
+
     assert_eq!(user.password, "hey");
     db.user_update_password_by_username(0, user.username.clone(), "hey2")
         .await

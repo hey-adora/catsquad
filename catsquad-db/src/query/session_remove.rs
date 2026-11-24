@@ -45,13 +45,24 @@ impl Db {
 #[cfg(test)]
 #[tokio::test]
 async fn test_session_remove() {
+    use std::net::{IpAddr, Ipv4Addr};
+
     init_log();
 
     let db = Db::test_db(0, "test_session_remove").await;
 
     let invite = db.invite_add(0, "hey@hey.com", 1).await.unwrap();
     let _result = db
-        .user_add(0, "hey", "hey", invite.token, 10, 10)
+        .user_add(
+            0,
+            "hey",
+            "hey",
+            invite.token,
+            10,
+            10,
+            IpAddr::V4(Ipv4Addr::from_octets([127, 0, 0, 1])),
+            "firefox",
+        )
         .await
         .unwrap();
     let session = db.session_add(0, "hey@hey.com").await.unwrap();

@@ -46,17 +46,15 @@ impl Db {
 #[cfg(test)]
 #[tokio::test]
 async fn test_session_get_by_key() {
+    use crate::user_add_for_testing;
+
     init_log();
 
     let db = Db::test_db(0, "test_session_get_by_key").await;
 
-    let invite = db.invite_add(0, "hey@hey.com", 1).await.unwrap();
-    let user1 = db
-        .user_add(0, "hey", "hey", invite.token, 10, 10)
-        .await
-        .unwrap();
+    let user1 = user_add_for_testing(&db, 0, "hey", "pss", "hey@heyadora.com", 10, 10).await;
 
-    let session = db.session_add(0, "hey@hey.com").await.unwrap();
+    let session = db.session_add(0, "hey@heyadora.com").await.unwrap();
     assert_eq!(session.user_id, user1.id);
 
     let _result = db.session_get_by_token(session.token).await.unwrap();

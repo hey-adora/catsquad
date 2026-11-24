@@ -50,24 +50,13 @@ impl Db {
 #[cfg(test)]
 #[tokio::test]
 async fn test_post_like_exists_by_post() {
+    use crate::user_add_for_testing;
+
     init_log();
     let db = Db::test_db(0, "test_post_like_exists_by_post").await;
 
-    let (user1, user2) = {
-        let invite1 = db.invite_add(0, "hey@heyadora.com", 1).await.unwrap();
-        let user1 = db
-            .user_add(0, "hey", "hey", invite1.token, 10, 10)
-            .await
-            .unwrap();
-
-        let invite2 = db.invite_add(0, "hey2@heyadora.com", 1).await.unwrap();
-        let user2 = db
-            .user_add(0, "hey2", "hey", invite2.token, 10, 10)
-            .await
-            .unwrap();
-
-        (user1, user2)
-    };
+    let user1 = user_add_for_testing(&db, 0, "hey", "pss", "hey@heyadora.com", 10, 10).await;
+    let user2 = user_add_for_testing(&db, 0, "hey2", "pss", "hey2@heyadora.com", 10, 10).await;
 
     let post1 = {
         let post1 = db

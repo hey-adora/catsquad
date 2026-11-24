@@ -1,3 +1,5 @@
+use std::net::{IpAddr, Ipv4Addr};
+
 use crate::{Db, Uuid, XTimestamp, XUuid};
 use catsquad_log::prelude::*;
 #[cfg(test)]
@@ -47,6 +49,10 @@ pub struct DbUser {
     #[sqlx(rename = "user_state_modified_at")]
     #[sqlx(try_from = "XTimestamp")]
     pub state_modified_at: u64,
+    #[sqlx(rename = "user_ip")]
+    pub ip: IpAddr,
+    #[sqlx(rename = "user_agent")]
+    pub agent: String,
     #[sqlx(rename = "user_modified_at")]
     #[sqlx(try_from = "XTimestamp")]
     pub modified_at: u64,
@@ -97,6 +103,8 @@ impl Db {
                 user_max_storage_per_file_bytes int8 NOT NULL,
                 user_max_storage_bytes int8 NOT NULL,
                 user_state_modified_at timestamp NOT NULL,
+                user_ip cidr NOT NULL,
+                user_agent text NOT NULL,
                 user_modified_at timestamp NOT NULL,
                 user_created_at timestamp NOT NULL
             );
@@ -115,10 +123,13 @@ impl Db {
         invite_token: Uuid,
         max_storage_bytes: u32,
         max_storage_per_file_bytes: u32,
+        ip: IpAddr,
+        agent: impl Into<String>,
     ) -> Result<DbUser, DbUserAddErr> {
         let pool = &self.db;
         let username = username.into();
         let password = password.into();
+        let agent = agent.into();
 
         let mut tx = pool.begin().await?;
 
@@ -174,9 +185,11 @@ impl Db {
                     user_state_modified_at,
                     user_modified_at,
                     user_created_at,
-                    user_state
+                    user_state,
+                    user_ip,
+                    user_agent
                 )
-                VALUES ( $1, $2, $3, $4, $5, $6, $6, $6, $7 )
+                VALUES ( $1, $2, $3, $4, $5, $6, $6, $6, $7, $8, $9 )
                 RETURNING user_id
             ";
 
@@ -188,6 +201,8 @@ impl Db {
                 .bind(max_storage_per_file_bytes as i64)
                 .bind(XTimestamp(time as i64))
                 .bind(UserState::Active.as_str())
+                .bind(ip)
+                .bind(agent)
                 .fetch_one(&mut *tx)
                 .await;
 
@@ -250,10 +265,42 @@ impl Db {
             max_storage_bytes,
             max_storage_per_image_bytes: max_storage_per_file_bytes,
             state_modified_at: time,
+            agent: String::from("firefox"),
+            ip: IpAddr::V4(Ipv4Addr::from_octets([127, 0, 0, 1])),
             modified_at: time,
             created_at: time,
         })
     }
+}
+
+#[cfg(test)]
+pub async fn user_add_for_testing(
+    db: &Db,
+    time: u64,
+    username: impl Into<String>,
+    password: impl Into<String>,
+    email: impl Into<String>,
+    max_storage_bytes: u32,
+    max_storage_per_file_bytes: u32,
+) -> DbUser {
+    let username = username.into();
+    let password = password.into();
+    let email = email.into();
+    let invite1 = db.invite_add(time, &email, time).await.unwrap();
+    let user = db
+        .user_add(
+            time,
+            username,
+            password,
+            invite1.token,
+            max_storage_bytes,
+            max_storage_per_file_bytes,
+            IpAddr::V4(Ipv4Addr::from_octets([127, 0, 0, 1])),
+            "firefox",
+        )
+        .await
+        .unwrap();
+    user
 }
 
 #[cfg(test)]
@@ -279,7 +326,6 @@ where
 
     let (mut user1, user1_session) = {
         let invite1 = db.invite_add(time, &email, time).await.unwrap();
-
         let user1 = db
             .user_add(
                 time,
@@ -288,6 +334,8 @@ where
                 invite1.token.clone(),
                 max_storage_bytes,
                 max_storage_per_file_bytes,
+                IpAddr::V4(Ipv4Addr::from_octets([127, 0, 0, 1])),
+                "firefox",
             )
             .await
             .unwrap();
@@ -320,12 +368,32 @@ async fn test_user_add() {
     // assert errors
     {
         let result = db
-            .user_add(0, "hey", "hey", 0_u128.to_be_bytes(), 10, 10)
+            .user_add(
+                0,
+                "hey",
+                "hey",
+                0_u128.to_be_bytes(),
+                10,
+                10,
+                IpAddr::V4(Ipv4Addr::from_octets([127, 0, 0, 1])),
+                "firefox",
+            )
             .await;
         assert!(matches!(result, Err(DbUserAddErr::InviteNotFound)));
 
         let invite = db.invite_add(0, "hey@hey.com", 1).await.unwrap();
-        let result = db.user_add(2, "hey", "hey", invite.token, 10, 10).await;
+        let result = db
+            .user_add(
+                2,
+                "hey",
+                "hey",
+                invite.token,
+                10,
+                10,
+                IpAddr::V4(Ipv4Addr::from_octets([127, 0, 0, 1])),
+                "firefox",
+            )
+            .await;
         assert!(matches!(result, Err(DbUserAddErr::InviteExpired)));
     }
 
@@ -333,7 +401,16 @@ async fn test_user_add() {
     let invite = {
         let invite = db.invite_add(2, "hey@hey.com", 3).await.unwrap();
         let result = db
-            .user_add(3, "hey", "hey", invite.token.clone(), 10, 5)
+            .user_add(
+                3,
+                "hey",
+                "hey",
+                invite.token.clone(),
+                10,
+                5,
+                IpAddr::V4(Ipv4Addr::from_octets([127, 0, 0, 1])),
+                "firefox",
+            )
             .await
             .unwrap();
         assert_eq!(result.username, "hey");
@@ -354,13 +431,31 @@ async fn test_user_add() {
     // assert errors
     {
         let result = db
-            .user_add(2, "hey", "hey", invite.token.clone(), 10, 10)
+            .user_add(
+                2,
+                "hey",
+                "hey",
+                invite.token.clone(),
+                10,
+                10,
+                IpAddr::V4(Ipv4Addr::from_octets([127, 0, 0, 1])),
+                "firefox",
+            )
             .await;
         assert!(matches!(result, Err(DbUserAddErr::InviteAlreadyUsed)));
 
         let invite = db.invite_add(2, "hey2@hey.com", 3).await.unwrap();
         let result = db
-            .user_add(2, "hey", "hey", invite.token.clone(), 10, 10)
+            .user_add(
+                2,
+                "hey",
+                "hey",
+                invite.token.clone(),
+                10,
+                10,
+                IpAddr::V4(Ipv4Addr::from_octets([127, 0, 0, 1])),
+                "firefox",
+            )
             .await;
         assert!(matches!(result, Err(DbUserAddErr::UsernameIsTaken)));
     }
@@ -371,12 +466,30 @@ async fn test_user_add() {
         let invite2 = db.invite_add(2, "hey3@hey.com", 3).await.unwrap();
 
         let result = db
-            .user_add(2, "hey3", "hey", invite1.token.clone(), 10, 10)
+            .user_add(
+                2,
+                "hey3",
+                "hey",
+                invite1.token.clone(),
+                10,
+                10,
+                IpAddr::V4(Ipv4Addr::from_octets([127, 0, 0, 1])),
+                "firefox",
+            )
             .await
             .unwrap();
 
         let result = db
-            .user_add(2, "hey4", "hey", invite2.token.clone(), 10, 10)
+            .user_add(
+                2,
+                "hey4",
+                "hey",
+                invite2.token.clone(),
+                10,
+                10,
+                IpAddr::V4(Ipv4Addr::from_octets([127, 0, 0, 1])),
+                "firefox",
+            )
             .await;
 
         assert!(matches!(result, Err(DbUserAddErr::EmailIsTaken)));

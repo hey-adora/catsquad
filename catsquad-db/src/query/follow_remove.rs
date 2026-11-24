@@ -129,28 +129,14 @@ impl Db {
 async fn test_follow_remove() {
     use catsquad_shared::SessionTokenKind;
 
+    use crate::user_add_for_testing;
+
     init_log();
     let db = Db::test_db(0, "test_follow_remove").await;
 
-    let _ = {
-        let invite1 = db.invite_add(0, "hey@heyadora.com", 1).await.unwrap();
-        let user1 = db
-            .user_add(0, "hey", "hey", invite1.token, 10, 10)
-            .await
-            .unwrap();
-        let invite2 = db.invite_add(0, "hey2@heyadora.com", 1).await.unwrap();
-        let user2 = db
-            .user_add(0, "hey2", "hey", invite2.token, 10, 10)
-            .await
-            .unwrap();
-        let invite3 = db.invite_add(0, "hey3@heyadora.com", 1).await.unwrap();
-        let user3 = db
-            .user_add(0, "hey3", "hey", invite3.token, 10, 10)
-            .await
-            .unwrap();
-
-        (user1, user2, user3)
-    };
+    let user = user_add_for_testing(&db, 0, "hey", "pss", "hey@heyadora.com", 10, 10).await;
+    let user2 = user_add_for_testing(&db, 0, "hey2", "pss", "hey2@heyadora.com", 10, 10).await;
+    let user3 = user_add_for_testing(&db, 0, "hey3", "pss", "hey3@heyadora.com", 10, 10).await;
 
     db.follow_add(0, "hey", "hey2").await.unwrap();
     db.follow_add(1, "hey", "hey3").await.unwrap();

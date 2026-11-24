@@ -63,24 +63,15 @@ impl Db {
 #[cfg(test)]
 #[tokio::test]
 async fn test_user_update_role_remove() {
+    use crate::user_add_for_testing;
     use catsquad_shared::SessionTokenKind;
+
     init_log();
 
     let db = Db::test_db(0, "test_user_update_role_remove").await;
 
-    let _user1 = {
-        let invite = db.invite_add(0, "hey@heyadora.com", 1).await.unwrap();
-        db.user_add(0, "hey", "hey", invite.token.clone(), 10, 10)
-            .await
-            .unwrap()
-    };
-
-    let _user2 = {
-        let invite = db.invite_add(0, "hey2@heyadora.com", 1).await.unwrap();
-        db.user_add(0, "hey2", "hey2", invite.token.clone(), 10, 10)
-            .await
-            .unwrap()
-    };
+    let _user1 = user_add_for_testing(&db, 0, "hey", "pss", "hey@heyadora.com", 10, 10).await;
+    let _user2 = user_add_for_testing(&db, 0, "hey2", "pss", "hey2@heyadora.com", 10, 10).await;
 
     // assert success
     {

@@ -57,15 +57,14 @@ impl Db {
 async fn test_user_update_aboutme() {
     use catsquad_shared::SessionTokenKind;
 
+    use crate::user_add_for_testing;
+
     init_log();
 
     let db = Db::test_db(0, "test_user_update_aboutme").await;
 
-    let invite1 = db.invite_add(0, "hey@heyadora.com", 1).await.unwrap();
-    let user = db
-        .user_add(0, "hey", "hey", invite1.token.clone(), 10, 5)
-        .await
-        .unwrap();
+    let user = user_add_for_testing(&db, 0, "hey", "pss", "hey@heyadora.com", 10, 5).await;
+
     assert_eq!(user.aboutme, "");
 
     db.user_update_aboutme(0, user.username.clone(), "one two three")

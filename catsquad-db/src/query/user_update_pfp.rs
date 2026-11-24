@@ -120,25 +120,14 @@ impl Db {
 #[cfg(test)]
 #[tokio::test]
 async fn test_user_update_pfp() {
-    use crate::DbFileImageGetByHashErr;
+    use crate::{DbFileImageGetByHashErr, user_add_for_testing};
 
     init_log();
 
     let db = Db::test_db(0, "test_user_update_pfp").await;
 
-    let user1 = {
-        let invite = db.invite_add(0, "hey@heyadora.com", 1).await.unwrap();
-        db.user_add(0, "hey", "hey", invite.token.clone(), 10, 10)
-            .await
-            .unwrap()
-    };
-
-    let user2 = {
-        let invite = db.invite_add(0, "hey2@heyadora.com", 1).await.unwrap();
-        db.user_add(0, "hey2", "hey2", invite.token.clone(), 10, 10)
-            .await
-            .unwrap()
-    };
+    let user1 = user_add_for_testing(&db, 0, "hey", "pss", "hey@heyadora.com", 10, 10).await;
+    let user2 = user_add_for_testing(&db, 0, "hey2", "pss", "hey2@heyadora.com", 10, 10).await;
 
     let result = db.file_image_get_by_hash(666).await;
 

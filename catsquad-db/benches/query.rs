@@ -6,7 +6,10 @@ use sqlx::{
     Execute,
     postgres::{PgConnectOptions, PgPoolOptions},
 };
-use std::env;
+use std::{
+    env,
+    net::{IpAddr, Ipv4Addr},
+};
 use tokio_util::task::TaskTracker;
 // use surrealdb::types::ToSql;
 use tokio::{io::AsyncWriteExt, time::Instant};
@@ -85,9 +88,18 @@ async fn bench_user_add_par(args: &BenchArgs) {
     for (invite, username) in itr {
         let db = db.clone();
         tracker.spawn(async move {
-            db.user_add(0, username, "hey", invite, 10, 10)
-                .await
-                .unwrap();
+            db.user_add(
+                0,
+                username,
+                "hey",
+                invite,
+                10,
+                10,
+                IpAddr::V4(Ipv4Addr::from_octets([127, 0, 0, 1])),
+                "firefox",
+            )
+            .await
+            .unwrap();
         });
     }
 
@@ -108,9 +120,18 @@ async fn bench_user_add_seq(args: &BenchArgs) {
     let time = Instant::now();
 
     for (invite, username) in itr {
-        db.user_add(0, username, "hey", invite, 10, 10)
-            .await
-            .unwrap();
+        db.user_add(
+            0,
+            username,
+            "hey",
+            invite,
+            10,
+            10,
+            IpAddr::V4(Ipv4Addr::from_octets([127, 0, 0, 1])),
+            "firefox",
+        )
+        .await
+        .unwrap();
     }
 
     let elapsed = time.elapsed() / n as u32;

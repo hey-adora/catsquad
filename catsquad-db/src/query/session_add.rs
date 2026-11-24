@@ -148,24 +148,22 @@ impl Db {
 #[cfg(test)]
 #[tokio::test]
 async fn test_session_add() {
+    use crate::user_add_for_testing;
+
     init_log();
 
     let db = Db::test_db(0, "test_session_add").await;
 
-    let invite = db.invite_add(0, "hey@hey.com", 1).await.unwrap();
-    let user1 = db
-        .user_add(0, "hey", "hey", invite.token.clone(), 10, 10)
-        .await
-        .unwrap();
+    let user1 = user_add_for_testing(&db, 0, "hey", "pss", "hey@heyadora.com", 10, 10).await;
 
     let email_send_fn = async move |_| "foo".to_string();
 
     // assert success
     {
-        let session1 = db.session_add(0, "hey@hey.com").await.unwrap();
+        let session1 = db.session_add(0, "hey@heyadora.com").await.unwrap();
         assert_eq!(session1.user_id, user1.id);
 
-        let session2 = db.session_add(0, "hey@hey.com").await.unwrap();
+        let session2 = db.session_add(0, "hey@heyadora.com").await.unwrap();
         assert_eq!(session2.user_id, user1.id);
     }
 
@@ -173,7 +171,7 @@ async fn test_session_add() {
     {
         use catsquad_shared::SessionTokenKind;
 
-        let result = db.session_add(0, "hey2@hey.com").await;
+        let result = db.session_add(0, "hey2@heyadora.com").await;
         assert!(matches!(result, Err(DbSessionAddErr::UserNotFound(_))));
 
         db.user_update_state(
@@ -186,7 +184,7 @@ async fn test_session_add() {
         .await
         .unwrap();
 
-        let result = db.session_add(0, "hey@hey.com").await;
+        let result = db.session_add(0, "hey@heyadora.com").await;
         assert!(matches!(result, Err(DbSessionAddErr::UserSuspended)));
     }
 }

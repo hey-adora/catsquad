@@ -149,19 +149,16 @@ impl Db {
 #[cfg(test)]
 #[tokio::test]
 async fn test_confirm_token_add() {
+    use crate::user_add_for_testing;
+
     init_log();
 
     let db = Db::test_db(0, "test_token_add").await;
 
     let username = "hey";
     let email = "hey@heyadora.com";
-    let invite1 = db.invite_add(0, email, 1).await.unwrap();
-    assert_eq!(invite1.email, email);
 
-    let _user = db
-        .user_add(0, username, "hey", invite1.token, 10, 10)
-        .await
-        .unwrap();
+    let _user = user_add_for_testing(&db, 0, username, "pss", email, 10, 10).await;
 
     let _result = db
         .confirm_token_add(0, username, 10, DbConfirmTokenLabel::PasswordChange)

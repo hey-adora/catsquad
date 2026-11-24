@@ -45,14 +45,14 @@ impl Db {
 #[cfg(test)]
 #[tokio::test]
 async fn test_user_get_password() {
+    use crate::user_add_for_testing;
+
     init_log();
 
     let db = Db::test_db(0, "test_user_get_password").await;
 
-    let invite = db.invite_add(0, "hey@hey.com", 10).await.unwrap();
-    db.user_add(0, "hey", "hey", invite.token.clone(), 10, 10)
-        .await
-        .unwrap();
-    let password = db.user_get_password("hey@hey.com").await.unwrap();
-    assert_eq!(password, "hey");
+    let _user = user_add_for_testing(&db, 0, "hey", "pss", "hey@heyadora.com", 10, 10).await;
+
+    let password = db.user_get_password("hey@heyadora.com").await.unwrap();
+    assert_eq!(password, "pss");
 }

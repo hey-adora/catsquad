@@ -122,7 +122,10 @@ impl Db {
 #[cfg(test)]
 #[tokio::test]
 async fn test_invite_add() {
-    use std::time::Duration;
+    use std::{
+        net::{IpAddr, Ipv4Addr},
+        time::Duration,
+    };
 
     init_log();
 
@@ -151,9 +154,18 @@ async fn test_invite_add() {
     assert_eq!(invite3.modified_at, 0);
     assert_eq!(invite3.created_at, 0);
 
-    db.user_add(0, "prime", "pss", invite2.token, 10, 5)
-        .await
-        .unwrap();
+    db.user_add(
+        0,
+        "prime",
+        "pss",
+        invite2.token,
+        10,
+        5,
+        IpAddr::V4(Ipv4Addr::from_octets([127, 0, 0, 1])),
+        "firefox",
+    )
+    .await
+    .unwrap();
 
     let result = db.invite_add(0, "prime@heyadora.com", 1).await;
     assert!(matches!(result, Err(DbInviteAddErr::EmailIsTaken(_))));

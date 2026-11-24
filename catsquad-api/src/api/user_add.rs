@@ -1,3 +1,5 @@
+use std::net::{IpAddr, Ipv4Addr};
+
 use crate::{
     auth::{create_auth_cookie, hash_password},
     server::promote_admin::promote_admin,
@@ -127,6 +129,8 @@ pub async fn user_add(
                 invite_token,
                 MAX_STORAGE,
                 MAX_STORAGE_PER_FILE,
+                IpAddr::V4(Ipv4Addr::from_octets([127, 0, 0, 1])), // TODO make this real
+                "firefox",
             )
             .await
             .map_err(from_db_user_add_err)?;

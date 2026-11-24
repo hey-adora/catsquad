@@ -80,6 +80,8 @@ impl Db {
 #[cfg(test)]
 #[tokio::test]
 async fn test_invite_get_by_key() {
+    use std::net::{IpAddr, Ipv4Addr};
+
     init_log();
 
     let db = Db::test_db(0, "test_invite_get_by_key").await;
@@ -110,9 +112,18 @@ async fn test_invite_get_by_key() {
 
     // used
     {
-        db.user_add(5, "hey", "r4$$ohnGergnn023n", invite_key.clone(), 10, 10)
-            .await
-            .unwrap();
+        db.user_add(
+            5,
+            "hey",
+            "r4$$ohnGergnn023n",
+            invite_key.clone(),
+            10,
+            10,
+            IpAddr::V4(Ipv4Addr::from_octets([127, 0, 0, 1])),
+            "firefox",
+        )
+        .await
+        .unwrap();
         let result = db.invite_get_by_key(5, invite_key.clone()).await;
         assert!(matches!(
             result,

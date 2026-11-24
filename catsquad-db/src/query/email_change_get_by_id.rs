@@ -85,15 +85,14 @@ impl Db {
 #[cfg(test)]
 #[tokio::test]
 async fn test_email_change_get_by_id() {
+    use crate::user_add_for_testing;
+
     init_log();
 
     let db = Db::test_db(0, "test_email_change_get_by_id").await;
 
-    let invite = db.invite_add(0, "hey@hey.com", 10).await.unwrap();
-    let user = db
-        .user_add(0, "hey", "r4$$ohnGergnn023n", invite.token, 10, 10)
-        .await
-        .unwrap();
+    let user = user_add_for_testing(&db, 0, "hey", "pss", "hey@heyadora.com", 10, 10).await;
+
     let email_change = db
         .email_change_add(0, user.username.clone(), 10)
         .await

@@ -293,18 +293,12 @@ impl Db {
 async fn test_comment_add() {
     // TODO check un-authorized errors
 
+    use crate::user_add_for_testing;
+
     init_log();
     let db = Db::test_db(0, "test_comment_add").await;
 
-    // create user
-    let user = {
-        let invite1 = db.invite_add(0, "hey@heyadora.com", 1).await.unwrap();
-        let user = db
-            .user_add(0, "hey", "hey", invite1.token, 10, 10)
-            .await
-            .unwrap();
-        user
-    };
+    let user = user_add_for_testing(&db, 0, "hey", "pss", "hey@heyadora.com", 10, 10).await;
 
     // create post
     let post1 = {

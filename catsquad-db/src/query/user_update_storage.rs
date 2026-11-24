@@ -61,17 +61,14 @@ impl Db {
 #[cfg(test)]
 #[tokio::test]
 async fn test_user_update_storage() {
+    use crate::user_add_for_testing;
     use catsquad_shared::SessionTokenKind;
 
     init_log();
 
     let db = Db::test_db(0, "test_user_update_storage").await;
 
-    let invite1 = db.invite_add(0, "hey@heyadora.com", 1).await.unwrap();
-    let user = db
-        .user_add(0, "hey", "hey", invite1.token.clone(), 10, 5)
-        .await
-        .unwrap();
+    let user = user_add_for_testing(&db, 0, "hey", "hey", "hey@heyadora.com", 10, 5).await;
     assert_eq!(user.max_storage_bytes, 10);
     assert_eq!(user.max_storage_per_image_bytes, 5);
 

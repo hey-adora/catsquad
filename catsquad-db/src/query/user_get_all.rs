@@ -30,6 +30,8 @@ impl Db {
                             user_max_storage_bytes,
                             user_max_storage_bytes,
                             user_state_modified_at,
+                            user_ip,
+                            user_agent,
                             user_modified_at,
                             user_created_at
                                 FROM users
@@ -57,13 +59,14 @@ impl Db {
 #[cfg(test)]
 #[tokio::test]
 async fn test_user_get_all() {
+    use crate::user_add_for_testing;
+
     init_log();
 
     let db = Db::test_db(0, "test_user_get_all").await;
-    let invite = db.invite_add(0, "hey@hey.com", 10).await.unwrap();
-    db.user_add(0, "hey", "hey", invite.token.clone(), 10, 10)
-        .await
-        .unwrap();
+
+    let user = user_add_for_testing(&db, 0, "hey", "pss", "hey@heyadora.com", 10, 10).await;
+
     let users = db.user_get_all().await.unwrap();
     assert_eq!(users.len(), 1);
 }

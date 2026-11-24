@@ -156,21 +156,14 @@ impl Db {
 #[cfg(test)]
 #[tokio::test]
 async fn test_email_change_update_new_add() {
+    use crate::user_add_for_testing;
+
     init_log();
 
     let db = Db::test_db(0, "test_email_change_update_new_add").await;
 
-    let invite1 = db.invite_add(0, "hey@heyadora.com", 1).await.unwrap();
-    let user = db
-        .user_add(0, "hey", "hey", invite1.token, 10, 10)
-        .await
-        .unwrap();
-
-    let invite2 = db.invite_add(0, "hey2@heyadora.com", 1).await.unwrap();
-    let user2 = db
-        .user_add(0, "hey2", "hey2", invite2.token, 10, 10)
-        .await
-        .unwrap();
+    let user = user_add_for_testing(&db, 0, "hey", "pss", "hey@heyadora.com", 10, 10).await;
+    let user2 = user_add_for_testing(&db, 0, "hey2", "pss", "hey2@heyadora.com", 10, 10).await;
 
     {
         let email_change = db

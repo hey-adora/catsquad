@@ -33,15 +33,14 @@ impl Db {
 #[cfg(test)]
 #[tokio::test]
 async fn test_conform_token_get_all() {
-    use crate::DbConfirmTokenLabel;
+    use crate::{DbConfirmTokenLabel, user_add_for_testing};
 
     init_log();
 
     let db = Db::test_db(0, "test_token_get_all").await;
-    let invite = db.invite_add(0, "hey@hey.com", 10).await.unwrap();
-    db.user_add(0, "hey", "hey", invite.token, 10, 10)
-        .await
-        .unwrap();
+
+    let _user = user_add_for_testing(&db, 0, "hey", "pss", "hey@heyadora.com", 10, 10).await;
+
     db.confirm_token_add(0, "hey", 10, DbConfirmTokenLabel::PasswordChange)
         .await
         .unwrap();
