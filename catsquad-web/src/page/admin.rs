@@ -1,4 +1,4 @@
-use crate::{Errs, ModalConfirm, Nav, hook::Spawner, page::create_client};
+use crate::{BtnSecondary, Errs, ModalConfirm, Nav, hook::Spawner, page::create_client};
 use leptos::prelude::*;
 
 mod component_user_table_rows;
@@ -16,7 +16,7 @@ pub fn Admin() -> impl IntoView {
 
     Effect::new(move || {
         spawner.spawn(async move {
-            user_state.fetch().await;
+            user_state.init().await;
         });
     });
 
@@ -26,6 +26,31 @@ pub fn Admin() -> impl IntoView {
     let on_check_all_fn = move |_| {
         user_state.check_all.update(|v| *v = !*v);
     };
+
+    let view_pages_text = move || {
+        format!(
+            "{}/{}",
+            user_state.current_page(),
+            user_state.max_page() + 1 // +1 = start from 1
+        )
+    };
+
+    let on_prev_page = move |_| {
+        spawner.spawn(async move {
+            user_state.prev_page();
+            user_state.get_rows().await;
+        })
+    };
+
+    let on_next_page = move |_| {
+        spawner.spawn(async move {
+            user_state.next_page();
+            user_state.get_rows().await;
+        })
+    };
+
+    let is_first_page = move || user_state.is_first_page();
+    let is_last_page = move || user_state.is_last_page();
 
     // <td class="border">
     //     <BtnDelete size=BtnSize::Small>"delete"</BtnDelete>
@@ -48,28 +73,39 @@ pub fn Admin() -> impl IntoView {
                     "loading..."
                 </Show>
 
+
+
                 <Show when=when_is_not_loading>
-                    <div class="mt-2 overflow-x-scroll max-w-full">
-                        <table class="table-bordered border-collapse border-spacing-[10rem] border">
-                          <thead>
-                              <tr>
-                                <th>
-                                    <input on:change=on_check_all_fn type="checkbox" id="user_table_checkbox" name="user_table_checkbox" checked=user_state.check_all />
-                                </th>
-                                <th>"username"</th>
-                                <th>"state"</th>
-                                <th>"email"</th>
-                                <th>"likes"</th>
-                                <th>"followers"</th>
-                                <th>"following"</th>
-                                <th>"support"</th>
-                                <th>"aboutme"</th>
-                              </tr>
-                          </thead>
-                          <tbody>
-                              <UserTableRows user_state spawner />
-                          </tbody>
-                        </table>
+                    <div class="grid grid-rows-[auto_auto] grid-cols-[1fr]">
+                        <div class="flex gap-2 justify-end items-center">
+                            <BtnSecondary disabled=is_first_page on_click=on_prev_page >"-"</BtnSecondary>
+                            <span class="text-[1.1rem]">
+                                {view_pages_text}
+                            </span>
+                            <BtnSecondary disabled=is_last_page on_click=on_next_page >"+"</BtnSecondary>
+                        </div>
+                        <div class="mt-2 overflow-x-scroll max-w-full">
+                            <table class="table-bordered border-collapse border-spacing-[10rem] border">
+                              <thead>
+                                  <tr>
+                                    <th>
+                                        <input on:change=on_check_all_fn type="checkbox" id="user_table_checkbox" name="user_table_checkbox" checked=user_state.check_all />
+                                    </th>
+                                    <th>"username"</th>
+                                    <th>"state"</th>
+                                    <th>"email"</th>
+                                    <th>"likes"</th>
+                                    <th>"followers"</th>
+                                    <th>"following"</th>
+                                    <th>"support"</th>
+                                    <th>"aboutme"</th>
+                                  </tr>
+                              </thead>
+                              <tbody>
+                                  <UserTableRows user_state spawner />
+                              </tbody>
+                            </table>
+                        </div>
                     </div>
                 </Show>
 

@@ -23,9 +23,9 @@ where
     pub param_search_field_username: RwSignal<bool>,
     pub param_search_field_email: RwSignal<bool>,
     pub param_search_query: RwSignal<String>,
+    pub param_search_offset: RwSignal<usize>,
 
-    pub page_offset: RwSignal<usize>,
-    pub page_total: RwSignal<usize>,
+    pub page_total_rows: RwSignal<usize>,
 
     pub check_all: RwSignal<bool>,
     pub checked_usernames: RwSignal<Vec<String>>,
@@ -39,6 +39,18 @@ where
     TSender::TResponse: Response + Debug,
 {
 }
+
+// fn current_page(limit: usize, offset: usize) -> usize {
+//     offset / limit
+// }
+
+// fn total_pages(limit: usize, total: usize) -> usize {
+//     total / limit
+// }
+
+// fn test_page_math(
+
+// )
 
 impl<TSender> UsersState<TSender>
 where
@@ -58,14 +70,48 @@ where
             param_search_query: RwSignal::new(String::new()),
             check_all: RwSignal::new(false),
             checked_usernames: RwSignal::new(Vec::new()),
-            page_offset: RwSignal::new(0),
-            page_total: RwSignal::new(0),
+            param_search_offset: RwSignal::new(0),
+            page_total_rows: RwSignal::new(0),
             client: StoredValue::new_local(client),
         }
     }
 
-    pub async fn fetch(&self) {
+    pub fn current_page(&self) -> usize {
+        self.param_search_offset.get() / self.param_search_limit.get()
+    }
+
+    pub fn max_page(&self) -> usize {
+        self.page_total_rows.get() / self.param_search_limit.get()
+    }
+
+    pub fn next_page(&self) {
+        let limit = self.param_search_limit.get_untracked();
+        self.param_search_offset.update(|offset| *offset += limit);
+    }
+
+    pub fn prev_page(&self) {
+        let limit = self.param_search_limit.get_untracked();
+        self.param_search_offset
+            .update(|offset| *offset = offset.saturating_sub(limit));
+    }
+
+    pub fn is_first_page(&self) -> bool {
+        self.param_search_offset.get() == 0
+    }
+
+    pub fn is_last_page(&self) -> bool {
+        (self.param_search_limit.get() + self.param_search_offset.get())
+            >= self.page_total_rows.get()
+    }
+
+    pub async fn init(&self) {
+        self.get_pagination().await;
+        self.get_rows().await;
+    }
+
+    pub async fn get_rows(&self) {
         let client = self.client.get_value();
+
         let param_search_order = self.param_search_order.get_untracked();
         let param_search_limit = self.param_search_limit.get_untracked();
         let param_search_field_username = self.param_search_field_username.get_untracked();
@@ -75,6 +121,7 @@ where
             email: param_search_field_email,
         };
         let param_search_query = self.param_search_query.get_untracked();
+        let param_search_offset = self.param_search_offset.get_untracked();
 
         self.err_fetch.update(|v| v.clear());
 
@@ -84,7 +131,7 @@ where
                 .user_search(
                     0,
                     param_search_limit,
-                    0,
+                    param_search_offset,
                     TimeRange::MoreOrEqual,
                     param_search_order.clone(),
                     param_search_field.clone(),
@@ -105,6 +152,20 @@ where
             };
             self.users.set(users);
         }
+    }
+
+    pub async fn get_pagination(&self) {
+        let client = self.client.get_value();
+
+        let param_search_order = self.param_search_order.get_untracked();
+        let param_search_limit = self.param_search_limit.get_untracked();
+        let param_search_field_username = self.param_search_field_username.get_untracked();
+        let param_search_field_email = self.param_search_field_email.get_untracked();
+        let param_search_field = UserSearchFields {
+            username: param_search_field_username,
+            email: param_search_field_email,
+        };
+        let param_search_query = self.param_search_query.get_untracked();
 
         // get pagination
         {
@@ -131,7 +192,7 @@ where
                     return;
                 }
             };
-            self.page_total.set(pagination.total_count);
+            self.page_total_rows.set(pagination.total_count);
         }
     }
 
@@ -303,7 +364,7 @@ async fn test_user_state_update_checked() {
             .inject_header(header::COOKIE, create_auth_cookie_str(uuid_to_str(token0)))
             .await;
 
-        user_state.fetch().await;
+        user_state.get_rows().await;
 
         let users_in_state = user_state.users.get_untracked();
         let users_in_db = server.state.db.user_get_all().await.unwrap();
@@ -375,7 +436,7 @@ async fn test_user_state_remove_checked() {
             .inject_header(header::COOKIE, create_auth_cookie_str(uuid_to_str(token0)))
             .await;
 
-        user_state.fetch().await;
+        user_state.get_rows().await;
 
         let users_in_state = user_state.users.get_untracked();
         let users_in_db = server.state.db.user_get_all().await.unwrap();
@@ -419,7 +480,7 @@ async fn test_user_state_remove_all() {
         }
 
         user_state.param_search_query.set("prime__ %".to_string());
-        user_state.fetch().await;
+        user_state.get_rows().await;
         assert_eq!(user_state.users.with_untracked(|v| v.len()), 2);
 
         let users = server.state.db.user_get_all().await.unwrap();
@@ -454,9 +515,30 @@ async fn test_user_state_fetch() {
         )
         .await;
 
+    server.state.set_time(1);
+
+    let (_user2, session2) = server
+        .user_add_full(
+            "prime2",
+            "prime2@heyadora.com",
+            "235j4t49ngerigrog#IOTNOnfo",
+        )
+        .await;
+
+    server.state.set_time(2);
+
+    let (_user3, session3) = server
+        .user_add_full(
+            "prime3",
+            "prime3@heyadora.com",
+            "235j4t49ngerigrog#IOTNOnfo",
+        )
+        .await;
+
     // assert init
     let user_state = {
         let user_state = UsersState::new(server.client.clone());
+        user_state.param_search_limit.set(2);
 
         assert_eq!(user_state.err_fetch.get_untracked(), "");
         assert_eq!(user_state.users.get_untracked().len(), 0);
@@ -465,7 +547,7 @@ async fn test_user_state_fetch() {
 
     // assert error: no acc
     {
-        user_state.fetch().await;
+        user_state.get_rows().await;
 
         assert!(!user_state.err_fetch.get_untracked().is_empty());
         assert_eq!(user_state.users.get_untracked().len(), 0);
@@ -480,11 +562,11 @@ async fn test_user_state_fetch() {
             )
             .await;
 
-        user_state.fetch().await;
+        user_state.get_rows().await;
 
         assert!(!user_state.err_fetch.get_untracked().is_empty());
         assert_eq!(user_state.users.get_untracked().len(), 0);
-        assert_eq!(user_state.page_total.get_untracked(), 0);
+        assert_eq!(user_state.page_total_rows.get_untracked(), 0);
     }
 
     // assert success
@@ -492,11 +574,34 @@ async fn test_user_state_fetch() {
         server.state.set_admin_username("prime1").await;
         promote_admin(server.state.clone()).await.unwrap();
 
-        user_state.fetch().await;
+        user_state.init().await;
 
         assert_eq!(user_state.err_fetch.get_untracked(), "");
+
+        assert_eq!(user_state.param_search_offset.get_untracked(), 0);
+        assert_eq!(user_state.page_total_rows.get_untracked(), 3);
+
+        assert_eq!(user_state.current_page(), 0);
+        assert_eq!(user_state.max_page(), 1);
+        assert!(user_state.is_first_page());
+        assert!(!user_state.is_last_page());
+
+        assert_eq!(user_state.users.get_untracked().len(), 2);
+        assert_eq!(user_state.users.get_untracked()[0].username, "prime3");
+        assert_eq!(user_state.users.get_untracked()[1].username, "prime2");
+
+        user_state.next_page();
+        user_state.get_rows().await;
+
+        assert_eq!(user_state.param_search_offset.get_untracked(), 2);
+        assert_eq!(user_state.page_total_rows.get_untracked(), 3);
+
+        assert_eq!(user_state.current_page(), 1);
+        assert_eq!(user_state.max_page(), 1);
+        assert!(!user_state.is_first_page());
+        assert!(user_state.is_last_page());
+
         assert_eq!(user_state.users.get_untracked().len(), 1);
-        assert_eq!(user_state.page_total.get_untracked(), 1);
         assert_eq!(user_state.users.get_untracked()[0].username, "prime1");
     }
 }

@@ -23,7 +23,7 @@ pub fn UserTableControls(spawner: Spawner, user_state: UsersState<XMLSender>) ->
         };
 
         spawner.spawn(async move {
-            user_state.fetch().await;
+            user_state.get_rows().await;
         });
     };
 
