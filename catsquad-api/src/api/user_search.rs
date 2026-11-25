@@ -25,6 +25,8 @@ pub fn from_db_user_search(value: Vec<DbUserSearch>) -> Vec<UserSearchRes> {
             likes: value.likes_count,
             support: value.support,
             aboutme: value.aboutme,
+            ip: value.ip.to_string(),
+            agent: value.agent,
             created_at: value.created_at,
         })
         .collect()

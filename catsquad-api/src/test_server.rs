@@ -1,9 +1,20 @@
-use crate::{proccess_images::storage_file_path, promote_admin, server::app, state::AppState};
-use axum::http::HeaderName;
+use crate::{
+    auth::auth_optional_middleware, proccess_images::storage_file_path, promote_admin, server::app,
+    state::AppState,
+};
+use axum::{
+    extract::{ConnectInfo, State},
+    http::HeaderName,
+    middleware,
+};
 use catsquad_client::{AxumTestSender, Client};
 use catsquad_db::{DbEmailSent, DbEmailSentReason};
 use catsquad_shared::{PostState, SessionTokenKind, UUID_ZERO, UserState, Uuid, i64_to_str};
-use std::{path::PathBuf, sync::Arc};
+use std::{
+    net::{Ipv4Addr, SocketAddr, SocketAddrV4},
+    path::PathBuf,
+    sync::Arc,
+};
 use tokio::sync::RwLock;
 
 #[derive(Clone)]
@@ -27,8 +38,23 @@ pub struct TestImg {
 impl TestServer {
     pub async fn new(time: u64, test_db: &str) -> Self {
         let state = AppState::mem(time, test_db).await;
-        let router = app(state.clone()).await;
+        let router = app(state.clone())
+            .await
+            .route_layer(middleware::from_fn_with_state(
+                state.clone(),
+                async move |State(_app_state): State<AppState>,
+                            mut req: axum::extract::Request,
+                            next: axum::middleware::Next| {
+                    let extensions = req.extensions_mut();
+                    extensions.insert(ConnectInfo(SocketAddr::V4(SocketAddrV4::new(
+                        Ipv4Addr::from_octets([127, 0, 0, 1]),
+                        5359,
+                    ))));
 
+                    next.run(req).await
+                },
+            ));
+        //
         let server = axum_test::TestServer::new(router);
         let server = Arc::new(server);
         let inject_headers = Arc::new(RwLock::new(Vec::new()));

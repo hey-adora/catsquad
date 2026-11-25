@@ -24,6 +24,8 @@ pub struct UserSearchRes {
     pub following: u32,
     pub followers: u32,
     pub support: String,
+    pub ip: String,
+    pub agent: String,
     pub aboutme: String,
     pub created_at: u64,
 }

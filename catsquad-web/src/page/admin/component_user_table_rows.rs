@@ -90,6 +90,18 @@ pub fn UserTableRow(
             .with(|v| v.get(index).map(|v| v.aboutme.clone()))
             .unwrap_or_default()
     };
+    let ip = move || {
+        user_state
+            .users
+            .with(|v| v.get(index).map(|v| v.ip.clone()))
+            .unwrap_or_default()
+    };
+    let agent = move || {
+        user_state
+            .users
+            .with(|v| v.get(index).map(|v| v.agent.clone()))
+            .unwrap_or_default()
+    };
 
     let id = move || format!("{}_checkbox", username_tracked());
     let row_is_checked_tracked = move || {
@@ -142,6 +154,7 @@ pub fn UserTableRow(
             <td>
                 <input on:change=on_check_fn type="checkbox" id=id.clone() name=id />
             </td>
+            <td>{ip}</td>
             <td>{username_tracked}</td>
             <td>{state}</td>
             <td>{email}</td>
@@ -149,12 +162,17 @@ pub fn UserTableRow(
             <td>{followers}</td>
             <td>{following}</td>
             <td>
-                <textarea rows=1 cols=20>
+                <textarea class="whitespace-nowrap" rows=1 cols=20>
+                    {agent}
+                </textarea>
+            </td>
+            <td>
+                <textarea class="whitespace-nowrap" rows=1 cols=20>
                     {support}
                 </textarea>
             </td>
             <td>
-                <textarea rows=1 cols=20>
+                <textarea class="whitespace-nowrap" rows=1 cols=20>
                     {aboutme}
                 </textarea>
             </td>

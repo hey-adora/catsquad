@@ -11,6 +11,8 @@ use users_state::UsersState;
 
 #[component]
 pub fn Admin() -> impl IntoView {
+    // TODO show thier last comment and like count, comment count, etc
+
     let spawner = Spawner::new();
     let user_state = UsersState::new(create_client());
 
@@ -27,13 +29,8 @@ pub fn Admin() -> impl IntoView {
         user_state.check_all.update(|v| *v = !*v);
     };
 
-    let view_pages_text = move || {
-        format!(
-            "{}/{}",
-            user_state.current_page(),
-            user_state.max_page() + 1 // +1 = start from 1
-        )
-    };
+    let view_pages_text =
+        move || format!("{}/{}", user_state.current_page(), user_state.max_page());
 
     let on_prev_page = move |_| {
         spawner.spawn(async move {
@@ -91,12 +88,14 @@ pub fn Admin() -> impl IntoView {
                                     <th>
                                         <input on:change=on_check_all_fn type="checkbox" id="user_table_checkbox" name="user_table_checkbox" checked=user_state.check_all />
                                     </th>
+                                    <th>"ip"</th>
                                     <th>"username"</th>
                                     <th>"state"</th>
                                     <th>"email"</th>
                                     <th>"likes"</th>
                                     <th>"followers"</th>
                                     <th>"following"</th>
+                                    <th>"agent"</th>
                                     <th>"support"</th>
                                     <th>"aboutme"</th>
                                   </tr>

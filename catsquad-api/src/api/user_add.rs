@@ -1,22 +1,23 @@
-use std::net::{IpAddr, Ipv4Addr};
-
 use crate::{
+    UserAgent,
     auth::{create_auth_cookie, hash_password},
     server::promote_admin::promote_admin,
     state::AppState,
 };
 use axum::{
     Form, Json,
-    extract::State,
+    extract::{ConnectInfo, State},
     http::{HeaderMap, StatusCode},
     response::IntoResponse,
 };
+use axum_client_ip::XRealIp as ClientIp;
 use catsquad_db::{DbSessionAddErr, DbUser, DbUserAddErr, DbUserGet};
 use catsquad_log::prelude::*;
 use catsquad_shared::{
     MAX_STORAGE, MAX_STORAGE_PER_FILE, SensitiveUserRes, UserAddErr, UserAddReq, validate_password,
     validate_username,
 };
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
 // pub fn from_db_user_redacted(value: DbUser) -> RedactedUserRes {
 //     RedactedUserRes {
@@ -98,6 +99,9 @@ fn status_code(result: &Result<SensitiveUserRes, UserAddErr>) -> StatusCode {
 /// username cant contain ',' because its used as last_char marker in api_user_remove_by_usernames
 /// check in catsquad_shared/api/user_remove_by_username
 pub async fn user_add(
+    ConnectInfo(connect_info): ConnectInfo<SocketAddr>,
+    UserAgent(user_agent): UserAgent,
+    // ClientIp(ip): ClientIp,
     State(app): State<AppState>,
     Form(req): Form<UserAddReq>,
 ) -> impl IntoResponse {
@@ -129,8 +133,8 @@ pub async fn user_add(
                 invite_token,
                 MAX_STORAGE,
                 MAX_STORAGE_PER_FILE,
-                IpAddr::V4(Ipv4Addr::from_octets([127, 0, 0, 1])), // TODO make this real
-                "firefox",
+                connect_info.ip(),
+                user_agent,
             )
             .await
             .map_err(from_db_user_add_err)?;

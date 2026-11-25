@@ -1,3 +1,5 @@
+use std::net::IpAddr;
+
 use crate::{
     Db, DbUserGetBySessionAndRolesErr, DbUserGetBySessionAndRolesSimpleErr, XTimestamp, join_str,
 };
@@ -42,6 +44,10 @@ pub struct DbUserSearch {
     #[sqlx(rename = "user_following_count")]
     #[sqlx(try_from = "i64")]
     pub following_count: u32,
+    #[sqlx(rename = "user_ip")]
+    pub ip: IpAddr,
+    #[sqlx(rename = "user_agent")]
+    pub agent: String,
     #[sqlx(rename = "user_created_at")]
     #[sqlx(try_from = "XTimestamp")]
     pub created_at: u64,
@@ -120,7 +126,8 @@ impl Db {
         let q_like = if search_query.is_empty() {
             "".to_string()
         } else {
-            "(user_username || ' ' || user_email) LIKE $4".to_string()
+            "(user_ip || ' ' || user_username || ' ' || user_email || ' ' || user_agent) LIKE $4"
+                .to_string()
         };
 
         let filters = [q_time_after, q_like];
@@ -159,6 +166,8 @@ impl Db {
              user_likes_count,
              user_followers_count,
              user_following_count,
+             user_ip,
+             user_agent,
              user_created_at
             "
         };

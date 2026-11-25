@@ -11,9 +11,10 @@ use axum::{
     middleware,
     routing::{delete, get, post},
 };
+use axum_client_ip::ClientIpSource;
 use catsquad_log::prelude::*;
 use catsquad_shared::{self as cs, DEFAULT_GLOBAL_MAX_UPLOAD_SIZE, FILE_IMAGE_THUMBNAIL_SIZE};
-use std::time::Duration;
+use std::{net::SocketAddr, time::Duration};
 
 pub mod promote_admin;
 
@@ -65,10 +66,13 @@ pub async fn server() {
         info!("Shutting down...");
     };
 
-    axum::serve(listener, app.into_make_service())
-        .with_graceful_shutdown(shutdown)
-        .await
-        .unwrap();
+    axum::serve(
+        listener,
+        app.into_make_service_with_connect_info::<SocketAddr>(),
+    )
+    .with_graceful_shutdown(shutdown)
+    .await
+    .unwrap();
 }
 
 pub async fn app(state: AppState) -> Router {
@@ -80,7 +84,8 @@ pub async fn app(state: AppState) -> Router {
         .route(catsquad_shared::LINK_WEB_SETTINGS, get(api::assets::index))
         .route(catsquad_shared::LINK_WEB_PROFILE, get(api::assets::index))
         .route(catsquad_shared::LINK_WEB_POST, get(api::assets::index))
-        .route(catsquad_shared::LINK_WEB_FOLLOWED, get(api::assets::index));
+        .route(catsquad_shared::LINK_WEB_FOLLOWED, get(api::assets::index))
+        .route(catsquad_shared::LINK_WEB_ADMIN, get(api::assets::index));
 
     let router_assets = Router::new()
         .route(catsquad_shared::LINK_WEB_CSS, get(api::assets::css))
@@ -117,7 +122,8 @@ pub async fn app(state: AppState) -> Router {
         .route(
             catsquad_shared::LINK_API_INVITE_GET_BY_KEY,
             get(api::invite_get_by_id),
-        );
+        )
+        .layer(ClientIpSource::ConnectInfo.into_extension());
 
     let api_router_upload = Router::new()
         .route(
