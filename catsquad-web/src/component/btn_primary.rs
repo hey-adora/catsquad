@@ -32,11 +32,9 @@ pub fn BtnPrimary(
     let disabled_fn = move || disabled.get();
     let is_disabled_fn = move || is_loading_fn() || disabled_fn();
 
-    let class_on_disable = move || "bg-base03 font-bold text-base01";
-    let class_on_active = move || "hover:bg-base05 bg-base0D font-bold text-base01";
-
     view! {
         <Btn
+            primary=true
             modal_enable
             modal_title
             modal_text
@@ -45,8 +43,6 @@ pub fn BtnPrimary(
             on_click=on_click_handler
             on_modal_open
             class=class_fn
-            class_on_disable=class_on_disable
-            class_on_active=class_on_active
             size
             >
             {children()}

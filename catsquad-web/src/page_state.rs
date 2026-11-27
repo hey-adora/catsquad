@@ -2,9 +2,9 @@ use crate::ProfileParams;
 use catsquad_client::{Client, Response, Sender, XMLSender};
 use catsquad_log::prelude::*;
 use catsquad_shared::{
-    MATCH_ADMIN, MATCH_FOLLOWED, MATCH_INDEX, MATCH_PROFILE, MATCH_PROFILE_ABOUTME,
-    MATCH_PROFILE_PAWS, MATCH_PROFILE_SUPPORT, RoleValue, SensitiveUserRes, SessionRemoveErr,
-    UserGetBySessionKeyErr, contains_perms,
+    MATCH_ADMIN, MATCH_ADMIN_ROLES, MATCH_ADMIN_USERS, MATCH_FOLLOWED, MATCH_INDEX, MATCH_PROFILE,
+    MATCH_PROFILE_ABOUTME, MATCH_PROFILE_PAWS, MATCH_PROFILE_SUPPORT, RoleValue, SensitiveUserRes,
+    SessionRemoveErr, UserGetBySessionKeyErr, contains_perms,
 };
 use catsquad_web_utils::time::time_now_micro;
 use leptos::prelude::*;
@@ -44,6 +44,8 @@ pub enum CurrentRoute {
     Index,
     Followed,
     Admin,
+    AdminUsers,
+    AdminRoles,
     ProfileGallery,
     ProfilePaws,
     ProfileSupport,
@@ -83,6 +85,8 @@ where
             let query = location.search.get();
             let pathname = location.pathname.get();
 
+            // trace!("wowza {} {}", pathname, query);
+
             if pathname == MATCH_INDEX {
                 return CurrentRoute::Index;
             }
@@ -91,7 +95,14 @@ where
                 return CurrentRoute::Followed;
             }
 
-            if pathname == MATCH_ADMIN {
+            if pathname.contains(MATCH_ADMIN) {
+                // trace!("wowza2 {} {}", pathname, query);
+                if query.contains(MATCH_ADMIN_USERS) {
+                    return CurrentRoute::AdminUsers;
+                }
+                if query.contains(MATCH_ADMIN_ROLES) {
+                    return CurrentRoute::AdminRoles;
+                }
                 return CurrentRoute::Admin;
             }
 

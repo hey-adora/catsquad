@@ -52,7 +52,11 @@ pub fn Nav() -> impl IntoView {
     let class_link_admin_underline = move || {
         format!(
             "hidden sm:block {}",
-            (current_route.get() == CurrentRoute::Admin).or("underline")
+            (match current_route.get() {
+                CurrentRoute::Admin | CurrentRoute::AdminUsers | CurrentRoute::AdminRoles => true,
+                _ => false,
+            })
+            .or("underline")
         )
     };
 

@@ -22,11 +22,9 @@ pub fn BtnDelete(
     };
     let is_disabled_fn = move || is_loading.get() || disabled.get();
 
-    let class_on_disable = move || "bg-base03 font-bold text-base01";
-    let class_on_active = move || "hover:bg-base05 bg-base08 font-bold text-base01";
-
     view! {
         <Btn
+            danger=true
             size
             id=move || id.get()
             disabled=is_disabled_fn
@@ -35,8 +33,6 @@ pub fn BtnDelete(
             modal_enable
             modal_title
             modal_text
-            class_on_disable=class_on_disable
-            class_on_active=class_on_active
             >
             {children()}
         </Btn>

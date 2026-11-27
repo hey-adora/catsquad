@@ -123,6 +123,10 @@ pub async fn app(state: AppState) -> Router {
             catsquad_shared::LINK_API_INVITE_GET_BY_KEY,
             get(api::invite_get_by_id),
         )
+        .route(
+            catsquad_shared::LINK_API_ROLE_GET_ALL,
+            get(api::role_get_all),
+        )
         .layer(ClientIpSource::ConnectInfo.into_extension());
 
     let api_router_upload = Router::new()

@@ -12,18 +12,30 @@ pub enum BtnSize {
     Normal,
 }
 
+// #[derive(Clone, Copy, Default)]
+// pub enum BtnSize {
+//     Small,
+//     #[default]
+//     Normal,
+// }
+
 #[component]
 pub fn Btn(
     #[prop(optional, into)] id: Signal<String>,
     #[prop(optional, into)] class: Signal<String>,
     #[prop(optional, into)] is_loading: Signal<bool>,
     #[prop(optional, into)] disabled: Signal<bool>,
+    #[prop(optional, into)] basic: Signal<bool>,
+    #[prop(optional, into)] primary: Signal<bool>,
+    #[prop(optional, into)] secondary: Signal<bool>,
+    #[prop(optional, into)] active: Signal<bool>,
+    #[prop(optional, into)] warning: Signal<bool>,
+    #[prop(optional, into)] danger: Signal<bool>,
     #[prop(optional, into)] modal_enable: Signal<bool>,
     #[prop(optional, into)] modal_title: Signal<String>,
     #[prop(optional, into)] modal_text: Signal<String>,
     #[prop(optional, into)] on_click: Option<Callback<MouseEvent>>,
     #[prop(optional, into)] on_modal_open: Option<Callback<()>>,
-    #[prop(optional, into)] no_default_style: Signal<bool>,
     #[prop(optional, into)] class_on_disable: Signal<String>,
     #[prop(optional, into)] class_on_active: Signal<String>,
     #[prop(optional, into)] size: Signal<BtnSize>,
@@ -43,29 +55,120 @@ pub fn Btn(
         BtnSize::Normal => "text-[1rem] leading-[1rem] px-[1rem] py-[0.5rem]",
     };
 
-    let class_fn = move || {
-        if no_default_style.get() {
-            format!(
-                "{} {}",
-                if is_disabled_fn() {
-                    class_on_disable()
-                } else {
-                    class_on_active()
-                },
-                class_fn()
-            )
-        } else {
-            format!(
-                "flex gap-2 place-content-center rounded-xl {} {} {}",
-                size_class(),
-                if is_disabled_fn() {
-                    class_on_disable()
-                } else {
-                    class_on_active()
-                },
-                class_fn()
-            )
+    let base_class = move || {
+        format!(
+            "flex gap-2 place-content-center rounded-xl {}",
+            size_class()
+        )
+    };
+
+    let class_on_disable = move || {
+        let class_dark_on_disable = move || "bg-base03 font-bold text-base01";
+        let class_darker_on_disable = move || "bg-base02 text-base01";
+
+        if basic.get() {
+            return format!("{} {}", base_class(), class_on_disable());
         }
+
+        if primary.get() || active.get() || warning.get() || danger.get() {
+            return format!(
+                "{} {} {}",
+                base_class(),
+                class_dark_on_disable(),
+                class_on_disable()
+            );
+        }
+
+        if secondary.get() {
+            return format!(
+                "{} {} {}",
+                base_class(),
+                class_darker_on_disable(),
+                class_on_disable()
+            );
+        }
+
+        class_on_disable()
+    };
+
+    let class_on_active = move || {
+        let class_primary_on_active = move || "hover:bg-base05 bg-base0D font-bold text-base01";
+        let class_secondary_on_active = move || "hover:bg-base0D bg-base03 text-base05";
+        let class_active_on_active = move || "hover:bg-base05 bg-base0B font-bold text-base01";
+        let class_warning_on_active = move || "hover:bg-base05 bg-base0A font-bold text-base01";
+        let class_danger_on_active = move || "hover:bg-base05 bg-base08 font-bold text-base01";
+
+        if basic.get() {
+            return format!("{} {}", base_class(), class_on_active());
+        }
+
+        if primary.get() {
+            return format!(
+                "{} {} {}",
+                base_class(),
+                class_primary_on_active(),
+                class_on_active()
+            );
+        }
+
+        if secondary.get() {
+            return format!(
+                "{} {} {}",
+                base_class(),
+                class_secondary_on_active(),
+                class_on_active()
+            );
+        }
+
+        if active.get() {
+            return format!(
+                "{} {} {}",
+                base_class(),
+                class_active_on_active(),
+                class_on_active()
+            );
+        }
+
+        if active.get() {
+            return format!(
+                "{} {} {}",
+                base_class(),
+                class_active_on_active(),
+                class_on_active()
+            );
+        }
+
+        if warning.get() {
+            return format!(
+                "{} {} {}",
+                base_class(),
+                class_warning_on_active(),
+                class_on_active()
+            );
+        }
+
+        if danger.get() {
+            return format!(
+                "{} {} {}",
+                base_class(),
+                class_danger_on_active(),
+                class_on_active()
+            );
+        }
+
+        class_on_active()
+    };
+
+    let class_fn = move || {
+        format!(
+            "{} {}",
+            if is_disabled_fn() {
+                class_on_disable()
+            } else {
+                class_on_active()
+            },
+            class_fn()
+        )
     };
 
     let modal_confirm = ModalConfirmDto::get();

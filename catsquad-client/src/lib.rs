@@ -706,6 +706,10 @@ where
         self.delete_empty(link_relative_post_remove(post_id))
     }
 
+    pub fn role_get_all(&self) -> Builder<TSender, Vec<cs::RoleRes>, cs::RoleGetAllErr> {
+        self.get(cs::link_relative_role_get_all())
+    }
+
     pub fn role_add(
         &self,
         role_name: impl Display,

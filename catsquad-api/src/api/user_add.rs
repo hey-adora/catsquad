@@ -99,7 +99,7 @@ fn status_code(result: &Result<SensitiveUserRes, UserAddErr>) -> StatusCode {
 /// username cant contain ',' because its used as last_char marker in api_user_remove_by_usernames
 /// check in catsquad_shared/api/user_remove_by_username
 pub async fn user_add(
-    ConnectInfo(connect_info): ConnectInfo<SocketAddr>,
+    ConnectInfo(connect_info): ConnectInfo<SocketAddr>, // TODO when using reverse proxy, get the real IP instead
     UserAgent(user_agent): UserAgent,
     // ClientIp(ip): ClientIp,
     State(app): State<AppState>,

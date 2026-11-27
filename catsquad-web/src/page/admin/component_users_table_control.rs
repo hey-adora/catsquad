@@ -1,14 +1,31 @@
 use super::UsersState;
-use crate::{BtnDelete, BtnPrimary, hook::Spawner};
+use crate::{BtnDelete, BtnPrimary, BtnSecondary, hook::Spawner};
 use catsquad_client::XMLSender;
-use catsquad_log::prelude::*;
 use catsquad_shared::Order;
 use leptos::prelude::*;
 use web_sys::{HtmlInputElement, HtmlSelectElement};
 
 #[component]
 pub fn UserTableControls(spawner: Spawner, user_state: UsersState<XMLSender>) -> impl IntoView {
-    let view_user_count = move || user_state.users.with(|v| v.len());
+    let on_prev_page = move |_| {
+        spawner.spawn(async move {
+            user_state.prev_page();
+            user_state.get_rows().await;
+        })
+    };
+
+    let on_next_page = move |_| {
+        spawner.spawn(async move {
+            user_state.next_page();
+            user_state.get_rows().await;
+        })
+    };
+
+    let is_first_page = move || user_state.is_first_page();
+    let is_last_page = move || user_state.is_last_page();
+
+    let view_pages_text =
+        move || format!("{}/{}", user_state.current_page(), user_state.max_page());
 
     let input_search_ord = NodeRef::new();
     let input_search_limit = NodeRef::new();
@@ -27,7 +44,7 @@ pub fn UserTableControls(spawner: Spawner, user_state: UsersState<XMLSender>) ->
         });
     };
 
-    let input_search_ord_fn = move |e: web_sys::Event| {
+    let input_search_ord_fn = move |_e: web_sys::Event| {
         let Some(input_order) = input_search_ord
             .get_untracked()
             .and_then(|v: HtmlSelectElement| Order::try_from(v.value().as_str()).ok())
@@ -37,7 +54,7 @@ pub fn UserTableControls(spawner: Spawner, user_state: UsersState<XMLSender>) ->
         user_state.param_search_order.set(input_order);
     };
 
-    let input_search_limit_fn = move |e: web_sys::Event| {
+    let input_search_limit_fn = move |_e: web_sys::Event| {
         let Some(input_limit) = input_search_limit
             .get_untracked()
             .and_then(|v: HtmlSelectElement| usize::from_str_radix(v.value().as_str(), 10).ok())
@@ -103,9 +120,7 @@ pub fn UserTableControls(spawner: Spawner, user_state: UsersState<XMLSender>) ->
 
     view! {
         <div class="flex flex-col gap-2">
-            <p class="font-bold text-base06">"Search"</p>
             <div class="flex gap-2 place-items-center flex-wrap">
-                <span>{view_user_count}" users"</span>
                 <input
                     autocomplete="off"
                     id="input_search_query"
@@ -113,13 +128,13 @@ pub fn UserTableControls(spawner: Spawner, user_state: UsersState<XMLSender>) ->
                     placeholder="search"
                     on:keydown=input_search_fn
                     node_ref=input_search_query
-                    class="bg-base02 rounded-md px-2 py-1 "
+                    class="bg-base02 rounded-md px-2 h-[2rem] "
                     />
-                <select node_ref=input_search_ord on:change=input_search_ord_fn class="bg-base02 rounded-md px-2 py-1" name="input_search_order" id="input_search_order">
+                <select node_ref=input_search_ord on:change=input_search_ord_fn class="bg-base02 rounded-md px-2 h-[2rem]" name="input_search_order" id="input_search_order">
                     <option value="desc">desc</option>
                     <option value="asc">asc</option>
                 </select>
-                <select node_ref=input_search_limit on:change=input_search_limit_fn class="bg-base02 rounded-md px-2 py-1" name="input_search_limit" id="input_search_limit">
+                <select node_ref=input_search_limit on:change=input_search_limit_fn class="bg-base02 rounded-md px-2 h-[2rem]" name="input_search_limit" id="input_search_limit">
                     <option value="100">100</option>
                     <option value="250">250</option>
                     <option value="500">500</option>
@@ -131,26 +146,34 @@ pub fn UserTableControls(spawner: Spawner, user_state: UsersState<XMLSender>) ->
                 </BtnPrimary>
             </div>
 
-            <p class="font-bold text-base06">"Actions"</p>
-            <div class="flex flex-wrap gap-2">
-                <BtnDelete
-                    on_click=on_delete
-                    modal_enable=true
-                    modal_title="delete users"
-                    modal_text=remove_users_modal_text
-                >"delete"</BtnDelete>
-                <BtnDelete
-                    on_click=on_suspend
-                    modal_enable=true
-                    modal_title="suspend users"
-                    modal_text=suspend_users_modal_text
-                >"suspend"</BtnDelete>
-                <BtnDelete
-                    on_click=on_active
-                    modal_enable=true
-                    modal_title="activate users"
-                    modal_text=active_users_modal_text
-                >"activate"</BtnDelete>
+            <div class="mt-2 flex flex-wrap gap-2 justify-between">
+                <div class="flex flex-wrap gap-2">
+                    <BtnDelete
+                        on_click=on_delete
+                        modal_enable=true
+                        modal_title="delete users"
+                        modal_text=remove_users_modal_text
+                    >"delete"</BtnDelete>
+                    <BtnDelete
+                        on_click=on_suspend
+                        modal_enable=true
+                        modal_title="suspend users"
+                        modal_text=suspend_users_modal_text
+                    >"suspend"</BtnDelete>
+                    <BtnDelete
+                        on_click=on_active
+                        modal_enable=true
+                        modal_title="activate users"
+                        modal_text=active_users_modal_text
+                    >"activate"</BtnDelete>
+                </div>
+                <div class="flex gap-2 justify-end items-center">
+                    <BtnSecondary disabled=is_first_page on_click=on_prev_page >"-"</BtnSecondary>
+                    <span class="text-[1.1rem]">
+                        {view_pages_text}
+                    </span>
+                    <BtnSecondary disabled=is_last_page on_click=on_next_page >"+"</BtnSecondary>
+                </div>
             </div>
         </div>
     }

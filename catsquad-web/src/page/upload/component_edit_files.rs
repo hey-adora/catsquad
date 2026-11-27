@@ -1,8 +1,8 @@
 use super::component_edit_area::EditArea;
 use super::upload_state::UploadState;
 use crate::{
-    BtnSecondary, BtnSize, Errs, Floater, LengthCounter, PageState, SVGSpinner, SVGTrash, Zone,
-    ZoneData, ZoneStage,
+    Btn, BtnSecondary, BtnSize, Errs, Floater, LengthCounter, PageState, SVGSpinner, SVGTrash,
+    Zone, ZoneData, ZoneStage,
     hook::{
         EventListener, ParsedPostImage, ParsedPostImageState, PostImageId, PostImagesState, Spawner,
     },
@@ -609,16 +609,15 @@ pub fn TrashCanBtn(
 
     view! {
         <Show when=when_is_owner>
-            <BtnSecondary
+            <Btn
                 modal_enable=true
                 modal_title="delete image"
                 modal_text=modal_text
-                no_default_style=true
                 class="rounded-full bg-base03 p-[0.35rem] text-base08 z-[3] absolute left-[100%] top-[100%] transform -translate-x-full -translate-y-full "
                 on_click=on_click.clone()
             >
                 <SVGTrash class="size-[1.2rem]" />
-            </BtnSecondary>
+            </Btn>
         </Show>
     }
 }

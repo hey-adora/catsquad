@@ -126,7 +126,7 @@ pub fn ProfileAuthor(
         <Show when=when_is_open>
             <div class="hidden sm:grid sm:col-start-2 sm:row-start-1 grid-rows-[auto_auto_auto_auto_1fr] gap-4 px-6 py-4 mr-2 mb-2 border-base02 border-3 rounded-lg">
                 <div class="flex justify-start gap-4 ">
-                    <Btn class="self-start bg-base02 " on_click=toggle_open><SVGArrowDown stroke=2.5 class="size-6 rotate-90 "/></Btn>
+                    <Btn basic=true class="self-start bg-base02 " on_click=toggle_open><SVGArrowDown stroke=2.5 class="size-6 rotate-90 "/></Btn>
                     <div class="flex w-full justify-center gap-6 ">
                         <a href=link_tab_gallery class=class_side_link_gallery >"Gallery"</a>
                         <a href=link_tab_paws class=class_side_link_paws >"Paws"</a>
@@ -167,7 +167,7 @@ pub fn ProfileAuthor(
 
         <Show when=when_is_closed>
             <div class="place-items-center hidden sm:grid sm:col-start-2 sm:row-start-1 grid-rows-[auto_auto_auto_auto_1fr] gap-4 px-4 py-2 bg-base01 rounded-lg">
-                <Btn class="self-start bg-base02 " size=BtnSize::Small on_click=toggle_open><SVGArrowDown stroke=2.5 class="size-6 -rotate-90 "/></Btn>
+                <Btn basic=true class="self-start bg-base02 " size=BtnSize::Small on_click=toggle_open><SVGArrowDown stroke=2.5 class="size-6 -rotate-90 "/></Btn>
                 <p class="self-start text-[1rem] rounded-full size-[2.5rem] shrink-0 bg-base05"></p>
                 <a href=link_tab_gallery class=class_side_minimized_gallery>"G"</a>
                 <a href=link_tab_paws class=class_side_minimized_paws>"P"</a>

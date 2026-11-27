@@ -37,6 +37,7 @@ pub mod post_update_state;
 pub mod post_update_tags;
 pub mod post_update_title;
 pub mod role_add;
+pub mod role_get_all;
 pub mod role_remove;
 pub mod session_add;
 pub mod session_remove;

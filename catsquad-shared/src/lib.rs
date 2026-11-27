@@ -66,6 +66,7 @@ pub use api::post_update_state::*;
 pub use api::post_update_tags::*;
 pub use api::post_update_title::*;
 pub use api::role_add::*;
+pub use api::role_get_all::*;
 pub use api::role_remove::*;
 pub use api::session_add::*;
 pub use api::session_remove::*;

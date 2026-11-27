@@ -33,7 +33,7 @@ pub fn Profile(spawner: Spawner) -> impl IntoView {
 
     view! {
         <Show when=when_dropdown >
-            <div on:click=on_open class="z-[99] w-[100dvw] h-[100dvh] bg-base01/30 absolute left-0 top-0">
+            <div on:click=on_open class="z-[99] w-[100dvw] h-[100dvh] bg-base01/30 fixed left-0 top-0">
             </div>
         </Show>
         <div class="flex relative">

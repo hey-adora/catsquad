@@ -332,6 +332,7 @@ pub fn Comment(
                                     />
                                     <Show when=when_normal_mode >
                                         <Btn
+                                            basic=true
                                             on_click=delete_comment
                                             modal_enable=true
                                             modal_title="delete comment"
