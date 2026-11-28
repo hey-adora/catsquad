@@ -68,6 +68,7 @@ pub use api::post_update_title::*;
 pub use api::role_add::*;
 pub use api::role_get_all::*;
 pub use api::role_remove::*;
+pub use api::role_update_value::*;
 pub use api::session_add::*;
 pub use api::session_remove::*;
 pub use api::test_backdoor_email_sent_get_all::*;
@@ -171,24 +172,24 @@ fn serde_from_role_value<S: serde::Serializer>(
     output.serialize(serializer)
 }
 
-fn serde_from_role_value2<S: serde::Serializer>(
-    v: &Vec<RoleValue>,
-    serializer: S,
-) -> Result<S::Ok, S::Error> {
-    use serde::Serialize;
+// fn serde_from_role_value2<S: serde::Serializer>(
+//     v: &Vec<RoleValue>,
+//     serializer: S,
+// ) -> Result<S::Ok, S::Error> {
+//     use serde::Serialize;
 
-    let mut output = String::new();
-    let len = v.len();
+//     let mut output = String::new();
+//     let len = v.len();
 
-    for (i, v) in v.into_iter().enumerate() {
-        output.push_str(v.as_str());
-        if i - 1 == len {
-            output.push(',');
-        }
-    }
+//     for (i, v) in v.into_iter().enumerate() {
+//         output.push_str(v.as_str());
+//         if i - 1 == len {
+//             output.push(',');
+//         }
+//     }
 
-    output.serialize(serializer)
-}
+//     output.serialize(serializer)
+// }
 
 fn serde_to_role_value<'de, D: serde::Deserializer<'de>>(
     deserializer: D,
@@ -196,6 +197,9 @@ fn serde_to_role_value<'de, D: serde::Deserializer<'de>>(
     use serde::Deserialize;
 
     String::deserialize(deserializer).and_then(|v| {
+        if v.is_empty() {
+            return Ok(Vec::new());
+        }
         v.split(',')
             .into_iter()
             .map(|v| RoleValue::try_from(v))

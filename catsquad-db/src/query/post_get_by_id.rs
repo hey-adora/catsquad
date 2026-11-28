@@ -391,7 +391,7 @@ async fn test_post_get_by_id() {
         } else {
             vec![]
         };
-        db.role_update_value(0, user_role_id, permissions)
+        db.role_update_value(SessionTokenKind::Root, 0, user_role_id, permissions)
             .await
             .unwrap();
     };

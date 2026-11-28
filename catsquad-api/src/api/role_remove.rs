@@ -80,6 +80,7 @@ mod test_utils {
 async fn test_api_role_remove() {
     use catsquad_log::prelude::*;
     use catsquad_shared::RoleValue;
+    use catsquad_shared::SessionTokenKind;
 
     init_log();
     let server = crate::TestServer::new(0, "test_api_role_remove").await;
@@ -90,8 +91,6 @@ async fn test_api_role_remove() {
 
     // setup, create admin role
     let role_admin = {
-        use catsquad_shared::SessionTokenKind;
-
         let role_admin = server
             .state
             .db
@@ -136,6 +135,7 @@ async fn test_api_role_remove() {
             .state
             .db
             .role_update_value(
+                SessionTokenKind::Root,
                 0,
                 role_admin.id,
                 vec![

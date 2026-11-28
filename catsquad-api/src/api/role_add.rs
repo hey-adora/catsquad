@@ -10,6 +10,7 @@ use catsquad_shared::{RoleAddErr, RoleAddPrams, RoleAddReq, RoleRes, RoleValue, 
 
 pub fn from_db_role(value: DbRole) -> RoleRes {
     RoleRes {
+        id: value.id,
         name: value.name,
         values: value.values,
     }

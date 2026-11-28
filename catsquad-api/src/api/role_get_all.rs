@@ -61,7 +61,7 @@ async fn test_api_role_get_all() {
     use catsquad_shared::SessionTokenKind;
 
     init_log();
-    let server = crate::TestServer::new(0, "test_api_role_remove").await;
+    let server = crate::TestServer::new(0, "test_api_role_get_all").await;
 
     // assert success
     {

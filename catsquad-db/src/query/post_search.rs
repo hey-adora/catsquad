@@ -769,9 +769,14 @@ async fn test_post_search() {
 
             // post0 active - user1 suspended - see hidden
             {
-                db.role_update_value(0, user2.roles[0], vec![ROLE_VALUE_PERMISSION_SEE_HIDDEN])
-                    .await
-                    .unwrap();
+                db.role_update_value(
+                    SessionTokenKind::Root,
+                    0,
+                    user2.roles[0],
+                    vec![ROLE_VALUE_PERMISSION_SEE_HIDDEN],
+                )
+                .await
+                .unwrap();
 
                 let result = results().await;
                 assert_eq!(result, [0, 0, 3, 3]);

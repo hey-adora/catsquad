@@ -306,9 +306,14 @@ async fn test_post_image_get_by_hash() {
         assert!(success_fn(result4));
     }
 
-    db.role_update_value(0, user2.roles[0], vec![ROLE_VALUE_PERMISSION_SEE_HIDDEN])
-        .await
-        .unwrap();
+    db.role_update_value(
+        SessionTokenKind::Root,
+        0,
+        user2.roles[0],
+        vec![ROLE_VALUE_PERMISSION_SEE_HIDDEN],
+    )
+    .await
+    .unwrap();
 
     // assert - see hidden
     {

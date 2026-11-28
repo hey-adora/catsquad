@@ -217,6 +217,7 @@ pub enum Method {
     Get,
     Post,
     Delete,
+    Patch,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -340,15 +341,17 @@ where
         let res = self.response.map_err(|_err| TError::default())?;
         let status_code = res.get_status();
 
+        let res_debug_info = format!("{res:#?}");
+
         let bytes = res
             .into_bytes()
             .await
-            .inspect_err(|err| error!("client err getting bytes {err}"))
+            .inspect_err(|err| error!("client err getting bytes {err}, {res_debug_info}"))
             .map_err(|_err| TError::default())?;
 
         let raw_str = String::from_utf8_lossy(&bytes);
         let res = serde_json::from_slice::<Result<TResult, TError>>(&bytes)
-            .inspect_err(|err| error!("client err parsing to json {err}"))
+            .inspect_err(|err| error!("client err parsing to json {err}, {res_debug_info}"))
             .map_err(|_err| TError::default());
 
         debug!(
@@ -492,6 +495,30 @@ where
         let params = SenderParams {
             path: link.into(),
             method: Method::Post,
+            body: Body::Form(req),
+            ..Default::default()
+        };
+        let sender = self.sender.clone();
+        Builder::new(sender, params)
+    }
+
+    pub fn patch_form<TReq, TResult, TError>(
+        &self,
+        link: impl Into<String>,
+        req: TReq,
+    ) -> Builder<TSender, TResult, TError>
+    where
+        TReq: serde::Serialize + Debug,
+        TResult: for<'a> serde::Deserialize<'a> + Debug,
+        TError: for<'a> serde::Deserialize<'a> + Debug + Default,
+    {
+        let req = req
+            .to_form()
+            .inspect_err(|err| error!("serializing of\n{req:#?}\nfailed {err}"))
+            .unwrap_or_default();
+        let params = SenderParams {
+            path: link.into(),
+            method: Method::Patch,
             body: Body::Form(req),
             ..Default::default()
         };
@@ -718,6 +745,17 @@ where
         self.post_form(
             cs::link_relative_role_add(role_name),
             cs::RoleAddReq { role_values },
+        )
+    }
+
+    pub fn role_update_value(
+        &self,
+        role_id: i64,
+        role_values: Vec<cs::RoleValue>,
+    ) -> Builder<TSender, (), cs::RoleUpdateValueErr> {
+        self.patch_form(
+            cs::link_relative_role_update_value(role_id),
+            cs::RoleUpdateValueReq { role_values },
         )
     }
 

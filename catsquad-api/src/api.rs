@@ -37,6 +37,7 @@ mod post_update_title;
 mod role_add;
 mod role_get_all;
 mod role_remove;
+mod role_update_value;
 mod session_add;
 mod session_remove;
 mod user_add;

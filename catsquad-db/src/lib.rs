@@ -60,6 +60,7 @@ pub use query::post_update_title::*;
 pub use query::role_add::*;
 pub use query::role_get_all::*;
 pub use query::role_remove::*;
+pub use query::role_update_value::*;
 pub use query::session_add::*;
 pub use query::session_get_all::*;
 pub use query::session_get_by_id::*;

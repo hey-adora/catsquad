@@ -378,9 +378,14 @@ async fn test_comment_search() {
                 .await
                 .unwrap();
 
-            db.role_update_value(0, user2.roles[0], vec![ROLE_VALUE_PERMISSION_SEE_HIDDEN])
-                .await
-                .unwrap();
+            db.role_update_value(
+                SessionTokenKind::Root,
+                0,
+                user2.roles[0],
+                vec![ROLE_VALUE_PERMISSION_SEE_HIDDEN],
+            )
+            .await
+            .unwrap();
 
             let result = get_comments_fn(user_token).await;
             assert!(matches!(result, Err(DbCommentSearchErr::Unauthorized(_))));

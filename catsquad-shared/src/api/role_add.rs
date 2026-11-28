@@ -6,10 +6,12 @@ use anyhow::anyhow;
 use crate::SessionTokenKind;
 
 /// also used in /shared/src/api/role_remove.rs
+/// also used in /shared/src/api/role_update_value.rs
 pub const LINK_API_ROLE: &str = "/api/role/{role_name}";
 
 pub const ROLE_VALUE_PERMISSION_ROLE_ADD: &'static str = "permission_role_add";
 pub const ROLE_VALUE_PERMISSION_ROLE_REMOVE: &'static str = "permission_role_remove";
+pub const ROLE_VALUE_PERMISSION_ROLE_UPDATE_VALUE: &'static str = "permission_role_update_value";
 pub const ROLE_VALUE_PERMISSION_USER_SEARCH: &'static str = "permission_user_search";
 pub const ROLE_VALUE_PERMISSION_USER_UPDATE_STATE: &'static str = "permission_user_update_state";
 pub const ROLE_VALUE_PERMISSION_USER_REMOVE_BY_USERNAMES: &'static str =
@@ -24,6 +26,7 @@ pub fn link_relative_role_add(role_name: impl Display) -> String {
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
 pub struct RoleRes {
+    pub id: i64,
     pub name: String,
     pub values: Vec<String>,
 }
@@ -32,6 +35,7 @@ pub struct RoleRes {
 pub enum RoleValue {
     PermissionRoleAdd,
     PermissionRoleRemove,
+    PermissionRoleUpdateValue,
     PermissionUserSearch,
     PermissionUserUserUpdateState,
     PermissionUserRemoveByUsername,
@@ -160,6 +164,7 @@ impl RoleValue {
         match self {
             Self::PermissionRoleAdd => ROLE_VALUE_PERMISSION_ROLE_ADD,
             Self::PermissionRoleRemove => ROLE_VALUE_PERMISSION_ROLE_REMOVE,
+            Self::PermissionRoleUpdateValue => ROLE_VALUE_PERMISSION_ROLE_UPDATE_VALUE,
             Self::PermissionUserSearch => ROLE_VALUE_PERMISSION_USER_SEARCH,
             Self::PermissionUserUserUpdateState => ROLE_VALUE_PERMISSION_USER_UPDATE_STATE,
             Self::PermissionUserRemoveByUsername => ROLE_VALUE_PERMISSION_USER_REMOVE_BY_USERNAMES,
@@ -183,13 +188,14 @@ impl TryFrom<&str> for RoleValue {
         let result = match value {
             ROLE_VALUE_PERMISSION_ROLE_ADD => Self::PermissionRoleAdd,
             ROLE_VALUE_PERMISSION_ROLE_REMOVE => Self::PermissionRoleRemove,
+            ROLE_VALUE_PERMISSION_ROLE_UPDATE_VALUE => Self::PermissionRoleUpdateValue,
             ROLE_VALUE_PERMISSION_USER_SEARCH => Self::PermissionUserSearch,
             ROLE_VALUE_PERMISSION_USER_UPDATE_STATE => Self::PermissionUserUserUpdateState,
             ROLE_VALUE_PERMISSION_USER_REMOVE_BY_USERNAMES => Self::PermissionUserRemoveByUsername,
             ROLE_VALUE_PERMISSION_SEE_HIDDEN => Self::PermissionSeeHidden,
             ROLE_VALUE_PERMISSION_SEE_POST_CONTROLS => Self::PermissionSeePostControls,
             ROLE_VALUE_PERMISSION_SEE_ADMIN_CONTROLS => Self::PermissionSeeAdminControls,
-            _ => return Err(anyhow!("invalid value {value}")),
+            _ => return Err(anyhow!("invalid value \"{value}\"")),
         };
 
         Ok(result)

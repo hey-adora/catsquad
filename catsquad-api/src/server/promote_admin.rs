@@ -55,7 +55,12 @@ pub async fn promote_admin(state: AppState) -> Result<i64, PromoteAdminErr> {
                 if !contains_expected_roles {
                     let result = state
                         .db
-                        .role_update_value(0, admin_role.id, ADMIN_ROLES.to_vec())
+                        .role_update_value(
+                            SessionTokenKind::Root,
+                            0,
+                            admin_role.id,
+                            ADMIN_ROLES.to_vec(),
+                        )
                         .await;
                     match result {
                         Ok(v) => v,
